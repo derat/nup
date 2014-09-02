@@ -24,6 +24,16 @@ type SongData struct {
 	Error error `json:"-"`
 }
 
+type TagData struct {
+	Name         string
+	CreationTime int
+}
+
+type PlayData struct {
+	StartTime int
+	IpAddress string
+}
+
 type ExtraSongData struct {
 	// Primary key for the song in the DB.
 	SongId int
@@ -31,15 +41,8 @@ type ExtraSongData struct {
 	// Rating in the range [0.0, 1.0] or -1 if unrated.
 	Rating float32
 
-	Tags []struct {
-		Name         string
-		CreationTime int
-	} `json:",omitempty"`
-
-	Plays []struct {
-		StartTime int
-		IpAddress string
-	} `json:",omitempty"`
+	Tags  []TagData  `json:",omitempty"`
+	Plays []PlayData `json:",omitempty"`
 
 	// Last time the DB row was modified (apart from playback stats) as usec since the epoch.
 	LastModifiedUsec int64
