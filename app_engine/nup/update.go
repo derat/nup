@@ -52,7 +52,7 @@ func copySongUserFields(dest, src *nup.Song) {
 	dest.Tags = src.Tags
 }
 
-func replacePlays(c appengine.Context, songKey *datastore.Key, plays *[]nup.Play) error {
+func replacePlays(c appengine.Context, songKey *datastore.Key, plays *[]*nup.Play) error {
 	playKeys, err := datastore.NewQuery(playKind).Ancestor(songKey).KeysOnly().GetAll(c, nil)
 	if err != nil {
 		return err
@@ -62,12 +62,10 @@ func replacePlays(c appengine.Context, songKey *datastore.Key, plays *[]nup.Play
 	}
 
 	playKeys = make([]*datastore.Key, len(*plays))
-	playPtrs := make([]*nup.Play, len(*plays))
-	for i, p := range *plays {
+	for i := range *plays {
 		playKeys[i] = datastore.NewIncompleteKey(c, playKind, songKey)
-		playPtrs[i] = &p
 	}
-	if _, err = datastore.PutMulti(c, playKeys, playPtrs); err != nil {
+	if _, err = datastore.PutMulti(c, playKeys, *plays); err != nil {
 		return err
 	}
 	return nil
@@ -108,7 +106,7 @@ func updateSong(c appengine.Context, updatedSong *nup.Song, replaceUserData bool
 		if err != nil {
 			return fmt.Errorf("Putting %v failed: %v", key.IntID(), err)
 		}
-		c.Debugf("Put song with key %v", key.IntID())
+		c.Debugf("Put %v with key %v", songKind, key.IntID())
 
 		if replaceUserData {
 			if err = replacePlays(c, key, &updatedSong.Plays); err != nil {
