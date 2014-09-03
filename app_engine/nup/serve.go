@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"erat.org/nup"
@@ -55,18 +56,27 @@ func checkOAuth(c appengine.Context, w http.ResponseWriter) bool {
 	return true
 }
 
-/*
-func updateSong(c appengine.Context, id int64) error {
-	key := datastore.NewKey(c, songKind, "", id, nil)
-
-	err := datastore.RunInTransaction(c, func() error {
-		song := nup.Song{}
-		err := datastore.Get(c, key, &song)
-	})
-
-	return nil
+func parseIntParam(c appengine.Context, w http.ResponseWriter, r *http.Request, name string, v *int64) bool {
+	val, err := strconv.ParseInt(r.PostFormValue(name), 10, 64)
+	if err != nil {
+		c.Errorf("Unable to parse %v param %q", name, r.PostFormValue(name))
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return false
+	}
+	*v = val
+	return true
 }
-*/
+
+func parseFloatParam(c appengine.Context, w http.ResponseWriter, r *http.Request, name string, v *float64) bool {
+	val, err := strconv.ParseFloat(r.PostFormValue(name), 64)
+	if err != nil {
+		c.Errorf("Unable to parse %v param %q", name, r.PostFormValue(name))
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return false
+	}
+	*v = val
+	return true
+}
 
 func init() {
 	allowedUsers = make(map[string]bool)
@@ -93,22 +103,11 @@ func handleContents(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleListTags(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	if !checkUser(c, w, r) {
+		return
+	}
 	tags := make([]string, 0, 0)
-	/*
-		if err := useDb(func(db *sql.DB) error {
-			return iterateOverRows(db, "SELECT Name FROM Tags", func(r *sql.Rows) error {
-				var tag string
-				if err := r.Scan(&tag); err != nil {
-					return err
-				}
-				tags = append(tags, tag)
-				return nil
-			})
-		}); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	*/
 	writeJsonResponse(w, tags)
 }
 
@@ -120,11 +119,30 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRate(w http.ResponseWriter, r *http.Request) {
-	// create key with song id from request
-	// within transaction:
-	//   get existing Song
-	//   update rating and update time
-	//   put Song
+	c := appengine.NewContext(r)
+	if !checkUser(c, w, r) {
+		return
+	}
+	var id int64
+	var rating float64
+	if !parseIntParam(c, w, r, "songId", &id) || !parseFloatParam(c, w, r, "rating", &rating) {
+		return
+	}
+	c.Debugf("Got request to set song %v's rating to %v", id, rating)
+	if rating < 0.0 {
+		rating = -1.0
+	} else if rating > 1.0 {
+		rating = 1.0
+	}
+	if err := updateExistingSong(c, id, func(c appengine.Context, s *nup.Song) error {
+		s.Rating = rating
+		return nil
+	}); err != nil {
+		c.Errorf("Got error while rating song: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 }
 
 func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
@@ -154,10 +172,6 @@ func handleUpdateSongs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	updatedSongs := make([]nup.Song, 0, 0)
 	if err := json.Unmarshal([]byte(r.Form.Get("songs")), &updatedSongs); err != nil {
 		c.Errorf("Unable to decode songs from update request: %v", err)
@@ -168,7 +182,7 @@ func handleUpdateSongs(w http.ResponseWriter, r *http.Request) {
 	c.Debugf("Got %v song(s)", len(updatedSongs))
 
 	for _, updatedSong := range updatedSongs {
-		if err := updateSong(c, &updatedSong, replaceUserData); err != nil {
+		if err := updateOrInsertSong(c, &updatedSong, replaceUserData); err != nil {
 			c.Errorf("Got error while updating song: %v", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

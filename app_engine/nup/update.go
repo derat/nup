@@ -71,7 +71,25 @@ func replacePlays(c appengine.Context, songKey *datastore.Key, plays *[]*nup.Pla
 	return nil
 }
 
-func updateSong(c appengine.Context, updatedSong *nup.Song, replaceUserData bool) error {
+func updateExistingSong(c appengine.Context, id int64, f func(appengine.Context, *nup.Song) error) error {
+	return datastore.RunInTransaction(c, func(c appengine.Context) error {
+		key := datastore.NewKey(c, songKind, "", id, nil)
+		song := &nup.Song{}
+		if err := datastore.Get(c, key, song); err != nil {
+			return err
+		}
+		if err := f(c, song); err != nil {
+			return err
+		}
+		song.LastModifiedTime = time.Now()
+		if _, err := datastore.Put(c, key, song); err != nil {
+			return err
+		}
+		return nil
+	}, nil)
+}
+
+func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserData bool) error {
 	sha1 := updatedSong.Sha1
 	queryKeys, err := datastore.NewQuery(songKind).KeysOnly().Filter("Sha1 =", sha1).GetAll(c, nil)
 	if err != nil {
