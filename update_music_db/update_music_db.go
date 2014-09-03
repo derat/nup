@@ -49,28 +49,27 @@ func main() {
 			log.Fatal(err)
 		}
 
-		songs, _, err := importFromLegacyDb(*importDb)
+		songs, err := importFromLegacyDb(*importDb)
 		if err != nil {
 			log.Fatal(err)
 		}
 		log.Printf("Got %v songs from legacy database\n", len(*songs))
 
-		songsBatch := make([]nup.SongData, 0, updateBatchSize)
+		songsBatch := make([]nup.Song, 0, updateBatchSize)
 		for i := 0; i < len(*songs); i++ {
 			songsBatch = append(songsBatch, *(*songs)[i])
 			if len(songsBatch) == updateBatchSize {
-				if err = u.UpdateSongs(&songsBatch); err != nil {
+				if err = u.UpdateSongs(&songsBatch, true); err != nil {
 					log.Fatal(err)
 				}
 				songsBatch = songsBatch[:0]
 			}
 		}
 		if len(songsBatch) > 0 {
-			if err = u.UpdateSongs(&songsBatch); err != nil {
+			if err = u.UpdateSongs(&songsBatch, true); err != nil {
 				log.Fatal(err)
 			}
 		}
-
 		return
 	}
 
@@ -90,18 +89,18 @@ func main() {
 		log.Fatalf("Unable to get last update time: ", err)
 	}
 
-	updateChan := make(chan *nup.SongData, updateBatchSize)
+	updateChan := make(chan SongAndError, updateBatchSize)
 	numUpdates := scanForUpdatedFiles(*musicDir, lastUpdateTime, updateChan)
-	batchedUpdates := make([]nup.SongData, 0, updateBatchSize)
+	batchedUpdates := make([]nup.Song, 0, updateBatchSize)
 	for i := 0; i < numUpdates; i++ {
-		song := <-updateChan
-		if song.Error != nil {
-			log.Fatalf("Got error while reading %v: %v\n", song.Filename, song.Error)
+		songAndError := <-updateChan
+		if songAndError.Error != nil {
+			log.Fatalf("Got error while reading %v: %v\n", songAndError.Song.Filename, songAndError.Error)
 		}
 
-		batchedUpdates = append(batchedUpdates, *song)
+		batchedUpdates = append(batchedUpdates, *songAndError.Song)
 		if len(batchedUpdates) == updateBatchSize {
-			if err := u.UpdateSongs(&batchedUpdates); err != nil {
+			if err := u.UpdateSongs(&batchedUpdates, false); err != nil {
 				log.Fatal("Failed updating songs: ", err)
 			}
 			batchedUpdates = batchedUpdates[:0]
@@ -109,7 +108,7 @@ func main() {
 	}
 
 	if len(batchedUpdates) > 0 {
-		if err := u.UpdateSongs(&batchedUpdates); err != nil {
+		if err := u.UpdateSongs(&batchedUpdates, false); err != nil {
 			log.Fatal("Failed updating songs: ", err)
 		}
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,13 +14,17 @@ import (
 )
 
 const (
-	jsonType        = "application/json"
-	oauthScope      = "https://www.googleapis.com/auth/userinfo.email"
-	updateSongsPath = "update_songs"
+	oauthScope = "https://www.googleapis.com/auth/userinfo.email"
+
+	// Server path to update songs and query params.
+	updatePath         = "update_songs"
+	updateSongsKey     = "songs"
+	updateReplaceKey   = "replace"
+	updateReplaceValue = "1"
 )
 
 type updater struct {
-	serverUrl string
+	serverUrl url.URL
 	transport *oauth.Transport
 }
 
@@ -37,7 +40,7 @@ func newUpdater(server, clientId, clientSecret, tokenCache string) (*updater, er
 	if err != nil {
 		return nil, err
 	}
-	return &updater{serverUrl: serverUrl.String(), transport: transport}, nil
+	return &updater{serverUrl: *serverUrl, transport: transport}, nil
 }
 
 func (u *updater) GetLastUpdateTime() (time.Time, error) {
@@ -48,7 +51,7 @@ func (u *updater) SetLastUpdateTime(t time.Time) error {
 	return nil
 }
 
-func (u *updater) UpdateSongs(songs *[]nup.SongData) error {
+func (u *updater) UpdateSongs(songs *[]nup.Song, replace bool) error {
 	b, err := json.Marshal(*songs)
 	if err != nil {
 		return err
@@ -57,18 +60,22 @@ func (u *updater) UpdateSongs(songs *[]nup.SongData) error {
 	if err = cloud.MaybeRefreshToken(u.transport); err != nil {
 		return err
 	}
-	resp, err := u.transport.Client().Post(u.serverUrl+updateSongsPath, jsonType, bytes.NewReader(b))
+
+	destUrl := u.serverUrl
+	destUrl.Path += updatePath
+	form := make(url.Values)
+	form.Add(updateSongsKey, string(b))
+	if replace {
+		form.Add(updateReplaceKey, updateReplaceValue)
+	}
+	resp, err := u.transport.Client().PostForm(destUrl.String(), form)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Got non-OK status from %v: %v", updateSongsPath, resp.Status)
+		return fmt.Errorf("Got non-OK status from %v: %v", updatePath, resp.Status)
 	}
-	return nil
-}
-
-func (u *updater) UpdateExtra(extra *[]nup.ExtraSongData) error {
 	return nil
 }

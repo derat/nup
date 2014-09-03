@@ -22,6 +22,11 @@ const (
 	logProgressInterval = 100
 )
 
+type SongAndError struct {
+	Song  *nup.Song
+	Error error
+}
+
 func getId3FooterLength(f *os.File, fi os.FileInfo) (int64, error) {
 	const (
 		length = 128
@@ -126,20 +131,21 @@ func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLeng
 	return (fi.Size() - headerLength - footerLength) / kbitRate * 8, nil
 }
 
-func readFileDetails(p string, fi os.FileInfo, updateChan chan *nup.SongData) {
-	s := &nup.SongData{Filename: p}
-	defer func() { updateChan <- s }()
+func readFileDetails(p string, fi os.FileInfo, updateChan chan SongAndError) {
+	s := &nup.Song{Filename: p}
+	var err error
+	defer func() { updateChan <- SongAndError{s, err} }()
 
 	var f *os.File
-	f, s.Error = os.Open(p)
-	if s.Error != nil {
+	f, err = os.Open(p)
+	if err != nil {
 		return
 	}
 	defer f.Close()
 
 	var tag taglib.GenericTag
-	tag, s.Error = taglib.Decode(f, fi.Size())
-	if s.Error != nil {
+	tag, err = taglib.Decode(f, fi.Size())
+	if err != nil {
 		return
 	}
 	s.Artist = tag.Artist()
@@ -149,21 +155,21 @@ func readFileDetails(p string, fi os.FileInfo, updateChan chan *nup.SongData) {
 	s.Disc = int(tag.Disc())
 
 	var footerLength int64
-	footerLength, s.Error = getId3FooterLength(f, fi)
-	if s.Error != nil {
+	footerLength, err = getId3FooterLength(f, fi)
+	if err != nil {
 		return
 	}
-	s.LengthMs, s.Error = computeAudioDurationMs(f, fi, int64(tag.TagSize()), footerLength)
-	if s.Error != nil {
+	s.Sha1, err = computeAudioSha1(f, fi, int64(tag.TagSize()), footerLength)
+	if err != nil {
 		return
 	}
-	s.Sha1, s.Error = computeAudioSha1(f, fi, int64(tag.TagSize()), footerLength)
-	if s.Error != nil {
+	s.LengthMs, err = computeAudioDurationMs(f, fi, int64(tag.TagSize()), footerLength)
+	if err != nil {
 		return
 	}
 }
 
-func scanForUpdatedFiles(dir string, lastUpdateTime time.Time, updateChan chan *nup.SongData) (numUpdates int) {
+func scanForUpdatedFiles(dir string, lastUpdateTime time.Time, updateChan chan SongAndError) (numUpdates int) {
 	numMp3s := 0
 	err := filepath.Walk(dir, func(p string, fi os.FileInfo, err error) error {
 		if err != nil {

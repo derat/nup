@@ -2,7 +2,7 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
+	"time"
 
 	"erat.org/nup"
 	_ "github.com/mattn/go-sqlite3"
@@ -22,82 +22,82 @@ func doQuery(db *sql.DB, q string, f func(*sql.Rows) error) error {
 	return nil
 }
 
-func importFromLegacyDb(path string) (*[]*nup.SongData, *[]*nup.ExtraSongData, error) {
+func importFromLegacyDb(path string) (*[]*nup.Song, error) {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	defer db.Close()
 
-	songs := make([]*nup.SongData, 0, 0)
-	extra := make([]*nup.ExtraSongData, 0, 0)
+	songs := make(map[int]*nup.Song)
 
 	if err = doQuery(db,
-		`SELECT SongId, Sha1, Filename, Artist, Title, Album, DiscNumber, TrackNumber, Length, Rating, Deleted, LastModifiedUsec
+		`SELECT SongId, Sha1, Filename, Artist, Title, Album, DiscNumber, TrackNumber, Length, Rating
 		 FROM Songs
+		 WHERE Deleted = 0
 		 ORDER BY SongId ASC`,
 		func(rows *sql.Rows) error {
-			var s nup.SongData
-			var e nup.ExtraSongData
-			e.Tags = make([]nup.TagData, 0, 0)
-			e.Plays = make([]nup.PlayData, 0, 0)
-
-			var lengthSec int
-			if err := rows.Scan(&s.SongId, &s.Sha1, &s.Filename, &s.Artist, &s.Title, &s.Album, &s.Disc, &s.Track,
-				&lengthSec, &e.Rating, &e.Deleted, &e.LastModifiedUsec); err != nil {
+			var s nup.Song
+			var songId, lengthSec int
+			if err := rows.Scan(&songId, &s.Sha1, &s.Filename, &s.Artist, &s.Title, &s.Album, &s.Disc, &s.Track, &lengthSec, &s.Rating); err != nil {
 				return err
 			}
 			s.LengthMs = int64(lengthSec) * 1000
-			e.SongId = s.SongId
-
-			songs = append(songs, &s)
-			extra = append(extra, &e)
+			s.Plays = make([]nup.Play, 0)
+			s.Tags = make([]string, 0)
+			songs[songId] = &s
 			return nil
 		}); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	i := 0
-	if err = doQuery(db, "SELECT SongId, StartTime, IpAddress FROM PlayHistory ORDER BY SongId ASC, StartTime ASC", func(rows *sql.Rows) error {
-		var songId, startTime int
+	if err = doQuery(db, "SELECT SongId, StartTime, IpAddress FROM PlayHistory", func(rows *sql.Rows) error {
+		var songId, startTimeSec int
 		var ip string
-		if err := rows.Scan(&songId, &startTime, &ip); err != nil {
+		if err := rows.Scan(&songId, &startTimeSec, &ip); err != nil {
 			return err
 		}
-		for i < len(extra) && extra[i].SongId < songId {
-			i++
+		s, ok := songs[songId]
+		// If not present, it's probably deleted.
+		if !ok {
+			return nil
 		}
-		if i >= len(extra) || extra[i].SongId != songId {
-			return fmt.Errorf("Don't have extra song data for song ID %v (dangling PlayHistory row)", songId)
+
+		startTime := time.Unix(int64(startTimeSec), 0)
+		s.Plays = append(s.Plays, nup.Play{startTime, ip})
+		if s.FirstStartTime.IsZero() || startTime.Before(s.FirstStartTime) {
+			s.FirstStartTime = startTime
 		}
-		extra[i].Plays = append(extra[i].Plays, nup.PlayData{startTime, ip})
+		if s.LastStartTime.IsZero() || startTime.After(s.LastStartTime) {
+			s.LastStartTime = startTime
+		}
 		return nil
 	}); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	i = 0
-	if err = doQuery(db,
-		`SELECT st.SongId, st.CreationTime, t.Name FROM SongTags st
-		 INNER JOIN Tags t ON(st.TagId = t.TagId)
-		 ORDER BY st.SongId ASC, t.Name ASC`,
-		func(rows *sql.Rows) error {
-			var songId, creationTime int
-			var tagName string
-			if err := rows.Scan(&songId, &creationTime, &tagName); err != nil {
-				return err
-			}
-			for i < len(extra) && extra[i].SongId < songId {
-				i++
-			}
-			if i >= len(extra) || extra[i].SongId != songId {
-				return fmt.Errorf("Don't have extra song data for song ID %v (dangling SongTags row)", songId)
-			}
-			extra[i].Tags = append(extra[i].Tags, nup.TagData{tagName, creationTime})
+	if err = doQuery(db, "SELECT st.SongId, t.Name FROM SongTags st INNER JOIN Tags t ON(st.TagId = t.TagId)", func(rows *sql.Rows) error {
+		var songId int
+		var tag string
+		if err := rows.Scan(&songId, &tag); err != nil {
+			return err
+		}
+		s, ok := songs[songId]
+		// If not present, it's probably deleted.
+		if !ok {
 			return nil
-		}); err != nil {
-		return nil, nil, err
+		}
+		s.Tags = append(s.Tags, tag)
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
-	return &songs, &extra, nil
+	res := make([]*nup.Song, len(songs), len(songs))
+	i := 0
+	for _, s := range songs {
+		res[i] = s
+		i++
+	}
+	return &res, nil
 }
