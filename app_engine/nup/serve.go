@@ -55,6 +55,19 @@ func checkOAuth(c appengine.Context, w http.ResponseWriter) bool {
 	return true
 }
 
+/*
+func updateSong(c appengine.Context, id int64) error {
+	key := datastore.NewKey(c, songKind, "", id, nil)
+
+	err := datastore.RunInTransaction(c, func() error {
+		song := nup.Song{}
+		err := datastore.Get(c, key, &song)
+	})
+
+	return nil
+}
+*/
+
 func init() {
 	allowedUsers = make(map[string]bool)
 	for _, u := range strings.Split(os.Getenv("ALLOWED_USERS"), ",") {
@@ -107,15 +120,32 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRate(w http.ResponseWriter, r *http.Request) {
+	// create key with song id from request
+	// within transaction:
+	//   get existing Song
+	//   update rating and update time
+	//   put Song
 }
 
 func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
+	// create key with song id from request
+	// within transaction:
+	//   check if Play already exists; if so, error
+	//   insert new Play
+	//   get existing Song
+	//   update play times, play count, and update time
+	//   put Song
 }
 
 func handleSongs(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleTag(w http.ResponseWriter, r *http.Request) {
+	// create key with song id from request
+	// within transaction:
+	//   get existing Song
+	//   update tags and update time
+	//   put Song
 }
 
 func handleUpdateSongs(w http.ResponseWriter, r *http.Request) {
@@ -128,12 +158,20 @@ func handleUpdateSongs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	songs := make([]nup.Song, 0, 0)
-	if err := json.Unmarshal([]byte(r.Form.Get("songs")), &songs); err != nil {
+	updatedSongs := make([]nup.Song, 0, 0)
+	if err := json.Unmarshal([]byte(r.Form.Get("songs")), &updatedSongs); err != nil {
 		c.Errorf("Unable to decode songs from update request: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	//replace := r.Form.Get("replace") == "1"
-	c.Debugf("Got %v song(s)", len(songs))
+	replaceUserData := r.Form.Get("replace") == "1"
+	c.Debugf("Got %v song(s)", len(updatedSongs))
+
+	for _, updatedSong := range updatedSongs {
+		if err := updateSong(c, &updatedSong, replaceUserData); err != nil {
+			c.Errorf("Got error while updating song: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 }
