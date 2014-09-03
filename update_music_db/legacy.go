@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"sort"
 	"time"
 
 	"erat.org/nup"
@@ -62,6 +63,7 @@ func getSongsFromLegacyDb(path string, updateChan chan SongAndError) (numUpdates
 		}
 
 		startTime := time.Unix(int64(startTimeSec), 0)
+		s.NumPlays++
 		s.Plays = append(s.Plays, nup.Play{startTime, ip})
 		if s.FirstStartTime.IsZero() || startTime.Before(s.FirstStartTime) {
 			s.FirstStartTime = startTime
@@ -92,8 +94,15 @@ func getSongsFromLegacyDb(path string, updateChan chan SongAndError) (numUpdates
 	}
 
 	go func() {
-		for _, s := range songs {
-			updateChan <- SongAndError{s, nil}
+		keys := make([]int, len(songs), len(songs))
+		i := 0
+		for id := range songs {
+			keys[i] = id
+			i++
+		}
+		sort.Ints(keys)
+		for _, id := range keys {
+			updateChan <- SongAndError{songs[id], nil}
 		}
 	}()
 	return len(songs), nil

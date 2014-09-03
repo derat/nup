@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"math"
 	"time"
 
 	"erat.org/cloud"
@@ -28,6 +29,7 @@ func main() {
 	configFile := flag.String("config", "", "Path to config file")
 	//dryRun := flag.Bool("dry-run", false, "Only print what would be done")
 	importDb := flag.String("import-db", "", "If non-empty, path to legacy SQLite database to read info from")
+	limit := flag.Int("limit", 0, "If positive, limits the number of songs to update (for testing)")
 	musicDir := flag.String("music-dir", "", "Directory where music is stored")
 	server := flag.String("server", "", "URL of the server to update")
 	flag.Parse()
@@ -68,6 +70,10 @@ func main() {
 		if numSongs, err = scanForUpdatedSongs(*musicDir, lastUpdateTime, updateChan); err != nil {
 			log.Fatal(err)
 		}
+	}
+
+	if *limit > 0 {
+		numSongs = int(math.Min(float64(numSongs), float64(*limit)))
 	}
 
 	log.Printf("Sending %v song(s)\n", numSongs)
