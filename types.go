@@ -57,7 +57,7 @@ type Song struct {
 
 	// The song's playback history.
 	// Only used for importing data -- in Datastore, Play is a descendant of Song.
-	Plays []Play `json:",omitempty",datastore:",noindex"`
+	Plays []*Play `json:",omitempty",datastore:",noindex"`
 
 	// Tags assigned to the song.
 	Tags []string `json:",omitempty"`
