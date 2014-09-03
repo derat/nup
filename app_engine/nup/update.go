@@ -4,7 +4,9 @@ import (
 	"appengine"
 	"appengine/datastore"
 	"fmt"
+	"strings"
 	"time"
+	"unicode"
 
 	"erat.org/nup"
 )
@@ -14,7 +16,7 @@ const (
 	songKind = "Song"
 )
 
-func copyFileFields(dest, src *nup.Song) {
+func copySongFileFields(dest, src *nup.Song) {
 	dest.Sha1 = src.Sha1
 	dest.Filename = src.Filename
 	dest.Artist = src.Artist
@@ -23,10 +25,26 @@ func copyFileFields(dest, src *nup.Song) {
 	dest.Track = src.Track
 	dest.Disc = src.Disc
 	dest.LengthMs = src.LengthMs
-	// FIXME: update lower and keywords
+
+	dest.ArtistLower = strings.ToLower(src.Artist)
+	dest.TitleLower = strings.ToLower(src.Title)
+	dest.AlbumLower = strings.ToLower(src.Album)
+
+	keywords := make(map[string]bool)
+	for _, s := range []string{dest.ArtistLower, dest.TitleLower, dest.AlbumLower} {
+		for _, w := range strings.FieldsFunc(s, func(c rune) bool { return !unicode.IsLetter(c) && !unicode.IsNumber(c) }) {
+			keywords[w] = true
+		}
+	}
+	dest.Keywords = make([]string, len(keywords))
+	i := 0
+	for w := range keywords {
+		dest.Keywords[i] = w
+		i++
+	}
 }
 
-func copyUserFields(dest, src *nup.Song) {
+func copySongUserFields(dest, src *nup.Song) {
 	dest.Rating = src.Rating
 	dest.FirstStartTime = src.FirstStartTime
 	dest.LastStartTime = src.LastStartTime
@@ -43,8 +61,8 @@ func replacePlays(c appengine.Context, songKey *datastore.Key, plays *[]nup.Play
 		return err
 	}
 
-	playKeys = make([]*datastore.Key, len(*plays), len(*plays))
-	playPtrs := make([]*nup.Play, len(*plays), len(*plays))
+	playKeys = make([]*datastore.Key, len(*plays))
+	playPtrs := make([]*nup.Play, len(*plays))
 	for i, p := range *plays {
 		playKeys[i] = datastore.NewIncompleteKey(c, playKind, songKey)
 		playPtrs[i] = &p
@@ -81,9 +99,9 @@ func updateSong(c appengine.Context, updatedSong *nup.Song, replaceUserData bool
 			key = datastore.NewIncompleteKey(c, songKind, nil)
 		}
 
-		copyFileFields(&song, updatedSong)
+		copySongFileFields(&song, updatedSong)
 		if replaceUserData {
-			copyUserFields(&song, updatedSong)
+			copySongUserFields(&song, updatedSong)
 		}
 		song.LastModifiedTime = time.Now()
 		key, err = datastore.Put(c, key, &song)
