@@ -22,20 +22,18 @@ func doQuery(db *sql.DB, q string, f func(*sql.Rows) error) error {
 	return nil
 }
 
-func importFromLegacyDb(path string) (*[]*nup.Song, error) {
+func getSongsFromLegacyDb(path string, updateChan chan SongAndError) (numUpdates int, err error) {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	defer db.Close()
 
+	// TODO: If I cared about this path, it'd be better to iterate through all three queries in parallel
+	// in a goroutine and stream the songs out via the channel instead of building up a map.
 	songs := make(map[int]*nup.Song)
 
-	if err = doQuery(db,
-		`SELECT SongId, Sha1, Filename, Artist, Title, Album, DiscNumber, TrackNumber, Length, Rating
-		 FROM Songs
-		 WHERE Deleted = 0
-		 ORDER BY SongId ASC`,
+	if err = doQuery(db, "SELECT SongId, Sha1, Filename, Artist, Title, Album, DiscNumber, TrackNumber, Length, Rating FROM Songs WHERE Deleted = 0",
 		func(rows *sql.Rows) error {
 			var s nup.Song
 			var songId, lengthSec int
@@ -48,7 +46,7 @@ func importFromLegacyDb(path string) (*[]*nup.Song, error) {
 			songs[songId] = &s
 			return nil
 		}); err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	if err = doQuery(db, "SELECT SongId, StartTime, IpAddress FROM PlayHistory", func(rows *sql.Rows) error {
@@ -73,7 +71,7 @@ func importFromLegacyDb(path string) (*[]*nup.Song, error) {
 		}
 		return nil
 	}); err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	if err = doQuery(db, "SELECT st.SongId, t.Name FROM SongTags st INNER JOIN Tags t ON(st.TagId = t.TagId)", func(rows *sql.Rows) error {
@@ -90,14 +88,13 @@ func importFromLegacyDb(path string) (*[]*nup.Song, error) {
 		s.Tags = append(s.Tags, tag)
 		return nil
 	}); err != nil {
-		return nil, err
+		return 0, err
 	}
 
-	res := make([]*nup.Song, len(songs), len(songs))
-	i := 0
-	for _, s := range songs {
-		res[i] = s
-		i++
-	}
-	return &res, nil
+	go func() {
+		for _, s := range songs {
+			updateChan <- SongAndError{s, nil}
+		}
+	}()
+	return len(songs), nil
 }

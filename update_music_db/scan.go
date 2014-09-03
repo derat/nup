@@ -22,11 +22,6 @@ const (
 	logProgressInterval = 100
 )
 
-type SongAndError struct {
-	Song  *nup.Song
-	Error error
-}
-
 func getId3FooterLength(f *os.File, fi os.FileInfo) (int64, error) {
 	const (
 		length = 128
@@ -169,9 +164,9 @@ func readFileDetails(p string, fi os.FileInfo, updateChan chan SongAndError) {
 	}
 }
 
-func scanForUpdatedFiles(dir string, lastUpdateTime time.Time, updateChan chan SongAndError) (numUpdates int) {
+func scanForUpdatedSongs(dir string, lastUpdateTime time.Time, updateChan chan SongAndError) (numUpdates int, err error) {
 	numMp3s := 0
-	err := filepath.Walk(dir, func(p string, fi os.FileInfo, err error) error {
+	err = filepath.Walk(dir, func(p string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -190,9 +185,9 @@ func scanForUpdatedFiles(dir string, lastUpdateTime time.Time, updateChan chan S
 		return nil
 	})
 	if err != nil {
-		log.Fatal(err)
+		return 0, err
 	}
 
 	log.Printf("Found %v update(s) among %v files.\n", numUpdates, numMp3s)
-	return numUpdates
+	return numUpdates, nil
 }
