@@ -2,18 +2,24 @@ package nup
 
 import (
 	"appengine"
+	"appengine/datastore"
 	"appengine/user"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"os"
 	"strconv"
-	"strings"
 
+	"erat.org/cloud"
 	"erat.org/nup"
 )
 
-// Email addresses of users allowed to use the app.
-var allowedUsers map[string]bool
+const (
+	configFile = "nup/config.json"
+)
+
+var cfg struct {
+	AllowedUsers []string
+}
 
 func writeJsonResponse(w http.ResponseWriter, v interface{}) {
 	b, err := json.Marshal(v)
@@ -33,8 +39,16 @@ func checkUser(c appengine.Context, w http.ResponseWriter, r *http.Request) bool
 		http.Redirect(w, r, loginUrl, http.StatusFound)
 		return false
 	}
-	if ok, _ := allowedUsers[u.Email]; !ok {
-		c.Debugf("Invalid access from %v", u.ID)
+
+	allowed := false
+	for _, au := range cfg.AllowedUsers {
+		if u.Email == au {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		c.Debugf("Invalid access from %v", u.Email)
 		http.Redirect(w, r, loginUrl, http.StatusFound)
 		return false
 	}
@@ -79,11 +93,9 @@ func parseFloatParam(c appengine.Context, w http.ResponseWriter, r *http.Request
 }
 
 func init() {
-	allowedUsers = make(map[string]bool)
-	for _, u := range strings.Split(os.Getenv("ALLOWED_USERS"), ",") {
-		allowedUsers[u] = true
+	if err := cloud.ReadJson(configFile, &cfg); err != nil {
+		panic(fmt.Sprintf("Unable to read %v: %v", configFile, err))
 	}
-
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/contents", handleContents)
 	http.HandleFunc("/list_tags", handleListTags)
@@ -107,8 +119,31 @@ func handleListTags(w http.ResponseWriter, r *http.Request) {
 	if !checkUser(c, w, r) {
 		return
 	}
-	tags := make([]string, 0, 0)
-	writeJsonResponse(w, tags)
+
+	tags := make(map[string]bool)
+	it := datastore.NewQuery(songKind).Project("Tags").Distinct().Run(c)
+	for {
+		song := &nup.Song{}
+		if _, err := it.Next(song); err == nil {
+			for _, t := range song.Tags {
+				tags[t] = true
+			}
+		} else if err == datastore.Done {
+			break
+		} else {
+			c.Errorf("Unable to query tags: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	res := make([]string, len(tags))
+	i := 0
+	for t := range tags {
+		res[i] = t
+		i++
+	}
+	writeJsonResponse(w, res)
 }
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {
@@ -173,12 +208,12 @@ func handleUpdateSongs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updatedSongs := make([]nup.Song, 0, 0)
-	if err := json.Unmarshal([]byte(r.Form.Get("songs")), &updatedSongs); err != nil {
+	if err := json.Unmarshal([]byte(r.PostFormValue("songs")), &updatedSongs); err != nil {
 		c.Errorf("Unable to decode songs from update request: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	replaceUserData := r.Form.Get("replace") == "1"
+	replaceUserData := r.PostFormValue("replace") == "1"
 	c.Debugf("Got %v song(s)", len(updatedSongs))
 
 	for _, updatedSong := range updatedSongs {

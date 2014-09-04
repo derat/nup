@@ -1,0 +1,39 @@
+application: nup
+version: 1
+runtime: go
+api_version: go1
+
+builtins:
+- remote_api: on
+
+handlers:
+- url: /
+  script: _go_app
+  secure: always
+- url: /contents
+  script: _go_app
+  secure: always
+- url: /list_tags
+  script: _go_app
+  secure: always
+- url: /query
+  script: _go_app
+  secure: always
+- url: /rate
+  script: _go_app
+  secure: always
+- url: /report_played
+  script: _go_app
+  secure: always
+- url: /songs
+  script: _go_app
+  secure: always
+- url: /static
+  static_dir: static
+  secure: always
+- url: /tag
+  script: _go_app
+  secure: always
+- url: /update_songs
+  script: _go_app
+  secure: always
