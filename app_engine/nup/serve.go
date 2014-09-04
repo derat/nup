@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"erat.org/cloud"
 	"erat.org/nup"
@@ -175,9 +176,20 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		q.HasMaxPlays = true
 	}
 
-	// FIXME
-	//append.call('ps.FirstStartTime >= ?', Time.now.to_i - request['firstPlayed'].to_i) if request['firstPlayed']
-	//append.call('ps.LastStartTime <= ?', Time.now.to_i - request['lastPlayed'].to_i) if request['lastPlayed']
+	if len(r.FormValue("firstPlayed")) > 0 {
+		var s int64
+		if !parseIntParam(c, w, r, "firstPlayed", &s) {
+			return
+		}
+		q.MinFirstStartTime = time.Now().Add(time.Duration(-s) * time.Second)
+	}
+	if len(r.FormValue("lastPlayed")) > 0 {
+		var s int64
+		if !parseIntParam(c, w, r, "lastPlayed", &s) {
+			return
+		}
+		q.MaxLastStartTime = time.Now().Add(time.Duration(-s) * time.Second)
+	}
 
 	songs, err := doQuery(c, q)
 	if err != nil {

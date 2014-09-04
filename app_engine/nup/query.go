@@ -165,7 +165,7 @@ func doQuery(c appengine.Context, query *songQuery) (*[]nup.Song, error) {
 		qs = append(qs, bq.Filter("FirstStartTime >=", query.MinFirstStartTime))
 	}
 	if !query.MaxLastStartTime.IsZero() {
-		qs = append(qs, bq.Filter("LastStartTime >=", query.MaxLastStartTime))
+		qs = append(qs, bq.Filter("LastStartTime <=", query.MaxLastStartTime))
 	}
 	if len(qs) == 0 {
 		qs = []*datastore.Query{bq}
