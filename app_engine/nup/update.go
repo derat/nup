@@ -11,11 +11,6 @@ import (
 	"erat.org/nup"
 )
 
-const (
-	playKind = "Play"
-	songKind = "Song"
-)
-
 func copySongFileFields(dest, src *nup.Song) {
 	dest.Sha1 = src.Sha1
 	dest.Filename = src.Filename

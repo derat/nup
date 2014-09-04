@@ -2,7 +2,6 @@ package nup
 
 import (
 	"appengine"
-	"appengine/datastore"
 	"appengine/user"
 	"encoding/json"
 	"fmt"
@@ -14,7 +13,12 @@ import (
 )
 
 const (
+	// Config file path relative to base app directory.
 	configFile = "nup/config.json"
+
+	// Datastore kinds of various objects.
+	playKind = "Play"
+	songKind = "Song"
 )
 
 var cfg struct {
@@ -31,11 +35,11 @@ func writeJsonResponse(w http.ResponseWriter, v interface{}) {
 	}
 }
 
-func checkUser(c appengine.Context, w http.ResponseWriter, r *http.Request) bool {
+func checkUserRequest(c appengine.Context, w http.ResponseWriter, r *http.Request, method string) bool {
 	loginUrl, _ := user.LoginURL(c, "/")
 	u := user.Current(c)
 	if u == nil {
-		c.Debugf("Invalid access from unauthenticated user")
+		c.Debugf("Unauthorized request for %v from unauthenticated user at %v", r.URL.String(), r.RemoteAddr)
 		http.Redirect(w, r, loginUrl, http.StatusFound)
 		return false
 	}
@@ -48,22 +52,28 @@ func checkUser(c appengine.Context, w http.ResponseWriter, r *http.Request) bool
 		}
 	}
 	if !allowed {
-		c.Debugf("Invalid access from %v", u.Email)
+		c.Debugf("Unauthorized request for %v from %v at %v", r.URL.String(), u.Email, r.RemoteAddr)
 		http.Redirect(w, r, loginUrl, http.StatusFound)
 		return false
 	}
+
+	if r.Method != method {
+		c.Debugf("Invalid %v request for %v (expected %v)", r.Method, r.URL.String(), method)
+		return false
+	}
+
 	return true
 }
 
-func checkOAuth(c appengine.Context, w http.ResponseWriter) bool {
+func checkOAuthRequest(c appengine.Context, w http.ResponseWriter, r *http.Request) bool {
 	u, err := user.CurrentOAuth(c, "")
 	if err != nil {
-		c.Debugf("Missing OAuth Authorization header")
+		c.Debugf("Missing OAuth Authorization header in request for %v by %v", r.URL.String(), r.RemoteAddr)
 		http.Error(w, "OAuth Authorization header required", http.StatusUnauthorized)
 		return false
 	}
 	if !appengine.IsDevAppServer() && !u.Admin {
-		c.Debugf("Non-admin OAuth access from %v", u)
+		c.Debugf("Non-admin OAuth request for %v from %v at %v", r.URL.String(), u, r.RemoteAddr)
 		http.Error(w, "Admin access only", http.StatusUnauthorized)
 		return false
 	}
@@ -71,9 +81,9 @@ func checkOAuth(c appengine.Context, w http.ResponseWriter) bool {
 }
 
 func parseIntParam(c appengine.Context, w http.ResponseWriter, r *http.Request, name string, v *int64) bool {
-	val, err := strconv.ParseInt(r.PostFormValue(name), 10, 64)
+	val, err := strconv.ParseInt(r.FormValue(name), 10, 64)
 	if err != nil {
-		c.Errorf("Unable to parse %v param %q", name, r.PostFormValue(name))
+		c.Errorf("Unable to parse %v param %q", name, r.FormValue(name))
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return false
 	}
@@ -82,9 +92,9 @@ func parseIntParam(c appengine.Context, w http.ResponseWriter, r *http.Request, 
 }
 
 func parseFloatParam(c appengine.Context, w http.ResponseWriter, r *http.Request, name string, v *float64) bool {
-	val, err := strconv.ParseFloat(r.PostFormValue(name), 64)
+	val, err := strconv.ParseFloat(r.FormValue(name), 64)
 	if err != nil {
-		c.Errorf("Unable to parse %v param %q", name, r.PostFormValue(name))
+		c.Errorf("Unable to parse %v param %q", name, r.FormValue(name))
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return false
 	}
@@ -116,34 +126,16 @@ func handleContents(w http.ResponseWriter, r *http.Request) {
 
 func handleListTags(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	if !checkUser(c, w, r) {
+	if !checkUserRequest(c, w, r, "GET") {
 		return
 	}
-
-	tags := make(map[string]bool)
-	it := datastore.NewQuery(songKind).Project("Tags").Distinct().Run(c)
-	for {
-		song := &nup.Song{}
-		if _, err := it.Next(song); err == nil {
-			for _, t := range song.Tags {
-				tags[t] = true
-			}
-		} else if err == datastore.Done {
-			break
-		} else {
-			c.Errorf("Unable to query tags: %v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+	tags, err := getTags(c)
+	if err != nil {
+		c.Errorf("Unable to query tags: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-
-	res := make([]string, len(tags))
-	i := 0
-	for t := range tags {
-		res[i] = t
-		i++
-	}
-	writeJsonResponse(w, res)
+	writeJsonResponse(w, tags)
 }
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {
@@ -155,7 +147,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 
 func handleRate(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	if !checkUser(c, w, r) {
+	if !checkUserRequest(c, w, r, "POST") {
 		return
 	}
 	var id int64
@@ -203,7 +195,7 @@ func handleTag(w http.ResponseWriter, r *http.Request) {
 
 func handleUpdateSongs(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	if !checkOAuth(c, w) {
+	if !checkOAuthRequest(c, w, r) {
 		return
 	}
 
@@ -213,7 +205,7 @@ func handleUpdateSongs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	replaceUserData := r.PostFormValue("replace") == "1"
+	replaceUserData := r.FormValue("replace") == "1"
 	c.Debugf("Got %v song(s)", len(updatedSongs))
 
 	for _, updatedSong := range updatedSongs {
