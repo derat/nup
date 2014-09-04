@@ -139,10 +139,53 @@ func handleListTags(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {
-	/*
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(jsonData)
-	*/
+	c := appengine.NewContext(r)
+	if !checkUserRequest(c, w, r, "GET") {
+		return
+	}
+
+	q := &songQuery{}
+	if len(r.FormValue("artist")) > 0 {
+		q.Artist = r.FormValue("artist")
+	}
+	if len(r.FormValue("title")) > 0 {
+		q.Title = r.FormValue("title")
+	}
+	if len(r.FormValue("album")) > 0 {
+		q.Album = r.FormValue("album")
+	}
+	if r.FormValue("firstTrack") == "1" {
+		q.Track = 1
+		q.Disc = 1
+	}
+
+	if len(r.FormValue("minRating")) > 0 {
+		if !parseFloatParam(c, w, r, "minRating", &q.MinRating) {
+			return
+		}
+		q.HasMinRating = true
+	} else if r.FormValue("unrated") == "1" {
+		q.Unrated = true
+	}
+
+	if len(r.FormValue("maxPlays")) > 0 {
+		if !parseIntParam(c, w, r, "maxPlays", &q.MaxPlays) {
+			return
+		}
+		q.HasMaxPlays = true
+	}
+
+	// FIXME
+	//append.call('ps.FirstStartTime >= ?', Time.now.to_i - request['firstPlayed'].to_i) if request['firstPlayed']
+	//append.call('ps.LastStartTime <= ?', Time.now.to_i - request['lastPlayed'].to_i) if request['lastPlayed']
+
+	songs, err := doQuery(c, q)
+	if err != nil {
+		c.Errorf("Unable to query songs: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJsonResponse(w, songs)
 }
 
 func handleRate(w http.ResponseWriter, r *http.Request) {
