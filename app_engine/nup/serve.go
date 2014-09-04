@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"erat.org/cloud"
@@ -189,6 +190,21 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		q.MaxLastStartTime = time.Now().Add(time.Duration(-s) * time.Second)
+	}
+
+	if len(r.FormValue("tags")) > 0 {
+		tags := strings.Split(r.FormValue("tags"), ",")
+		for _, t := range tags {
+			t = strings.TrimSpace(t)
+			if len(t) == 0 {
+				continue
+			}
+			if t[0] == '-' {
+				q.NotTags = append(q.NotTags, t[1:len(t)-1])
+			} else {
+				q.Tags = append(q.Tags, t)
+			}
+		}
 	}
 
 	songs, err := doQuery(c, q)

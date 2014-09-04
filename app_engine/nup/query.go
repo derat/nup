@@ -148,7 +148,7 @@ func doQuery(c appengine.Context, query *songQuery) (*[]nup.Song, error) {
 	}
 	if len(query.Tags) > 0 {
 		for _, t := range query.Tags {
-			bq = bq.Filter("Tag =", t)
+			bq = bq.Filter("Tags =", t)
 		}
 	}
 
@@ -171,7 +171,7 @@ func doQuery(c appengine.Context, query *songQuery) (*[]nup.Song, error) {
 		qs = []*datastore.Query{bq}
 	}
 
-	// FIXME: Tags, NotTags.
+	// FIXME: NotTags.
 
 	unmergedIds, err := getQueryIds(c, qs)
 	if err != nil {
