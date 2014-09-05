@@ -9,7 +9,6 @@ import (
 type coverFinder struct {
 	artistAlbumMap map[string]string
 	albumMap       map[string]string
-	artistMap      map[string]string
 }
 
 func newCoverFinder(coverDir string) (*coverFinder, error) {
@@ -21,7 +20,6 @@ func newCoverFinder(coverDir string) (*coverFinder, error) {
 	cf := &coverFinder{
 		artistAlbumMap: make(map[string]string),
 		albumMap:       make(map[string]string),
-		artistMap:      make(map[string]string),
 	}
 	for _, fi := range entries {
 		fn := fi.Name()
@@ -38,12 +36,10 @@ func newCoverFinder(coverDir string) (*coverFinder, error) {
 		}
 
 		// Artist or album names may contain hyphens, so we'll just consider everything
-		// following a hyphen to be a potential album and everything preceding a hyphen
-		// to be a potential artist.
+		// following a hyphen to be a potential album.
 		cf.artistAlbumMap[base] = fn
 		for i := 1; i < len(parts); i++ {
 			cf.albumMap[strings.Join(parts[i:], "-")] = fn
-			cf.artistMap[strings.Join(parts[0:i], "-")] = fn
 		}
 	}
 	return cf, nil
@@ -60,8 +56,5 @@ func (cf *coverFinder) findPath(artist, album string) string {
 	if fn, ok := cf.artistAlbumMap[artist+"-"+album]; ok {
 		return fn
 	}
-	if fn, ok := cf.albumMap[album]; ok {
-		return fn
-	}
-	return cf.artistMap[album]
+	return cf.albumMap[album]
 }
