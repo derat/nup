@@ -28,15 +28,15 @@ type updater struct {
 	transport *oauth.Transport
 }
 
-func newUpdater(server, clientId, clientSecret, tokenCache string) (*updater, error) {
-	serverUrl, err := url.Parse(server)
+func newUpdater(cfg config) (*updater, error) {
+	serverUrl, err := url.Parse(cfg.ServerUrl)
 	if err != nil {
 		return nil, err
 	}
 	if !strings.HasSuffix(serverUrl.Path, "/") {
 		serverUrl.Path += "/"
 	}
-	transport, err := cloud.CreateTransport(clientId, clientSecret, oauthScope, tokenCache)
+	transport, err := cloud.CreateTransport(cfg.ClientId, cfg.ClientSecret, oauthScope, cfg.TokenCache)
 	if err != nil {
 		return nil, err
 	}

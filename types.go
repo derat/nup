@@ -22,6 +22,10 @@ type Song struct {
 	// Must be escaped for Cloud Storage.
 	Filename string
 
+	// Relative path from the base of the covers directory.
+	// Must be escaped for Cloud Storage.
+	CoverFilename string `datastore:",noindex"`
+
 	// Canonical versions used for display.
 	Artist string `datastore:",noindex"`
 	Title  string `datastore:",noindex"`
@@ -46,7 +50,7 @@ type Song struct {
 	LastModifiedTime time.Time `json:"-"`
 
 	// Rating in the range [0.0, 1.0] or -1 if unrated.
-	Rating float32
+	Rating float64
 
 	// First and last time the song was played.
 	FirstStartTime time.Time `json:",omitempty"`
@@ -57,7 +61,7 @@ type Song struct {
 
 	// The song's playback history.
 	// Only used for importing data -- in Datastore, Play is a descendant of Song.
-	Plays []*Play `json:",omitempty",datastore:",noindex"`
+	Plays []*Play `json:",omitempty",datastore:"-"`
 
 	// Tags assigned to the song.
 	Tags []string `json:",omitempty"`
