@@ -104,16 +104,16 @@ table.songTable tr.playing {
   padding-left: 2px;
 }
 
-#artistInput, #titleInput, #albumInput, #tagsInput, #minRatingInput {
+#artistInput, #titleInput, #albumInput, #keywordsInput, #tagsInput, #minRatingInput {
   padding-right: 17px;
 }
-#artistClearButton, #titleClearButton, #albumClearButton, #tagsClearButton {
+#artistClearButton, #titleClearButton, #albumClearButton, #keywordsClearButton, #tagsClearButton {
   position: relative;
   left: -22px;
   top: 2px;
   cursor: pointer;
 }
-#substringCheckbox, #firstTrackCheckbox, #shuffleCheckbox, #unratedCheckbox {
+#firstTrackCheckbox, #shuffleCheckbox, #unratedCheckbox {
   margin-right: 15px;
 }
 #maxPlaysInput {

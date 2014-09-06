@@ -21,9 +21,10 @@ function Playlist(player) {
   this.titleClearButton = $('titleClearButton');
   this.albumInput = $('albumInput');
   this.albumClearButton = $('albumClearButton');
+  this.keywordsInput = $('keywordsInput');
+  this.keywordsClearButton = $('keywordsClearButton');
   this.tagsInput = $('tagsInput');
   this.tagsClearButton = $('tagsClearButton');
-  this.substringCheckbox = $('substringCheckbox');
   this.shuffleCheckbox = $('shuffleCheckbox');
   this.firstTrackCheckbox = $('firstTrackCheckbox');
   this.unratedCheckbox = $('unratedCheckbox');
@@ -48,11 +49,12 @@ function Playlist(player) {
   this.artistClearButton.addEventListener('click', function(e) { this.artistInput.value = null; }.bind(this), false);
   this.titleClearButton.addEventListener('click', function(e) { this.titleInput.value = null; }.bind(this), false);
   this.albumClearButton.addEventListener('click', function(e) { this.albumInput.value = null; }.bind(this), false);
+  this.keywordsClearButton.addEventListener('click', function(e) { this.keywordsInput.value = null; }.bind(this), false);
   this.tagsClearButton.addEventListener('click', function(e) { this.tagsInput.value = null; }.bind(this), false);
   this.titleInput.addEventListener('keydown', this.handleFormKeyDown.bind(this), false);
   this.albumInput.addEventListener('keydown', this.handleFormKeyDown.bind(this), false);
+  this.keywordsInput.addEventListener('keydown', this.handleFormKeyDown.bind(this), false);
   this.tagsInput.addEventListener('keydown', this.handleFormKeyDown.bind(this), false);
-  this.substringCheckbox.addEventListener('keydown', this.handleFormKeyDown.bind(this), false);
   this.shuffleCheckbox.addEventListener('keydown', this.handleFormKeyDown.bind(this), false);
   this.firstTrackCheckbox.addEventListener('keydown', this.handleFormKeyDown.bind(this), false);
   this.unratedCheckbox.addEventListener('keydown', this.handleFormKeyDown.bind(this), false);
@@ -125,12 +127,12 @@ Playlist.prototype.submitQuery = function(appendToQueue) {
     terms.push('title=' + encodeURIComponent(this.titleInput.value.trim()));
   if (this.albumInput.value.trim())
     terms.push('album=' + encodeURIComponent(this.albumInput.value.trim()));
+  if (this.keywordsInput.value.trim())
+    terms.push('keywords=' + encodeURIComponent(this.keywordsInput.value.trim()));
   if (this.tagsInput.value.trim())
     terms.push('tags=' + encodeURIComponent(this.tagsInput.value.trim()));
   if (this.minRatingSelect.value != 0 && !this.unratedCheckbox.checked)
     terms.push('minRating=' + this.minRatingSelect.value);
-  if (this.substringCheckbox.checked)
-    terms.push('substring=1');
   if (this.shuffleCheckbox.checked)
     terms.push('shuffle=1');
   if (this.firstTrackCheckbox.checked)
@@ -212,8 +214,8 @@ Playlist.prototype.resetSearchForm = function(artist, album, clearResults) {
   this.artistInput.value = artist ? artist : null;
   this.titleInput.value = null;
   this.albumInput.value = album ? album : null;
+  this.keywordsInput.value = null;
   this.tagsInput.value = null;
-  this.substringCheckbox.checked = false;
   this.shuffleCheckbox.checked = false;
   this.firstTrackCheckbox.checked = false;
   this.unratedCheckbox.checked = false;
@@ -232,6 +234,7 @@ Playlist.prototype.doLuckySearch = function() {
   if (!this.artistInput.value &&
       !this.titleInput.value &&
       !this.albumInput.value &&
+      !this.keywordsInput.value &&
       !this.tagsInput.value &&
       !this.shuffleCheckbox.checked &&
       !this.firstTrackCheckbox.checked &&

@@ -153,15 +153,11 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := &songQuery{}
-	if len(r.FormValue("artist")) > 0 {
-		q.Artist = r.FormValue("artist")
-	}
-	if len(r.FormValue("title")) > 0 {
-		q.Title = r.FormValue("title")
-	}
-	if len(r.FormValue("album")) > 0 {
-		q.Album = r.FormValue("album")
-	}
+	q.Artist = r.FormValue("artist")
+	q.Title = r.FormValue("title")
+	q.Album = r.FormValue("album")
+	q.Keywords = strings.Fields(r.FormValue("keywords"))
+
 	if r.FormValue("firstTrack") == "1" {
 		q.Track = 1
 		q.Disc = 1
@@ -198,18 +194,11 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		q.MaxLastStartTime = time.Now().Add(time.Duration(-s) * time.Second)
 	}
 
-	if len(r.FormValue("tags")) > 0 {
-		tags := strings.Split(r.FormValue("tags"), ",")
-		for _, t := range tags {
-			t = strings.TrimSpace(t)
-			if len(t) == 0 {
-				continue
-			}
-			if t[0] == '-' {
-				q.NotTags = append(q.NotTags, t[1:len(t)-1])
-			} else {
-				q.Tags = append(q.Tags, t)
-			}
+	for _, t := range strings.Fields(r.FormValue("tags")) {
+		if t[0] == '-' {
+			q.NotTags = append(q.NotTags, t[1:len(t)-1])
+		} else {
+			q.Tags = append(q.Tags, t)
 		}
 	}
 
@@ -283,7 +272,7 @@ func handleUpdateSongs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	replaceUserData := r.FormValue("replace") == "1"
-	c.Debugf("Got %v song(s)", len(updatedSongs))
+	c.Debugf("Got %v song(s) to update", len(updatedSongs))
 
 	for _, updatedSong := range updatedSongs {
 		if err := updateOrInsertSong(c, &updatedSong, replaceUserData); err != nil {

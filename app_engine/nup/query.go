@@ -20,6 +20,8 @@ const (
 type songQuery struct {
 	Artist, Title, Album string
 
+	Keywords []string
+
 	MinRating    float64
 	HasMinRating bool
 	Unrated      bool
@@ -157,6 +159,9 @@ func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl st
 	if len(query.Album) > 0 {
 		bq = bq.Filter("AlbumLower =", strings.ToLower(query.Album))
 	}
+	for _, w := range query.Keywords {
+		bq = bq.Filter("Keywords =", w)
+	}
 	if query.Unrated && !query.HasMinRating {
 		bq = bq.Filter("Rating =", -1.0)
 	}
@@ -166,10 +171,8 @@ func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl st
 	if query.Disc > 0 {
 		bq = bq.Filter("Disc =", query.Disc)
 	}
-	if len(query.Tags) > 0 {
-		for _, t := range query.Tags {
-			bq = bq.Filter("Tags =", t)
-		}
+	for _, t := range query.Tags {
+		bq = bq.Filter("Tags =", t)
 	}
 
 	// Datastore doesn't allow multiple inequality filters on different properties.
