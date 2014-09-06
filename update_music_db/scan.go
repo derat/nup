@@ -158,10 +158,11 @@ func readFileDetails(p string, fi os.FileInfo, updateChan chan SongAndError) {
 	if err != nil {
 		return
 	}
-	s.LengthMs, err = computeAudioDurationMs(f, fi, int64(tag.TagSize()), footerLength)
+	lengthMs, err := computeAudioDurationMs(f, fi, int64(tag.TagSize()), footerLength)
 	if err != nil {
 		return
 	}
+	s.Length = float64(lengthMs) / 1000
 }
 
 func scanForUpdatedSongs(cfg config, lastUpdateTime time.Time, updateChan chan SongAndError) (numUpdates int, err error) {

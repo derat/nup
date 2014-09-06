@@ -37,11 +37,10 @@ func getSongsFromLegacyDb(path string, updateChan chan SongAndError) (numUpdates
 	if err = doQuery(db, "SELECT SongId, Sha1, Filename, Artist, Title, Album, DiscNumber, TrackNumber, Length, Rating FROM Songs WHERE Deleted = 0",
 		func(rows *sql.Rows) error {
 			var s nup.Song
-			var songId, lengthSec int
-			if err := rows.Scan(&songId, &s.Sha1, &s.Filename, &s.Artist, &s.Title, &s.Album, &s.Disc, &s.Track, &lengthSec, &s.Rating); err != nil {
+			var songId int
+			if err := rows.Scan(&songId, &s.Sha1, &s.Filename, &s.Artist, &s.Title, &s.Album, &s.Disc, &s.Track, &s.Length, &s.Rating); err != nil {
 				return err
 			}
-			s.LengthMs = int64(lengthSec) * 1000
 			s.Plays = make([]*nup.Play, 0)
 			s.Tags = make([]string, 0)
 			songs[songId] = &s
@@ -63,14 +62,7 @@ func getSongsFromLegacyDb(path string, updateChan chan SongAndError) (numUpdates
 		}
 
 		startTime := time.Unix(int64(startTimeSec), 0)
-		s.NumPlays++
 		s.Plays = append(s.Plays, &nup.Play{startTime, ip})
-		if s.FirstStartTime.IsZero() || startTime.Before(s.FirstStartTime) {
-			s.FirstStartTime = startTime
-		}
-		if s.LastStartTime.IsZero() || startTime.After(s.LastStartTime) {
-			s.LastStartTime = startTime
-		}
 		return nil
 	}); err != nil {
 		return 0, err
