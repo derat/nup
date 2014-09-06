@@ -24,7 +24,13 @@ const (
 )
 
 var cfg struct {
+	// Email addresses of users allowed to use the server.
 	AllowedUsers []string
+
+	// Base URLs for song and cover files.
+	// These should be something like "https://storage.cloud.google.com/my-bucket-name/".
+	BaseSongUrl  string
+	BaseCoverUrl string
 }
 
 func writeJsonResponse(w http.ResponseWriter, v interface{}) {
@@ -207,7 +213,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	songs, err := doQuery(c, q)
+	songs, err := doQuery(c, q, cfg.BaseSongUrl, cfg.BaseCoverUrl)
 	if err != nil {
 		c.Errorf("Unable to query songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

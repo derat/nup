@@ -14,12 +14,13 @@ import (
 func copySongFileFields(dest, src *nup.Song) {
 	dest.Sha1 = src.Sha1
 	dest.Filename = src.Filename
+	dest.CoverFilename = src.CoverFilename
 	dest.Artist = src.Artist
 	dest.Title = src.Title
 	dest.Album = src.Album
 	dest.Track = src.Track
 	dest.Disc = src.Disc
-	dest.LengthMs = src.LengthMs
+	dest.Length = src.Length
 
 	dest.ArtistLower = strings.ToLower(src.Artist)
 	dest.TitleLower = strings.ToLower(src.Title)
@@ -45,6 +46,22 @@ func copySongUserFields(dest, src *nup.Song) {
 	dest.LastStartTime = src.LastStartTime
 	dest.NumPlays = src.NumPlays
 	dest.Tags = src.Tags
+}
+
+func buildSongPlayStats(s *nup.Song) {
+	s.NumPlays = 0
+	s.FirstStartTime = time.Time{}
+	s.LastStartTime = time.Time{}
+
+	for _, p := range s.Plays {
+		s.NumPlays++
+		if s.FirstStartTime.IsZero() || p.StartTime.Before(s.FirstStartTime) {
+			s.FirstStartTime = p.StartTime
+		}
+		if s.LastStartTime.IsZero() || p.StartTime.After(s.LastStartTime) {
+			s.LastStartTime = p.StartTime
+		}
+	}
 }
 
 func replacePlays(c appengine.Context, songKey *datastore.Key, plays *[]*nup.Play) error {
@@ -96,12 +113,12 @@ func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserD
 
 	return datastore.RunInTransaction(c, func(c appengine.Context) error {
 		var key *datastore.Key
-		song := nup.Song{}
+		song := &nup.Song{}
 		if len(queryKeys) == 1 {
 			c.Debugf("Updating %v with SHA1 %v", updatedSong.Filename, sha1)
 			key = queryKeys[0]
 			if !replaceUserData {
-				if err := datastore.Get(c, key, &song); err != nil {
+				if err := datastore.Get(c, key, song); err != nil {
 					return fmt.Errorf("Getting %v failed: %v", sha1, key.IntID(), err)
 				}
 			}
@@ -110,12 +127,13 @@ func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserD
 			key = datastore.NewIncompleteKey(c, songKind, nil)
 		}
 
-		copySongFileFields(&song, updatedSong)
+		copySongFileFields(song, updatedSong)
 		if replaceUserData {
-			copySongUserFields(&song, updatedSong)
+			buildSongPlayStats(updatedSong)
+			copySongUserFields(song, updatedSong)
 		}
 		song.LastModifiedTime = time.Now()
-		key, err = datastore.Put(c, key, &song)
+		key, err = datastore.Put(c, key, song)
 		if err != nil {
 			return fmt.Errorf("Putting %v failed: %v", key.IntID(), err)
 		}

@@ -112,7 +112,7 @@ Playlist.prototype.refreshSongTable = function(table, songs) {
     updateTitleAttributeForTruncation(cell, song.album);
 
     var cell = row.insertCell(-1);
-    cell.innerText = formatTime(parseInt(song.length));
+    cell.innerText = formatTime(parseFloat(song.length));
     cell.className = 'time';
   }
 };

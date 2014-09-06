@@ -162,9 +162,9 @@ Player.prototype.selectTrack = function(index) {
   this.updateSongDisplay();
   this.updateButtonState();
 
-  var musicUrl = '../music/' + this.getCurrentSong().filename;
-  console.log('Switching to ' + musicUrl);
-  this.audio.src = musicUrl;
+  var url = this.getCurrentSong().url;
+  console.log('Switching to ' + url);
+  this.audio.src = url;
   this.play();
   this.reachedEndOfSongs = false;
 };
@@ -188,10 +188,10 @@ Player.prototype.updateSongDisplay = function() {
   updateTitleAttributeForTruncation(this.titleDiv, song.title);
   updateTitleAttributeForTruncation(this.albumDiv, song.album);
 
-  if (song && song.cover) {
-    this.coverImage.src = '../cover/' + song.cover;
+  if (song && song.coverUrl) {
+    this.coverImage.src = song.coverUrl;
     this.favicon.type = 'image/jpeg';
-    this.favicon.href = '../cover/' + song.cover;
+    this.favicon.href = song.coverUrl;
   } else {
     this.coverImage.src = 'images/missing_cover.png';
     this.favicon.type = 'image/png';

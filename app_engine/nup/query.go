@@ -5,9 +5,11 @@ import (
 	"appengine/datastore"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
+	"erat.org/cloud"
 	"erat.org/nup"
 )
 
@@ -43,6 +45,24 @@ func (a int64array) Len() int           { return len(a) }
 func (a int64array) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a int64array) Less(i, j int) bool { return a[i] < a[j] }
 
+func prepareSongForSearchResult(s *nup.Song, id int64, baseSongUrl, baseCoverUrl string) {
+	// Set fields that are only present in search results (i.e. not in Datastore).
+	s.Id = strconv.FormatInt(id, 10)
+	if len(s.Filename) > 0 {
+		s.Url = baseSongUrl + cloud.EscapeObjectName(s.Filename)
+	}
+	if len(s.CoverFilename) > 0 {
+		s.CoverUrl = baseCoverUrl + cloud.EscapeObjectName(s.CoverFilename)
+	}
+
+	// Clear fields that are passed for updates (and hence not excluded from JSON)
+	// but that aren't needed in search results.
+	s.Sha1 = ""
+	s.Filename = ""
+	s.CoverFilename = ""
+	s.Plays = s.Plays[:0]
+}
+
 func getTags(c appengine.Context) (*[]string, error) {
 	tags := make(map[string]bool)
 	it := datastore.NewQuery(songKind).Project("Tags").Distinct().Run(c)
@@ -68,7 +88,7 @@ func getTags(c appengine.Context) (*[]string, error) {
 	return &res, nil
 }
 
-func getQueryIds(c appengine.Context, qs []*datastore.Query) ([]*[]int64, error) {
+func runQueriesAndGetIds(c appengine.Context, qs []*datastore.Query) ([]*[]int64, error) {
 	type idsAndError struct {
 		ids *[]int64
 		err error
@@ -125,7 +145,7 @@ func intersectSortedIds(a, b *[]int64) *[]int64 {
 	return &m
 }
 
-func doQuery(c appengine.Context, query *songQuery) (*[]nup.Song, error) {
+func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl string) (*[]nup.Song, error) {
 	// First, build a base query with all of the equality filters.
 	bq := datastore.NewQuery(songKind).KeysOnly()
 	if len(query.Artist) > 0 {
@@ -173,7 +193,7 @@ func doQuery(c appengine.Context, query *songQuery) (*[]nup.Song, error) {
 
 	// FIXME: NotTags.
 
-	unmergedIds, err := getQueryIds(c, qs)
+	unmergedIds, err := runQueriesAndGetIds(c, qs)
 	if err != nil {
 		return nil, err
 	}
@@ -197,6 +217,9 @@ func doQuery(c appengine.Context, query *songQuery) (*[]nup.Song, error) {
 	songs := make([]nup.Song, len(idsToReturn))
 	if err = datastore.GetMulti(c, keys, songs); err != nil {
 		return nil, err
+	}
+	for i := range songs {
+		prepareSongForSearchResult(&songs[i], keys[i].IntID(), baseSongUrl, baseCoverUrl)
 	}
 	return &songs, nil
 }
