@@ -51,8 +51,8 @@ func (u *updater) SetLastUpdateTime(t time.Time) error {
 	return nil
 }
 
-func (u *updater) UpdateSongs(songs *[]nup.Song, replace bool) error {
-	b, err := json.Marshal(*songs)
+func (u *updater) UpdateSongs(songs []nup.Song, replace bool) error {
+	b, err := json.Marshal(songs)
 	if err != nil {
 		return err
 	}

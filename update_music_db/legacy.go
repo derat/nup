@@ -41,7 +41,7 @@ func getSongsFromLegacyDb(path string, updateChan chan SongAndError) (numUpdates
 			if err := rows.Scan(&songId, &s.Sha1, &s.Filename, &s.Artist, &s.Title, &s.Album, &s.Disc, &s.Track, &s.Length, &s.Rating); err != nil {
 				return err
 			}
-			s.Plays = make([]*nup.Play, 0)
+			s.Plays = make([]nup.Play, 0)
 			s.Tags = make([]string, 0)
 			songs[songId] = &s
 			return nil
@@ -62,7 +62,7 @@ func getSongsFromLegacyDb(path string, updateChan chan SongAndError) (numUpdates
 		}
 
 		startTime := time.Unix(int64(startTimeSec), 0)
-		s.Plays = append(s.Plays, &nup.Play{startTime, ip})
+		s.Plays = append(s.Plays, nup.Play{startTime, ip})
 		return nil
 	}); err != nil {
 		return 0, err

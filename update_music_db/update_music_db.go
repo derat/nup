@@ -98,7 +98,7 @@ func main() {
 
 		batchedSongs = append(batchedSongs, s)
 		if len(batchedSongs) == updateBatchSize || i == numSongs-1 {
-			if err := u.UpdateSongs(&batchedSongs, replaceUserData); err != nil {
+			if err := u.UpdateSongs(batchedSongs, replaceUserData); err != nil {
 				log.Fatal("Failed updating songs: ", err)
 			}
 			batchedSongs = batchedSongs[:0]
