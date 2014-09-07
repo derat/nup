@@ -19,7 +19,7 @@ type Song struct {
 	Sha1 string `json:"sha1,omitempty"`
 
 	// Song entity's key ID from Datastore. Only set in search results.
-	Id string `datastore:"-" json:"songId,omitempty"`
+	SongId string `datastore:"-" json:"songId,omitempty"`
 
 	// Relative path from the base of the music directory.
 	// Must be escaped for Cloud Storage when constructing Url.

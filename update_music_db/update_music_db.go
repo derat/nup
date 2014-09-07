@@ -10,10 +10,6 @@ import (
 	"erat.org/nup"
 )
 
-const (
-	updateBatchSize = 100
-)
-
 type SongAndError struct {
 	Song  *nup.Song
 	Error error
@@ -41,10 +37,6 @@ func main() {
 	if err := cloud.ReadJson(*configFile, &cfg); err != nil {
 		log.Fatal("Unable to read config file: ", err)
 	}
-	u, err := newUpdater(cfg)
-	if err != nil {
-		log.Fatal(err)
-	}
 	log.Printf("Loading covers from %v", cfg.CoverDir)
 	cf, err := newCoverFinder(cfg.CoverDir)
 	if err != nil {
@@ -52,23 +44,23 @@ func main() {
 	}
 
 	numSongs := 0
-	updateChan := make(chan SongAndError, updateBatchSize)
+	readChan := make(chan SongAndError)
 	startTime := time.Now()
 	replaceUserData := false
 
 	if len(*importDb) > 0 {
 		log.Printf("Reading songs from %v", *importDb)
-		if numSongs, err = getSongsFromLegacyDb(*importDb, updateChan); err != nil {
+		if numSongs, err = getSongsFromLegacyDb(*importDb, readChan); err != nil {
 			log.Fatal(err)
 		}
 		replaceUserData = true
 	} else {
-		lastUpdateTime, err := u.GetLastUpdateTime()
+		lastUpdateTime, err := getLastUpdateTime()
 		if err != nil {
 			log.Fatalf("Unable to get last update time: ", err)
 		}
 		log.Printf("Scanning for songs in %v updated since %v", cfg.MusicDir, lastUpdateTime.Local())
-		if numSongs, err = scanForUpdatedSongs(cfg, lastUpdateTime, updateChan); err != nil {
+		if numSongs, err = scanForUpdatedSongs(cfg, lastUpdateTime, readChan); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -78,36 +70,38 @@ func main() {
 	}
 
 	log.Printf("Sending %v song(s)\n", numSongs)
-	batchedSongs := make([]nup.Song, 0, updateBatchSize)
-	for i := 0; i < numSongs; i++ {
-		songAndError := <-updateChan
-		if songAndError.Error != nil {
-			log.Fatalf("Got error for %v: %v\n", songAndError.Song.Filename, songAndError.Error)
-		}
 
-		s := *songAndError.Song
-		s.CoverFilename = cf.findPath(s.Artist, s.Album)
-		if cfg.RequireCovers && len(s.CoverFilename) == 0 {
-			log.Fatalf("Failed to find cover for %v (%v-%v)", s.Filename, s.Artist, s.Album)
-		}
-
-		if *dryRun {
-			log.Print(s)
-			continue
-		}
-
-		batchedSongs = append(batchedSongs, s)
-		if len(batchedSongs) == updateBatchSize || i == numSongs-1 {
-			if err := u.UpdateSongs(batchedSongs, replaceUserData); err != nil {
-				log.Fatal("Failed updating songs: ", err)
+	// Look up covers and feed songs to the updater.
+	updateChan := make(chan nup.Song)
+	go func() {
+		for i := 0; i < numSongs; i++ {
+			songAndError := <-readChan
+			if songAndError.Error != nil {
+				log.Fatalf("Got error for %v: %v\n", songAndError.Song.Filename, songAndError.Error)
 			}
-			batchedSongs = batchedSongs[:0]
-		}
-	}
+			s := *songAndError.Song
+			s.CoverFilename = cf.findPath(s.Artist, s.Album)
+			if cfg.RequireCovers && len(s.CoverFilename) == 0 {
+				log.Fatalf("Failed to find cover for %v (%v-%v)", s.Filename, s.Artist, s.Album)
+			}
 
-	if !*dryRun && len(*importDb) == 0 {
-		if err := u.SetLastUpdateTime(startTime); err != nil {
-			log.Fatal("Failed setting last-update time: ", err)
+			if *dryRun {
+				log.Print(s)
+			} else {
+				log.Print("Sending ", s.Filename)
+				updateChan <- s
+			}
+		}
+	}()
+
+	if !*dryRun {
+		if err = updateSongs(cfg, updateChan, numSongs, replaceUserData); err != nil {
+			log.Fatal(err)
+		}
+		if len(*importDb) == 0 {
+			if err = setLastUpdateTime(startTime); err != nil {
+				log.Fatal("Failed setting last-update time: ", err)
+			}
 		}
 	}
 }
