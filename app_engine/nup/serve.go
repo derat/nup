@@ -206,7 +206,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 
 	for _, t := range strings.Fields(r.FormValue("tags")) {
 		if t[0] == '-' {
-			q.NotTags = append(q.NotTags, t[1:len(t)-1])
+			q.NotTags = append(q.NotTags, t[1:len(t)])
 		} else {
 			q.Tags = append(q.Tags, t)
 		}

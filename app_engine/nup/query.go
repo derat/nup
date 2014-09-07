@@ -130,19 +130,34 @@ func runQueriesAndGetIds(c appengine.Context, qs []*datastore.Query) ([][]int64,
 // intersectSortedIds returns the intersection of two sorted arrays that don't have duplicate values.
 func intersectSortedIds(a, b []int64) []int64 {
 	m := make([]int64, 0)
-	var ai, bi int
-	for ai < len(a) && bi < len(b) {
-		av := a[ai]
-		bv := b[bi]
-		if av == bv {
-			m = append(m, av)
-			ai++
-			bi++
-		} else if av < bv {
-			ai++
+	var i, j int
+	for i < len(a) && j < len(b) {
+		if a[i] == b[j] {
+			m = append(m, a[i])
+			i++
+			j++
+		} else if a[i] < b[j] {
+			i++
 		} else {
-			bi++
+			j++
 		}
+	}
+	return m
+}
+
+// filterSortedIds returns values present in a but not in b (i.e. the intersection of a and !b).
+// Both arrays must be sorted.
+func filterSortedIds(a, b []int64) []int64 {
+	m := make([]int64, 0)
+	var i, j int
+	for i < len(a) {
+		for j < len(b) && a[i] > b[j] {
+			j++
+		}
+		if j >= len(b) || a[i] != b[j] {
+			m = append(m, a[i])
+		}
+		i++
 	}
 	return m
 }
@@ -202,7 +217,11 @@ func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl st
 		qs = []*datastore.Query{bq}
 	}
 
-	// FIXME: NotTags.
+	// Also run queries for tags that shouldn't be present.
+	negativeQueryStart := len(qs)
+	for _, t := range query.NotTags {
+		qs = append(qs, bq.Filter("Tags =", t))
+	}
 
 	startTime := time.Now()
 	unmergedIds, err := runQueriesAndGetIds(c, qs)
@@ -215,8 +234,10 @@ func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl st
 	for i, a := range unmergedIds {
 		if i == 0 {
 			mergedIds = a
-		} else {
+		} else if i < negativeQueryStart {
 			mergedIds = intersectSortedIds(mergedIds, a)
+		} else {
+			mergedIds = filterSortedIds(mergedIds, a)
 		}
 	}
 
@@ -239,7 +260,7 @@ func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl st
 	if err = datastore.GetMulti(c, keys, songs); err != nil {
 		return nil, err
 	}
-	c.Debugf("Fetched %v songs in %v ms", len(songs), time.Now().Sub(startTime).Nanoseconds()/(1000*1000))
+	c.Debugf("Fetched %v song(s) in %v ms", len(songs), time.Now().Sub(startTime).Nanoseconds()/(1000*1000))
 
 	for i := range songs {
 		prepareSongForSearchResult(&songs[i], keys[i].IntID(), baseSongUrl, baseCoverUrl)
