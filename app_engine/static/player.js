@@ -368,30 +368,26 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
     else
       console.log('Skipping unknown tag "' + tag + '"');
   }
-  var tagsChanged = newTags.sort().join(',') != song.tags.sort().join(',');
+  newTags = newTags.sort()
+  var tagsChanged = newTags.join(' ') != song.tags.sort().join(' ');
 
-  if (ratingChanged) {
-    var body = 'songId=' + song.songId + '&rating=' + newRating;
-    console.log("Rating track: " + body);
-    var req = new XMLHttpRequest();
-    req.open('POST', '../rate', true);
-    req.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-    req.send(body);
-    song.rating = newRating;
-  }
+  if (!ratingChanged && !tagsChanged)
+    return;
 
-  if (tagsChanged) {
-    var body = 'songId=' + song.songId + '&tags=' + newTags.join(',');
-    console.log("Tagging track: " + body);
-    var req = new XMLHttpRequest();
-    req.open('POST', '../tag', true);
-    req.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-    req.send(body);
-    song.tags = newTags;
-  }
+  var url = '../rate_and_tag?songId=' + encodeURIComponent(song.songId);
+  if (ratingChanged)
+    url += '&rating=' + encodeURIComponent(newRating);
+  if (tagsChanged)
+    url += '&tags=' + encodeURIComponent(newTags.join(' '));
+  console.log("Rating/tagging track: " + url);
+  var req = new XMLHttpRequest();
+  req.open('POST', url, true);
+  req.send();
 
-  if (ratingChanged || tagsChanged)
-    this.updateCoverTitleAttribute();
+  song.rating = newRating;
+  song.tags = newTags;
+
+  this.updateCoverTitleAttribute();
   if (ratingChanged)
     this.updateRatingOverlay();
 };

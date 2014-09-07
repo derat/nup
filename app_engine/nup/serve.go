@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -41,6 +42,11 @@ func writeJsonResponse(w http.ResponseWriter, v interface{}) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(b)
 	}
+}
+
+func writeTextResponse(w http.ResponseWriter, s string) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte(s))
 }
 
 func checkUserRequest(c appengine.Context, w http.ResponseWriter, r *http.Request, method string, redirectToLogin bool) bool {
@@ -115,6 +121,18 @@ func parseFloatParam(c appengine.Context, w http.ResponseWriter, r *http.Request
 	return true
 }
 
+func sortedStringSlicesMatch(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func init() {
 	if err := cloud.ReadJson(configFile, &cfg); err != nil {
 		panic(fmt.Sprintf("Unable to read %v: %v", configFile, err))
@@ -123,10 +141,9 @@ func init() {
 	http.HandleFunc("/contents", handleContents)
 	http.HandleFunc("/list_tags", handleListTags)
 	http.HandleFunc("/query", handleQuery)
-	http.HandleFunc("/rate", handleRate)
+	http.HandleFunc("/rate_and_tag", handleRateAndTag)
 	http.HandleFunc("/report_played", handleReportPlayed)
 	http.HandleFunc("/songs", handleSongs)
-	http.HandleFunc("/tag", handleTag)
 	http.HandleFunc("/update_songs", handleUpdateSongs)
 }
 
@@ -221,31 +238,63 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	writeJsonResponse(w, songs)
 }
 
-func handleRate(w http.ResponseWriter, r *http.Request) {
+func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	if !checkUserRequest(c, w, r, "POST", false) {
 		return
 	}
 	var id int64
-	var rating float64
-	if !parseIntParam(c, w, r, "songId", &id) || !parseFloatParam(c, w, r, "rating", &rating) {
+	if !parseIntParam(c, w, r, "songId", &id) {
 		return
 	}
-	c.Debugf("Got request to set song %v's rating to %v", id, rating)
-	if rating < 0.0 {
-		rating = -1.0
-	} else if rating > 1.0 {
-		rating = 1.0
+
+	var hasRating, hasTags bool
+	var rating float64
+	tags := make([]string, 0)
+	if _, ok := r.Form["rating"]; ok {
+		hasRating = true
+		if !parseFloatParam(c, w, r, "rating", &rating) {
+			return
+		}
+		if rating < 0.0 {
+			rating = -1.0
+		} else if rating > 1.0 {
+			rating = 1.0
+		}
 	}
+	if _, ok := r.Form["tags"]; ok {
+		hasTags = true
+		for _, t := range strings.Fields(r.FormValue("tags")) {
+			tags = append(tags, strings.TrimSpace(t))
+		}
+		sort.Strings(tags)
+	}
+	if !hasRating && !hasTags {
+		http.Error(w, "No rating or tags supplied", http.StatusBadRequest)
+		return
+	}
+
 	if err := updateExistingSong(c, id, func(c appengine.Context, s *nup.Song) error {
-		s.Rating = rating
-		return nil
-	}); err != nil {
+		var updated bool
+		if hasRating && rating != s.Rating {
+			s.Rating = rating
+			updated = true
+		}
+		if hasTags && !sortedStringSlicesMatch(tags, s.Tags) {
+			s.Tags = tags
+			updated = true
+		}
+		if updated {
+			return nil
+		} else {
+			return ErrSongUnchanged
+		}
+	}); err != nil && err != ErrSongUnchanged {
 		c.Errorf("Got error while rating song: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
+	writeTextResponse(w, "ok")
 }
 
 func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
@@ -259,14 +308,6 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleSongs(w http.ResponseWriter, r *http.Request) {
-}
-
-func handleTag(w http.ResponseWriter, r *http.Request) {
-	// create key with song id from request
-	// within transaction:
-	//   get existing Song
-	//   update tags and update time
-	//   put Song
 }
 
 func handleUpdateSongs(w http.ResponseWriter, r *http.Request) {

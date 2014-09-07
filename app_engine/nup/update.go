@@ -3,12 +3,18 @@ package nup
 import (
 	"appengine"
 	"appengine/datastore"
+	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
 
 	"erat.org/nup"
+)
+
+var (
+	ErrSongUnchanged = errors.New("Song wasn't modified")
 )
 
 func copySongFileFields(dest, src *nup.Song) {
@@ -46,6 +52,7 @@ func copySongUserFields(dest, src *nup.Song) {
 	dest.LastStartTime = src.LastStartTime
 	dest.NumPlays = src.NumPlays
 	dest.Tags = src.Tags
+	sort.Strings(dest.Tags)
 }
 
 func buildSongPlayStats(s *nup.Song) {
@@ -91,12 +98,16 @@ func updateExistingSong(c appengine.Context, id int64, f func(appengine.Context,
 			return err
 		}
 		if err := f(c, song); err != nil {
+			if err == ErrSongUnchanged {
+				c.Debugf("Song %v wasn't changed", id)
+			}
 			return err
 		}
 		song.LastModifiedTime = time.Now()
 		if _, err := datastore.Put(c, key, song); err != nil {
 			return err
 		}
+		c.Debugf("Updated song %v", id)
 		return nil
 	}, nil)
 }
