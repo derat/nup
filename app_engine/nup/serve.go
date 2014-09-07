@@ -128,6 +128,7 @@ func init() {
 	}
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/contents", handleContents)
+	http.HandleFunc("/export", handleExport)
 	http.HandleFunc("/import", handleImport)
 	http.HandleFunc("/list_tags", handleListTags)
 	http.HandleFunc("/query", handleQuery)
@@ -145,6 +146,18 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleContents(w http.ResponseWriter, r *http.Request) {
+}
+
+func handleExport(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	if !checkOAuthRequest(c, w, r) {
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	if err := dumpSongs(c, w); err != nil {
+		c.Errorf("Failed to export songs: %v", err)
+	}
 }
 
 func handleImport(w http.ResponseWriter, r *http.Request) {

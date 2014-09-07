@@ -13,6 +13,9 @@ handlers:
 - url: /contents
   script: _go_app
   secure: always
+- url: /export
+  script: _go_app
+  secure: always
 - url: /import
   script: _go_app
   secure: always

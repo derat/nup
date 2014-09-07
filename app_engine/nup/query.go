@@ -3,6 +3,9 @@ package nup
 import (
 	"appengine"
 	"appengine/datastore"
+	"encoding/json"
+	"fmt"
+	"io"
 	"math/rand"
 	"sort"
 	"strconv"
@@ -14,7 +17,9 @@ import (
 )
 
 const (
-	MaxQueryResults = 100
+	maxQueryResults = 100
+
+	keyProperty = "__key__"
 )
 
 type songQuery struct {
@@ -248,8 +253,8 @@ func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl st
 
 	// Oh, for generics...
 	numResults := len(mergedIds)
-	if numResults > MaxQueryResults {
-		numResults = MaxQueryResults
+	if numResults > maxQueryResults {
+		numResults = maxQueryResults
 	}
 
 	if query.Shuffle {
@@ -271,4 +276,46 @@ func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl st
 		prepareSongForSearchResult(&songs[i], keys[i].IntID(), baseSongUrl, baseCoverUrl)
 	}
 	return songs, nil
+}
+
+func dumpSongs(c appengine.Context, w io.Writer) error {
+	d := json.NewEncoder(w)
+	si := datastore.NewQuery(songKind).Order(keyProperty).Run(c)
+	pi := datastore.NewQuery(playKind).Order(keyProperty).Run(c)
+
+	p := nup.Play{}
+	pk, err := pi.Next(&p)
+	if err != datastore.Done && err != nil {
+		return fmt.Errorf("Unable to read play: %v", err)
+	}
+
+	for true {
+		s := &nup.Song{}
+		sk, err := si.Next(s)
+		if err == datastore.Done {
+			break
+		} else if err != nil {
+			return fmt.Errorf("Unable to read song: %v", err)
+		}
+		s.Plays = make([]nup.Play, 0)
+
+		for pk.Parent().IntID() == sk.IntID() {
+			s.Plays = append(s.Plays, p)
+			if pk, err = pi.Next(&p); err == datastore.Done {
+				break
+			} else if err != nil {
+				return fmt.Errorf("Unable to read play: %v", err)
+			}
+		}
+
+		if err = d.Encode(s); err != nil {
+			return err
+		}
+	}
+
+	if pk, err = pi.Next(&p); err != datastore.Done {
+		return fmt.Errorf("Have orphaned play %v for song %v", pk.IntID(), pk.Parent().IntID())
+	}
+
+	return nil
 }
