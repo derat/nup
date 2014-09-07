@@ -5,6 +5,7 @@ import (
 	"appengine/user"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"strconv"
@@ -127,12 +128,12 @@ func init() {
 	}
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/contents", handleContents)
+	http.HandleFunc("/import", handleImport)
 	http.HandleFunc("/list_tags", handleListTags)
 	http.HandleFunc("/query", handleQuery)
 	http.HandleFunc("/rate_and_tag", handleRateAndTag)
 	http.HandleFunc("/report_played", handleReportPlayed)
 	http.HandleFunc("/songs", handleSongs)
-	http.HandleFunc("/update_songs", handleUpdateSongs)
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -144,6 +145,35 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleContents(w http.ResponseWriter, r *http.Request) {
+}
+
+func handleImport(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	if !checkOAuthRequest(c, w, r) {
+		return
+	}
+
+	numSongs := 0
+	replaceUserData := r.FormValue("replaceUserData") == "1"
+	d := json.NewDecoder(r.Body)
+	for true {
+		s := &nup.Song{}
+		if err := d.Decode(s); err == io.EOF {
+			break
+		} else if err != nil {
+			c.Errorf("Failed to decode song: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := updateOrInsertSong(c, s, replaceUserData); err != nil {
+			c.Errorf("Failed to update song with SHA1 %v: %v", s.Sha1, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		numSongs++
+	}
+	c.Debugf("Updated %v song(s)", numSongs)
+	writeTextResponse(w, "ok")
 }
 
 func handleListTags(w http.ResponseWriter, r *http.Request) {
@@ -288,28 +318,4 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleSongs(w http.ResponseWriter, r *http.Request) {
-}
-
-func handleUpdateSongs(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if !checkOAuthRequest(c, w, r) {
-		return
-	}
-
-	updatedSongs := make([]nup.Song, 0, 0)
-	if err := json.Unmarshal([]byte(r.PostFormValue("songs")), &updatedSongs); err != nil {
-		c.Errorf("Unable to decode songs from update request: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	replaceUserData := r.FormValue("replace") == "1"
-	c.Debugf("Got %v song(s) to update", len(updatedSongs))
-
-	for _, updatedSong := range updatedSongs {
-		if err := updateOrInsertSong(c, &updatedSong, replaceUserData); err != nil {
-			c.Errorf("Got error while updating song: %v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
 }

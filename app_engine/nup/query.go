@@ -49,7 +49,7 @@ func (a int64array) Less(i, j int) bool { return a[i] < a[j] }
 
 func prepareSongForSearchResult(s *nup.Song, id int64, baseSongUrl, baseCoverUrl string) {
 	// Set fields that are only present in search results (i.e. not in Datastore).
-	s.Id = strconv.FormatInt(id, 10)
+	s.SongId = strconv.FormatInt(id, 10)
 	if len(s.Filename) > 0 {
 		s.Url = baseSongUrl + cloud.EscapeObjectName(s.Filename)
 	}
