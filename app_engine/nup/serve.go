@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -119,18 +118,6 @@ func parseFloatParam(c appengine.Context, w http.ResponseWriter, r *http.Request
 		return false
 	}
 	*v = val
-	return true
-}
-
-func sortedStringSlicesMatch(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
 	return true
 }
 
@@ -268,29 +255,12 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 		for _, t := range strings.Fields(r.FormValue("tags")) {
 			tags = append(tags, strings.TrimSpace(t))
 		}
-		sort.Strings(tags)
 	}
 	if !hasRating && !hasTags {
 		http.Error(w, "No rating or tags supplied", http.StatusBadRequest)
 		return
 	}
-
-	if err := updateExistingSong(c, id, func(c appengine.Context, s *nup.Song) error {
-		var updated bool
-		if hasRating && rating != s.Rating {
-			s.Rating = rating
-			updated = true
-		}
-		if hasTags && !sortedStringSlicesMatch(tags, s.Tags) {
-			s.Tags = tags
-			updated = true
-		}
-		if updated {
-			return nil
-		} else {
-			return ErrSongUnchanged
-		}
-	}); err != nil && err != ErrSongUnchanged {
+	if err := updateRatingAndTags(c, id, hasRating, rating, hasTags, tags); err != nil {
 		c.Errorf("Got error while rating/tagging song: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

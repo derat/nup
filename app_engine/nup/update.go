@@ -17,6 +17,18 @@ var (
 	ErrSongUnchanged = errors.New("Song wasn't modified")
 )
 
+func sortedStringSlicesMatch(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func copySongFileFields(dest, src *nup.Song) {
 	dest.Sha1 = src.Sha1
 	dest.Filename = src.Filename
@@ -136,6 +148,29 @@ func addPlay(c appengine.Context, id int64, startTime time.Time, ip string) erro
 		}
 		return nil
 	})
+}
+
+func updateRatingAndTags(c appengine.Context, id int64, hasRating bool, rating float64, hasTags bool, tags []string) error {
+	if err := updateExistingSong(c, id, func(c appengine.Context, s *nup.Song) error {
+		var updated bool
+		if hasRating && rating != s.Rating {
+			s.Rating = rating
+			updated = true
+		}
+		sort.Strings(tags)
+		if hasTags && !sortedStringSlicesMatch(tags, s.Tags) {
+			s.Tags = tags
+			updated = true
+		}
+		if updated {
+			return nil
+		} else {
+			return ErrSongUnchanged
+		}
+	}); err != nil && err != ErrSongUnchanged {
+		return err
+	}
+	return nil
 }
 
 func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserData bool) error {
