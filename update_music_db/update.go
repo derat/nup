@@ -67,6 +67,7 @@ func updateSongs(cfg config, ch chan nup.Song, numSongs int, replaceUserData boo
 
 	// Ideally these results could just be streamed, but dev_appserver.py doesn't seem to support
 	// chunked encoding: https://code.google.com/p/googleappengine/issues/detail?id=129
+	// Might be for the best, as the max request duration could probably be hit otherwise.
 
 	var buf bytes.Buffer
 	e := json.NewEncoder(&buf)

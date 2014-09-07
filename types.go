@@ -7,10 +7,10 @@ import (
 // Play represents one playback of a Song.
 type Play struct {
 	// Time at which playback started.
-	StartTime time.Time `json:"startTime"`
+	StartTime time.Time `json:"t"`
 
 	// Client playing the song.
-	IpAddress string `json:"ipAddress"`
+	IpAddress string `json:"ip"`
 }
 
 // Song represents an audio file.
