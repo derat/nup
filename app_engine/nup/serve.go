@@ -166,6 +166,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	q.Title = r.FormValue("title")
 	q.Album = r.FormValue("album")
 	q.Keywords = strings.Fields(r.FormValue("keywords"))
+	q.Shuffle = r.FormValue("shuffle") == "1"
 
 	if r.FormValue("firstTrack") == "1" {
 		q.Track = 1

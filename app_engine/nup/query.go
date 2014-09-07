@@ -3,7 +3,7 @@ package nup
 import (
 	"appengine"
 	"appengine/datastore"
-	"math"
+	"math/rand"
 	"sort"
 	"strconv"
 	"strings"
@@ -147,6 +147,14 @@ func intersectSortedIds(a, b []int64) []int64 {
 	return m
 }
 
+// shufflePartial randomly swaps into the first n positions using elements from the entire slice.
+func shufflePartial(a []int64, n int) {
+	for i := 0; i < n; i++ {
+		j := i + rand.Intn(len(a)-i)
+		a[i], a[j] = a[j], a[i]
+	}
+}
+
 func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl string) ([]nup.Song, error) {
 	// First, build a base query with all of the equality filters.
 	bq := datastore.NewQuery(songKind).KeysOnly()
@@ -196,10 +204,13 @@ func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl st
 
 	// FIXME: NotTags.
 
+	startTime := time.Now()
 	unmergedIds, err := runQueriesAndGetIds(c, qs)
 	if err != nil {
 		return nil, err
 	}
+	c.Debugf("Ran %v query(s) in %v ms", len(qs), time.Now().Sub(startTime).Nanoseconds()/(1000*1000))
+
 	var mergedIds []int64
 	for i, a := range unmergedIds {
 		if i == 0 {
@@ -209,18 +220,27 @@ func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl st
 		}
 	}
 
-	// FIXME: Shuffle
+	// Oh, for generics...
+	numResults := len(mergedIds)
+	if numResults > MaxQueryResults {
+		numResults = MaxQueryResults
+	}
 
-	// There has to be a better way to do this.
-	idsToReturn := mergedIds[:int(math.Min(float64(len(mergedIds)), float64(MaxQueryResults)))]
-	keys := make([]*datastore.Key, len(idsToReturn))
-	for i, id := range idsToReturn {
+	if query.Shuffle {
+		shufflePartial(mergedIds, numResults)
+	}
+
+	startTime = time.Now()
+	keys := make([]*datastore.Key, numResults)
+	for i, id := range mergedIds[:numResults] {
 		keys[i] = datastore.NewKey(c, songKind, "", id, nil)
 	}
-	songs := make([]nup.Song, len(idsToReturn))
+	songs := make([]nup.Song, numResults)
 	if err = datastore.GetMulti(c, keys, songs); err != nil {
 		return nil, err
 	}
+	c.Debugf("Fetched %v songs in %v ms", len(songs), time.Now().Sub(startTime).Nanoseconds()/(1000*1000))
+
 	for i := range songs {
 		prepareSongForSearchResult(&songs[i], keys[i].IntID(), baseSongUrl, baseCoverUrl)
 	}
