@@ -297,6 +297,8 @@ func dumpSongs(c appengine.Context, w io.Writer) error {
 		} else if err != nil {
 			return fmt.Errorf("Unable to read song: %v", err)
 		}
+		s.SongId = strconv.FormatInt(sk.IntID(), 10)
+		s.CoverFilename = ""
 		s.Plays = make([]nup.Play, 0)
 
 		for pk.Parent().IntID() == sk.IntID() {
