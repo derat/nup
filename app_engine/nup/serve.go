@@ -5,6 +5,7 @@ import (
 	"appengine/user"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -290,21 +291,30 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 			return ErrSongUnchanged
 		}
 	}); err != nil && err != ErrSongUnchanged {
-		c.Errorf("Got error while rating song: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		c.Errorf("Got error while rating/tagging song: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeTextResponse(w, "ok")
 }
 
 func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
-	// create key with song id from request
-	// within transaction:
-	//   check if Play already exists; if so, error
-	//   insert new Play
-	//   get existing Song
-	//   update play times, play count, and update time
-	//   put Song
+	c := appengine.NewContext(r)
+	if !checkUserRequest(c, w, r, "POST", false) {
+		return
+	}
+	var id int64
+	var startTimeFloat float64
+	if !parseIntParam(c, w, r, "songId", &id) || !parseFloatParam(c, w, r, "startTime", &startTimeFloat) {
+		return
+	}
+	startTime := time.Unix(int64(startTimeFloat), int64((startTimeFloat-math.Floor(startTimeFloat))*1000*1000*1000))
+
+	if err := addPlay(c, id, startTime, r.RemoteAddr); err != nil {
+		c.Errorf("Got error while recording play: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	writeTextResponse(w, "ok")
 }
 
 func handleSongs(w http.ResponseWriter, r *http.Request) {

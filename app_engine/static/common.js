@@ -16,7 +16,7 @@ function getCurrentTimeMs() {
 }
 
 function getCurrentTimeSec() {
-  return parseInt(getCurrentTimeMs() / 1000);
+  return getCurrentTimeMs() / 1000;
 }
 
 function updateTitleAttributeForTruncation(element, text) {

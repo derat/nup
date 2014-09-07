@@ -57,6 +57,11 @@ func prepareSongForSearchResult(s *nup.Song, id int64, baseSongUrl, baseCoverUrl
 		s.CoverUrl = baseCoverUrl + cloud.EscapeObjectName(s.CoverFilename)
 	}
 
+	// Create an empty tags slice so that clients don't need to check for null.
+	if s.Tags == nil {
+		s.Tags = make([]string, 0)
+	}
+
 	// Clear fields that are passed for updates (and hence not excluded from JSON)
 	// but that aren't needed in search results.
 	s.Sha1 = ""

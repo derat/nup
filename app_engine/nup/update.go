@@ -112,6 +112,32 @@ func updateExistingSong(c appengine.Context, id int64, f func(appengine.Context,
 	}, nil)
 }
 
+func addPlay(c appengine.Context, id int64, startTime time.Time, ip string) error {
+	return updateExistingSong(c, id, func(c appengine.Context, s *nup.Song) error {
+		songKey := datastore.NewKey(c, songKind, "", id, nil)
+		existingKeys, err := datastore.NewQuery(playKind).Ancestor(songKey).KeysOnly().Filter("StartTime =", startTime).Filter("IpAddress =", ip).GetAll(c, nil)
+		if err != nil {
+			return fmt.Errorf("Querying for existing play failed: %v", err)
+		} else if len(existingKeys) > 0 {
+			return fmt.Errorf("Already have play for song %v starting at %v from %v", id, startTime, ip)
+		}
+
+		s.NumPlays++
+		if s.FirstStartTime.IsZero() || startTime.Before(s.FirstStartTime) {
+			s.FirstStartTime = startTime
+		}
+		if s.LastStartTime.IsZero() || startTime.After(s.LastStartTime) {
+			s.LastStartTime = startTime
+		}
+
+		newKey := datastore.NewIncompleteKey(c, playKind, songKey)
+		if _, err = datastore.Put(c, newKey, &nup.Play{startTime, ip}); err != nil {
+			return fmt.Errorf("Putting play failed: %v", err)
+		}
+		return nil
+	})
+}
+
 func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserData bool) error {
 	sha1 := updatedSong.Sha1
 	queryKeys, err := datastore.NewQuery(songKind).KeysOnly().Filter("Sha1 =", sha1).GetAll(c, nil)

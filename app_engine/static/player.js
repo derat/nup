@@ -318,13 +318,11 @@ Player.prototype.reportCurrentTrack = function() {
   this.reportedCurrentTrack = true;
 
   var song = this.getCurrentSong();
-  var body = 'songId=' + song.songId + '&startTime=' + this.startTime;
-
-  console.log("Reporting track: " + body);
+  var url = '../report_played?songId=' + encodeURIComponent(song.songId) + '&startTime=' + encodeURIComponent(this.startTime);
+  console.log("Reporting track: " + url);
   var req = new XMLHttpRequest();
-  req.open('POST', '../report_played', true);
-  req.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-  req.send(body);
+  req.open('POST', url, true);
+  req.send();
 };
 
 Player.prototype.showUpdateDiv = function() {
