@@ -65,7 +65,7 @@ func prepareSongForSearchResult(s *nup.Song, id int64, baseSongUrl, baseCoverUrl
 	s.Plays = s.Plays[:0]
 }
 
-func getTags(c appengine.Context) (*[]string, error) {
+func getTags(c appengine.Context) ([]string, error) {
 	tags := make(map[string]bool)
 	it := datastore.NewQuery(songKind).Project("Tags").Distinct().Run(c)
 	for {
@@ -87,12 +87,12 @@ func getTags(c appengine.Context) (*[]string, error) {
 		res[i] = t
 		i++
 	}
-	return &res, nil
+	return res, nil
 }
 
-func runQueriesAndGetIds(c appengine.Context, qs []*datastore.Query) ([]*[]int64, error) {
+func runQueriesAndGetIds(c appengine.Context, qs []*datastore.Query) ([][]int64, error) {
 	type idsAndError struct {
-		ids *[]int64
+		ids []int64
 		err error
 	}
 	ch := make(chan idsAndError)
@@ -112,11 +112,11 @@ func runQueriesAndGetIds(c appengine.Context, qs []*datastore.Query) ([]*[]int64
 				}
 			}
 			sort.Sort(int64array(ids))
-			ch <- idsAndError{&ids, nil}
+			ch <- idsAndError{ids, nil}
 		}(q)
 	}
 
-	res := make([]*[]int64, len(qs))
+	res := make([][]int64, len(qs))
 	for i := range qs {
 		iae := <-ch
 		if iae.err != nil {
@@ -128,12 +128,12 @@ func runQueriesAndGetIds(c appengine.Context, qs []*datastore.Query) ([]*[]int64
 }
 
 // intersectSortedIds returns the intersection of two sorted arrays that don't have duplicate values.
-func intersectSortedIds(a, b *[]int64) *[]int64 {
+func intersectSortedIds(a, b []int64) []int64 {
 	m := make([]int64, 0)
 	var ai, bi int
-	for ai < len(*a) && bi < len(*b) {
-		av := (*a)[ai]
-		bv := (*b)[bi]
+	for ai < len(a) && bi < len(b) {
+		av := a[ai]
+		bv := b[bi]
 		if av == bv {
 			m = append(m, av)
 			ai++
@@ -144,10 +144,10 @@ func intersectSortedIds(a, b *[]int64) *[]int64 {
 			bi++
 		}
 	}
-	return &m
+	return m
 }
 
-func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl string) (*[]nup.Song, error) {
+func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl string) ([]nup.Song, error) {
 	// First, build a base query with all of the equality filters.
 	bq := datastore.NewQuery(songKind).KeysOnly()
 	if len(query.Artist) > 0 {
@@ -200,7 +200,7 @@ func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl st
 	if err != nil {
 		return nil, err
 	}
-	var mergedIds *[]int64
+	var mergedIds []int64
 	for i, a := range unmergedIds {
 		if i == 0 {
 			mergedIds = a
@@ -212,7 +212,7 @@ func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl st
 	// FIXME: Shuffle
 
 	// There has to be a better way to do this.
-	idsToReturn := (*mergedIds)[:int(math.Min(float64(len(*mergedIds)), float64(MaxQueryResults)))]
+	idsToReturn := mergedIds[:int(math.Min(float64(len(mergedIds)), float64(MaxQueryResults)))]
 	keys := make([]*datastore.Key, len(idsToReturn))
 	for i, id := range idsToReturn {
 		keys[i] = datastore.NewKey(c, songKind, "", id, nil)
@@ -224,5 +224,5 @@ func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl st
 	for i := range songs {
 		prepareSongForSearchResult(&songs[i], keys[i].IntID(), baseSongUrl, baseCoverUrl)
 	}
-	return &songs, nil
+	return songs, nil
 }

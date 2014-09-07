@@ -64,7 +64,7 @@ func buildSongPlayStats(s *nup.Song) {
 	}
 }
 
-func replacePlays(c appengine.Context, songKey *datastore.Key, plays *[]*nup.Play) error {
+func replacePlays(c appengine.Context, songKey *datastore.Key, plays []nup.Play) error {
 	playKeys, err := datastore.NewQuery(playKind).Ancestor(songKey).KeysOnly().GetAll(c, nil)
 	if err != nil {
 		return err
@@ -73,11 +73,11 @@ func replacePlays(c appengine.Context, songKey *datastore.Key, plays *[]*nup.Pla
 		return err
 	}
 
-	playKeys = make([]*datastore.Key, len(*plays))
-	for i := range *plays {
+	playKeys = make([]*datastore.Key, len(plays))
+	for i := range plays {
 		playKeys[i] = datastore.NewIncompleteKey(c, playKind, songKey)
 	}
-	if _, err = datastore.PutMulti(c, playKeys, *plays); err != nil {
+	if _, err = datastore.PutMulti(c, playKeys, plays); err != nil {
 		return err
 	}
 	return nil
@@ -140,7 +140,7 @@ func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserD
 		c.Debugf("Put %v with key %v", songKind, key.IntID())
 
 		if replaceUserData {
-			if err = replacePlays(c, key, &updatedSong.Plays); err != nil {
+			if err = replacePlays(c, key, updatedSong.Plays); err != nil {
 				return err
 			}
 		}

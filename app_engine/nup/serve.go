@@ -43,30 +43,35 @@ func writeJsonResponse(w http.ResponseWriter, v interface{}) {
 	}
 }
 
-func checkUserRequest(c appengine.Context, w http.ResponseWriter, r *http.Request, method string) bool {
-	loginUrl, _ := user.LoginURL(c, "/")
+func checkUserRequest(c appengine.Context, w http.ResponseWriter, r *http.Request, method string, redirectToLogin bool) bool {
 	u := user.Current(c)
-	if u == nil {
-		c.Debugf("Unauthorized request for %v from unauthenticated user at %v", r.URL.String(), r.RemoteAddr)
-		http.Redirect(w, r, loginUrl, http.StatusFound)
-		return false
-	}
-
 	allowed := false
 	for _, au := range cfg.AllowedUsers {
-		if u.Email == au {
+		if u != nil && u.Email == au {
 			allowed = true
 			break
 		}
 	}
+
 	if !allowed {
-		c.Debugf("Unauthorized request for %v from %v at %v", r.URL.String(), u.Email, r.RemoteAddr)
-		http.Redirect(w, r, loginUrl, http.StatusFound)
+		if u == nil {
+			c.Debugf("Unauthorized request for %v from unauthenticated user at %v", r.URL.String(), r.RemoteAddr)
+		} else {
+			c.Debugf("Unauthorized request for %v from %v at %v", r.URL.String(), u.Email, r.RemoteAddr)
+		}
+		if redirectToLogin {
+			loginUrl, _ := user.LoginURL(c, "/")
+			http.Redirect(w, r, loginUrl, http.StatusFound)
+		} else {
+			http.Error(w, "Request requires authorization", http.StatusUnauthorized)
+		}
 		return false
 	}
 
 	if r.Method != method {
 		c.Debugf("Invalid %v request for %v (expected %v)", r.Method, r.URL.String(), method)
+		w.Header().Set("Allow", method)
+		http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
 		return false
 	}
 
@@ -126,6 +131,10 @@ func init() {
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	if !checkUserRequest(c, w, r, "GET", true) {
+		return
+	}
 	http.Redirect(w, r, "/static/index.html", http.StatusFound)
 }
 
@@ -134,7 +143,7 @@ func handleContents(w http.ResponseWriter, r *http.Request) {
 
 func handleListTags(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	if !checkUserRequest(c, w, r, "GET") {
+	if !checkUserRequest(c, w, r, "GET", false) {
 		return
 	}
 	tags, err := getTags(c)
@@ -148,7 +157,7 @@ func handleListTags(w http.ResponseWriter, r *http.Request) {
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	if !checkUserRequest(c, w, r, "GET") {
+	if !checkUserRequest(c, w, r, "GET", false) {
 		return
 	}
 
@@ -213,7 +222,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 
 func handleRate(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	if !checkUserRequest(c, w, r, "POST") {
+	if !checkUserRequest(c, w, r, "POST", false) {
 		return
 	}
 	var id int64
@@ -277,7 +286,7 @@ func handleUpdateSongs(w http.ResponseWriter, r *http.Request) {
 	for _, updatedSong := range updatedSongs {
 		if err := updateOrInsertSong(c, &updatedSong, replaceUserData); err != nil {
 			c.Errorf("Got error while updating song: %v", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
