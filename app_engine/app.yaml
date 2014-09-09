@@ -10,7 +10,7 @@ handlers:
 - url: /index\.html
   script: _go_app
   secure: always
-- url: /(.*\.(css|html|js|png))
+- url: /(.*\.(css|html|gif|jpe?g|js|png|txt))
   static_files: static/\1
   secure: always
   upload: static/.*
