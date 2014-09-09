@@ -17,7 +17,11 @@ import (
 )
 
 const (
+	// Maximum number of results to return for a search.
 	maxQueryResults = 100
+
+	// Maximum batch size when returning songs to Android.
+	androidSongBatchSize = 250
 
 	keyProperty = "__key__"
 )
@@ -320,4 +324,41 @@ func dumpSongs(c appengine.Context, w io.Writer) error {
 	}
 
 	return nil
+}
+
+func getSongsForAndroid(c appengine.Context, minLastModified time.Time, startCursor, baseSongUrl, baseCoverUrl string) (songs []nup.Song, nextCursor string, err error) {
+	q := datastore.NewQuery(songKind).Filter("LastModifiedTime >= ", minLastModified)
+	if len(startCursor) > 0 {
+		sc, err := datastore.DecodeCursor(startCursor)
+		if err != nil {
+			return nil, "", fmt.Errorf("Unable to decode cursor %q: %v", startCursor, err)
+		}
+		q = q.Start(sc)
+	}
+
+	it := q.Run(c)
+	songs = make([]nup.Song, 0)
+	for true {
+		s := nup.Song{}
+		sk, err := it.Next(&s)
+		if err == datastore.Done {
+			break
+		} else if err != nil {
+			return nil, "", fmt.Errorf("Unable to read song: %v", err)
+		}
+
+		prepareSongForSearchResult(&s, sk.IntID(), baseSongUrl, baseCoverUrl)
+		songs = append(songs, s)
+
+		if len(songs) == androidSongBatchSize {
+			nc, err := it.Cursor()
+			if err != nil {
+				return nil, "", fmt.Errorf("Unable to get new cursor")
+			}
+			nextCursor = nc.String()
+			break
+		}
+	}
+
+	return songs, nextCursor, nil
 }

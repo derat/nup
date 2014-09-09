@@ -135,7 +135,6 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 
 	http.HandleFunc("/", handleIndex)
-	http.HandleFunc("/contents", handleContents)
 	http.HandleFunc("/export", handleExport)
 	http.HandleFunc("/import", handleImport)
 	http.HandleFunc("/list_tags", handleListTags)
@@ -168,9 +167,6 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	if _, err = io.Copy(w, f); err != nil {
 		c.Errorf("Failed to copy %v to response: %v", indexPath, err)
 	}
-}
-
-func handleContents(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleExport(w http.ResponseWriter, r *http.Request) {
@@ -357,4 +353,45 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleSongs(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	if !checkUserRequest(c, w, r, "GET", false) {
+		return
+	}
+
+	var minLastModifiedTime time.Time
+	if len(r.FormValue("minLastModifiedUsec")) > 0 {
+		var minLastModifiedUsec int64
+		if !parseIntParam(c, w, r, "minLastModifiedUsec", &minLastModifiedUsec) {
+			return
+		}
+		minLastModifiedTime = time.Unix(minLastModifiedUsec/(1000*1000), (minLastModifiedUsec%(1000*1000))*1000)
+	}
+
+	songs, cursor, err := getSongsForAndroid(c, minLastModifiedTime, r.FormValue("cursor"), cfg.BaseSongUrl, cfg.BaseCoverUrl)
+	if err != nil {
+		c.Errorf("Unable to get songs: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rows := make([][]interface{}, 0)
+	for _, s := range songs {
+		row := []interface{}{
+			s.SongId,
+			s.Url,
+			s.CoverUrl,
+			s.Artist,
+			s.Title,
+			s.Album,
+			s.Track,
+			s.Disc,
+			s.Length,
+			s.Rating,
+		}
+		rows = append(rows, row)
+	}
+	if len(cursor) > 0 {
+		rows = append(rows, []interface{}{cursor})
+	}
+	writeJsonResponse(w, rows)
 }
