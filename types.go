@@ -73,3 +73,11 @@ type Song struct {
 	// Last time the song was modified.
 	LastModifiedTime time.Time `json:"-"`
 }
+
+// ClientConfig holds configuration details shared across client binaries.
+type ClientConfig struct {
+	ClientId     string
+	ClientSecret string
+	TokenCache   string
+	ServerUrl    string
+}

@@ -165,9 +165,9 @@ func readFileDetails(p string, fi os.FileInfo, updateChan chan SongAndError) {
 	s.Length = float64(lengthMs) / 1000
 }
 
-func scanForUpdatedSongs(cfg config, lastUpdateTime time.Time, updateChan chan SongAndError) (numUpdates int, err error) {
+func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, updateChan chan SongAndError) (numUpdates int, err error) {
 	numMp3s := 0
-	err = filepath.Walk(cfg.MusicDir, func(p string, fi os.FileInfo, err error) error {
+	err = filepath.Walk(musicDir, func(p string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}

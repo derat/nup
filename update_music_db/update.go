@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
 
 	"erat.org/cloud"
@@ -32,7 +30,7 @@ func setLastUpdateTime(t time.Time) error {
 	return nil
 }
 
-func updateSongs(cfg config, ch chan nup.Song, numSongs int, replaceUserData bool) error {
+func updateSongs(cfg nup.ClientConfig, ch chan nup.Song, numSongs int, replaceUserData bool) error {
 	transport, err := cloud.CreateTransport(cfg.ClientId, cfg.ClientSecret, oauthScope, cfg.TokenCache)
 	if err != nil {
 		return err
@@ -41,20 +39,16 @@ func updateSongs(cfg config, ch chan nup.Song, numSongs int, replaceUserData boo
 		return err
 	}
 
-	destUrl, err := url.Parse(cfg.ServerUrl)
+	u, err := nup.GetServerUrl(cfg, importPath)
 	if err != nil {
 		return err
 	}
-	if !strings.HasSuffix(destUrl.Path, "/") {
-		destUrl.Path += "/"
-	}
-	destUrl.Path += importPath
 	if replaceUserData {
-		destUrl.RawQuery = importReplaceParam
+		u.RawQuery = importReplaceParam
 	}
 
 	sendFunc := func(r io.Reader) error {
-		resp, err := transport.Client().Post(destUrl.String(), "text/plain", r)
+		resp, err := transport.Client().Post(u.String(), "text/plain", r)
 		if err != nil {
 			return err
 		}

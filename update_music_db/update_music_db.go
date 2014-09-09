@@ -15,30 +15,22 @@ type SongAndError struct {
 	Error error
 }
 
-type config struct {
-	ClientId     string
-	ClientSecret string
-	TokenCache   string
-
-	ServerUrl     string
-	MusicDir      string
-	CoverDir      string
-	RequireCovers bool
-}
-
 func main() {
 	configFile := flag.String("config", "", "Path to config file")
+	coverDir := flag.String("cover-dir", "", "Path to directory where cover images are stored")
 	dryRun := flag.Bool("dry-run", false, "Only print what would be updated")
 	importDb := flag.String("import-db", "", "If non-empty, path to legacy SQLite database to read info from")
 	limit := flag.Int("limit", 0, "If positive, limits the number of songs to update (for testing)")
+	musicDir := flag.String("music-dir", "", "Path to directory where music files are stored")
+	requireCovers := flag.Bool("require-covers", false, "Die if cover images aren't found for any songs")
 	flag.Parse()
 
-	var cfg config
+	var cfg nup.ClientConfig
 	if err := cloud.ReadJson(*configFile, &cfg); err != nil {
 		log.Fatal("Unable to read config file: ", err)
 	}
-	log.Printf("Loading covers from %v", cfg.CoverDir)
-	cf, err := newCoverFinder(cfg.CoverDir)
+	log.Printf("Loading covers from %v", *coverDir)
+	cf, err := newCoverFinder(*coverDir)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -55,12 +47,15 @@ func main() {
 		}
 		replaceUserData = true
 	} else {
+		if len(*musicDir) == 0 {
+			log.Fatal("--music-dir not set")
+		}
 		lastUpdateTime, err := getLastUpdateTime()
 		if err != nil {
 			log.Fatalf("Unable to get last update time: ", err)
 		}
-		log.Printf("Scanning for songs in %v updated since %v", cfg.MusicDir, lastUpdateTime.Local())
-		if numSongs, err = scanForUpdatedSongs(cfg, lastUpdateTime, readChan); err != nil {
+		log.Printf("Scanning for songs in %v updated since %v", *musicDir, lastUpdateTime.Local())
+		if numSongs, err = scanForUpdatedSongs(*musicDir, lastUpdateTime, readChan); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -81,7 +76,7 @@ func main() {
 			}
 			s := *songAndError.Song
 			s.CoverFilename = cf.findPath(s.Artist, s.Album)
-			if cfg.RequireCovers && len(s.CoverFilename) == 0 {
+			if *requireCovers && len(s.CoverFilename) == 0 {
 				log.Fatalf("Failed to find cover for %v (%v-%v)", s.Filename, s.Artist, s.Album)
 			}
 
