@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -18,7 +20,10 @@ import (
 
 const (
 	// Config file path relative to base app directory.
-	configFile = "nup/config.json"
+	configPath = "nup/config.json"
+
+	// Path to the index file.
+	indexPath = "static/index.html"
 
 	// Datastore kinds of various objects.
 	playKind = "Play"
@@ -123,9 +128,12 @@ func parseFloatParam(c appengine.Context, w http.ResponseWriter, r *http.Request
 }
 
 func init() {
-	if err := cloud.ReadJson(configFile, &cfg); err != nil {
-		panic(fmt.Sprintf("Unable to read %v: %v", configFile, err))
+	if err := cloud.ReadJson(configPath, &cfg); err != nil {
+		panic(fmt.Sprintf("Unable to read %v: %v", configPath, err))
 	}
+
+	rand.Seed(time.Now().UnixNano())
+
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/contents", handleContents)
 	http.HandleFunc("/export", handleExport)
@@ -142,7 +150,24 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	if !checkUserRequest(c, w, r, "GET", true) {
 		return
 	}
-	http.Redirect(w, r, "/static/index.html", http.StatusFound)
+
+	if r.URL.Path != "/" {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	f, err := os.Open(indexPath)
+	if err != nil {
+		c.Errorf("Failed to open %v: %v", indexPath, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
+
+	w.Header().Set("Content-Type", "text/html")
+	if _, err = io.Copy(w, f); err != nil {
+		c.Errorf("Failed to copy %v to response: %v", indexPath, err)
+	}
 }
 
 func handleContents(w http.ResponseWriter, r *http.Request) {
@@ -316,6 +341,7 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 	if !checkUserRequest(c, w, r, "POST", false) {
 		return
 	}
+
 	var id int64
 	var startTimeFloat float64
 	if !parseIntParam(c, w, r, "songId", &id) || !parseFloatParam(c, w, r, "startTime", &startTimeFloat) {

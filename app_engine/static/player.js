@@ -88,7 +88,7 @@ function Player(playlistWindow) {
   }.bind(this);
 
   var req = new XMLHttpRequest();
-  req.open('GET', '../list_tags', true);
+  req.open('GET', 'list_tags', true);
   req.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
   req.onreadystatechange = function() {
     if (req.readyState == 4) {
@@ -318,7 +318,7 @@ Player.prototype.reportCurrentTrack = function() {
   this.reportedCurrentTrack = true;
 
   var song = this.getCurrentSong();
-  var url = '../report_played?songId=' + encodeURIComponent(song.songId) + '&startTime=' + encodeURIComponent(this.startTime);
+  var url = 'report_played?songId=' + encodeURIComponent(song.songId) + '&startTime=' + encodeURIComponent(this.startTime);
   console.log("Reporting track: " + url);
   var req = new XMLHttpRequest();
   req.open('POST', url, true);
@@ -372,7 +372,7 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
   if (!ratingChanged && !tagsChanged)
     return;
 
-  var url = '../rate_and_tag?songId=' + encodeURIComponent(song.songId);
+  var url = 'rate_and_tag?songId=' + encodeURIComponent(song.songId);
   if (ratingChanged)
     url += '&rating=' + encodeURIComponent(newRating);
   if (tagsChanged)
