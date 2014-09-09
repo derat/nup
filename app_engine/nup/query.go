@@ -50,11 +50,29 @@ type songQuery struct {
 }
 
 // From https://groups.google.com/forum/#!topic/golang-nuts/tyDC4S62nPo.
-type int64array []int64
+type int64Array []int64
 
-func (a int64array) Len() int           { return len(a) }
-func (a int64array) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a int64array) Less(i, j int) bool { return a[i] < a[j] }
+func (a int64Array) Len() int           { return len(a) }
+func (a int64Array) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a int64Array) Less(i, j int) bool { return a[i] < a[j] }
+
+type songArray []nup.Song
+
+func (a songArray) Len() int      { return len(a) }
+func (a songArray) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a songArray) Less(i, j int) bool {
+	if a[i].Album < a[j].Album {
+		return true
+	} else if a[i].Album > a[j].Album {
+		return false
+	}
+	if a[i].Disc < a[j].Disc {
+		return true
+	} else if a[i].Disc > a[j].Disc {
+		return false
+	}
+	return a[i].Track < a[j].Track
+}
 
 func prepareSongForSearchResult(s *nup.Song, id int64, baseSongUrl, baseCoverUrl string) {
 	// Set fields that are only present in search results (i.e. not in Datastore).
@@ -125,7 +143,7 @@ func runQueriesAndGetIds(c appengine.Context, qs []*datastore.Query) ([][]int64,
 					return
 				}
 			}
-			sort.Sort(int64array(ids))
+			sort.Sort(int64Array(ids))
 			ch <- idsAndError{ids, nil}
 		}(q)
 	}
@@ -278,6 +296,9 @@ func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl st
 
 	for i := range songs {
 		prepareSongForSearchResult(&songs[i], keys[i].IntID(), baseSongUrl, baseCoverUrl)
+	}
+	if !query.Shuffle {
+		sort.Sort(songArray(songs))
 	}
 	return songs, nil
 }
