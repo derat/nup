@@ -56,6 +56,10 @@ func writeTextResponse(w http.ResponseWriter, s string) {
 }
 
 func checkUserRequest(c appengine.Context, w http.ResponseWriter, r *http.Request, method string, redirectToLogin bool) bool {
+	if appengine.IsDevAppServer() {
+		return true
+	}
+
 	u := user.Current(c)
 	allowed := false
 	for _, au := range cfg.AllowedUsers {
@@ -358,6 +362,20 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle weird preliminary query from the Android app to get the max last-modified time.
+	if r.FormValue("getMaxLastModifiedUsec") == "1" {
+		t, err := getMaxLastModifiedTime(c)
+		if err != nil {
+			c.Errorf("Got error while getting max last-modified time: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		} else if t.IsZero() {
+			writeTextResponse(w, "0")
+		} else {
+			writeTextResponse(w, strconv.FormatInt(t.UnixNano()/1000, 10))
+		}
+		return
+	}
+
 	var minLastModifiedTime time.Time
 	if len(r.FormValue("minLastModifiedUsec")) > 0 {
 		var minLastModifiedUsec int64
@@ -374,24 +392,12 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows := make([][]interface{}, 0)
+	rows := make([]interface{}, 0)
 	for _, s := range songs {
-		row := []interface{}{
-			s.SongId,
-			s.Url,
-			s.CoverUrl,
-			s.Artist,
-			s.Title,
-			s.Album,
-			s.Track,
-			s.Disc,
-			s.Length,
-			s.Rating,
-		}
-		rows = append(rows, row)
+		rows = append(rows, s)
 	}
 	if len(cursor) > 0 {
-		rows = append(rows, []interface{}{cursor})
+		rows = append(rows, cursor)
 	}
 	writeJsonResponse(w, rows)
 }

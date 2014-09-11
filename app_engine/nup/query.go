@@ -383,3 +383,14 @@ func getSongsForAndroid(c appengine.Context, minLastModified time.Time, startCur
 
 	return songs, nextCursor, nil
 }
+
+func getMaxLastModifiedTime(c appengine.Context) (time.Time, error) {
+	songs := make([]nup.Song, 0)
+	if _, err := datastore.NewQuery(songKind).Order("-LastModifiedTime").Project("LastModifiedTime").Limit(1).GetAll(c, &songs); err != nil {
+		return time.Time{}, err
+	}
+	if len(songs) == 0 {
+		return time.Time{}, nil
+	}
+	return songs[0].LastModifiedTime, nil
+}
