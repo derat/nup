@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"log"
 	"math"
+	"os"
 	"time"
 
 	"erat.org/cloud"
@@ -13,6 +15,36 @@ import (
 type SongAndError struct {
 	Song  *nup.Song
 	Error error
+}
+
+type Config struct {
+	nup.ClientConfig
+	LastUpdateTimeFile string
+}
+
+func getLastUpdateTime(path string) (t time.Time, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return t, nil
+		}
+		return t, err
+	}
+	defer f.Close()
+
+	if err = json.NewDecoder(f).Decode(&t); err != nil {
+		return t, err
+	}
+	return t, nil
+}
+
+func setLastUpdateTime(path string, t time.Time) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return json.NewEncoder(f).Encode(t)
 }
 
 func main() {
@@ -25,7 +57,7 @@ func main() {
 	requireCovers := flag.Bool("require-covers", false, "Die if cover images aren't found for any songs")
 	flag.Parse()
 
-	var cfg nup.ClientConfig
+	var cfg Config
 	if err := cloud.ReadJson(*configFile, &cfg); err != nil {
 		log.Fatal("Unable to read config file: ", err)
 	}
@@ -50,7 +82,7 @@ func main() {
 		if len(*musicDir) == 0 {
 			log.Fatal("--music-dir not set")
 		}
-		lastUpdateTime, err := getLastUpdateTime()
+		lastUpdateTime, err := getLastUpdateTime(cfg.LastUpdateTimeFile)
 		if err != nil {
 			log.Fatalf("Unable to get last update time: ", err)
 		}
@@ -94,7 +126,7 @@ func main() {
 			log.Fatal(err)
 		}
 		if len(*importDb) == 0 {
-			if err = setLastUpdateTime(startTime); err != nil {
+			if err = setLastUpdateTime(cfg.LastUpdateTimeFile, startTime); err != nil {
 				log.Fatal("Failed setting last-update time: ", err)
 			}
 		}

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"erat.org/cloud"
 	"erat.org/nup"
@@ -22,15 +21,7 @@ const (
 	importReplaceParam = "replaceUserData=1"
 )
 
-func getLastUpdateTime() (time.Time, error) {
-	return time.Now(), nil
-}
-
-func setLastUpdateTime(t time.Time) error {
-	return nil
-}
-
-func updateSongs(cfg nup.ClientConfig, ch chan nup.Song, numSongs int, replaceUserData bool) error {
+func updateSongs(cfg Config, ch chan nup.Song, numSongs int, replaceUserData bool) error {
 	transport, err := cloud.CreateTransport(cfg.ClientId, cfg.ClientSecret, oauthScope, cfg.TokenCache)
 	if err != nil {
 		return err
@@ -39,7 +30,7 @@ func updateSongs(cfg nup.ClientConfig, ch chan nup.Song, numSongs int, replaceUs
 		return err
 	}
 
-	u, err := nup.GetServerUrl(cfg, importPath)
+	u, err := nup.GetServerUrl(cfg.ClientConfig, importPath)
 	if err != nil {
 		return err
 	}
