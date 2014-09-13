@@ -171,7 +171,7 @@ func readFileDetails(p, musicDir string, fi os.FileInfo, updateChan chan SongAnd
 	s.Length = float64(lengthMs) / 1000
 }
 
-func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, updateChan chan SongAndError) (numUpdates int, err error) {
+func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, updateChan chan SongAndError, logProgress bool) (numUpdates int, err error) {
 	numMp3s := 0
 	err = filepath.Walk(musicDir, func(p string, fi os.FileInfo, err error) error {
 		if err != nil {
@@ -182,7 +182,7 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, updateChan c
 		}
 
 		numMp3s++
-		if numMp3s%logProgressInterval == 0 {
+		if logProgress && numMp3s%logProgressInterval == 0 {
 			log.Printf("Progress: scanned %v files\n", numMp3s)
 		}
 
@@ -198,6 +198,8 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, updateChan c
 		return 0, err
 	}
 
-	log.Printf("Found %v update(s) among %v files.\n", numUpdates, numMp3s)
+	if logProgress {
+		log.Printf("Found %v update(s) among %v files.\n", numUpdates, numMp3s)
+	}
 	return numUpdates, nil
 }

@@ -49,7 +49,7 @@ func getSongsFromLegacyDb(path string, updateChan chan SongAndError) (numUpdates
 		return 0, err
 	}
 
-	if err = doQuery(db, "SELECT SongId, StartTime, IpAddress FROM PlayHistory", func(rows *sql.Rows) error {
+	if err = doQuery(db, "SELECT SongId, StartTime, IpAddress FROM PlayHistory ORDER BY StartTime ASC", func(rows *sql.Rows) error {
 		var songId, startTimeSec int
 		var ip string
 		if err := rows.Scan(&songId, &startTimeSec, &ip); err != nil {
@@ -68,7 +68,7 @@ func getSongsFromLegacyDb(path string, updateChan chan SongAndError) (numUpdates
 		return 0, err
 	}
 
-	if err = doQuery(db, "SELECT st.SongId, t.Name FROM SongTags st INNER JOIN Tags t ON(st.TagId = t.TagId)", func(rows *sql.Rows) error {
+	if err = doQuery(db, "SELECT st.SongId, t.Name FROM SongTags st INNER JOIN Tags t ON(st.TagId = t.TagId) ORDER BY t.Name ASC", func(rows *sql.Rows) error {
 		var songId int
 		var tag string
 		if err := rows.Scan(&songId, &tag); err != nil {

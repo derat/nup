@@ -4,14 +4,14 @@ import (
 	"testing"
 )
 
-func TestBogusDir(t *testing.T) {
+func TestCoversBogusDir(t *testing.T) {
 	cf, err := newCoverFinder("bogus")
 	if cf != nil || err == nil {
 		t.Errorf("creation with bogus cover dir didn't fail")
 	}
 }
 
-func TestFindPath(t *testing.T) {
+func TestCoversFindPath(t *testing.T) {
 	cf, err := newCoverFinder("testdata/covers")
 	if err != nil {
 		t.Fatalf("creation failed")

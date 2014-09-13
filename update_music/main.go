@@ -87,7 +87,7 @@ func main() {
 			log.Fatalf("Unable to get last update time: ", err)
 		}
 		log.Printf("Scanning for songs in %v updated since %v", *musicDir, lastUpdateTime.Local())
-		if numSongs, err = scanForUpdatedSongs(*musicDir, lastUpdateTime, readChan); err != nil {
+		if numSongs, err = scanForUpdatedSongs(*musicDir, lastUpdateTime, readChan, true); err != nil {
 			log.Fatal(err)
 		}
 	}
