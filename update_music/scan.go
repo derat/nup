@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"erat.org/nup"
@@ -126,10 +127,15 @@ func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLeng
 	return (fi.Size() - headerLength - footerLength) / kbitRate * 8, nil
 }
 
-func readFileDetails(p string, fi os.FileInfo, updateChan chan SongAndError) {
-	s := &nup.Song{Filename: p}
+func readFileDetails(p, musicDir string, fi os.FileInfo, updateChan chan SongAndError) {
+	s := &nup.Song{}
 	var err error
 	defer func() { updateChan <- SongAndError{s, err} }()
+
+	s.Filename, err = filepath.Rel(musicDir, p)
+	if err != nil {
+		return
+	}
 
 	var f *os.File
 	f, err = os.Open(p)
@@ -179,9 +185,12 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, updateChan c
 		if numMp3s%logProgressInterval == 0 {
 			log.Printf("Progress: scanned %v files\n", numMp3s)
 		}
-		if fi.ModTime().After(lastUpdateTime) {
+
+		stat := fi.Sys().(*syscall.Stat_t)
+		ctime := time.Unix(int64(stat.Ctim.Sec), int64(stat.Ctim.Nsec))
+		if fi.ModTime().After(lastUpdateTime) || ctime.After(lastUpdateTime) {
 			numUpdates++
-			go readFileDetails(p, fi, updateChan)
+			go readFileDetails(p, musicDir, fi, updateChan)
 		}
 		return nil
 	})

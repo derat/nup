@@ -4,10 +4,6 @@ import (
 	"testing"
 )
 
-const (
-	testdataDir = "testdata/covers"
-)
-
 func TestBogusDir(t *testing.T) {
 	cf, err := newCoverFinder("bogus")
 	if cf != nil || err == nil {
@@ -16,7 +12,7 @@ func TestBogusDir(t *testing.T) {
 }
 
 func TestFindPath(t *testing.T) {
-	cf, err := newCoverFinder(testdataDir)
+	cf, err := newCoverFinder("testdata/covers")
 	if err != nil {
 		t.Fatalf("creation failed")
 	}
