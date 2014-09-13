@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -56,7 +57,7 @@ var Song5s nup.Song = nup.Song{
 }
 
 func CreateTempDir() string {
-	dir, err := ioutil.TempDir("", "update_music.")
+	dir, err := ioutil.TempDir("", "nup_test.")
 	if err != nil {
 		panic(err)
 	}
@@ -95,7 +96,18 @@ func CopySongsToTempDir(dir string, filenames ...string) {
 	}
 }
 
-func CompareSongs(expected, actual []nup.Song) error {
+type songArray []nup.Song
+
+func (a songArray) Len() int           { return len(a) }
+func (a songArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a songArray) Less(i, j int) bool { return a[i].Sha1 < a[j].Sha1 }
+
+func CompareSongs(expected, actual []nup.Song, compareOrder bool) error {
+	if !compareOrder {
+		sort.Sort(songArray(expected))
+		sort.Sort(songArray(actual))
+	}
+
 	m := make([]string, 0)
 
 	for i := 0; i < len(expected); i++ {
@@ -120,7 +132,7 @@ func CompareSongs(expected, actual []nup.Song) error {
 	}
 
 	if len(m) > 0 {
-		return fmt.Errorf("actual songs didn't match expected: %v", strings.Join(m, "\n"))
+		return fmt.Errorf("actual songs didn't match expected:\n%v", strings.Join(m, "\n"))
 	}
 	return nil
 }

@@ -4,34 +4,39 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"erat.org/nup"
+	"erat.org/nup/test"
 )
 
 type Tester struct {
-	TempDir    string
-	ConfigFile string
-	ServerUrl  string
-	BinDir     string
+	TempDir  string
+	MusicDir string
+	CoverDir string
+
+	configFile string
+	serverUrl  string
+	binDir     string
 }
 
 func newTester(serverUrl, binDir string) *Tester {
 	t := &Tester{
-		ServerUrl: serverUrl,
-		BinDir:    binDir,
+		TempDir:   test.CreateTempDir(),
+		serverUrl: serverUrl,
+		binDir:    binDir,
 	}
 
-	var err error
-	if t.TempDir, err = ioutil.TempDir("", "test_music."); err != nil {
+	t.MusicDir = filepath.Join(t.TempDir, "music")
+	t.CoverDir = filepath.Join(t.MusicDir, ".covers")
+	if err := os.MkdirAll(t.CoverDir, 0700); err != nil {
 		panic(err)
 	}
 
-	t.ConfigFile = filepath.Join(t.TempDir, "config.json")
-	f, err := os.Create(t.ConfigFile)
+	t.configFile = filepath.Join(t.TempDir, "config.json")
+	f, err := os.Create(t.configFile)
 	if err != nil {
 		panic(err)
 	}
@@ -40,17 +45,17 @@ func newTester(serverUrl, binDir string) *Tester {
 	if err = json.NewEncoder(f).Encode(struct {
 		LastUpdateTimeFile string
 		ServerUrl          string
-	}{filepath.Join(t.TempDir, "last_update_time"), t.ServerUrl}); err != nil {
+	}{filepath.Join(t.TempDir, "last_update_time"), t.serverUrl}); err != nil {
 		panic(err)
 	}
 
 	return t
 }
 
-func (t *Tester) DumpSongs() ([]nup.Song, error) {
-	stdout, stderr, err := runCommand(filepath.Join(t.BinDir, "dump_music"), "-config="+t.ConfigFile)
+func (t *Tester) DumpSongs(stripIds bool) ([]nup.Song, error) {
+	stdout, stderr, err := runCommand(filepath.Join(t.binDir, "dump_music"), "-config="+t.configFile)
 	if err != nil {
-		return nil, fmt.Errorf("dumping songs failed: %v\nstderr: %v", err, stderr)
+		return nil, fmt.Errorf("%v\nstderr: %v", err, stderr)
 	}
 	songs := make([]nup.Song, 0)
 
@@ -58,7 +63,7 @@ func (t *Tester) DumpSongs() ([]nup.Song, error) {
 		return songs, nil
 	}
 
-	for _, l := range strings.Split(stdout, "\n") {
+	for _, l := range strings.Split(strings.TrimSpace(stdout), "\n") {
 		s := nup.Song{}
 		if err = json.Unmarshal([]byte(l), &s); err != nil {
 			if err == io.EOF {
@@ -66,7 +71,17 @@ func (t *Tester) DumpSongs() ([]nup.Song, error) {
 			}
 			return nil, fmt.Errorf("unable to unmarshal song %q: %v", l, err)
 		}
+		if stripIds {
+			s.SongId = ""
+		}
 		songs = append(songs, s)
 	}
 	return songs, nil
+}
+
+func (t *Tester) UpdateSongs() error {
+	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.configFile, "-music-dir="+t.MusicDir, "-cover-dir="+t.CoverDir); err != nil {
+		return fmt.Errorf("%v\nstderr: %v", err, stderr)
+	}
+	return nil
 }
