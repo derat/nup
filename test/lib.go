@@ -24,6 +24,7 @@ var Song0s nup.Song = nup.Song{
 	Track:    1,
 	Disc:     0,
 	Length:   0.026,
+	Rating:   -1,
 }
 var Song0sUpdated nup.Song = nup.Song{
 	Sha1:     "fefac74a1d5928316d7131747107c8a61b71ffe4",
@@ -34,6 +35,7 @@ var Song0sUpdated nup.Song = nup.Song{
 	Track:    1,
 	Disc:     0,
 	Length:   0.026,
+	Rating:   -1,
 }
 var Song1s nup.Song = nup.Song{
 	Sha1:     "c6e3230b4ed5e1f25d92dd6b80bfc98736bbee62",
@@ -44,6 +46,7 @@ var Song1s nup.Song = nup.Song{
 	Track:    2,
 	Disc:     0,
 	Length:   1.071,
+	Rating:   -1,
 }
 var Song5s nup.Song = nup.Song{
 	Sha1:     "63afdde2b390804562d54788865fff1bfd11cf94",
@@ -54,6 +57,7 @@ var Song5s nup.Song = nup.Song{
 	Track:    1,
 	Disc:     2,
 	Length:   5.041,
+	Rating:   -1,
 }
 
 func CreateTempDir() string {
