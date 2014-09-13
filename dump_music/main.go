@@ -29,7 +29,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to get server URL: ", err)
 	}
-	transport, err := cloud.CreateTransport(cfg.ClientId, cfg.ClientSecret, oauthScope, cfg.TokenCache)
+	transport, err := cloud.NewTransport(cfg.ClientId, cfg.ClientSecret, oauthScope, cfg.TokenCache)
 	if err != nil {
 		log.Fatal("Failed to create transport: ", err)
 	}

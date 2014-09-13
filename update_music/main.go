@@ -126,11 +126,11 @@ func main() {
 	}()
 
 	if !*dryRun {
-		transport, err := cloud.CreateTransport(cfg.ClientId, cfg.ClientSecret, oauthScope, cfg.TokenCache)
+		transport, err := cloud.NewTransport(cfg.ClientId, cfg.ClientSecret, oauthScope, cfg.TokenCache)
 		if err != nil {
 			log.Fatal("Failed to create transport: ", err)
 		}
-		if err = cloud.MaybeRefreshToken(transport); err != nil {
+		if err = transport.MaybeRefreshToken(); err != nil {
 			log.Fatal("Failed to refresh token: ", err)
 		}
 		if err = updateSongs(transport.Client(), cfg, updateChan, numSongs, replaceUserData); err != nil {
