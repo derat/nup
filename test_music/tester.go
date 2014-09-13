@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -83,4 +84,19 @@ func (t *Tester) UpdateSongs() {
 	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.configFile, "-music-dir="+t.MusicDir, "-cover-dir="+t.CoverDir); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
+}
+
+func (t *Tester) QuerySongs(params string) []nup.Song {
+	resp, err := http.Get(t.serverUrl + "query?" + params)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	songs := make([]nup.Song, 0)
+	d := json.NewDecoder(resp.Body)
+	if err = d.Decode(&songs); err != nil {
+		panic(err)
+	}
+	return songs
 }
