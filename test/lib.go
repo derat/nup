@@ -100,7 +100,7 @@ type songArray []nup.Song
 
 func (a songArray) Len() int           { return len(a) }
 func (a songArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a songArray) Less(i, j int) bool { return a[i].Sha1 < a[j].Sha1 }
+func (a songArray) Less(i, j int) bool { return a[i].Filename < a[j].Filename }
 
 func CompareSongs(expected, actual []nup.Song, compareOrder bool) error {
 	if !compareOrder {

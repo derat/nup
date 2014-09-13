@@ -52,15 +52,15 @@ func newTester(serverUrl, binDir string) *Tester {
 	return t
 }
 
-func (t *Tester) DumpSongs(stripIds bool) ([]nup.Song, error) {
+func (t *Tester) DumpSongs(stripIds bool) []nup.Song {
 	stdout, stderr, err := runCommand(filepath.Join(t.binDir, "dump_music"), "-config="+t.configFile)
 	if err != nil {
-		return nil, fmt.Errorf("%v\nstderr: %v", err, stderr)
+		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
 	songs := make([]nup.Song, 0)
 
 	if len(stdout) == 0 {
-		return songs, nil
+		return songs
 	}
 
 	for _, l := range strings.Split(strings.TrimSpace(stdout), "\n") {
@@ -69,19 +69,18 @@ func (t *Tester) DumpSongs(stripIds bool) ([]nup.Song, error) {
 			if err == io.EOF {
 				break
 			}
-			return nil, fmt.Errorf("unable to unmarshal song %q: %v", l, err)
+			panic(fmt.Sprintf("unable to unmarshal song %q: %v", l, err))
 		}
 		if stripIds {
 			s.SongId = ""
 		}
 		songs = append(songs, s)
 	}
-	return songs, nil
+	return songs
 }
 
-func (t *Tester) UpdateSongs() error {
+func (t *Tester) UpdateSongs() {
 	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.configFile, "-music-dir="+t.MusicDir, "-cover-dir="+t.CoverDir); err != nil {
-		return fmt.Errorf("%v\nstderr: %v", err, stderr)
+		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
-	return nil
 }

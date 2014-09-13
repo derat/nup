@@ -32,25 +32,30 @@ func main() {
 	defer os.RemoveAll(t.TempDir)
 
 	log.Print("dumping initial songs")
-	songs, err := t.DumpSongs(false)
-	if err != nil {
-		log.Fatalf("dumping songs failed: %v", err)
-	} else if len(songs) != 0 {
+	songs := t.DumpSongs(false)
+	if len(songs) != 0 {
 		log.Fatalf("server at %v isn't empty; got %v song(s)", *server, len(songs))
 	}
 
 	log.Print("importing 2 songs")
 	test.CopySongsToTempDir(t.MusicDir, test.Song0s.Filename, test.Song1s.Filename)
-	if err = t.UpdateSongs(); err != nil {
-		log.Fatalf("importing songs failed: %v", err)
-	}
+	t.UpdateSongs()
 
 	log.Print("sleeping and dumping songs")
 	time.Sleep(time.Second)
-	if songs, err = t.DumpSongs(true); err != nil {
-		log.Fatalf("dumping songs failed: %v", err)
+	songs = t.DumpSongs(true)
+	if err := test.CompareSongs([]nup.Song{test.Song0s, test.Song1s}, songs, false); err != nil {
+		log.Fatal(err)
 	}
-	if err = test.CompareSongs([]nup.Song{test.Song0s, test.Song1s}, songs, false); err != nil {
+
+	log.Print("importing another song")
+	test.CopySongsToTempDir(t.MusicDir, test.Song5s.Filename)
+	t.UpdateSongs()
+
+	log.Print("sleeping and dumping songs")
+	time.Sleep(time.Second)
+	songs = t.DumpSongs(true)
+	if err := test.CompareSongs([]nup.Song{test.Song0s, test.Song1s, test.Song5s}, songs, false); err != nil {
 		log.Fatal(err)
 	}
 }
