@@ -41,5 +41,11 @@ func TestLegacy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getting songs failed: %v", err)
 	}
-	test.CompareSongs(t, []nup.Song{s0, s1}, getSongsFromChannel(t, ch, num))
+	actual, err := getSongsFromChannel(ch, num)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = test.CompareSongs([]nup.Song{s0, s1}, actual); err != nil {
+		t.Error(err)
+	}
 }

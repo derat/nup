@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,43 +12,64 @@ import (
 	"erat.org/nup/test"
 )
 
-func scanAndCompareSongs(t *testing.T, dir string, lastUpdateTime time.Time, expected []nup.Song) {
+func scanAndCompareSongs(dir string, lastUpdateTime time.Time, expected []nup.Song) error {
 	ch := make(chan SongAndError)
 	num, err := scanForUpdatedSongs(dir, lastUpdateTime, ch, false)
 	if err != nil {
-		t.Errorf("scanning for songs failed")
-	} else {
-		test.CompareSongs(t, expected, getSongsFromChannel(t, ch, num))
+		return fmt.Errorf("scanning for songs failed")
 	}
+	actual, err := getSongsFromChannel(ch, num)
+	if err != nil {
+		return err
+	}
+	return test.CompareSongs(expected, actual)
 }
 
 func TestScan(t *testing.T) {
-	dir := test.CreateTempDir(t)
+	dir, err := ioutil.TempDir("", "update_music.")
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer os.RemoveAll(dir)
 
-	test.CopySongToTempDir(t, dir, test.Song0s.Filename)
-	test.CopySongToTempDir(t, dir, test.Song1s.Filename)
+	if err = test.CopySongsToTempDir(dir, test.Song0s.Filename, test.Song1s.Filename); err != nil {
+		t.Fatal(err)
+	}
 	startTime := time.Now()
-	scanAndCompareSongs(t, dir, time.Time{}, []nup.Song{test.Song0s, test.Song1s})
+	if err = scanAndCompareSongs(dir, time.Time{}, []nup.Song{test.Song0s, test.Song1s}); err != nil {
+		t.Error(err)
+	}
 
-	scanAndCompareSongs(t, dir, startTime, []nup.Song{})
+	if err = scanAndCompareSongs(dir, startTime, []nup.Song{}); err != nil {
+		t.Error(err)
+	}
 
-	test.CopySongToTempDir(t, dir, test.Song5s.Filename)
+	if err = test.CopySongsToTempDir(dir, test.Song5s.Filename); err != nil {
+		t.Fatal(err)
+	}
 	addTime := time.Now()
-	scanAndCompareSongs(t, dir, startTime, []nup.Song{test.Song5s})
+	if err = scanAndCompareSongs(dir, startTime, []nup.Song{test.Song5s}); err != nil {
+		t.Error(err)
+	}
 
-	test.DeleteFromTempDir(t, dir, test.Song0s.Filename)
-	test.CopySongToTempDir(t, dir, test.Song0sUpdated.Filename)
+	if err = os.Remove(filepath.Join(dir, test.Song0s.Filename)); err != nil {
+		t.Fatal(err)
+	}
+	if err = test.CopySongsToTempDir(dir, test.Song0sUpdated.Filename); err != nil {
+		t.Fatal(err)
+	}
 	updateTime := time.Now()
-	scanAndCompareSongs(t, dir, addTime, []nup.Song{test.Song0sUpdated})
+	if err = scanAndCompareSongs(dir, addTime, []nup.Song{test.Song0sUpdated}); err != nil {
+		t.Error(err)
+	}
 
 	subdir := filepath.Join(dir, "foo")
-	if err := os.Mkdir(subdir, 0700); err != nil {
+	if err = os.Mkdir(subdir, 0700); err != nil {
 		t.Fatalf("unable to create subdirectory %v: %v", subdir, err)
 	}
 	renamedPath := filepath.Join(subdir, test.Song1s.Filename)
 	if err := os.Rename(filepath.Join(dir, test.Song1s.Filename), renamedPath); err != nil {
-		t.Fatalf("unable to move file to %v: %v", renamedPath, err)
+		t.Fatal(err)
 	}
 	now := time.Now()
 	if err := os.Chtimes(renamedPath, now, now); err != nil {
@@ -54,7 +77,9 @@ func TestScan(t *testing.T) {
 	}
 	renamedSong1s := test.Song1s
 	renamedSong1s.Filename = filepath.Join(filepath.Base(subdir), test.Song1s.Filename)
-	scanAndCompareSongs(t, dir, updateTime, []nup.Song{renamedSong1s})
+	if err = scanAndCompareSongs(dir, updateTime, []nup.Song{renamedSong1s}); err != nil {
+		t.Error(err)
+	}
 }
 
 // TODO: Test errors, skipping bogus files, etc.

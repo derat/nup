@@ -75,7 +75,9 @@ func TestUpdate(t *testing.T) {
 	if err := updateSongs(client, cfg, ch, 2, true); err != nil {
 		t.Fatalf("failed to send songs: %v", err)
 	}
-	test.CompareSongs(t, []nup.Song{s0, s1}, receivedSongs)
+	if err := test.CompareSongs([]nup.Song{s0, s1}, receivedSongs); err != nil {
+		t.Error(err)
+	}
 	if replace != "1" {
 		t.Errorf("replaceUserData param was %q instead of 1", replace)
 	}
@@ -91,7 +93,9 @@ func TestUpdate(t *testing.T) {
 	if err := updateSongs(client, cfg, ch, len(sentSongs), false); err != nil {
 		t.Fatalf("failed to send songs: %v", err)
 	}
-	test.CompareSongs(t, sentSongs, receivedSongs)
+	if err := test.CompareSongs(sentSongs, receivedSongs); err != nil {
+		t.Error(err)
+	}
 	if len(replace) > 0 {
 		t.Errorf("replaceUserData param was %q instead of empty", replace)
 	}
