@@ -12,7 +12,7 @@ func TestCoversBogusDir(t *testing.T) {
 }
 
 func TestCoversFindPath(t *testing.T) {
-	cf, err := newCoverFinder("testdata/covers")
+	cf, err := newCoverFinder("../test/data/covers")
 	if err != nil {
 		t.Fatalf("creation failed")
 	}

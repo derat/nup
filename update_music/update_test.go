@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"erat.org/nup"
+	"erat.org/nup/test"
 )
 
 func TestUpdate(t *testing.T) {
@@ -74,7 +75,7 @@ func TestUpdate(t *testing.T) {
 	if err := updateSongs(client, cfg, ch, 2, true); err != nil {
 		t.Fatalf("failed to send songs: %v", err)
 	}
-	compareSongs(t, []nup.Song{s0, s1}, receivedSongs)
+	test.CompareSongs(t, []nup.Song{s0, s1}, receivedSongs)
 	if replace != "1" {
 		t.Errorf("replaceUserData param was %q instead of 1", replace)
 	}
@@ -90,7 +91,7 @@ func TestUpdate(t *testing.T) {
 	if err := updateSongs(client, cfg, ch, len(sentSongs), false); err != nil {
 		t.Fatalf("failed to send songs: %v", err)
 	}
-	compareSongs(t, sentSongs, receivedSongs)
+	test.CompareSongs(t, sentSongs, receivedSongs)
 	if len(replace) > 0 {
 		t.Errorf("replaceUserData param was %q instead of empty", replace)
 	}

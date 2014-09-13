@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"erat.org/nup"
+	"erat.org/nup/test"
 )
 
 func TestLegacy(t *testing.T) {
@@ -40,5 +41,5 @@ func TestLegacy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getting songs failed: %v", err)
 	}
-	compareSongs(t, []nup.Song{s0, s1}, getSongsFromChannel(t, ch, num))
+	test.CompareSongs(t, []nup.Song{s0, s1}, getSongsFromChannel(t, ch, num))
 }
