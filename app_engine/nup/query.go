@@ -326,7 +326,7 @@ func dumpSongs(c appengine.Context, w io.Writer) error {
 		s.CoverFilename = ""
 		s.Plays = make([]nup.Play, 0)
 
-		for pk.Parent().IntID() == sk.IntID() {
+		for pk != nil && pk.Parent().IntID() == sk.IntID() {
 			s.Plays = append(s.Plays, p)
 			if pk, err = pi.Next(&p); err == datastore.Done {
 				break
