@@ -55,45 +55,44 @@ var Song5s nup.Song = nup.Song{
 	Length:   5.041,
 }
 
-func CreateTempDir() (string, error) {
+func CreateTempDir() string {
 	dir, err := ioutil.TempDir("", "update_music.")
 	if err != nil {
-		return "", fmt.Errorf("failed to create temp dir: %v", err)
+		panic(err)
 	}
-	return dir, nil
+	return dir
 }
 
-func CopySongsToTempDir(dir string, filenames ...string) error {
+func CopySongsToTempDir(dir string, filenames ...string) {
 	_, td, _, ok := runtime.Caller(0)
 	if !ok {
-		return fmt.Errorf("unable to get runtime caller info")
+		panic("unable to get runtime caller info")
 	}
 
 	for _, fn := range filenames {
 		sp := filepath.Join(td, "../data/music", fn)
 		s, err := os.Open(sp)
 		if err != nil {
-			return fmt.Errorf("failed to open %v: %v", sp, err)
+			panic(err)
 		}
 		defer s.Close()
 
 		dp := filepath.Join(dir, fn)
 		d, err := os.Create(dp)
 		if err != nil {
-			return fmt.Errorf("failed to create %v: %v", dp, err)
+			panic(err)
 		}
 		defer d.Close()
 
 		if _, err = io.Copy(d, s); err != nil {
-			return fmt.Errorf("failed to copy %v to %v: %v", sp, dp, err)
+			panic(err)
 		}
 
 		now := time.Now()
 		if err = os.Chtimes(dp, now, now); err != nil {
-			return fmt.Errorf("failed to set %v's modification time to %v", dp, now)
+			panic(err)
 		}
 	}
-	return nil
 }
 
 func CompareSongs(expected, actual []nup.Song) error {
@@ -105,11 +104,11 @@ func CompareSongs(expected, actual []nup.Song) error {
 		} else {
 			e, err := json.Marshal(expected[i])
 			if err != nil {
-				return fmt.Errorf("unable to marshal to JSON: %v", err)
+				panic(err)
 			}
 			a, err := json.Marshal(actual[i])
 			if err != nil {
-				return fmt.Errorf("unable to marshal to JSON: %v", err)
+				panic(err)
 			}
 			if string(a) != string(e) {
 				m = append(m, fmt.Sprintf("song %v didn't match expected values:\nexpected: %v\n  actual: %v", i, string(e), string(a)))

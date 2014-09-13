@@ -32,11 +32,9 @@ func TestScan(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	if err = test.CopySongsToTempDir(dir, test.Song0s.Filename, test.Song1s.Filename); err != nil {
-		t.Fatal(err)
-	}
+	test.CopySongsToTempDir(dir, test.Song0s.Filename, test.Song1s.Filename)
 	startTime := time.Now()
-	if err = scanAndCompareSongs(dir, time.Time{}, []nup.Song{test.Song0s, test.Song1s}); err != nil {
+	if err := scanAndCompareSongs(dir, time.Time{}, []nup.Song{test.Song0s, test.Song1s}); err != nil {
 		t.Error(err)
 	}
 
@@ -44,20 +42,16 @@ func TestScan(t *testing.T) {
 		t.Error(err)
 	}
 
-	if err = test.CopySongsToTempDir(dir, test.Song5s.Filename); err != nil {
-		t.Fatal(err)
-	}
+	test.CopySongsToTempDir(dir, test.Song5s.Filename)
 	addTime := time.Now()
-	if err = scanAndCompareSongs(dir, startTime, []nup.Song{test.Song5s}); err != nil {
+	if err := scanAndCompareSongs(dir, startTime, []nup.Song{test.Song5s}); err != nil {
 		t.Error(err)
 	}
 
 	if err = os.Remove(filepath.Join(dir, test.Song0s.Filename)); err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
-	if err = test.CopySongsToTempDir(dir, test.Song0sUpdated.Filename); err != nil {
-		t.Fatal(err)
-	}
+	test.CopySongsToTempDir(dir, test.Song0sUpdated.Filename)
 	updateTime := time.Now()
 	if err = scanAndCompareSongs(dir, addTime, []nup.Song{test.Song0sUpdated}); err != nil {
 		t.Error(err)
@@ -65,15 +59,15 @@ func TestScan(t *testing.T) {
 
 	subdir := filepath.Join(dir, "foo")
 	if err = os.Mkdir(subdir, 0700); err != nil {
-		t.Fatalf("unable to create subdirectory %v: %v", subdir, err)
+		panic(err)
 	}
 	renamedPath := filepath.Join(subdir, test.Song1s.Filename)
 	if err := os.Rename(filepath.Join(dir, test.Song1s.Filename), renamedPath); err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	now := time.Now()
 	if err := os.Chtimes(renamedPath, now, now); err != nil {
-		t.Fatalf("failed to set %v's modification time to %v", renamedPath, now)
+		panic(err)
 	}
 	renamedSong1s := test.Song1s
 	renamedSong1s.Filename = filepath.Join(filepath.Base(subdir), test.Song1s.Filename)
