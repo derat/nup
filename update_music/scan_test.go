@@ -51,13 +51,13 @@ func deleteFromTempDir(t *testing.T, dir, fn string) {
 	}
 }
 
-func scanAndCheckSongs(t *testing.T, dir string, lastUpdateTime time.Time, expected []nup.Song) {
+func scanAndCompareSongs(t *testing.T, dir string, lastUpdateTime time.Time, expected []nup.Song) {
 	ch := make(chan SongAndError)
 	num, err := scanForUpdatedSongs(dir, lastUpdateTime, ch, false)
 	if err != nil {
 		t.Errorf("scanning for songs failed")
 	} else {
-		checkSongs(t, expected, ch, num)
+		compareSongs(t, expected, getSongsFromChannel(t, ch, num))
 	}
 }
 
@@ -109,18 +109,18 @@ func TestScan(t *testing.T) {
 	copyToTempDir(t, dir, song0s.Filename)
 	copyToTempDir(t, dir, song1s.Filename)
 	startTime := time.Now()
-	scanAndCheckSongs(t, dir, time.Time{}, []nup.Song{song0s, song1s})
+	scanAndCompareSongs(t, dir, time.Time{}, []nup.Song{song0s, song1s})
 
-	scanAndCheckSongs(t, dir, startTime, []nup.Song{})
+	scanAndCompareSongs(t, dir, startTime, []nup.Song{})
 
 	copyToTempDir(t, dir, song5s.Filename)
 	addTime := time.Now()
-	scanAndCheckSongs(t, dir, startTime, []nup.Song{song5s})
+	scanAndCompareSongs(t, dir, startTime, []nup.Song{song5s})
 
 	deleteFromTempDir(t, dir, song0s.Filename)
 	copyToTempDir(t, dir, song0sUpdated.Filename)
 	updateTime := time.Now()
-	scanAndCheckSongs(t, dir, addTime, []nup.Song{song0sUpdated})
+	scanAndCompareSongs(t, dir, addTime, []nup.Song{song0sUpdated})
 
 	subdir := filepath.Join(dir, "foo")
 	if err := os.Mkdir(subdir, 0700); err != nil {
@@ -136,7 +136,7 @@ func TestScan(t *testing.T) {
 	}
 	renamedSong1s := song1s
 	renamedSong1s.Filename = filepath.Join(filepath.Base(subdir), song1s.Filename)
-	scanAndCheckSongs(t, dir, updateTime, []nup.Song{renamedSong1s})
+	scanAndCompareSongs(t, dir, updateTime, []nup.Song{renamedSong1s})
 }
 
 // TODO: Test errors, skipping bogus files, etc.

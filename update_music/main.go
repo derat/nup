@@ -12,6 +12,10 @@ import (
 	"erat.org/nup"
 )
 
+const (
+	oauthScope = "https://www.googleapis.com/auth/userinfo.email"
+)
+
 type SongAndError struct {
 	Song  *nup.Song
 	Error error
@@ -122,7 +126,14 @@ func main() {
 	}()
 
 	if !*dryRun {
-		if err = updateSongs(cfg, updateChan, numSongs, replaceUserData); err != nil {
+		transport, err := cloud.CreateTransport(cfg.ClientId, cfg.ClientSecret, oauthScope, cfg.TokenCache)
+		if err != nil {
+			log.Fatal("Failed to create transport: ", err)
+		}
+		if err = cloud.MaybeRefreshToken(transport); err != nil {
+			log.Fatal("Failed to refresh token: ", err)
+		}
+		if err = updateSongs(transport.Client(), cfg, updateChan, numSongs, replaceUserData); err != nil {
 			log.Fatal(err)
 		}
 		if len(*importDb) == 0 {

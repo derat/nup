@@ -7,13 +7,10 @@ import (
 	"io"
 	"net/http"
 
-	"erat.org/cloud"
 	"erat.org/nup"
 )
 
 const (
-	oauthScope = "https://www.googleapis.com/auth/userinfo.email"
-
 	batchSize = 100
 
 	// Server path to import songs and query params.
@@ -21,15 +18,7 @@ const (
 	importReplaceParam = "replaceUserData=1"
 )
 
-func updateSongs(cfg Config, ch chan nup.Song, numSongs int, replaceUserData bool) error {
-	transport, err := cloud.CreateTransport(cfg.ClientId, cfg.ClientSecret, oauthScope, cfg.TokenCache)
-	if err != nil {
-		return err
-	}
-	if err = cloud.MaybeRefreshToken(transport); err != nil {
-		return err
-	}
-
+func updateSongs(client *http.Client, cfg Config, ch chan nup.Song, numSongs int, replaceUserData bool) error {
 	u, err := nup.GetServerUrl(cfg.ClientConfig, importPath)
 	if err != nil {
 		return err
@@ -39,7 +28,7 @@ func updateSongs(cfg Config, ch chan nup.Song, numSongs int, replaceUserData boo
 	}
 
 	sendFunc := func(r io.Reader) error {
-		resp, err := transport.Client().Post(u.String(), "text/plain", r)
+		resp, err := client.Post(u.String(), "text/plain", r)
 		if err != nil {
 			return err
 		}
