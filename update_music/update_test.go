@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 )
 
 func TestUpdate(t *testing.T) {
-	songs := make([]nup.Song, 0)
+	receivedSongs := make([]nup.Song, 0)
 	replace := ""
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -27,7 +28,7 @@ func TestUpdate(t *testing.T) {
 			} else if err != nil {
 				t.Errorf("failed to decode song: %v", err)
 			} else {
-				songs = append(songs, s)
+				receivedSongs = append(receivedSongs, s)
 			}
 		}
 
@@ -35,6 +36,10 @@ func TestUpdate(t *testing.T) {
 		w.Write([]byte("ok"))
 	}))
 	defer server.Close()
+
+	client := &http.Client{}
+	cfg := Config{ClientConfig: nup.ClientConfig{ServerUrl: server.URL}}
+	ch := make(chan nup.Song)
 
 	s0 := nup.Song{
 		Sha1:     "1977c91fea860245695dcceea0805c14cede7559",
@@ -62,14 +67,31 @@ func TestUpdate(t *testing.T) {
 		Plays:    []nup.Play{{time.Unix(1394773930, 0), "8.8.8.8"}},
 		Tags:     []string{"instrumental", "rock"},
 	}
-
-	ch := make(chan nup.Song)
 	go func() {
 		ch <- s0
 		ch <- s1
 	}()
-	if err := updateSongs(&http.Client{}, Config{ClientConfig: nup.ClientConfig{ServerUrl: server.URL}}, ch, 2, true); err != nil {
+	if err := updateSongs(client, cfg, ch, 2, true); err != nil {
 		t.Fatalf("failed to send songs: %v", err)
 	}
-	compareSongs(t, []nup.Song{s0, s1}, songs)
+	compareSongs(t, []nup.Song{s0, s1}, receivedSongs)
+	if replace != "1" {
+		t.Errorf("replaceUserData param was %q instead of 1", replace)
+	}
+
+	receivedSongs = receivedSongs[:0]
+	sentSongs := make([]nup.Song, 250, 250)
+	go func() {
+		for i := 0; i < len(sentSongs); i++ {
+			sentSongs[i].Sha1 = strconv.Itoa(i)
+			ch <- sentSongs[i]
+		}
+	}()
+	if err := updateSongs(client, cfg, ch, len(sentSongs), false); err != nil {
+		t.Fatalf("failed to send songs: %v", err)
+	}
+	compareSongs(t, sentSongs, receivedSongs)
+	if len(replace) > 0 {
+		t.Errorf("replaceUserData param was %q instead of empty", replace)
+	}
 }
