@@ -56,32 +56,30 @@ func writeTextResponse(w http.ResponseWriter, s string) {
 }
 
 func checkUserRequest(c appengine.Context, w http.ResponseWriter, r *http.Request, method string, redirectToLogin bool) bool {
-	if appengine.IsDevAppServer() {
-		return true
-	}
+	if !appengine.IsDevAppServer() {
+		u := user.Current(c)
+		allowed := false
+		for _, au := range cfg.AllowedUsers {
+			if u != nil && u.Email == au {
+				allowed = true
+				break
+			}
+		}
 
-	u := user.Current(c)
-	allowed := false
-	for _, au := range cfg.AllowedUsers {
-		if u != nil && u.Email == au {
-			allowed = true
-			break
+		if !allowed {
+			if u == nil {
+				c.Debugf("Unauthorized request for %v from unauthenticated user at %v", r.URL.String(), r.RemoteAddr)
+			} else {
+				c.Debugf("Unauthorized request for %v from %v at %v", r.URL.String(), u.Email, r.RemoteAddr)
+			}
+			if redirectToLogin {
+				loginUrl, _ := user.LoginURL(c, "/")
+				http.Redirect(w, r, loginUrl, http.StatusFound)
+			} else {
+				http.Error(w, "Request requires authorization", http.StatusUnauthorized)
+			}
+			return false
 		}
-	}
-
-	if !allowed {
-		if u == nil {
-			c.Debugf("Unauthorized request for %v from unauthenticated user at %v", r.URL.String(), r.RemoteAddr)
-		} else {
-			c.Debugf("Unauthorized request for %v from %v at %v", r.URL.String(), u.Email, r.RemoteAddr)
-		}
-		if redirectToLogin {
-			loginUrl, _ := user.LoginURL(c, "/")
-			http.Redirect(w, r, loginUrl, http.StatusFound)
-		} else {
-			http.Error(w, "Request requires authorization", http.StatusUnauthorized)
-		}
-		return false
 	}
 
 	if r.Method != method {
@@ -139,6 +137,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 
 	http.HandleFunc("/", handleIndex)
+	http.HandleFunc("/clear", handleClear)
 	http.HandleFunc("/export", handleExport)
 	http.HandleFunc("/import", handleImport)
 	http.HandleFunc("/list_tags", handleListTags)
@@ -146,6 +145,34 @@ func init() {
 	http.HandleFunc("/rate_and_tag", handleRateAndTag)
 	http.HandleFunc("/report_played", handleReportPlayed)
 	http.HandleFunc("/songs", handleSongs)
+}
+
+func handleClear(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	if !checkUserRequest(c, w, r, "POST", false) {
+		return
+	}
+	if !appengine.IsDevAppServer() {
+		http.Error(w, "only works on dev server", http.StatusBadRequest)
+		return
+	}
+	if err := clearData(c); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeTextResponse(w, "ok")
+}
+
+func handleExport(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	if !checkOAuthRequest(c, w, r) {
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	if err := dumpSongs(c, w); err != nil {
+		c.Errorf("Failed to export songs: %v", err)
+	}
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -170,18 +197,6 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	if _, err = io.Copy(w, f); err != nil {
 		c.Errorf("Failed to copy %v to response: %v", indexPath, err)
-	}
-}
-
-func handleExport(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if !checkOAuthRequest(c, w, r) {
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/plain")
-	if err := dumpSongs(c, w); err != nil {
-		c.Errorf("Failed to export songs: %v", err)
 	}
 }
 

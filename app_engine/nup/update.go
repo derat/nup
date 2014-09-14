@@ -222,3 +222,22 @@ func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserD
 		return nil
 	}, nil)
 }
+
+func clearData(c appengine.Context) error {
+	// Can't be too careful.
+	if !appengine.IsDevAppServer() {
+		return fmt.Errorf("Can't clear data on non-dev server")
+	}
+
+	c.Debugf("Clearing all data")
+	for _, kind := range []string{songKind, playKind} {
+		keys, err := datastore.NewQuery(kind).KeysOnly().GetAll(c, nil)
+		if err != nil {
+			return fmt.Errorf("Getting all %v keys failed: %v", kind, err)
+		}
+		if err = datastore.DeleteMulti(c, keys); err != nil {
+			return fmt.Errorf("Deleting all %v entities failed: %v", kind, err)
+		}
+	}
+	return nil
+}
