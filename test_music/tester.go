@@ -91,6 +91,9 @@ func (t *Tester) QuerySongs(params string) []nup.Song {
 	if err != nil {
 		panic(err)
 	}
+	if resp.StatusCode != http.StatusOK {
+		panic(resp.Status)
+	}
 	defer resp.Body.Close()
 
 	songs := make([]nup.Song, 0)
@@ -99,4 +102,15 @@ func (t *Tester) QuerySongs(params string) []nup.Song {
 		panic(err)
 	}
 	return songs
+}
+
+func (t *Tester) DoPost(pathAndQueryParams string) {
+	resp, err := http.Post(t.serverUrl+pathAndQueryParams, "text/plain", nil)
+	if err != nil {
+		panic(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		panic(resp.Status)
+	}
+	resp.Body.Close()
 }

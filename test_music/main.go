@@ -25,8 +25,9 @@ func buildBinaries() {
 }
 
 func compareQueryResults(expected, actual []nup.Song, compareOrder bool) error {
+	actualCleaned := make([]nup.Song, len(actual))
 	for i := range actual {
-		s := &actual[i]
+		s := actual[i]
 
 		if len(s.SongId) == 0 {
 			return fmt.Errorf("song %v (%v) has no ID", i, s.Url)
@@ -40,12 +41,17 @@ func compareQueryResults(expected, actual []nup.Song, compareOrder bool) error {
 			s.Url = ""
 			s.Filename = expected[i].Filename
 		}
+		actualCleaned[i] = s
 	}
+
+	expectedCleaned := make([]nup.Song, len(expected))
 	for i := range expected {
-		s := &expected[i]
+		s := expected[i]
 		s.Sha1 = ""
+		expectedCleaned[i] = s
 	}
-	return test.CompareSongs(expected, actual, compareOrder)
+
+	return test.CompareSongs(expectedCleaned, actualCleaned, compareOrder)
 }
 
 func main() {
@@ -68,20 +74,31 @@ func main() {
 	test.CopySongsToTempDir(t.MusicDir, test.Song0s.Filename, test.Song1s.Filename)
 	t.UpdateSongs()
 
-	log.Print("sleeping and running queries")
+	log.Print("sleeping and running query")
 	time.Sleep(time.Second)
 	songs = t.QuerySongs("artist=" + url.QueryEscape(test.Song0s.Artist))
 	if err := compareQueryResults([]nup.Song{test.Song0s}, songs, true); err != nil {
 		log.Fatal(err)
 	}
+
+	log.Print("rating and tagging")
+	id := songs[0].SongId
+	ratedSong0s := test.Song0s
+	ratedSong0s.Rating = 0.75
+	ratedSong0s.Tags = []string{"electronic", "instrumental"}
+	t.DoPost("rate_and_tag?songId=" + id + "&rating=0.75&tags=electronic+instrumental")
+	time.Sleep(time.Second)
 	songs = t.QuerySongs("album=" + url.QueryEscape(test.Song0s.Album))
-	if err := compareQueryResults([]nup.Song{test.Song0s, test.Song1s}, songs, true); err != nil {
+	if err := compareQueryResults([]nup.Song{ratedSong0s, test.Song1s}, songs, true); err != nil {
 		log.Fatal(err)
 	}
 
-	log.Print("dumping songs")
-	songs = t.DumpSongs(true)
-	if err := test.CompareSongs([]nup.Song{test.Song0s, test.Song1s}, songs, false); err != nil {
+	log.Print("clearing tags")
+	ratedSong0s.Tags = nil
+	t.DoPost("rate_and_tag?songId=" + id + "&tags=")
+	time.Sleep(time.Second)
+	songs = t.QuerySongs("album=" + url.QueryEscape(test.Song0s.Album))
+	if err := compareQueryResults([]nup.Song{ratedSong0s, test.Song1s}, songs, true); err != nil {
 		log.Fatal(err)
 	}
 
@@ -92,7 +109,7 @@ func main() {
 	log.Print("sleeping and dumping songs")
 	time.Sleep(time.Second)
 	songs = t.DumpSongs(true)
-	if err := test.CompareSongs([]nup.Song{test.Song0s, test.Song1s, test.Song5s}, songs, false); err != nil {
+	if err := test.CompareSongs([]nup.Song{ratedSong0s, test.Song1s, test.Song5s}, songs, false); err != nil {
 		log.Fatal(err)
 	}
 }
