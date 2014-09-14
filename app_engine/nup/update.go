@@ -150,17 +150,19 @@ func addPlay(c appengine.Context, id int64, startTime time.Time, ip string) erro
 	})
 }
 
-func updateRatingAndTags(c appengine.Context, id int64, hasRating bool, rating float64, hasTags bool, tags []string) error {
+func updateRatingAndTags(c appengine.Context, id int64, hasRating bool, rating float64, tags []string) error {
 	if err := updateExistingSong(c, id, func(c appengine.Context, s *nup.Song) error {
 		var updated bool
 		if hasRating && rating != s.Rating {
 			s.Rating = rating
 			updated = true
 		}
-		sort.Strings(tags)
-		if hasTags && !sortedStringSlicesMatch(tags, s.Tags) {
-			s.Tags = tags
-			updated = true
+		if tags != nil {
+			sort.Strings(tags)
+			if !sortedStringSlicesMatch(tags, s.Tags) {
+				s.Tags = tags
+				updated = true
+			}
 		}
 		if updated {
 			return nil
@@ -197,6 +199,7 @@ func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserD
 		} else {
 			c.Debugf("Inserting %v with SHA1 %v", updatedSong.Filename, sha1)
 			key = datastore.NewIncompleteKey(c, songKind, nil)
+			song.Rating = -1.0
 		}
 
 		copySongFileFields(song, updatedSong)

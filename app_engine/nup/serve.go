@@ -304,14 +304,15 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var hasRating, hasTags bool
+	hasRating := false
 	var rating float64
-	tags := make([]string, 0)
+	var tags []string
+
 	if _, ok := r.Form["rating"]; ok {
-		hasRating = true
 		if !parseFloatParam(c, w, r, "rating", &rating) {
 			return
 		}
+		hasRating = true
 		if rating < 0.0 {
 			rating = -1.0
 		} else if rating > 1.0 {
@@ -319,16 +320,13 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if _, ok := r.Form["tags"]; ok {
-		hasTags = true
-		for _, t := range strings.Fields(r.FormValue("tags")) {
-			tags = append(tags, strings.TrimSpace(t))
-		}
+		tags = strings.Fields(r.FormValue("tags"))
 	}
-	if !hasRating && !hasTags {
+	if !hasRating && tags == nil {
 		http.Error(w, "No rating or tags supplied", http.StatusBadRequest)
 		return
 	}
-	if err := updateRatingAndTags(c, id, hasRating, rating, hasTags, tags); err != nil {
+	if err := updateRatingAndTags(c, id, hasRating, rating, tags); err != nil {
 		c.Errorf("Got error while rating/tagging song: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
