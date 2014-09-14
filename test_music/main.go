@@ -64,18 +64,22 @@ func main() {
 	t := newTester(*server, *binDir)
 	defer os.RemoveAll(t.TempDir)
 
+	log.Printf("clearing all data on %v", *server)
+	t.DoPost("clear")
+	time.Sleep(time.Second)
+
 	log.Print("dumping initial songs")
 	songs := t.DumpSongs(false)
 	if len(songs) != 0 {
-		log.Fatalf("server at %v isn't empty; got %v song(s)", *server, len(songs))
+		log.Fatalf("server isn't empty; got %v song(s)", len(songs))
 	}
 
 	log.Print("importing 2 songs")
 	test.CopySongsToTempDir(t.MusicDir, test.Song0s.Filename, test.Song1s.Filename)
 	t.UpdateSongs()
-
-	log.Print("sleeping and running query")
 	time.Sleep(time.Second)
+
+	log.Print("running query")
 	songs = t.QuerySongs("artist=" + url.QueryEscape(test.Song0s.Artist))
 	if err := compareQueryResults([]nup.Song{test.Song0s}, songs, true); err != nil {
 		log.Fatal(err)
@@ -105,9 +109,9 @@ func main() {
 	log.Print("importing another song")
 	test.CopySongsToTempDir(t.MusicDir, test.Song5s.Filename)
 	t.UpdateSongs()
-
-	log.Print("sleeping and dumping songs")
 	time.Sleep(time.Second)
+
+	log.Print("dumping songs")
 	songs = t.DumpSongs(true)
 	if err := test.CompareSongs([]nup.Song{ratedSong0s, test.Song1s, test.Song5s}, songs, false); err != nil {
 		log.Fatal(err)
