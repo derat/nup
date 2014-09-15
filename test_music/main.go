@@ -99,12 +99,29 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// TODO: Record play.
+
+	log.Print("checking that user data is preserved after update")
+	if err := os.Remove(filepath.Join(t.MusicDir, ratedSong0s.Filename)); err != nil {
+		panic(err)
+	}
+	updatedSong0s := test.Song0sUpdated
+	updatedSong0s.Rating = ratedSong0s.Rating
+	updatedSong0s.Tags = ratedSong0s.Tags
+	test.CopySongsToTempDir(t.MusicDir, updatedSong0s.Filename)
+	t.UpdateSongs()
+	t.WaitForUpdate()
+	songs = t.QuerySongs("artist=" + url.QueryEscape(updatedSong0s.Artist))
+	if err := compareQueryResults([]nup.Song{updatedSong0s}, songs, true); err != nil {
+		log.Fatal(err)
+	}
+
 	log.Print("clearing tags")
-	ratedSong0s.Tags = nil
+	updatedSong0s.Tags = nil
 	t.DoPost("rate_and_tag?songId=" + id + "&tags=")
 	t.WaitForUpdate()
 	songs = t.QuerySongs("album=" + url.QueryEscape(test.Song0s.Album))
-	if err := compareQueryResults([]nup.Song{ratedSong0s, test.Song1s}, songs, true); err != nil {
+	if err := compareQueryResults([]nup.Song{updatedSong0s, test.Song1s}, songs, true); err != nil {
 		log.Fatal(err)
 	}
 
@@ -115,7 +132,7 @@ func main() {
 
 	log.Print("dumping songs")
 	songs = t.DumpSongs(true)
-	if err := test.CompareSongs([]nup.Song{ratedSong0s, test.Song1s, test.Song5s, test.LegacySong1, test.LegacySong2}, songs, false); err != nil {
+	if err := test.CompareSongs([]nup.Song{updatedSong0s, test.Song1s, test.Song5s, test.LegacySong1, test.LegacySong2}, songs, false); err != nil {
 		log.Fatal(err)
 	}
 }
