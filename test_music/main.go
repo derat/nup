@@ -7,7 +7,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"erat.org/nup"
 	"erat.org/nup/test"
@@ -47,6 +49,7 @@ func compareQueryResults(expected, actual []nup.Song, compareOrder bool) error {
 	for i := range expected {
 		s := expected[i]
 		s.Sha1 = ""
+		s.Plays = nil
 		expectedCleaned[i] = s
 	}
 
@@ -99,7 +102,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// TODO: Record play.
+	log.Print("reporting playback")
+	startTime1 := time.Unix(1410746718, 0)
+	ratedSong0s.Plays = append(ratedSong0s.Plays, nup.Play{startTime1, "127.0.0.1"})
+	startTime2 := time.Unix(1410746923, 0)
+	ratedSong0s.Plays = append(ratedSong0s.Plays, nup.Play{startTime2, "127.0.0.1"})
+	t.DoPost("report_played?songId=" + id + "&startTime=" + strconv.FormatInt(startTime1.Unix(), 10))
+	t.DoPost("report_played?songId=" + id + "&startTime=" + strconv.FormatInt(startTime2.Unix(), 10))
+
+	// TODO: Test that first/last play times and num plays are updated.
 
 	log.Print("checking that user data is preserved after update")
 	if err := os.Remove(filepath.Join(t.MusicDir, ratedSong0s.Filename)); err != nil {
@@ -108,6 +119,7 @@ func main() {
 	updatedSong0s := test.Song0sUpdated
 	updatedSong0s.Rating = ratedSong0s.Rating
 	updatedSong0s.Tags = ratedSong0s.Tags
+	updatedSong0s.Plays = ratedSong0s.Plays
 	test.CopySongsToTempDir(t.MusicDir, updatedSong0s.Filename)
 	t.UpdateSongs()
 	t.WaitForUpdate()

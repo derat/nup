@@ -152,6 +152,9 @@ func CompareSongs(expected, actual []nup.Song, compareOrder bool) error {
 		} else {
 			stringify := func(s nup.Song) string {
 				if s.Plays != nil {
+					for j := range s.Plays {
+						s.Plays[j].StartTime = s.Plays[j].StartTime.UTC()
+					}
 					sort.Sort(playArray(s.Plays))
 				}
 				b, err := json.Marshal(s)
