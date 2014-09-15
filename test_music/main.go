@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"erat.org/nup"
 	"erat.org/nup/test"
@@ -66,7 +65,7 @@ func main() {
 
 	log.Printf("clearing all data on %v", *server)
 	t.DoPost("clear")
-	time.Sleep(time.Second)
+	t.WaitForUpdate()
 
 	log.Print("dumping initial songs")
 	songs := t.DumpSongs(false)
@@ -74,10 +73,13 @@ func main() {
 		log.Fatalf("server isn't empty; got %v song(s)", len(songs))
 	}
 
-	log.Print("importing 2 songs")
+	log.Print("importing songs from legacy db")
+	t.ImportSongsFromLegacyDb("../test/data/legacy.db")
+
+	log.Print("importing songs from music dir")
 	test.CopySongsToTempDir(t.MusicDir, test.Song0s.Filename, test.Song1s.Filename)
 	t.UpdateSongs()
-	time.Sleep(time.Second)
+	t.WaitForUpdate()
 
 	log.Print("running query")
 	songs = t.QuerySongs("artist=" + url.QueryEscape(test.Song0s.Artist))
@@ -91,7 +93,7 @@ func main() {
 	ratedSong0s.Rating = 0.75
 	ratedSong0s.Tags = []string{"electronic", "instrumental"}
 	t.DoPost("rate_and_tag?songId=" + id + "&rating=0.75&tags=electronic+instrumental")
-	time.Sleep(time.Second)
+	t.WaitForUpdate()
 	songs = t.QuerySongs("album=" + url.QueryEscape(test.Song0s.Album))
 	if err := compareQueryResults([]nup.Song{ratedSong0s, test.Song1s}, songs, true); err != nil {
 		log.Fatal(err)
@@ -100,7 +102,7 @@ func main() {
 	log.Print("clearing tags")
 	ratedSong0s.Tags = nil
 	t.DoPost("rate_and_tag?songId=" + id + "&tags=")
-	time.Sleep(time.Second)
+	t.WaitForUpdate()
 	songs = t.QuerySongs("album=" + url.QueryEscape(test.Song0s.Album))
 	if err := compareQueryResults([]nup.Song{ratedSong0s, test.Song1s}, songs, true); err != nil {
 		log.Fatal(err)
@@ -109,11 +111,11 @@ func main() {
 	log.Print("importing another song")
 	test.CopySongsToTempDir(t.MusicDir, test.Song5s.Filename)
 	t.UpdateSongs()
-	time.Sleep(time.Second)
+	t.WaitForUpdate()
 
 	log.Print("dumping songs")
 	songs = t.DumpSongs(true)
-	if err := test.CompareSongs([]nup.Song{ratedSong0s, test.Song1s, test.Song5s}, songs, false); err != nil {
+	if err := test.CompareSongs([]nup.Song{ratedSong0s, test.Song1s, test.Song5s, test.LegacySong1, test.LegacySong2}, songs, false); err != nil {
 		log.Fatal(err)
 	}
 }

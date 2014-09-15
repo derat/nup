@@ -59,6 +59,32 @@ var Song5s nup.Song = nup.Song{
 	Length:   5.041,
 	Rating:   -1,
 }
+var LegacySong1 nup.Song = nup.Song{
+	Sha1:     "1977c91fea860245695dcceea0805c14cede7559",
+	Filename: "arovane/atol_scrap/thaem_nue.mp3",
+	Artist:   "Arovane",
+	Title:    "Thaem Nue",
+	Album:    "Atol Scrap",
+	Track:    3,
+	Disc:     1,
+	Length:   449,
+	Rating:   0.75,
+	Plays:    []nup.Play{{time.Unix(1276057170, 0).UTC(), "127.0.0.1"}, {time.Unix(1297316913, 0).UTC(), "1.2.3.4"}},
+	Tags:     []string{"electronic", "instrumental"},
+}
+var LegacySong2 nup.Song = nup.Song{
+	Sha1:     "b70984a4ac5084999b70478cdf163218b90cefdb",
+	Filename: "gary_hoey/animal_instinct/motown_fever.mp3",
+	Artist:   "Gary Hoey",
+	Title:    "Motown Fever",
+	Album:    "Animal Instinct",
+	Track:    7,
+	Disc:     1,
+	Length:   182,
+	Rating:   0.5,
+	Plays:    []nup.Play{{time.Unix(1394773930, 0).UTC(), "8.8.8.8"}},
+	Tags:     []string{"instrumental", "rock"},
+}
 
 func CreateTempDir() string {
 	dir, err := ioutil.TempDir("", "nup_test.")
@@ -106,6 +132,12 @@ func (a songArray) Len() int           { return len(a) }
 func (a songArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a songArray) Less(i, j int) bool { return a[i].Filename < a[j].Filename }
 
+type playArray []nup.Play
+
+func (a playArray) Len() int           { return len(a) }
+func (a playArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a playArray) Less(i, j int) bool { return a[i].StartTime.Before(a[j].StartTime) }
+
 func CompareSongs(expected, actual []nup.Song, compareOrder bool) error {
 	if !compareOrder {
 		sort.Sort(songArray(expected))
@@ -118,16 +150,20 @@ func CompareSongs(expected, actual []nup.Song, compareOrder bool) error {
 		if i >= len(actual) {
 			m = append(m, fmt.Sprintf("missing song at position %v; expected %q", i, expected[i].Filename))
 		} else {
-			e, err := json.Marshal(expected[i])
-			if err != nil {
-				panic(err)
+			stringify := func(s nup.Song) string {
+				if s.Plays != nil {
+					sort.Sort(playArray(s.Plays))
+				}
+				b, err := json.Marshal(s)
+				if err != nil {
+					panic(err)
+				}
+				return string(b)
 			}
-			a, err := json.Marshal(actual[i])
-			if err != nil {
-				panic(err)
-			}
-			if string(a) != string(e) {
-				m = append(m, fmt.Sprintf("song %v didn't match expected values:\nexpected: %v\n  actual: %v", i, string(e), string(a)))
+			a := stringify(actual[i])
+			e := stringify(expected[i])
+			if a != e {
+				m = append(m, fmt.Sprintf("song %v didn't match expected values:\nexpected: %v\n  actual: %v", i, e, a))
 			}
 		}
 	}

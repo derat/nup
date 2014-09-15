@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"time"
 
 	"erat.org/nup"
 	"erat.org/nup/test"
@@ -53,6 +55,10 @@ func newTester(serverUrl, binDir string) *Tester {
 	return t
 }
 
+func (t *Tester) WaitForUpdate() {
+	time.Sleep(2 * time.Second)
+}
+
 func (t *Tester) DumpSongs(stripIds bool) []nup.Song {
 	stdout, stderr, err := runCommand(filepath.Join(t.binDir, "dump_music"), "-config="+t.configFile)
 	if err != nil {
@@ -78,6 +84,17 @@ func (t *Tester) DumpSongs(stripIds bool) []nup.Song {
 		songs = append(songs, s)
 	}
 	return songs
+}
+
+func (t *Tester) ImportSongsFromLegacyDb(path string) {
+	_, caller, _, ok := runtime.Caller(1)
+	if !ok {
+		panic("unable to get runtime caller info")
+	}
+	db := filepath.Join(filepath.Dir(caller), path)
+	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.configFile, "-import-db="+db, "-cover-dir="+t.CoverDir); err != nil {
+		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
+	}
 }
 
 func (t *Tester) UpdateSongs() {
