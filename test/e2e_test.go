@@ -1,4 +1,4 @@
-package e2e
+package test
 
 import (
 	"fmt"
@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"erat.org/nup"
-	"erat.org/nup/test"
 )
 
 var server string = "http://localhost:8080/"
@@ -33,7 +32,7 @@ func doPlayTimeQueries(tc *testing.T, t *Tester, s *nup.Song, queryPrefix string
 	}
 
 	plays := s.Plays
-	sort.Sort(test.PlayArray(plays))
+	sort.Sort(PlayArray(plays))
 
 	firstPlay := plays[0].StartTime
 	beforeFirstPlay := strconv.Itoa(int(time.Now().Sub(firstPlay)/time.Second) + 10)
@@ -88,7 +87,7 @@ func compareQueryResults(expected, actual []nup.Song, compareOrder bool) error {
 		expectedCleaned[i] = s
 	}
 
-	return test.CompareSongs(expectedCleaned, actualCleaned, compareOrder)
+	return CompareSongs(expectedCleaned, actualCleaned, compareOrder)
 }
 
 func TestLegacy(tc *testing.T) {
@@ -98,19 +97,19 @@ func TestLegacy(tc *testing.T) {
 	log.Print("importing songs from legacy db")
 	t.ImportSongsFromLegacyDb("../test/data/legacy.db")
 	t.WaitForUpdate()
-	if err := test.CompareSongs([]nup.Song{test.LegacySong1, test.LegacySong2}, t.DumpSongs(true), false); err != nil {
+	if err := CompareSongs([]nup.Song{LegacySong1, LegacySong2}, t.DumpSongs(true), false); err != nil {
 		tc.Error(err)
 	}
 
 	log.Print("checking that play stats were generated correctly")
-	doPlayTimeQueries(tc, t, &test.LegacySong1, "artist="+url.QueryEscape(test.LegacySong1.Artist)+"&")
+	doPlayTimeQueries(tc, t, &LegacySong1, "artist="+url.QueryEscape(LegacySong1.Artist)+"&")
 	if err := compareQueryResults([]nup.Song{}, t.QuerySongs("maxPlays=0"), true); err != nil {
 		tc.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{test.LegacySong2}, t.QuerySongs("maxPlays=1"), true); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong2}, t.QuerySongs("maxPlays=1"), true); err != nil {
 		tc.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{test.LegacySong2, test.LegacySong1}, t.QuerySongs("maxPlays=2"), true); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong2, LegacySong1}, t.QuerySongs("maxPlays=2"), true); err != nil {
 		tc.Error(err)
 	}
 }
@@ -120,27 +119,27 @@ func TestUpdate(tc *testing.T) {
 	defer os.RemoveAll(t.TempDir)
 
 	log.Print("importing songs from music dir")
-	test.CopySongsToTempDir(t.MusicDir, test.Song0s.Filename, test.Song1s.Filename)
+	CopySongsToTempDir(t.MusicDir, Song0s.Filename, Song1s.Filename)
 	t.UpdateSongs()
 	t.WaitForUpdate()
-	if err := test.CompareSongs([]nup.Song{test.Song0s, test.Song1s}, t.DumpSongs(true), false); err != nil {
+	if err := CompareSongs([]nup.Song{Song0s, Song1s}, t.DumpSongs(true), false); err != nil {
 		tc.Error(err)
 	}
 
 	log.Print("importing another song")
-	test.CopySongsToTempDir(t.MusicDir, test.Song5s.Filename)
+	CopySongsToTempDir(t.MusicDir, Song5s.Filename)
 	t.UpdateSongs()
 	t.WaitForUpdate()
-	if err := test.CompareSongs([]nup.Song{test.Song0s, test.Song1s, test.Song5s}, t.DumpSongs(true), false); err != nil {
+	if err := CompareSongs([]nup.Song{Song0s, Song1s, Song5s}, t.DumpSongs(true), false); err != nil {
 		tc.Error(err)
 	}
 
 	log.Print("updating a song")
-	test.RemoveFromTempDir(t.MusicDir, test.Song0s.Filename)
-	test.CopySongsToTempDir(t.MusicDir, test.Song0sUpdated.Filename)
+	RemoveFromTempDir(t.MusicDir, Song0s.Filename)
+	CopySongsToTempDir(t.MusicDir, Song0sUpdated.Filename)
 	t.UpdateSongs()
 	t.WaitForUpdate()
-	if err := test.CompareSongs([]nup.Song{test.Song0sUpdated, test.Song1s, test.Song5s}, t.DumpSongs(true), false); err != nil {
+	if err := CompareSongs([]nup.Song{Song0sUpdated, Song1s, Song5s}, t.DumpSongs(true), false); err != nil {
 		tc.Error(err)
 	}
 }
@@ -150,18 +149,18 @@ func TestUserData(tc *testing.T) {
 	defer os.RemoveAll(t.TempDir)
 
 	log.Print("importing a song")
-	test.CopySongsToTempDir(t.MusicDir, test.Song0s.Filename)
+	CopySongsToTempDir(t.MusicDir, Song0s.Filename)
 	t.UpdateSongs()
 	t.WaitForUpdate()
 	id := t.DumpSongs(false)[0].SongId
 
 	log.Print("rating and tagging")
-	s := test.Song0s
+	s := Song0s
 	s.Rating = 0.75
 	s.Tags = []string{"electronic", "instrumental"}
 	t.DoPost("rate_and_tag?songId=" + id + "&rating=0.75&tags=electronic+instrumental")
 	t.WaitForUpdate()
-	if err := test.CompareSongs([]nup.Song{s}, t.DumpSongs(true), false); err != nil {
+	if err := CompareSongs([]nup.Song{s}, t.DumpSongs(true), false); err != nil {
 		tc.Fatal(err)
 	}
 
@@ -175,20 +174,20 @@ func TestUserData(tc *testing.T) {
 		t.DoPost("report_played?songId=" + id + "&startTime=" + strconv.FormatInt(p.StartTime.Unix(), 10))
 	}
 	t.WaitForUpdate()
-	if err := test.CompareSongs([]nup.Song{s}, t.DumpSongs(true), false); err != nil {
+	if err := CompareSongs([]nup.Song{s}, t.DumpSongs(true), false); err != nil {
 		tc.Fatal(err)
 	}
 
 	log.Print("updating song and checking that user data is preserved")
-	test.RemoveFromTempDir(t.MusicDir, s.Filename)
-	us := test.Song0sUpdated
+	RemoveFromTempDir(t.MusicDir, s.Filename)
+	us := Song0sUpdated
 	us.Rating = s.Rating
 	us.Tags = s.Tags
 	us.Plays = s.Plays
-	test.CopySongsToTempDir(t.MusicDir, us.Filename)
+	CopySongsToTempDir(t.MusicDir, us.Filename)
 	t.UpdateSongs()
 	t.WaitForUpdate()
-	if err := test.CompareSongs([]nup.Song{us}, t.DumpSongs(true), false); err != nil {
+	if err := CompareSongs([]nup.Song{us}, t.DumpSongs(true), false); err != nil {
 		tc.Error(err)
 	}
 
@@ -196,7 +195,7 @@ func TestUserData(tc *testing.T) {
 	us.Tags = nil
 	t.DoPost("rate_and_tag?songId=" + id + "&tags=")
 	t.WaitForUpdate()
-	if err := test.CompareSongs([]nup.Song{us}, t.DumpSongs(true), false); err != nil {
+	if err := CompareSongs([]nup.Song{us}, t.DumpSongs(true), false); err != nil {
 		tc.Fatal(err)
 	}
 

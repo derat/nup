@@ -1,4 +1,4 @@
-package e2e
+package test
 
 import (
 	"encoding/json"
@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"erat.org/nup"
-	"erat.org/nup/test"
 )
 
 func runCommand(p string, args ...string) (stdout, stderr string, err error) {
@@ -57,7 +56,7 @@ type Tester struct {
 
 func newTester(serverUrl, binDir string) *Tester {
 	t := &Tester{
-		TempDir:   test.CreateTempDir(),
+		TempDir:   CreateTempDir(),
 		serverUrl: serverUrl,
 		binDir:    binDir,
 	}
