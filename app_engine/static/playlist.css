@@ -1,0 +1,169 @@
+html {
+  height: 100%;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  font-family: Verdana, "DejaVu Sans", Arial, Helvetica, "Liberation Sans", sans-serif;
+  font-size: 12px;
+  color: black;
+  background-color: white;
+}
+
+#playlistContainer {
+  min-height: 100%;
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: stretch;
+}
+
+#leftPane {
+  flex-grow: 1;
+  min-height: 100%;
+  padding-bottom: 2px;
+}
+
+#playlistTable th.time {
+  /* This causes a doubly-thick border on high-DPI. */
+  /* border-right: solid 1px #888; */
+}
+
+table.songTable {
+  border-collapse: collapse;
+  padding-right: 10px;
+  table-layout: fixed;
+  width: 100%;
+}
+table.songTable th {
+  text-align: left;
+  padding-right: 10px;
+  border-bottom: solid 1px #ccc;
+  padding-left: 8px;
+  background-color: #f5f5f5;
+}
+table.songTable td {
+  padding-left: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+table.songTable td a {
+  color: black;
+  text-decoration: none;
+  cursor: pointer;
+}
+table.songTable td a:hover {
+  color: #666;
+  text-decoration: underline;
+}
+table.songTable td.checkbox, table.songTable th.checkbox {
+  width: 1px;
+}
+table.songTable td.time, table.songTable th.artist {
+  padding-left: 6px;
+}
+table.songTable td.time, table.songTable th.time {
+  width: 3em;
+  text-align: right;
+  padding-right: 6px;
+  text-overflow: clip;
+}
+table.songTable tr.playing {
+  background-color: #bde;
+}
+
+#centerDivider {
+  flex: 0 0 1px;
+  background-color: #888;
+}
+
+#rightPane {
+  flex-grow: 1;
+  padding-bottom: 2px;
+}
+#searchTitle {
+  padding-top: 8px;
+  font-weight: bold;
+  padding-left: 10px;
+}
+#searchTable {
+  border: 0;
+  margin-top: 5px;
+  border-collapse: collapse;
+}
+#searchLeftColumn {
+  width: 4em;
+}
+#searchTable td {
+  padding-left: 10px;
+}
+
+#rightPane input[type=text] {
+  border: 1px solid #aaa;
+  padding-left: 2px;
+}
+
+#artistInput, #titleInput, #albumInput, #keywordsInput, #tagsInput, #minRatingInput {
+  padding-right: 17px;
+}
+#artistClearButton, #titleClearButton, #albumClearButton, #keywordsClearButton, #tagsClearButton {
+  position: relative;
+  left: -22px;
+  top: 2px;
+  cursor: pointer;
+}
+#firstTrackCheckbox, #shuffleCheckbox, #unratedCheckbox {
+  margin-right: 15px;
+}
+#maxPlaysInput {
+  padding-right: 2px;
+  width: 2em;
+}
+
+#searchButtons {
+  padding-top: 5px;
+}
+
+#searchResultsTitle {
+  font-weight: bold;
+  padding-right: 10px;
+}
+
+#searchResultsControls {
+  border-top: 1px solid #888;
+  margin-top: 10px;
+  padding-top: 10px;
+  padding-left: 10px;
+}
+
+#searchResultsTable {
+  margin-top: 10px;
+}
+#searchResultsTable th {
+  border-top: solid 1px #ccc;
+}
+#searchResultsTable input[type="checkbox"] {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+}
+
+#searchResultsCheckbox[class~="opaque"] {
+  opacity: 1.0;
+}
+#searchResultsCheckbox[class~="transparent"] {
+  opacity: 0.3;
+}
+
+#waitingDiv {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background-color: #a00;
+  color: white;
+  padding: 5px;
+  font-size: 11px;
+  border-radius: 8px;
+  display: none;
+}
