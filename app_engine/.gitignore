@@ -1,4 +1,2 @@
-index.yaml
-nup/config.json
-run_dev_appserver.sh
+config.json
 update_app.sh

@@ -1,4 +1,4 @@
-package nup
+package appengine
 
 import (
 	"appengine"
@@ -20,7 +20,7 @@ import (
 
 const (
 	// Config file path relative to base app directory.
-	configPath = "nup/config.json"
+	configPath = "config.json"
 
 	// Path to the index file.
 	indexPath = "static/index.html"
