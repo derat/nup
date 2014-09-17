@@ -63,22 +63,22 @@ func RemoveFromTempDir(dir string, filenames ...string) {
 	}
 }
 
-type songArray []nup.Song
+type SongArray []nup.Song
 
-func (a songArray) Len() int           { return len(a) }
-func (a songArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a songArray) Less(i, j int) bool { return a[i].Filename < a[j].Filename }
+func (a SongArray) Len() int           { return len(a) }
+func (a SongArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a SongArray) Less(i, j int) bool { return a[i].Filename < a[j].Filename }
 
-type playArray []nup.Play
+type PlayArray []nup.Play
 
-func (a playArray) Len() int           { return len(a) }
-func (a playArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a playArray) Less(i, j int) bool { return a[i].StartTime.Before(a[j].StartTime) }
+func (a PlayArray) Len() int           { return len(a) }
+func (a PlayArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a PlayArray) Less(i, j int) bool { return a[i].StartTime.Before(a[j].StartTime) }
 
 func CompareSongs(expected, actual []nup.Song, compareOrder bool) error {
 	if !compareOrder {
-		sort.Sort(songArray(expected))
-		sort.Sort(songArray(actual))
+		sort.Sort(SongArray(expected))
+		sort.Sort(SongArray(actual))
 	}
 
 	m := make([]string, 0)
@@ -92,7 +92,7 @@ func CompareSongs(expected, actual []nup.Song, compareOrder bool) error {
 					for j := range s.Plays {
 						s.Plays[j].StartTime = s.Plays[j].StartTime.UTC()
 					}
-					sort.Sort(playArray(s.Plays))
+					sort.Sort(PlayArray(s.Plays))
 				}
 				b, err := json.Marshal(s)
 				if err != nil {
