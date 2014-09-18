@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -132,6 +133,21 @@ func (t *Tester) UpdateSongs() {
 	}
 }
 
+func (t *Tester) PostSongs(songs []nup.Song, replaceUserData bool) {
+	var buf bytes.Buffer
+	e := json.NewEncoder(&buf)
+	for _, s := range songs {
+		if err := e.Encode(s); err != nil {
+			panic(err)
+		}
+	}
+	path := "import"
+	if replaceUserData {
+		path += "?replaceUserData=1"
+	}
+	t.DoPost(path, &buf)
+}
+
 func (t *Tester) QuerySongs(params string) []nup.Song {
 	resp, err := http.Get(t.serverUrl + "query?" + params)
 	if err != nil {
@@ -150,8 +166,8 @@ func (t *Tester) QuerySongs(params string) []nup.Song {
 	return songs
 }
 
-func (t *Tester) DoPost(pathAndQueryParams string) {
-	resp, err := http.Post(t.serverUrl+pathAndQueryParams, "text/plain", nil)
+func (t *Tester) DoPost(pathAndQueryParams string, body io.Reader) {
+	resp, err := http.Post(t.serverUrl+pathAndQueryParams, "text/plain", body)
 	if err != nil {
 		panic(err)
 	}

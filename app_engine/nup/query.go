@@ -215,7 +215,7 @@ func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl st
 		bq = bq.Filter("AlbumLower =", strings.ToLower(query.Album))
 	}
 	for _, w := range query.Keywords {
-		bq = bq.Filter("Keywords =", w)
+		bq = bq.Filter("Keywords =", strings.ToLower(w))
 	}
 	if query.Unrated && !query.HasMinRating {
 		bq = bq.Filter("Rating =", -1.0)
