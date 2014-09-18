@@ -23,7 +23,7 @@ const (
 	configPath = "config.json"
 
 	// Path to the index file.
-	indexPath = "static/index.html"
+	indexPath = "nup/index.html"
 
 	// Datastore kinds of various objects.
 	playKind = "Play"
@@ -72,7 +72,7 @@ func checkUserRequest(c appengine.Context, w http.ResponseWriter, r *http.Reques
 			} else {
 				c.Debugf("Unauthorized request for %v from %v at %v", r.URL.String(), u.Email, r.RemoteAddr)
 			}
-			if redirectToLogin {
+			if u == nil && redirectToLogin {
 				loginUrl, _ := user.LoginURL(c, "/")
 				http.Redirect(w, r, loginUrl, http.StatusFound)
 			} else {
