@@ -7,17 +7,31 @@ import (
 	"erat.org/nup/test"
 )
 
-func TestLegacy(t *testing.T) {
+func testLegacyQuery(expected []nup.Song, minId int64) error {
 	ch := make(chan SongAndError)
-	num, err := getSongsFromLegacyDb("../test/data/legacy.db", ch)
+	num, err := getSongsFromLegacyDb("../test/data/legacy.db", minId, ch)
 	if err != nil {
-		t.Fatalf("getting songs failed: %v", err)
+		return err
 	}
 	actual, err := getSongsFromChannel(ch, num)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
-	if err = test.CompareSongs([]nup.Song{test.LegacySong1, test.LegacySong2}, actual, true); err != nil {
-		t.Error(err)
+	return test.CompareSongs(expected, actual, true)
+}
+
+func TestLegacy(t *testing.T) {
+	for _, tc := range []struct {
+		MinId         int64
+		ExpectedSongs []nup.Song
+	}{
+		{0, []nup.Song{test.LegacySong1, test.LegacySong2}},
+		{1, []nup.Song{test.LegacySong1, test.LegacySong2}},
+		{2, []nup.Song{test.LegacySong2}},
+		{3, []nup.Song{}},
+	} {
+		if err := testLegacyQuery(tc.ExpectedSongs, tc.MinId); err != nil {
+			t.Errorf("Min ID %v: %v", tc.MinId, err)
+		}
 	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"sort"
 	"time"
 
@@ -23,7 +24,7 @@ func doQuery(db *sql.DB, q string, f func(*sql.Rows) error) error {
 	return nil
 }
 
-func getSongsFromLegacyDb(path string, updateChan chan SongAndError) (numUpdates int, err error) {
+func getSongsFromLegacyDb(path string, minId int64, updateChan chan SongAndError) (numUpdates int, err error) {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		return 0, err
@@ -34,7 +35,7 @@ func getSongsFromLegacyDb(path string, updateChan chan SongAndError) (numUpdates
 	// in a goroutine and stream the songs out via the channel instead of building up a map.
 	songs := make(map[int]*nup.Song)
 
-	if err = doQuery(db, "SELECT SongId, Sha1, Filename, Artist, Title, Album, DiscNumber, TrackNumber, Length, Rating FROM Songs WHERE Deleted = 0",
+	if err = doQuery(db, fmt.Sprintf("SELECT SongId, Sha1, Filename, Artist, Title, Album, DiscNumber, TrackNumber, Length, Rating FROM Songs WHERE SongId >= %v AND Deleted = 0", minId),
 		func(rows *sql.Rows) error {
 			var s nup.Song
 			var songId int
@@ -49,7 +50,7 @@ func getSongsFromLegacyDb(path string, updateChan chan SongAndError) (numUpdates
 		return 0, err
 	}
 
-	if err = doQuery(db, "SELECT SongId, StartTime, IpAddress FROM PlayHistory ORDER BY StartTime ASC", func(rows *sql.Rows) error {
+	if err = doQuery(db, fmt.Sprintf("SELECT SongId, StartTime, IpAddress FROM PlayHistory WHERE SongId >= %v ORDER BY StartTime ASC", minId), func(rows *sql.Rows) error {
 		var songId, startTimeSec int
 		var ip string
 		if err := rows.Scan(&songId, &startTimeSec, &ip); err != nil {
@@ -68,7 +69,7 @@ func getSongsFromLegacyDb(path string, updateChan chan SongAndError) (numUpdates
 		return 0, err
 	}
 
-	if err = doQuery(db, "SELECT st.SongId, t.Name FROM SongTags st INNER JOIN Tags t ON(st.TagId = t.TagId) ORDER BY t.Name ASC", func(rows *sql.Rows) error {
+	if err = doQuery(db, fmt.Sprintf("SELECT st.SongId, t.Name FROM SongTags st INNER JOIN Tags t ON(st.TagId = t.TagId) WHERE st.SongId >= %v ORDER BY t.Name ASC", minId), func(rows *sql.Rows) error {
 		var songId int
 		var tag string
 		if err := rows.Scan(&songId, &tag); err != nil {
