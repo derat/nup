@@ -212,10 +212,27 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
-	if err := dumpSongs(c, w); err != nil {
-		c.Errorf("Failed to export songs: %v", err)
+	songs, songCursor, playCursor, err := dumpSongs(c, r.FormValue("songCursor"), r.FormValue("playCursor"))
+	if err != nil {
+		c.Errorf("Unable to dump songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+
+	d := json.NewEncoder(w)
+	for _, s := range songs {
+		if err = d.Encode(&s); err != nil {
+			c.Errorf("Encoding song failed: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	if err = d.Encode([]string{songCursor, playCursor}); err != nil {
+		c.Errorf("Encoding cursors failed: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
