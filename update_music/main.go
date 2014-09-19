@@ -52,6 +52,7 @@ func setLastUpdateTime(path string, t time.Time) error {
 func main() {
 	configFile := flag.String("config", "", "Path to config file")
 	dryRun := flag.Bool("dry-run", false, "Only print what would be updated")
+	forceGlob := flag.String("force-glob", "", "Glob pattern relative to music dir for files to scan and update even if they haven't changed")
 	importDb := flag.String("import-db", "", "If non-empty, path to legacy SQLite database to read info from")
 	limit := flag.Int("limit", 0, "If positive, limits the number of songs to update (for testing)")
 	requireCovers := flag.Bool("require-covers", false, "Die if cover images aren't found for any songs")
@@ -87,7 +88,7 @@ func main() {
 			log.Fatalf("Unable to get last update time: ", err)
 		}
 		log.Printf("Scanning for songs in %v updated since %v", cfg.MusicDir, lastUpdateTime.Local())
-		if numSongs, err = scanForUpdatedSongs(cfg.MusicDir, lastUpdateTime, readChan, true); err != nil {
+		if numSongs, err = scanForUpdatedSongs(cfg.MusicDir, *forceGlob, lastUpdateTime, readChan, true); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -125,7 +126,7 @@ func main() {
 		if err = updateSongs(cfg, updateChan, numSongs, replaceUserData); err != nil {
 			log.Fatal(err)
 		}
-		if len(*importDb) == 0 {
+		if len(*importDb) == 0 && len(*forceGlob) == 0 {
 			if err = setLastUpdateTime(cfg.LastUpdateTimeFile, startTime); err != nil {
 				log.Fatal("Failed setting last-update time: ", err)
 			}

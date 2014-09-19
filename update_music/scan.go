@@ -127,18 +127,13 @@ func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLeng
 	return (fi.Size() - headerLength - footerLength) / kbitRate * 8, nil
 }
 
-func readFileDetails(p, musicDir string, fi os.FileInfo, updateChan chan SongAndError) {
+func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan SongAndError) {
 	s := &nup.Song{}
 	var err error
 	defer func() { updateChan <- SongAndError{s, err} }()
 
-	s.Filename, err = filepath.Rel(musicDir, p)
-	if err != nil {
-		return
-	}
-
 	var f *os.File
-	f, err = os.Open(p)
+	f, err = os.Open(path)
 	if err != nil {
 		return
 	}
@@ -149,6 +144,7 @@ func readFileDetails(p, musicDir string, fi os.FileInfo, updateChan chan SongAnd
 	if err != nil {
 		return
 	}
+	s.Filename = relPath
 	s.Artist = tag.Artist()
 	s.Title = tag.Title()
 	s.Album = tag.Album()
@@ -171,14 +167,18 @@ func readFileDetails(p, musicDir string, fi os.FileInfo, updateChan chan SongAnd
 	s.Length = float64(lengthMs) / 1000
 }
 
-func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, updateChan chan SongAndError, logProgress bool) (numUpdates int, err error) {
+func scanForUpdatedSongs(musicDir, forceGlob string, lastUpdateTime time.Time, updateChan chan SongAndError, logProgress bool) (numUpdates int, err error) {
 	numMp3s := 0
-	err = filepath.Walk(musicDir, func(p string, fi os.FileInfo, err error) error {
+	err = filepath.Walk(musicDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if fi.Mode()&os.ModeType != 0 || strings.ToLower(filepath.Ext(p)) != mp3Extension {
+		if fi.Mode()&os.ModeType != 0 || strings.ToLower(filepath.Ext(path)) != mp3Extension {
 			return nil
+		}
+		relPath, err := filepath.Rel(musicDir, path)
+		if err != nil {
+			return fmt.Errorf("%v isn't subpath of %v: %v", path, musicDir, err)
 		}
 
 		numMp3s++
@@ -186,12 +186,22 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, updateChan c
 			log.Printf("Progress: scanned %v files\n", numMp3s)
 		}
 
-		stat := fi.Sys().(*syscall.Stat_t)
-		ctime := time.Unix(int64(stat.Ctim.Sec), int64(stat.Ctim.Nsec))
-		if fi.ModTime().After(lastUpdateTime) || ctime.After(lastUpdateTime) {
-			numUpdates++
-			go readFileDetails(p, musicDir, fi, updateChan)
+		if len(forceGlob) > 0 {
+			if matched, err := filepath.Match(forceGlob, relPath); err != nil {
+				return fmt.Errorf("Invalid glob %v: %v", forceGlob, err)
+			} else if !matched {
+				return nil
+			}
+		} else {
+			stat := fi.Sys().(*syscall.Stat_t)
+			ctime := time.Unix(int64(stat.Ctim.Sec), int64(stat.Ctim.Nsec))
+			if fi.ModTime().Before(lastUpdateTime) && ctime.Before(lastUpdateTime) {
+				return nil
+			}
 		}
+
+		numUpdates++
+		go readFileDetails(path, relPath, fi, updateChan)
 		return nil
 	})
 	if err != nil {

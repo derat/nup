@@ -2,7 +2,6 @@ package main
 
 import (
 	"testing"
-	"time"
 
 	"erat.org/nup"
 	"erat.org/nup/test"

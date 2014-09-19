@@ -11,9 +11,9 @@ import (
 	"erat.org/nup/test"
 )
 
-func scanAndCompareSongs(t *testing.T, desc, dir string, lastUpdateTime time.Time, expected []nup.Song) {
+func scanAndCompareSongs(t *testing.T, desc, dir, forceGlob string, lastUpdateTime time.Time, expected []nup.Song) {
 	ch := make(chan SongAndError)
-	num, err := scanForUpdatedSongs(dir, lastUpdateTime, ch, false)
+	num, err := scanForUpdatedSongs(dir, forceGlob, lastUpdateTime, ch, false)
 	if err != nil {
 		t.Errorf("%v: %v", desc, err)
 		return
@@ -40,19 +40,19 @@ func TestScan(t *testing.T) {
 
 	test.CopySongsToTempDir(dir, test.Song0s.Filename, test.Song1s.Filename)
 	startTime := time.Now()
-	scanAndCompareSongs(t, "initial", dir, time.Time{}, []nup.Song{test.Song0s, test.Song1s})
-	scanAndCompareSongs(t, "unchanged", dir, startTime, []nup.Song{})
+	scanAndCompareSongs(t, "initial", dir, "", time.Time{}, []nup.Song{test.Song0s, test.Song1s})
+	scanAndCompareSongs(t, "unchanged", dir, "", startTime, []nup.Song{})
 
 	test.CopySongsToTempDir(dir, test.Song5s.Filename)
 	addTime := time.Now()
-	scanAndCompareSongs(t, "add", dir, startTime, []nup.Song{test.Song5s})
+	scanAndCompareSongs(t, "add", dir, "", startTime, []nup.Song{test.Song5s})
 
 	if err = os.Remove(filepath.Join(dir, test.Song0s.Filename)); err != nil {
 		panic(err)
 	}
 	test.CopySongsToTempDir(dir, test.Song0sUpdated.Filename)
 	updateTime := time.Now()
-	scanAndCompareSongs(t, "update", dir, addTime, []nup.Song{test.Song0sUpdated})
+	scanAndCompareSongs(t, "update", dir, "", addTime, []nup.Song{test.Song0sUpdated})
 
 	subdir := filepath.Join(dir, "foo")
 	if err = os.Mkdir(subdir, 0700); err != nil {
@@ -68,7 +68,10 @@ func TestScan(t *testing.T) {
 	}
 	renamedSong1s := test.Song1s
 	renamedSong1s.Filename = filepath.Join(filepath.Base(subdir), test.Song1s.Filename)
-	scanAndCompareSongs(t, "rename", dir, updateTime, []nup.Song{renamedSong1s})
+	scanAndCompareSongs(t, "rename", dir, "", updateTime, []nup.Song{renamedSong1s})
+
+	scanAndCompareSongs(t, "force exact", dir, test.Song0sUpdated.Filename, updateTime, []nup.Song{test.Song0sUpdated})
+	scanAndCompareSongs(t, "force wildcard", dir, "foo/*", updateTime, []nup.Song{renamedSong1s})
 }
 
 // TODO: Test errors, skipping bogus files, etc.

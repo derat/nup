@@ -38,7 +38,6 @@ func TestUpdate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &http.Client{}
 	cfg := Config{ClientConfig: nup.ClientConfig{ServerUrl: server.URL}}
 	ch := make(chan nup.Song)
 
@@ -72,7 +71,7 @@ func TestUpdate(t *testing.T) {
 		ch <- s0
 		ch <- s1
 	}()
-	if err := updateSongs(client, cfg, ch, 2, true); err != nil {
+	if err := updateSongs(cfg, ch, 2, true); err != nil {
 		t.Fatalf("failed to send songs: %v", err)
 	}
 	if err := test.CompareSongs([]nup.Song{s0, s1}, receivedSongs, true); err != nil {
@@ -90,7 +89,7 @@ func TestUpdate(t *testing.T) {
 			ch <- sentSongs[i]
 		}
 	}()
-	if err := updateSongs(client, cfg, ch, len(sentSongs), false); err != nil {
+	if err := updateSongs(cfg, ch, len(sentSongs), false); err != nil {
 		t.Fatalf("failed to send songs: %v", err)
 	}
 	if err := test.CompareSongs(sentSongs, receivedSongs, true); err != nil {
