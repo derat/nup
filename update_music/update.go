@@ -18,8 +18,8 @@ const (
 	importReplaceParam = "replaceUserData=1"
 )
 
-func updateSongs(client *http.Client, cfg Config, ch chan nup.Song, numSongs int, replaceUserData bool) error {
-	u, err := nup.GetServerUrl(cfg.ClientConfig, importPath)
+func updateSongs(cfg Config, ch chan nup.Song, numSongs int, replaceUserData bool) error {
+	u, err := nup.GetServerUrl(cfg.ServerUrl, importPath)
 	if err != nil {
 		return err
 	}
@@ -27,11 +27,21 @@ func updateSongs(client *http.Client, cfg Config, ch chan nup.Song, numSongs int
 		u.RawQuery = importReplaceParam
 	}
 
+	client := http.Client{}
+
 	sendFunc := func(r io.Reader) error {
-		resp, err := client.Post(u.String(), "text/plain", r)
+		req, err := http.NewRequest("POST", u.String(), r)
 		if err != nil {
 			return err
 		}
+		req.Header.Set("Content-Type", "text/plain")
+		req.SetBasicAuth(cfg.Username, cfg.Password)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("Got non-OK status: %v", resp.Status)

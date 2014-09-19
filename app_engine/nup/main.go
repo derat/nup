@@ -3,6 +3,7 @@ package appengine
 import (
 	"appengine"
 	"appengine/user"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 
 	"erat.org/cloud"
 	"erat.org/nup"
+	"erat.org/nup/test"
 )
 
 const (
@@ -30,14 +32,50 @@ const (
 	songKind = "Song"
 )
 
+type basicAuthInfo struct {
+	Username string
+	Password string
+}
+
 var cfg struct {
-	// Email addresses of users allowed to use the server.
-	AllowedUsers []string
+	// Email addresses of Google users allowed to use the server.
+	GoogleUsers []string
+
+	// Credentials of accounts using HTTP basic authentication.
+	BasicAuthUsers []basicAuthInfo
 
 	// Base URLs for song and cover files.
 	// These should be something like "https://storage.cloud.google.com/my-bucket-name/".
 	BaseSongUrl  string
 	BaseCoverUrl string
+}
+
+// TODO: This is swiped from https://code.google.com/p/go/source/detail?r=5e03333d2dcf.
+// Switch to the version in net/http once it makes its way into App Engine.
+
+// basicAuth returns the username and password provided in the request's
+// Authorization header, if the request uses HTTP Basic Authentication.
+// See RFC 2617, Section 2.
+func basicAuth(r *http.Request) (username, password string, ok bool) {
+	auth := r.Header.Get("Authorization")
+	if auth == "" {
+		return
+	}
+
+	// "Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==" returns ("Aladdin", "open sesame", true).
+	if !strings.HasPrefix(auth, "Basic ") {
+		return
+	}
+	c, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(auth, "Basic "))
+	if err != nil {
+		return
+	}
+	cs := string(c)
+	s := strings.IndexByte(cs, ':')
+	if s < 0 {
+		return
+	}
+	return cs[:s], cs[s+1:], true
 }
 
 func writeJsonResponse(w http.ResponseWriter, v interface{}) {
@@ -55,31 +93,48 @@ func writeTextResponse(w http.ResponseWriter, s string) {
 	w.Write([]byte(s))
 }
 
-func checkUserRequest(c appengine.Context, w http.ResponseWriter, r *http.Request, method string, redirectToLogin bool) bool {
-	if !appengine.IsDevAppServer() {
-		u := user.Current(c)
-		allowed := false
-		for _, au := range cfg.AllowedUsers {
-			if u != nil && u.Email == au {
-				allowed = true
-				break
-			}
-		}
+func hasAllowedGoogleAuth(c appengine.Context, r *http.Request) (email string, allowed bool) {
+	u := user.Current(c)
+	if u == nil {
+		return "", false
+	}
 
-		if !allowed {
-			if u == nil {
-				c.Debugf("Unauthorized request for %v from unauthenticated user at %v", r.URL.String(), r.RemoteAddr)
-			} else {
-				c.Debugf("Unauthorized request for %v from %v at %v", r.URL.String(), u.Email, r.RemoteAddr)
-			}
-			if u == nil && redirectToLogin {
-				loginUrl, _ := user.LoginURL(c, "/")
-				http.Redirect(w, r, loginUrl, http.StatusFound)
-			} else {
-				http.Error(w, "Request requires authorization", http.StatusUnauthorized)
-			}
-			return false
+	for _, e := range cfg.GoogleUsers {
+		if u.Email == e {
+			return u.Email, true
 		}
+	}
+	return u.Email, false
+}
+
+func hasAllowedBasicAuth(r *http.Request) (username string, allowed bool) {
+	username, password, ok := basicAuth(r)
+	if !ok {
+		return "", false
+	}
+
+	for _, u := range cfg.BasicAuthUsers {
+		if username == u.Username && password == u.Password {
+			return username, true
+		}
+	}
+	return username, false
+}
+
+func checkRequest(c appengine.Context, w http.ResponseWriter, r *http.Request, method string, redirectToLogin bool) bool {
+	username, allowed := hasAllowedGoogleAuth(c, r)
+	if !allowed && len(username) == 0 {
+		username, allowed = hasAllowedBasicAuth(r)
+	}
+	if !allowed {
+		if len(username) == 0 && redirectToLogin {
+			loginUrl, _ := user.LoginURL(c, "/")
+			http.Redirect(w, r, loginUrl, http.StatusFound)
+		} else {
+			c.Debugf("Unauthorized request for %v from %q at %v", r.URL.String(), username, r.RemoteAddr)
+			http.Error(w, "Request requires authorization", http.StatusUnauthorized)
+		}
+		return false
 	}
 
 	if r.Method != method {
@@ -89,21 +144,6 @@ func checkUserRequest(c appengine.Context, w http.ResponseWriter, r *http.Reques
 		return false
 	}
 
-	return true
-}
-
-func checkOAuthRequest(c appengine.Context, w http.ResponseWriter, r *http.Request) bool {
-	u, err := user.CurrentOAuth(c, "")
-	if err != nil {
-		c.Debugf("Missing OAuth Authorization header in request for %v by %v", r.URL.String(), r.RemoteAddr)
-		http.Error(w, "OAuth Authorization header required", http.StatusUnauthorized)
-		return false
-	}
-	if !appengine.IsDevAppServer() && !u.Admin {
-		c.Debugf("Non-admin OAuth request for %v from %v at %v", r.URL.String(), u, r.RemoteAddr)
-		http.Error(w, "Admin access only", http.StatusUnauthorized)
-		return false
-	}
 	return true
 }
 
@@ -133,6 +173,9 @@ func init() {
 	if err := cloud.ReadJson(configPath, &cfg); err != nil {
 		panic(fmt.Sprintf("Unable to read %v: %v", configPath, err))
 	}
+	if appengine.IsDevAppServer() {
+		cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, basicAuthInfo{test.TestUsername, test.TestPassword})
+	}
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -149,11 +192,11 @@ func init() {
 
 func handleClear(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	if !checkUserRequest(c, w, r, "POST", false) {
+	if !checkRequest(c, w, r, "POST", false) {
 		return
 	}
 	if !appengine.IsDevAppServer() {
-		http.Error(w, "only works on dev server", http.StatusBadRequest)
+		http.Error(w, "Only works on dev server", http.StatusBadRequest)
 		return
 	}
 	if err := clearData(c); err != nil {
@@ -165,19 +208,20 @@ func handleClear(w http.ResponseWriter, r *http.Request) {
 
 func handleExport(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	if !checkOAuthRequest(c, w, r) {
+	if !checkRequest(c, w, r, "GET", false) {
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
 	if err := dumpSongs(c, w); err != nil {
 		c.Errorf("Failed to export songs: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	if !checkUserRequest(c, w, r, "GET", true) {
+	if !checkRequest(c, w, r, "GET", true) {
 		return
 	}
 
@@ -202,7 +246,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 func handleImport(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	if !checkOAuthRequest(c, w, r) {
+	if !checkRequest(c, w, r, "POST", false) {
 		return
 	}
 
@@ -231,7 +275,7 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 
 func handleListTags(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	if !checkUserRequest(c, w, r, "GET", false) {
+	if !checkRequest(c, w, r, "GET", false) {
 		return
 	}
 	tags, err := getTags(c)
@@ -245,7 +289,7 @@ func handleListTags(w http.ResponseWriter, r *http.Request) {
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	if !checkUserRequest(c, w, r, "GET", false) {
+	if !checkRequest(c, w, r, "GET", false) {
 		return
 	}
 
@@ -311,7 +355,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 
 func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	if !checkUserRequest(c, w, r, "POST", false) {
+	if !checkRequest(c, w, r, "POST", false) {
 		return
 	}
 	var id int64
@@ -351,7 +395,7 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 
 func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	if !checkUserRequest(c, w, r, "POST", false) {
+	if !checkRequest(c, w, r, "POST", false) {
 		return
 	}
 
@@ -371,7 +415,7 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 
 func handleSongs(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	if !checkUserRequest(c, w, r, "GET", false) {
+	if !checkRequest(c, w, r, "GET", false) {
 		return
 	}
 

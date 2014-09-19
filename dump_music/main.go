@@ -25,16 +25,19 @@ func main() {
 		log.Fatal("Unable to read config file: ", err)
 	}
 
-	u, err := nup.GetServerUrl(cfg, exportPath)
+	u, err := nup.GetServerUrl(cfg.ServerUrl, exportPath)
 	if err != nil {
 		log.Fatal("Failed to get server URL: ", err)
 	}
-	transport, err := cloud.NewTransport(cfg.ClientId, cfg.ClientSecret, oauthScope, cfg.TokenCache)
-	if err != nil {
-		log.Fatal("Failed to create transport: ", err)
-	}
 
-	resp, err := transport.Client().Get(u.String())
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		log.Fatal("Failed to create request: ", err)
+	}
+	req.SetBasicAuth(cfg.Username, cfg.Password)
+
+	client := http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Fatalf("Failed to fetch %v: %v", u.String(), err)
 	}

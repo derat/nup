@@ -15,6 +15,11 @@ import (
 	"erat.org/nup"
 )
 
+const (
+	TestUsername = "testuser"
+	TestPassword = "testpass"
+)
+
 func CreateTempDir() string {
 	dir, err := ioutil.TempDir("", "nup_test.")
 	if err != nil {

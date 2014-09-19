@@ -53,6 +53,7 @@ type Tester struct {
 	configFile string
 	serverUrl  string
 	binDir     string
+	client     http.Client
 }
 
 func newTester(serverUrl, binDir string) *Tester {
@@ -78,7 +79,14 @@ func newTester(serverUrl, binDir string) *Tester {
 	if err = json.NewEncoder(f).Encode(struct {
 		LastUpdateTimeFile string
 		ServerUrl          string
-	}{filepath.Join(t.TempDir, "last_update_time"), t.serverUrl}); err != nil {
+		Username           string
+		Password           string
+	}{
+		filepath.Join(t.TempDir, "last_update_time"),
+		t.serverUrl,
+		TestUsername,
+		TestPassword,
+	}); err != nil {
 		panic(err)
 	}
 
@@ -149,7 +157,13 @@ func (t *Tester) PostSongs(songs []nup.Song, replaceUserData bool) {
 }
 
 func (t *Tester) QuerySongs(params string) []nup.Song {
-	resp, err := http.Get(t.serverUrl + "query?" + params)
+	req, err := http.NewRequest("GET", t.serverUrl+"query?"+params, nil)
+	if err != nil {
+		panic(err)
+	}
+	req.SetBasicAuth(TestUsername, TestPassword)
+
+	resp, err := t.client.Do(req)
 	if err != nil {
 		panic(err)
 	}
@@ -167,7 +181,14 @@ func (t *Tester) QuerySongs(params string) []nup.Song {
 }
 
 func (t *Tester) DoPost(pathAndQueryParams string, body io.Reader) {
-	resp, err := http.Post(t.serverUrl+pathAndQueryParams, "text/plain", body)
+	req, err := http.NewRequest("POST", t.serverUrl+pathAndQueryParams, body)
+	if err != nil {
+		panic(err)
+	}
+	req.Header.Set("Content-Type", "text/plain")
+	req.SetBasicAuth(TestUsername, TestPassword)
+
+	resp, err := t.client.Do(req)
 	if err != nil {
 		panic(err)
 	}

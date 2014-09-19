@@ -76,8 +76,7 @@ type Song struct {
 
 // ClientConfig holds configuration details shared across client binaries.
 type ClientConfig struct {
-	ClientId     string
-	ClientSecret string
-	TokenCache   string
-	ServerUrl    string
+	ServerUrl string
+	Username  string
+	Password  string
 }
