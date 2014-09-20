@@ -21,7 +21,6 @@ func setUpTest() *Tester {
 	t := newTester(server, binDir)
 	log.Printf("clearing all data on %v", server)
 	t.DoPost("clear", nil)
-	t.WaitForUpdate()
 	return t
 }
 
@@ -104,7 +103,6 @@ func TestLegacy(tt *testing.T) {
 
 	log.Print("importing songs from legacy db")
 	t.ImportSongsFromLegacyDb(filepath.Join(GetDataDir(), "legacy.db"))
-	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{LegacySong1, LegacySong2}, t.DumpSongs(true), false); err != nil {
 		tt.Error(err)
 	}
@@ -129,7 +127,6 @@ func TestUpdate(tt *testing.T) {
 	log.Print("importing songs from music dir")
 	CopySongsToTempDir(t.MusicDir, Song0s.Filename, Song1s.Filename)
 	t.UpdateSongs()
-	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{Song0s, Song1s}, t.DumpSongs(true), false); err != nil {
 		tt.Error(err)
 	}
@@ -137,7 +134,6 @@ func TestUpdate(tt *testing.T) {
 	log.Print("importing another song")
 	CopySongsToTempDir(t.MusicDir, Song5s.Filename)
 	t.UpdateSongs()
-	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{Song0s, Song1s, Song5s}, t.DumpSongs(true), false); err != nil {
 		tt.Error(err)
 	}
@@ -146,7 +142,6 @@ func TestUpdate(tt *testing.T) {
 	RemoveFromTempDir(t.MusicDir, Song0s.Filename)
 	CopySongsToTempDir(t.MusicDir, Song0sUpdated.Filename)
 	t.UpdateSongs()
-	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{Song0sUpdated, Song1s, Song5s}, t.DumpSongs(true), false); err != nil {
 		tt.Error(err)
 	}
@@ -159,7 +154,6 @@ func TestUserData(tt *testing.T) {
 	log.Print("importing a song")
 	CopySongsToTempDir(t.MusicDir, Song0s.Filename)
 	t.UpdateSongs()
-	t.WaitForUpdate()
 	id := t.GetSongId(Song0s.Sha1)
 
 	log.Print("rating and tagging")
@@ -167,7 +161,6 @@ func TestUserData(tt *testing.T) {
 	s.Rating = 0.75
 	s.Tags = []string{"electronic", "instrumental"}
 	t.DoPost("rate_and_tag?songId="+id+"&rating=0.75&tags=electronic+instrumental", nil)
-	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{s}, t.DumpSongs(true), false); err != nil {
 		tt.Fatal(err)
 	}
@@ -181,7 +174,6 @@ func TestUserData(tt *testing.T) {
 	for _, p := range s.Plays {
 		t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(p.StartTime.Unix(), 10), nil)
 	}
-	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{s}, t.DumpSongs(true), false); err != nil {
 		tt.Fatal(err)
 	}
@@ -194,7 +186,6 @@ func TestUserData(tt *testing.T) {
 	us.Plays = s.Plays
 	CopySongsToTempDir(t.MusicDir, us.Filename)
 	t.UpdateSongs()
-	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{us}, t.DumpSongs(true), false); err != nil {
 		tt.Error(err)
 	}
@@ -202,7 +193,6 @@ func TestUserData(tt *testing.T) {
 	log.Print("clearing tags")
 	us.Tags = nil
 	t.DoPost("rate_and_tag?songId="+id+"&tags=", nil)
-	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{us}, t.DumpSongs(true), false); err != nil {
 		tt.Fatal(err)
 	}
@@ -226,7 +216,6 @@ func TestQueries(tt *testing.T) {
 	log.Print("posting some songs")
 	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, true)
 	t.PostSongs([]nup.Song{Song0s}, false)
-	t.WaitForUpdate()
 
 	log.Print("doing a bunch of queries")
 	for _, q := range []struct {
@@ -270,7 +259,6 @@ func TestAndroid(tt *testing.T) {
 	startTime := time.Now()
 	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, true)
 	endTime := time.Now()
-	t.WaitForUpdate()
 
 	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(time.Time{}), false); err != nil {
 		tt.Error(err)
@@ -290,7 +278,6 @@ func TestAndroid(tt *testing.T) {
 	startTime = time.Now()
 	t.DoPost("rate_and_tag?songId="+id+"&rating=1.0", nil)
 	endTime = time.Now()
-	t.WaitForUpdate()
 
 	if err := compareQueryResults([]nup.Song{updatedLegacySong1}, t.GetSongsForAndroid(modTime.Add(time.Microsecond)), false); err != nil {
 		tt.Error(err)
@@ -305,7 +292,6 @@ func TestAndroid(tt *testing.T) {
 	p := nup.Play{time.Unix(1410746718, 0), "127.0.0.1"}
 	updatedLegacySong1.Plays = append(updatedLegacySong1.Plays, p)
 	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(p.StartTime.Unix(), 10), nil)
-	t.WaitForUpdate()
 	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(modTime.Add(time.Microsecond)), false); err != nil {
 		tt.Error(err)
 	}

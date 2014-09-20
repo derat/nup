@@ -118,10 +118,6 @@ func newTester(serverUrl, binDir string) *Tester {
 	return t
 }
 
-func (t *Tester) WaitForUpdate() {
-	//time.Sleep(2 * time.Second)
-}
-
 func (t *Tester) DumpSongs(stripIds bool) []nup.Song {
 	stdout, stderr, err := runCommand(filepath.Join(t.binDir, "dump_music"), "-config="+t.dumpConfigFile,
 		"-song-batch-size="+strconv.Itoa(dumpBatchSize), "-play-batch-size="+strconv.Itoa(dumpBatchSize))
