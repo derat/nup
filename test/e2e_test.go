@@ -94,7 +94,7 @@ func TestLegacy(tc *testing.T) {
 	defer os.RemoveAll(t.TempDir)
 
 	log.Print("importing songs from legacy db")
-	t.ImportSongsFromLegacyDb("../test/data/legacy.db")
+	t.ImportSongsFromLegacyDb(filepath.Join(GetDataDir(), "legacy.db"))
 	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{LegacySong1, LegacySong2}, t.DumpSongs(true), false); err != nil {
 		tc.Error(err)

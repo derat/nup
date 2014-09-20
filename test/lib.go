@@ -28,14 +28,18 @@ func CreateTempDir() string {
 	return dir
 }
 
-func CopySongsToTempDir(dir string, filenames ...string) {
-	_, td, _, ok := runtime.Caller(0)
+// GetDataDir returns the test data dir relative to the caller.
+func GetDataDir() string {
+	_, p, _, ok := runtime.Caller(0)
 	if !ok {
 		panic("unable to get runtime caller info")
 	}
+	return filepath.Join(filepath.Dir(p), "data")
+}
 
+func CopySongsToTempDir(dir string, filenames ...string) {
 	for _, fn := range filenames {
-		sp := filepath.Join(td, "../data/music", fn)
+		sp := filepath.Join(GetDataDir(), "music", fn)
 		s, err := os.Open(sp)
 		if err != nil {
 			panic(err)

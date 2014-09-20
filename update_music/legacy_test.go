@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"testing"
 
 	"erat.org/nup"
@@ -9,7 +10,7 @@ import (
 
 func testLegacyQuery(expected []nup.Song, minId int64) error {
 	ch := make(chan SongAndError)
-	num, err := getSongsFromLegacyDb("../test/data/legacy.db", minId, ch)
+	num, err := getSongsFromLegacyDb(filepath.Join(test.GetDataDir(), "legacy.db"), minId, ch)
 	if err != nil {
 		return err
 	}

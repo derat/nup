@@ -1,7 +1,10 @@
 package main
 
 import (
+	"path/filepath"
 	"testing"
+
+	"erat.org/nup/test"
 )
 
 func TestCoversBogusDir(t *testing.T) {
@@ -12,7 +15,7 @@ func TestCoversBogusDir(t *testing.T) {
 }
 
 func TestCoversFindPath(t *testing.T) {
-	cf, err := newCoverFinder("../test/data/covers")
+	cf, err := newCoverFinder(filepath.Join(test.GetDataDir(), "covers"))
 	if err != nil {
 		t.Fatalf("creation failed")
 	}

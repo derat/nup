@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -151,12 +150,7 @@ func (t *Tester) DumpSongs(stripIds bool) []nup.Song {
 }
 
 func (t *Tester) ImportSongsFromLegacyDb(path string) {
-	_, caller, _, ok := runtime.Caller(1)
-	if !ok {
-		panic("unable to get runtime caller info")
-	}
-	db := filepath.Join(filepath.Dir(caller), path)
-	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile, "-import-db="+db); err != nil {
+	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile, "-import-db="+path); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
 }
