@@ -11,10 +11,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	"erat.org/nup"
+)
+
+const (
+	dumpBatchSize = 2
 )
 
 func runCommand(p string, args ...string) (stdout, stderr string, err error) {
@@ -50,10 +55,11 @@ type Tester struct {
 	MusicDir string
 	CoverDir string
 
-	configFile string
-	serverUrl  string
-	binDir     string
-	client     http.Client
+	updateConfigFile string
+	dumpConfigFile   string
+	serverUrl        string
+	binDir           string
+	client           http.Client
 }
 
 func newTester(serverUrl, binDir string) *Tester {
@@ -69,26 +75,45 @@ func newTester(serverUrl, binDir string) *Tester {
 		panic(err)
 	}
 
-	t.configFile = filepath.Join(t.TempDir, "config.json")
-	f, err := os.Create(t.configFile)
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
+	writeConfig := func(fn string, d interface{}) (path string) {
+		path = filepath.Join(t.TempDir, fn)
+		f, err := os.Create(path)
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
 
-	if err = json.NewEncoder(f).Encode(struct {
+		if err = json.NewEncoder(f).Encode(d); err != nil {
+			panic(err)
+		}
+		return path
+	}
+
+	t.updateConfigFile = writeConfig("update_config.json", struct {
 		LastUpdateTimeFile string
 		ServerUrl          string
 		Username           string
 		Password           string
+		CoverDir           string
+		MusicDir           string
 	}{
 		filepath.Join(t.TempDir, "last_update_time"),
 		t.serverUrl,
 		TestUsername,
 		TestPassword,
-	}); err != nil {
-		panic(err)
-	}
+		t.CoverDir,
+		t.MusicDir,
+	})
+
+	t.dumpConfigFile = writeConfig("dump_config.json", struct {
+		ServerUrl string
+		Username  string
+		Password  string
+	}{
+		t.serverUrl,
+		TestUsername,
+		TestPassword,
+	})
 
 	return t
 }
@@ -98,7 +123,8 @@ func (t *Tester) WaitForUpdate() {
 }
 
 func (t *Tester) DumpSongs(stripIds bool) []nup.Song {
-	stdout, stderr, err := runCommand(filepath.Join(t.binDir, "dump_music"), "-config="+t.configFile)
+	stdout, stderr, err := runCommand(filepath.Join(t.binDir, "dump_music"), "-config="+t.dumpConfigFile,
+		"-song-batch-size="+strconv.Itoa(dumpBatchSize), "-play-batch-size="+strconv.Itoa(dumpBatchSize))
 	if err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
@@ -130,13 +156,13 @@ func (t *Tester) ImportSongsFromLegacyDb(path string) {
 		panic("unable to get runtime caller info")
 	}
 	db := filepath.Join(filepath.Dir(caller), path)
-	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.configFile, "-import-db="+db, "-cover-dir="+t.CoverDir); err != nil {
+	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile, "-import-db="+db); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
 }
 
 func (t *Tester) UpdateSongs() {
-	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.configFile, "-music-dir="+t.MusicDir, "-cover-dir="+t.CoverDir); err != nil {
+	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
 }

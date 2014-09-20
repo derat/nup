@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -13,29 +14,26 @@ import (
 )
 
 const (
-	oauthScope = "https://www.googleapis.com/auth/userinfo.email"
 	exportPath = "export"
+
+	// TODO: Tune these numbers.
+	defaultSongBatchSize = 400
+	defaultPlayBatchSize = 800
+	chanSize             = 50
 )
 
-func main() {
-	configFile := flag.String("config", "", "Path to config file")
-	flag.Parse()
-
-	var cfg nup.ClientConfig
-	if err := cloud.ReadJson(*configFile, &cfg); err != nil {
-		log.Fatal("Unable to read config file: ", err)
+func getEntities(cfg *nup.ClientConfig, entityType string, batchSize int, f func([]byte)) {
+	client := http.Client{}
+	u, err := nup.GetServerUrl(cfg.ServerUrl, exportPath)
+	if err != nil {
+		log.Fatal("Failed to get server URL: ", err)
 	}
 
-	client := http.Client{}
-
-	var songCursor, playCursor string
+	cursor := ""
 	for {
-		u, err := nup.GetServerUrl(cfg.ServerUrl, exportPath)
-		if err != nil {
-			log.Fatal("Failed to get server URL: ", err)
-		}
-		if len(songCursor) > 0 {
-			u.RawQuery = "songCursor=" + songCursor + "&playCursor=" + playCursor
+		u.RawQuery = fmt.Sprintf("type=%s&max=%d", entityType, batchSize)
+		if len(cursor) > 0 {
+			u.RawQuery += "&cursor=" + cursor
 		}
 
 		req, err := http.NewRequest("GET", u.String(), nil)
@@ -53,28 +51,84 @@ func main() {
 			log.Fatal("Got non-OK status: ", resp.Status)
 		}
 
-		songCursor = ""
-		playCursor = ""
+		cursor = ""
 		scanner := bufio.NewScanner(resp.Body)
 		for scanner.Scan() {
-			var s nup.Song
-			var cursors []interface{}
-			if err := json.Unmarshal(scanner.Bytes(), &s); err == nil {
-				os.Stdout.Write(scanner.Bytes())
-				os.Stdout.WriteString("\n")
-			} else if err := json.Unmarshal(scanner.Bytes(), &cursors); err == nil {
-				songCursor = cursors[0].(string)
-				playCursor = cursors[1].(string)
-			} else {
-				log.Fatalf("Got unexpected line from server: %v", scanner.Text())
+			if err := json.Unmarshal(scanner.Bytes(), &cursor); err != nil {
+				f(scanner.Bytes())
 			}
+
 		}
 		if err = scanner.Err(); err != nil {
 			log.Fatal("Got error while reading from server: ", err)
 		}
 
-		if len(songCursor) == 0 {
+		if len(cursor) == 0 {
 			break
 		}
+	}
+}
+
+func getSongs(cfg *nup.ClientConfig, batchSize int, ch chan *nup.Song) {
+	getEntities(cfg, "song", batchSize, func(b []byte) {
+		var s nup.Song
+		if err := json.Unmarshal(b, &s); err == nil {
+			ch <- &s
+		} else {
+			log.Fatalf("Got unexpected line from server: %v", string(b))
+		}
+	})
+	ch <- nil
+}
+
+func getPlays(cfg *nup.ClientConfig, batchSize int, ch chan *nup.PlayDump) {
+	getEntities(cfg, "play", batchSize, func(b []byte) {
+		var pd nup.PlayDump
+		if err := json.Unmarshal(b, &pd); err == nil {
+			ch <- &pd
+		} else {
+			log.Fatalf("Got unexpected line from server: %v", string(b))
+		}
+	})
+	ch <- nil
+}
+
+func main() {
+	songBatchSize := flag.Int("song-batch-size", defaultSongBatchSize, "Size for each batch of entities")
+	playBatchSize := flag.Int("play-batch-size", defaultPlayBatchSize, "Size for each batch of entities")
+	configFile := flag.String("config", "", "Path to config file")
+	flag.Parse()
+
+	var cfg nup.ClientConfig
+	if err := cloud.ReadJson(*configFile, &cfg); err != nil {
+		log.Fatal("Unable to read config file: ", err)
+	}
+
+	songChan := make(chan *nup.Song, chanSize)
+	go getSongs(&cfg, *songBatchSize, songChan)
+
+	playChan := make(chan *nup.PlayDump, chanSize)
+	go getPlays(&cfg, *playBatchSize, playChan)
+
+	e := json.NewEncoder(os.Stdout)
+
+	pd := <-playChan
+	for {
+		s := <-songChan
+		if s == nil {
+			break
+		}
+
+		for pd != nil && pd.SongId == s.SongId {
+			s.Plays = append(s.Plays, pd.Play)
+			pd = <-playChan
+		}
+
+		if err := e.Encode(s); err != nil {
+			log.Fatal("Failed to encode song: %v", err)
+		}
+	}
+	if pd != nil {
+		log.Fatal("Got orphaned play for song %v: %v", pd.SongId, pd.Play)
 	}
 }

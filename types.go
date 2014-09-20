@@ -74,6 +74,15 @@ type Song struct {
 	LastModifiedTime time.Time `json:"-"`
 }
 
+// PlayDump is used when dumping data.
+type PlayDump struct {
+	// Song entity's key ID from Datastore.
+	SongId string `json:"songId"`
+
+	// Play information.
+	Play Play `json:"play"`
+}
+
 // ClientConfig holds configuration details shared across client binaries.
 type ClientConfig struct {
 	ServerUrl string

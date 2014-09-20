@@ -30,6 +30,8 @@ const (
 	// Datastore kinds of various objects.
 	playKind = "Play"
 	songKind = "Song"
+
+	defaultExportBatchSize = 100
 )
 
 type basicAuthInfo struct {
@@ -212,27 +214,66 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	songs, songCursor, playCursor, err := dumpSongs(c, r.FormValue("songCursor"), r.FormValue("playCursor"))
+	var max int64 = defaultExportBatchSize
+	if len(r.FormValue("max")) > 0 && !parseIntParam(c, w, r, "max", &max) {
+		return
+	}
+
+	var kind string
+	objects := make([]interface{}, max)
+
+	switch r.FormValue("type") {
+	case "song":
+		kind = songKind
+		for i := range objects {
+			objects[i] = &nup.Song{}
+		}
+	case "play":
+		kind = playKind
+		for i := range objects {
+			objects[i] = &nup.Play{}
+		}
+	default:
+		http.Error(w, "Invalid type", http.StatusBadRequest)
+		return
+	}
+
+	ids, parentIds, cursor, err := dumpEntities(c, kind, objects, r.FormValue("cursor"))
 	if err != nil {
-		c.Errorf("Unable to dump songs: %v", err)
+		c.Errorf("Failed to dump %v entities: %v", kind, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
+	switch kind {
+	case songKind:
+		for i, id := range ids {
+			s := objects[i].(*nup.Song)
+			s.SongId = strconv.FormatInt(id, 10)
+			s.CoverFilename = ""
+		}
+	case playKind:
+		for i, pid := range parentIds {
+			objects[i] = &nup.PlayDump{strconv.FormatInt(pid, 10), *objects[i].(*nup.Play)}
+		}
+	}
 
-	d := json.NewEncoder(w)
-	for _, s := range songs {
-		if err = d.Encode(&s); err != nil {
-			c.Errorf("Encoding song failed: %v", err)
+	w.Header().Set("Content-Type", "text/plain")
+	e := json.NewEncoder(w)
+
+	for i := 0; i < len(ids); i++ {
+		if err = e.Encode(objects[i]); err != nil {
+			c.Errorf("Encoding %v failed: %v", kind, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
-	if err = d.Encode([]string{songCursor, playCursor}); err != nil {
-		c.Errorf("Encoding cursors failed: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if len(cursor) > 0 {
+		if err = e.Encode(cursor); err != nil {
+			c.Errorf("Encoding %v cursor failed: %v", kind, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }
 

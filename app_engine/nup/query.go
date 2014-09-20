@@ -16,8 +16,6 @@ import (
 const (
 	// Maximum number of results to return for a search.
 	maxQueryResults = 100
-
-	keyProperty = "__key__"
 )
 
 type songQuery struct {

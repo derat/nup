@@ -4,97 +4,65 @@ import (
 	"appengine"
 	"appengine/datastore"
 	"fmt"
-	"strconv"
 	"time"
 
 	"erat.org/nup"
 )
 
 const (
-	// Maximum batch size when dumping song data.
-	dumpSongBatchSize = 100
-
 	// Maximum batch size when returning songs to Android.
 	androidSongBatchSize = 100
+
+	keyProperty = "__key__"
 )
 
-func createCursor(it *datastore.Iterator) (string, error) {
-	c, err := it.Cursor()
-	if err != nil {
-		return "", fmt.Errorf("Unable to get cursor: %v", err)
-	}
-	return c.String(), nil
-}
-
-func dumpSongs(c appengine.Context, songCursor, playCursor string) (songs []nup.Song, nextSongCursor, nextPlayCursor string, err error) {
-	startQuery := func(kind, cursor string) (*datastore.Iterator, error) {
-		q := datastore.NewQuery(kind).Order(keyProperty)
-		if len(cursor) > 0 {
-			c, err := datastore.DecodeCursor(cursor)
-			if err != nil {
-				return nil, fmt.Errorf("Unable to decode %v cursor %q: %v", kind, cursor, err)
-			}
-			q = q.Start(c)
+func dumpEntities(c appengine.Context, kind string, entities []interface{}, cursor string) (ids, parentIds []int64, nextCursor string, err error) {
+	q := datastore.NewQuery(kind).KeysOnly().Order(keyProperty)
+	if len(cursor) > 0 {
+		dc, err := datastore.DecodeCursor(cursor)
+		if err != nil {
+			return nil, nil, "", fmt.Errorf("Unable to decode %v cursor %q: %v", kind, cursor, err)
 		}
-		return q.Run(c), nil
+		q = q.Start(dc)
 	}
+	it := q.Run(c)
 
-	si, err := startQuery(songKind, songCursor)
-	if err != nil {
-		return
-	}
-	pi, err := startQuery(playKind, playCursor)
-	if err != nil {
-		return
-	}
-
-	nextPlayCursor = playCursor
-	p := nup.Play{}
-	pk, err := pi.Next(&p)
-	if err != datastore.Done && err != nil {
-		return
-	}
-
-	songs = make([]nup.Song, 0)
+	keys := make([]*datastore.Key, 0, len(entities))
+	ids = make([]int64, 0, len(entities))
+	parentIds = make([]int64, 0, len(entities))
 
 	for true {
-		s := nup.Song{}
-		sk, err := si.Next(&s)
+		k, err := it.Next(nil)
 		if err == datastore.Done {
 			break
 		} else if err != nil {
-			return nil, "", "", err
+			return nil, nil, "", err
 		}
-		s.SongId = strconv.FormatInt(sk.IntID(), 10)
-		s.CoverFilename = ""
-		s.Plays = make([]nup.Play, 0)
 
-		for pk != nil && pk.Parent().IntID() == sk.IntID() {
-			nextPlayCursor, err = createCursor(pi)
+		keys = append(keys, k)
+		ids = append(ids, k.IntID())
+
+		var pid int64
+		if pk := k.Parent(); pk != nil {
+			pid = pk.IntID()
+		}
+		parentIds = append(parentIds, pid)
+
+		if len(keys) == len(entities) {
+			nc, err := it.Cursor()
 			if err != nil {
-				return nil, "", "", err
+				return nil, nil, "", fmt.Errorf("Unable to get %v cursor: %v", kind, err)
 			}
-			s.Plays = append(s.Plays, p)
-			if pk, err = pi.Next(&p); err == datastore.Done {
-				break
-			} else if err != nil {
-				return nil, "", "", err
-			}
-		}
-
-		songs = append(songs, s)
-
-		if len(songs) == dumpSongBatchSize {
-			nextSongCursor, err = createCursor(si)
-			return songs, nextSongCursor, nextPlayCursor, nil
+			nextCursor = nc.String()
+			break
 		}
 	}
 
-	if pk, err = pi.Next(&p); err != datastore.Done {
-		err = fmt.Errorf("Have orphaned play %v for song %v", pk.IntID(), pk.Parent().IntID())
-		return nil, "", "", err
+	entities = entities[0:len(keys)]
+	if err := datastore.GetMulti(c, keys, entities); err != nil {
+		return nil, nil, "", fmt.Errorf("Failed to get %v %v entities: %v", len(keys), kind, err)
 	}
-	return songs, "", "", nil
+	return ids, parentIds, nextCursor, nil
 }
 
 func getSongsForAndroid(c appengine.Context, minLastModified time.Time, startCursor, baseSongUrl, baseCoverUrl string) (songs []nup.Song, nextCursor string, err error) {
