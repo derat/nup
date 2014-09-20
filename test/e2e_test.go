@@ -234,6 +234,7 @@ func TestQueries(tt *testing.T) {
 		{"unrated=1", []nup.Song{Song0s}},
 		{"tags=instrumental", []nup.Song{LegacySong2, LegacySong1}},
 		{"tags=electronic+instrumental", []nup.Song{LegacySong1}},
+		// This query is flaky; I have no idea why.
 		{"tags=-electronic+instrumental", []nup.Song{LegacySong2}},
 		{"tags=instrumental&minRating=0.75", []nup.Song{LegacySong1}},
 	} {
@@ -247,27 +248,16 @@ func TestAndroid(tt *testing.T) {
 	t := setUpTest()
 	defer os.RemoveAll(t.TempDir)
 
-	modTime := t.GetLastModified()
-	if !modTime.IsZero() {
-		tt.Errorf("got mod time %v from empty database", modTime)
-	}
-	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(time.Time{}), false); err != nil {
-		tt.Error(err)
-	}
-
 	log.Print("posting songs")
-	startTime := time.Now()
+	now := t.GetNowFromServer()
 	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, true)
-	endTime := time.Now()
-
 	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(time.Time{}), false); err != nil {
 		tt.Error(err)
 	}
-	modTime = t.GetLastModified()
-	if modTime.Before(startTime) || modTime.After(endTime) {
-		tt.Errorf("got mod time %v after updating between %v and %v", modTime, startTime, endTime)
+	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(now), false); err != nil {
+		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(modTime), false); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(t.GetNowFromServer()), false); err != nil {
 		tt.Error(err)
 	}
 
@@ -275,28 +265,19 @@ func TestAndroid(tt *testing.T) {
 	id := t.GetSongId(LegacySong1.Sha1)
 	updatedLegacySong1 := LegacySong1
 	updatedLegacySong1.Rating = 1.0
-	startTime = time.Now()
+	now = t.GetNowFromServer()
 	t.DoPost("rate_and_tag?songId="+id+"&rating=1.0", nil)
-	endTime = time.Now()
-
-	if err := compareQueryResults([]nup.Song{updatedLegacySong1}, t.GetSongsForAndroid(modTime), false); err != nil {
+	if err := compareQueryResults([]nup.Song{updatedLegacySong1}, t.GetSongsForAndroid(now), false); err != nil {
 		tt.Error(err)
-	}
-	modTime = t.GetLastModified()
-	if modTime.Before(startTime) || modTime.After(endTime) {
-		tt.Errorf("got mod time %v after updating between %v and %v", modTime, startTime, endTime)
 	}
 
 	// Reporting a play shouldn't update the song's last-modified time.
 	log.Print("reporting playback")
 	p := nup.Play{time.Unix(1410746718, 0), "127.0.0.1"}
 	updatedLegacySong1.Plays = append(updatedLegacySong1.Plays, p)
+	now = t.GetNowFromServer()
 	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(p.StartTime.Unix(), 10), nil)
-	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(modTime), false); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(now), false); err != nil {
 		tt.Error(err)
-	}
-	newModTime := t.GetLastModified()
-	if !newModTime.Equal(modTime) {
-		tt.Errorf("mod time changed from %v to %v after reporting play", modTime, newModTime)
 	}
 }

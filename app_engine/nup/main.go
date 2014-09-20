@@ -186,8 +186,8 @@ func init() {
 	http.HandleFunc("/clear", handleClear)
 	http.HandleFunc("/export", handleExport)
 	http.HandleFunc("/import", handleImport)
-	http.HandleFunc("/last_modified_usec", handleLastModifiedUsec)
 	http.HandleFunc("/list_tags", handleListTags)
+	http.HandleFunc("/now_nsec", handleNowNsec)
 	http.HandleFunc("/query", handleQuery)
 	http.HandleFunc("/rate_and_tag", handleRateAndTag)
 	http.HandleFunc("/report_played", handleReportPlayed)
@@ -331,24 +331,6 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 	writeTextResponse(w, "ok")
 }
 
-func handleLastModifiedUsec(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if !checkRequest(c, w, r, "GET", false) {
-		return
-	}
-
-	t, err := getMaxLastModifiedTime(c)
-	if err != nil {
-		c.Errorf("Got error while getting max last-modified time: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	} else if t.IsZero() {
-		writeTextResponse(w, "0")
-	} else {
-		writeTextResponse(w, strconv.FormatInt(nup.TimeToUsec(t), 10))
-	}
-	return
-}
-
 func handleListTags(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	if !checkRequest(c, w, r, "GET", false) {
@@ -361,6 +343,14 @@ func handleListTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJsonResponse(w, tags)
+}
+
+func handleNowNsec(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	if !checkRequest(c, w, r, "GET", false) {
+		return
+	}
+	writeTextResponse(w, strconv.FormatInt(time.Now().UnixNano(), 10))
 }
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {
@@ -503,19 +493,18 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 		max = maxDumpBatchSize
 	}
 
-	var lastModified time.Time
-	if len(r.FormValue("lastModifiedUsec")) > 0 {
-		var lastModifiedUsec int64
-		if !parseIntParam(c, w, r, "lastModifiedUsec", &lastModifiedUsec) {
+	var minLastModified time.Time
+	if len(r.FormValue("minLastModifiedNsec")) > 0 {
+		var ns int64
+		if !parseIntParam(c, w, r, "minLastModifiedNsec", &ns) {
 			return
 		}
-		if lastModifiedUsec > 0 {
-			lastModified = nup.UsecToTime(lastModifiedUsec)
+		if ns > 0 {
+			minLastModified = time.Unix(0, ns)
 		}
 	}
 
-	c.Debugf("returning songs modified after %v", lastModified)
-	songs, cursor, err := dumpSongsForAndroid(c, lastModified, max, r.FormValue("cursor"), cfg.BaseSongUrl, cfg.BaseCoverUrl)
+	songs, cursor, err := dumpSongsForAndroid(c, minLastModified, max, r.FormValue("cursor"), cfg.BaseSongUrl, cfg.BaseCoverUrl)
 	if err != nil {
 		c.Errorf("Unable to get songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

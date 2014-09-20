@@ -221,34 +221,34 @@ func (t *Tester) QuerySongs(params string) []nup.Song {
 	return songs
 }
 
-func (t *Tester) GetLastModified() time.Time {
-	resp := t.SendRequest(t.NewRequest("GET", "last_modified_usec", nil))
+func (t *Tester) GetNowFromServer() time.Time {
+	resp := t.SendRequest(t.NewRequest("GET", "now_nsec", nil))
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		panic(err)
 	}
-	usec, err := strconv.ParseInt(string(b), 10, 64)
+	nsec, err := strconv.ParseInt(string(b), 10, 64)
 	if err != nil {
 		panic(err)
-	} else if usec <= 0 {
+	} else if nsec <= 0 {
 		return time.Time{}
 	}
-	return nup.UsecToTime(usec)
+	return time.Unix(0, nsec)
 }
 
-func (t *Tester) GetSongsForAndroid(lastModified time.Time) []nup.Song {
-	var usec int64
-	if !lastModified.IsZero() {
-		usec = nup.TimeToUsec(lastModified)
+func (t *Tester) GetSongsForAndroid(minLastModified time.Time) []nup.Song {
+	var nsec int64
+	if !minLastModified.IsZero() {
+		nsec = minLastModified.UnixNano()
 	}
 
 	songs := make([]nup.Song, 0)
 	var cursor string
 
 	for {
-		path := fmt.Sprintf("songs?lastModifiedUsec=%d&max=%d", usec, androidBatchSize)
+		path := fmt.Sprintf("songs?minLastModifiedNsec=%d&max=%d", nsec, androidBatchSize)
 		if len(cursor) > 0 {
 			path += "&cursor=" + cursor
 		}

@@ -36,11 +36,3 @@ func SecondsToTime(s float64) time.Time {
 func TimeToSeconds(t time.Time) float64 {
 	return float64(t.UnixNano()) / float64(time.Second/time.Nanosecond)
 }
-
-func UsecToTime(usec int64) time.Time {
-	return time.Unix(0, int64(time.Duration(usec)*time.Microsecond/time.Nanosecond))
-}
-
-func TimeToUsec(t time.Time) int64 {
-	return int64(time.Duration(t.UnixNano()) * time.Nanosecond / time.Microsecond)
-}
