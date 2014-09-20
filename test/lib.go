@@ -92,23 +92,24 @@ func CompareSongs(expected, actual []nup.Song, compareOrder bool) error {
 
 	m := make([]string, 0)
 
+	stringify := func(s nup.Song) string {
+		if s.Plays != nil {
+			for j := range s.Plays {
+				s.Plays[j].StartTime = s.Plays[j].StartTime.UTC()
+			}
+			sort.Sort(PlayArray(s.Plays))
+		}
+		b, err := json.Marshal(s)
+		if err != nil {
+			panic(err)
+		}
+		return string(b)
+	}
+
 	for i := 0; i < len(expected); i++ {
 		if i >= len(actual) {
-			m = append(m, fmt.Sprintf("missing song at position %v; expected %q", i, expected[i].Filename))
+			m = append(m, fmt.Sprintf("missing song at position %v; expected %v", i, stringify(expected[i])))
 		} else {
-			stringify := func(s nup.Song) string {
-				if s.Plays != nil {
-					for j := range s.Plays {
-						s.Plays[j].StartTime = s.Plays[j].StartTime.UTC()
-					}
-					sort.Sort(PlayArray(s.Plays))
-				}
-				b, err := json.Marshal(s)
-				if err != nil {
-					panic(err)
-				}
-				return string(b)
-			}
 			a := stringify(actual[i])
 			e := stringify(expected[i])
 			if a != e {
@@ -117,7 +118,7 @@ func CompareSongs(expected, actual []nup.Song, compareOrder bool) error {
 		}
 	}
 	for i := len(expected); i < len(actual); i++ {
-		m = append(m, fmt.Sprintf("got unexpected song %q at position %v", actual[i].Filename, i))
+		m = append(m, fmt.Sprintf("unexpected song at position %v: %v", i, stringify(actual[i])))
 	}
 
 	if len(m) > 0 {

@@ -299,4 +299,14 @@ func TestAndroid(tt *testing.T) {
 	if modTime.Before(startTime) || modTime.After(endTime) {
 		tt.Errorf("got mod time %v after updating between %v and %v", modTime, startTime, endTime)
 	}
+
+	// Reporting a play shouldn't update the song's last-modified time.
+	log.Print("reporting playback")
+	p := nup.Play{time.Unix(1410746718, 0), "127.0.0.1"}
+	updatedLegacySong1.Plays = append(updatedLegacySong1.Plays, p)
+	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(p.StartTime.Unix(), 10), nil)
+	t.WaitForUpdate()
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(modTime.Add(time.Microsecond)), false); err != nil {
+		tt.Error(err)
+	}
 }

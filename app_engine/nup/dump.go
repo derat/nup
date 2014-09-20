@@ -11,9 +11,6 @@ import (
 )
 
 const (
-	// Maximum batch size when returning songs to Android.
-	androidSongBatchSize = 100
-
 	keyProperty = "__key__"
 )
 
@@ -108,9 +105,9 @@ func dumpPlays(c appengine.Context, max int64, cursor string) (plays []nup.PlayD
 	return plays, nextCursor, nil
 }
 
-func dumpSongsForAndroid(c appengine.Context, minLastModified time.Time, cursor, baseSongUrl, baseCoverUrl string) (songs []nup.Song, nextCursor string, err error) {
-	songs = make([]nup.Song, androidSongBatchSize)
-	songPtrs := make([]interface{}, androidSongBatchSize)
+func dumpSongsForAndroid(c appengine.Context, minLastModified time.Time, max int64, cursor, baseSongUrl, baseCoverUrl string) (songs []nup.Song, nextCursor string, err error) {
+	songs = make([]nup.Song, max)
+	songPtrs := make([]interface{}, max)
 	for i := range songs {
 		songPtrs[i] = &songs[i]
 	}

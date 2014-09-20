@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"math/rand"
 	"net/http"
 	"os"
@@ -31,7 +30,7 @@ const (
 	playKind = "Play"
 	songKind = "Song"
 
-	defaultExportBatchSize = 100
+	defaultDumpBatchSize = 100
 )
 
 type basicAuthInfo struct {
@@ -215,7 +214,7 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var max int64 = defaultExportBatchSize
+	var max int64 = defaultDumpBatchSize
 	if len(r.FormValue("max")) > 0 && !parseIntParam(c, w, r, "max", &max) {
 		return
 	}
@@ -476,7 +475,7 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 	if !parseIntParam(c, w, r, "songId", &id) || !parseFloatParam(c, w, r, "startTime", &startTimeFloat) {
 		return
 	}
-	startTime := time.Unix(int64(startTimeFloat), int64((startTimeFloat-math.Floor(startTimeFloat))*1000*1000*1000))
+	startTime := time.Unix(0, int64(startTimeFloat*1000*1000*1000))
 
 	if err := addPlay(c, id, startTime, r.RemoteAddr); err != nil {
 		c.Errorf("Got error while recording play: %v", err)
@@ -491,6 +490,11 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var max int64 = defaultDumpBatchSize
+	if len(r.FormValue("max")) > 0 && !parseIntParam(c, w, r, "max", &max) {
+		return
+	}
+
 	var minLastModifiedTime time.Time
 	if len(r.FormValue("minLastModifiedUsec")) > 0 {
 		var minLastModifiedUsec int64
@@ -502,7 +506,7 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	songs, cursor, err := dumpSongsForAndroid(c, minLastModifiedTime, r.FormValue("cursor"), cfg.BaseSongUrl, cfg.BaseCoverUrl)
+	songs, cursor, err := dumpSongsForAndroid(c, minLastModifiedTime, max, r.FormValue("cursor"), cfg.BaseSongUrl, cfg.BaseCoverUrl)
 	if err != nil {
 		c.Errorf("Unable to get songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

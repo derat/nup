@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	dumpBatchSize = 2
+	dumpBatchSize    = 2
+	androidBatchSize = 1
 )
 
 func runCommand(p string, args ...string) (stdout, stderr string, err error) {
@@ -118,7 +119,7 @@ func newTester(serverUrl, binDir string) *Tester {
 }
 
 func (t *Tester) WaitForUpdate() {
-	time.Sleep(2 * time.Second)
+	//time.Sleep(2 * time.Second)
 }
 
 func (t *Tester) DumpSongs(stripIds bool) []nup.Song {
@@ -253,9 +254,9 @@ func (t *Tester) GetSongsForAndroid(minLastModified time.Time) []nup.Song {
 	var cursor string
 
 	for {
-		path := "songs?minLastModifiedUsec=" + strconv.FormatInt(usec, 10)
+		path := fmt.Sprintf("songs?minLastModifiedUsec=%d&max=%d", usec, androidBatchSize)
 		if len(cursor) > 0 {
-			path += "?cursor=" + cursor
+			path += "&cursor=" + cursor
 		}
 
 		resp := t.SendRequest(t.NewRequest("GET", path, nil))

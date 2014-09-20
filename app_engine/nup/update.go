@@ -115,7 +115,6 @@ func updateExistingSong(c appengine.Context, id int64, f func(appengine.Context,
 			}
 			return err
 		}
-		song.LastModifiedTime = time.Now()
 		if _, err := datastore.Put(c, key, song); err != nil {
 			return err
 		}
@@ -165,6 +164,7 @@ func updateRatingAndTags(c appengine.Context, id int64, hasRating bool, rating f
 			}
 		}
 		if updated {
+			s.LastModifiedTime = time.Now()
 			return nil
 		} else {
 			return ErrSongUnchanged
