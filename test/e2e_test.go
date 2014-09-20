@@ -160,7 +160,7 @@ func TestUserData(tt *testing.T) {
 	CopySongsToTempDir(t.MusicDir, Song0s.Filename)
 	t.UpdateSongs()
 	t.WaitForUpdate()
-	id := t.DumpSongs(false)[0].SongId
+	id := t.GetSongId(Song0s.Sha1)
 
 	log.Print("rating and tagging")
 	s := Song0s
@@ -272,14 +272,31 @@ func TestAndroid(tt *testing.T) {
 	endTime := time.Now()
 	t.WaitForUpdate()
 
+	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(time.Time{}), false); err != nil {
+		tt.Error(err)
+	}
 	modTime = t.GetLastModified()
 	if modTime.Before(startTime) || modTime.After(endTime) {
 		tt.Errorf("got mod time %v after updating between %v and %v", modTime, startTime, endTime)
 	}
-	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(time.Time{}), false); err != nil {
-		tt.Error(err)
-	}
 	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(modTime.Add(time.Microsecond)), false); err != nil {
 		tt.Error(err)
+	}
+
+	log.Print("rating a song")
+	id := t.GetSongId(LegacySong1.Sha1)
+	updatedLegacySong1 := LegacySong1
+	updatedLegacySong1.Rating = 1.0
+	startTime = time.Now()
+	t.DoPost("rate_and_tag?songId="+id+"&rating=1.0", nil)
+	endTime = time.Now()
+	t.WaitForUpdate()
+
+	if err := compareQueryResults([]nup.Song{updatedLegacySong1}, t.GetSongsForAndroid(modTime.Add(time.Microsecond)), false); err != nil {
+		tt.Error(err)
+	}
+	modTime = t.GetLastModified()
+	if modTime.Before(startTime) || modTime.After(endTime) {
+		tt.Errorf("got mod time %v after updating between %v and %v", modTime, startTime, endTime)
 	}
 }

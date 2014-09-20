@@ -149,6 +149,15 @@ func (t *Tester) DumpSongs(stripIds bool) []nup.Song {
 	return songs
 }
 
+func (t *Tester) GetSongId(sha1 string) string {
+	for _, s := range t.DumpSongs(false) {
+		if s.Sha1 == sha1 {
+			return s.SongId
+		}
+	}
+	panic(fmt.Sprintf("failed to find ID for %v", sha1))
+}
+
 func (t *Tester) ImportSongsFromLegacyDb(path string) {
 	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile, "-import-db="+path); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
