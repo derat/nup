@@ -16,6 +16,8 @@ import (
 const (
 	exportPath = "export"
 
+	progressInterval = 100
+
 	// TODO: Tune these numbers.
 	defaultSongBatchSize = 400
 	defaultPlayBatchSize = 800
@@ -112,6 +114,7 @@ func main() {
 
 	e := json.NewEncoder(os.Stdout)
 
+	numSongs := 0
 	pd := <-playChan
 	for {
 		s := <-songChan
@@ -127,7 +130,14 @@ func main() {
 		if err := e.Encode(s); err != nil {
 			log.Fatal("Failed to encode song: %v", err)
 		}
+
+		numSongs++
+		if numSongs%progressInterval == 0 {
+			log.Printf("Wrote %d songs", numSongs)
+		}
 	}
+	log.Printf("Wrote %d songs", numSongs)
+
 	if pd != nil {
 		log.Fatal("Got orphaned play for song %v: %v", pd.SongId, pd.Play)
 	}
