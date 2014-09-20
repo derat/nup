@@ -161,6 +161,33 @@ func (t *Tester) UpdateSongs() {
 	}
 }
 
+func (t *Tester) NewRequest(method, path string, body io.Reader) *http.Request {
+	req, err := http.NewRequest(method, t.serverUrl+path, body)
+	if err != nil {
+		panic(err)
+	}
+	req.SetBasicAuth(TestUsername, TestPassword)
+	return req
+}
+
+func (t *Tester) SendRequest(req *http.Request) *http.Response {
+	resp, err := t.client.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		panic(resp.Status)
+	}
+	return resp
+}
+
+func (t *Tester) DoPost(pathAndQueryParams string, body io.Reader) {
+	req := t.NewRequest("POST", pathAndQueryParams, body)
+	req.Header.Set("Content-Type", "text/plain")
+	resp := t.SendRequest(req)
+	resp.Body.Close()
+}
+
 func (t *Tester) PostSongs(songs []nup.Song, replaceUserData bool) {
 	var buf bytes.Buffer
 	e := json.NewEncoder(&buf)
@@ -177,43 +204,32 @@ func (t *Tester) PostSongs(songs []nup.Song, replaceUserData bool) {
 }
 
 func (t *Tester) QuerySongs(params string) []nup.Song {
-	req, err := http.NewRequest("GET", t.serverUrl+"query?"+params, nil)
-	if err != nil {
-		panic(err)
-	}
-	req.SetBasicAuth(TestUsername, TestPassword)
-
-	resp, err := t.client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		panic(resp.Status)
-	}
+	resp := t.SendRequest(t.NewRequest("GET", "query?"+params, nil))
 	defer resp.Body.Close()
 
 	songs := make([]nup.Song, 0)
 	d := json.NewDecoder(resp.Body)
-	if err = d.Decode(&songs); err != nil {
+	if err := d.Decode(&songs); err != nil {
 		panic(err)
 	}
 	return songs
 }
 
-func (t *Tester) DoPost(pathAndQueryParams string, body io.Reader) {
-	req, err := http.NewRequest("POST", t.serverUrl+pathAndQueryParams, body)
-	if err != nil {
-		panic(err)
-	}
-	req.Header.Set("Content-Type", "text/plain")
-	req.SetBasicAuth(TestUsername, TestPassword)
+func (t *Tester) GetLastModified() time.Time {
+	resp := t.SendRequest(t.NewRequest("GET", "last_modified", nil))
+	defer resp.Body.Close()
 
-	resp, err := t.client.Do(req)
+	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		panic(err)
 	}
-	if resp.StatusCode != http.StatusOK {
-		panic(resp.Status)
+	if string(b) == "0" {
+		return time.Time{}
 	}
-	resp.Body.Close()
+
+	usec, err := strconv.ParseInt(string(b), 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	return time.Unix(0, usec*1000)
 }

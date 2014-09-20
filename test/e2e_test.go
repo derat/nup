@@ -56,7 +56,7 @@ func compareQueryResults(expected, actual []nup.Song) error {
 	return CompareSongs(expectedCleaned, actualCleaned, true)
 }
 
-func doPlayTimeQueries(tc *testing.T, t *Tester, s *nup.Song, queryPrefix string) {
+func doPlayTimeQueries(tt *testing.T, t *Tester, s *nup.Song, queryPrefix string) {
 	if s.Plays == nil || len(s.Plays) == 0 {
 		panic("song has no plays")
 	}
@@ -68,28 +68,28 @@ func doPlayTimeQueries(tc *testing.T, t *Tester, s *nup.Song, queryPrefix string
 	beforeFirstPlay := strconv.Itoa(int(time.Now().Sub(firstPlay)/time.Second) + 10)
 	songs := t.QuerySongs(queryPrefix + "firstPlayed=" + beforeFirstPlay)
 	if err := compareQueryResults([]nup.Song{*s}, songs); err != nil {
-		tc.Error(err)
+		tt.Error(err)
 	}
 	afterFirstPlay := strconv.Itoa(int(time.Now().Sub(firstPlay)/time.Second) - 10)
 	songs = t.QuerySongs(queryPrefix + "firstPlayed=" + afterFirstPlay)
 	if err := compareQueryResults([]nup.Song{}, songs); err != nil {
-		tc.Error(err)
+		tt.Error(err)
 	}
 
 	lastPlay := plays[len(plays)-1].StartTime
 	beforeLastPlay := strconv.Itoa(int(time.Now().Sub(lastPlay)/time.Second) + 10)
 	songs = t.QuerySongs(queryPrefix + "lastPlayed=" + beforeLastPlay)
 	if err := compareQueryResults([]nup.Song{}, songs); err != nil {
-		tc.Error(err)
+		tt.Error(err)
 	}
 	afterLastPlay := strconv.Itoa(int(time.Now().Sub(lastPlay)/time.Second) - 10)
 	songs = t.QuerySongs(queryPrefix + "lastPlayed=" + afterLastPlay)
 	if err := compareQueryResults([]nup.Song{*s}, songs); err != nil {
-		tc.Error(err)
+		tt.Error(err)
 	}
 }
 
-func TestLegacy(tc *testing.T) {
+func TestLegacy(tt *testing.T) {
 	t := setUpTest()
 	defer os.RemoveAll(t.TempDir)
 
@@ -97,23 +97,23 @@ func TestLegacy(tc *testing.T) {
 	t.ImportSongsFromLegacyDb(filepath.Join(GetDataDir(), "legacy.db"))
 	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{LegacySong1, LegacySong2}, t.DumpSongs(true), false); err != nil {
-		tc.Error(err)
+		tt.Error(err)
 	}
 
 	log.Print("checking that play stats were generated correctly")
-	doPlayTimeQueries(tc, t, &LegacySong1, "tags=electronic&")
+	doPlayTimeQueries(tt, t, &LegacySong1, "tags=electronic&")
 	if err := compareQueryResults([]nup.Song{}, t.QuerySongs("maxPlays=0")); err != nil {
-		tc.Error(err)
+		tt.Error(err)
 	}
 	if err := compareQueryResults([]nup.Song{LegacySong2}, t.QuerySongs("maxPlays=1")); err != nil {
-		tc.Error(err)
+		tt.Error(err)
 	}
 	if err := compareQueryResults([]nup.Song{LegacySong2, LegacySong1}, t.QuerySongs("maxPlays=2")); err != nil {
-		tc.Error(err)
+		tt.Error(err)
 	}
 }
 
-func TestUpdate(tc *testing.T) {
+func TestUpdate(tt *testing.T) {
 	t := setUpTest()
 	defer os.RemoveAll(t.TempDir)
 
@@ -122,7 +122,7 @@ func TestUpdate(tc *testing.T) {
 	t.UpdateSongs()
 	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{Song0s, Song1s}, t.DumpSongs(true), false); err != nil {
-		tc.Error(err)
+		tt.Error(err)
 	}
 
 	log.Print("importing another song")
@@ -130,7 +130,7 @@ func TestUpdate(tc *testing.T) {
 	t.UpdateSongs()
 	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{Song0s, Song1s, Song5s}, t.DumpSongs(true), false); err != nil {
-		tc.Error(err)
+		tt.Error(err)
 	}
 
 	log.Print("updating a song")
@@ -139,11 +139,11 @@ func TestUpdate(tc *testing.T) {
 	t.UpdateSongs()
 	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{Song0sUpdated, Song1s, Song5s}, t.DumpSongs(true), false); err != nil {
-		tc.Error(err)
+		tt.Error(err)
 	}
 }
 
-func TestUserData(tc *testing.T) {
+func TestUserData(tt *testing.T) {
 	t := setUpTest()
 	defer os.RemoveAll(t.TempDir)
 
@@ -160,7 +160,7 @@ func TestUserData(tc *testing.T) {
 	t.DoPost("rate_and_tag?songId="+id+"&rating=0.75&tags=electronic+instrumental", nil)
 	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{s}, t.DumpSongs(true), false); err != nil {
-		tc.Fatal(err)
+		tt.Fatal(err)
 	}
 
 	log.Print("reporting playback")
@@ -174,7 +174,7 @@ func TestUserData(tc *testing.T) {
 	}
 	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{s}, t.DumpSongs(true), false); err != nil {
-		tc.Fatal(err)
+		tt.Fatal(err)
 	}
 
 	log.Print("updating song and checking that user data is preserved")
@@ -187,7 +187,7 @@ func TestUserData(tc *testing.T) {
 	t.UpdateSongs()
 	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{us}, t.DumpSongs(true), false); err != nil {
-		tc.Error(err)
+		tt.Error(err)
 	}
 
 	log.Print("clearing tags")
@@ -195,22 +195,22 @@ func TestUserData(tc *testing.T) {
 	t.DoPost("rate_and_tag?songId="+id+"&tags=", nil)
 	t.WaitForUpdate()
 	if err := CompareSongs([]nup.Song{us}, t.DumpSongs(true), false); err != nil {
-		tc.Fatal(err)
+		tt.Fatal(err)
 	}
 
 	log.Print("checking that play stats were updated")
-	doPlayTimeQueries(tc, t, &us, "")
+	doPlayTimeQueries(tt, t, &us, "")
 	for i := 0; i < 3; i++ {
 		if err := compareQueryResults([]nup.Song{}, t.QuerySongs("maxPlays="+strconv.Itoa(i))); err != nil {
-			tc.Error(err)
+			tt.Error(err)
 		}
 	}
 	if err := compareQueryResults([]nup.Song{us}, t.QuerySongs("maxPlays=3")); err != nil {
-		tc.Error(err)
+		tt.Error(err)
 	}
 }
 
-func TestQueries(tc *testing.T) {
+func TestQueries(tt *testing.T) {
 	t := setUpTest()
 	defer os.RemoveAll(t.TempDir)
 
@@ -240,9 +240,28 @@ func TestQueries(tc *testing.T) {
 		{"tags=instrumental&minRating=0.75", []nup.Song{LegacySong1}},
 	} {
 		if err := compareQueryResults(q.ExpectedSongs, t.QuerySongs(q.Query)); err != nil {
-			tc.Errorf("%v: %v", q.Query, err)
+			tt.Errorf("%v: %v", q.Query, err)
 		}
 	}
 }
 
-// TODO: android stuff
+func TestAndroid(tt *testing.T) {
+	t := setUpTest()
+	defer os.RemoveAll(t.TempDir)
+
+	modTime := t.GetLastModified()
+	if !modTime.IsZero() {
+		tt.Errorf("got mod time %v from empty database", modTime)
+	}
+
+	log.Print("posting songs")
+	startTime := time.Now()
+	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, true)
+	endTime := time.Now()
+	t.WaitForUpdate()
+
+	modTime = t.GetLastModified()
+	if modTime.Before(startTime) || modTime.After(endTime) {
+		tt.Errorf("got mod time %v after updating between %v and %v", modTime, startTime, endTime)
+	}
+}
