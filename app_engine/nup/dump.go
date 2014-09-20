@@ -18,6 +18,7 @@ const (
 )
 
 func dumpEntities(c appengine.Context, q *datastore.Query, cursor string, entities []interface{}) (ids, parentIds []int64, nextCursor string, err error) {
+	q = q.KeysOnly()
 	if len(cursor) > 0 {
 		dc, err := datastore.DecodeCursor(cursor)
 		if err != nil {
@@ -74,8 +75,7 @@ func dumpSongs(c appengine.Context, max int64, cursor string) (songs []nup.Song,
 		songPtrs[i] = &songs[i]
 	}
 
-	q := datastore.NewQuery(songKind).KeysOnly().Order(keyProperty)
-	ids, _, nextCursor, err := dumpEntities(c, q, cursor, songPtrs)
+	ids, _, nextCursor, err := dumpEntities(c, datastore.NewQuery(songKind).Order(keyProperty), cursor, songPtrs)
 	if err != nil {
 		return nil, "", err
 	}
@@ -96,8 +96,7 @@ func dumpPlays(c appengine.Context, max int64, cursor string) (plays []nup.PlayD
 		playPtrs[i] = &plays[i].Play
 	}
 
-	q := datastore.NewQuery(playKind).KeysOnly().Order(keyProperty)
-	_, pids, nextCursor, err := dumpEntities(c, q, cursor, playPtrs)
+	_, pids, nextCursor, err := dumpEntities(c, datastore.NewQuery(playKind).Order(keyProperty), cursor, playPtrs)
 	if err != nil {
 		return nil, "", err
 	}
@@ -109,40 +108,22 @@ func dumpPlays(c appengine.Context, max int64, cursor string) (plays []nup.PlayD
 	return plays, nextCursor, nil
 }
 
-func getSongsForAndroid(c appengine.Context, minLastModified time.Time, startCursor, baseSongUrl, baseCoverUrl string) (songs []nup.Song, nextCursor string, err error) {
-	q := datastore.NewQuery(songKind).Filter("LastModifiedTime >= ", minLastModified)
-	if len(startCursor) > 0 {
-		sc, err := datastore.DecodeCursor(startCursor)
-		if err != nil {
-			return nil, "", fmt.Errorf("Unable to decode cursor %q: %v", startCursor, err)
-		}
-		q = q.Start(sc)
+func dumpSongsForAndroid(c appengine.Context, minLastModified time.Time, cursor, baseSongUrl, baseCoverUrl string) (songs []nup.Song, nextCursor string, err error) {
+	songs = make([]nup.Song, androidSongBatchSize)
+	songPtrs := make([]interface{}, androidSongBatchSize)
+	for i := range songs {
+		songPtrs[i] = &songs[i]
 	}
 
-	it := q.Run(c)
-	songs = make([]nup.Song, 0)
-	for true {
-		s := nup.Song{}
-		sk, err := it.Next(&s)
-		if err == datastore.Done {
-			break
-		} else if err != nil {
-			return nil, "", fmt.Errorf("Unable to read song: %v", err)
-		}
-
-		prepareSongForSearchResult(&s, sk.IntID(), baseSongUrl, baseCoverUrl)
-		songs = append(songs, s)
-
-		if len(songs) == androidSongBatchSize {
-			nc, err := it.Cursor()
-			if err != nil {
-				return nil, "", fmt.Errorf("Unable to get new cursor")
-			}
-			nextCursor = nc.String()
-			break
-		}
+	ids, _, nextCursor, err := dumpEntities(c, datastore.NewQuery(songKind).Filter("LastModifiedTime >= ", minLastModified), cursor, songPtrs)
+	if err != nil {
+		return nil, "", err
 	}
 
+	songs = songs[0:len(ids)]
+	for i, id := range ids {
+		prepareSongForSearchResult(&songs[i], id, baseSongUrl, baseCoverUrl)
+	}
 	return songs, nextCursor, nil
 }
 
