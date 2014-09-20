@@ -30,7 +30,9 @@ const (
 	playKind = "Play"
 	songKind = "Song"
 
+	// Default and maximum size of a batch of dumped entities.
 	defaultDumpBatchSize = 100
+	maxDumpBatchSize     = 5000
 )
 
 type basicAuthInfo struct {
@@ -217,6 +219,9 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 	var max int64 = defaultDumpBatchSize
 	if len(r.FormValue("max")) > 0 && !parseIntParam(c, w, r, "max", &max) {
 		return
+	}
+	if max > maxDumpBatchSize {
+		max = maxDumpBatchSize
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
@@ -493,6 +498,9 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 	var max int64 = defaultDumpBatchSize
 	if len(r.FormValue("max")) > 0 && !parseIntParam(c, w, r, "max", &max) {
 		return
+	}
+	if max > maxDumpBatchSize {
+		max = maxDumpBatchSize
 	}
 
 	var lastModified time.Time
