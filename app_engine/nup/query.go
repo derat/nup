@@ -4,13 +4,11 @@ import (
 	"appengine"
 	"appengine/datastore"
 	"math/rand"
-	"net/url"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"erat.org/cloud"
 	"erat.org/nup"
 )
 
@@ -67,23 +65,14 @@ func (a songArray) Less(i, j int) bool {
 	return a[i].Track < a[j].Track
 }
 
-// encodePathForCloudStorage converts the passed-in original Unix filename to the appropriate path for accessing the file via Cloud Storage.
-// This includes:
-// - the initial escaping performed by the cloud_sync program (a subset of query escaping),
-// - regular query escaping, and
-// - replacing "+" with "%20" because Cloud Storage seems unhappy otherwise.
-func encodePathForCloudStorage(p string) string {
-	return strings.Replace(url.QueryEscape(cloud.EscapeObjectName(p)), "+", "%20", -1)
-}
-
 func prepareSongForSearchResult(s *nup.Song, id int64, baseSongUrl, baseCoverUrl string) {
 	// Set fields that are only present in search results (i.e. not in Datastore).
 	s.SongId = strconv.FormatInt(id, 10)
 	if len(s.Filename) > 0 {
-		s.Url = baseSongUrl + encodePathForCloudStorage(s.Filename)
+		s.Url = baseSongUrl + nup.EncodePathForCloudStorage(s.Filename)
 	}
 	if len(s.CoverFilename) > 0 {
-		s.CoverUrl = baseCoverUrl + encodePathForCloudStorage(s.CoverFilename)
+		s.CoverUrl = baseCoverUrl + nup.EncodePathForCloudStorage(s.CoverFilename)
 	}
 
 	// Create an empty tags slice so that clients don't need to check for null.

@@ -13,16 +13,6 @@ indexes:
 - kind: Song
   properties:
   - name: ArtistLower
-  - name: FirstStartTime
-
-- kind: Song
-  properties:
-  - name: ArtistLower
-  - name: LastStartTime
-
-- kind: Song
-  properties:
-  - name: ArtistLower
   - name: Rating
 
 - kind: Song
@@ -30,6 +20,16 @@ indexes:
   - name: Disc
   - name: Track
   - name: FirstStartTime
+
+- kind: Song
+  properties:
+  - name: Tags
+  - name: FirstStartTime
+
+- kind: Song
+  properties:
+  - name: Tags
+  - name: LastStartTime
 
 - kind: Song
   properties:

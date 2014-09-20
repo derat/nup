@@ -3,7 +3,6 @@ package test
 import (
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -39,7 +38,7 @@ func compareQueryResults(expected, actual []nup.Song) error {
 		if len(s.Tags) == 0 {
 			s.Tags = nil
 		}
-		if i < len(expected) && strings.HasSuffix(s.Url, expected[i].Filename) {
+		if i < len(expected) && strings.HasSuffix(s.Url, nup.EncodePathForCloudStorage(expected[i].Filename)) {
 			s.Url = ""
 			s.Filename = expected[i].Filename
 		}
@@ -102,7 +101,7 @@ func TestLegacy(tc *testing.T) {
 	}
 
 	log.Print("checking that play stats were generated correctly")
-	doPlayTimeQueries(tc, t, &LegacySong1, "artist="+url.QueryEscape(LegacySong1.Artist)+"&")
+	doPlayTimeQueries(tc, t, &LegacySong1, "tags=electronic&")
 	if err := compareQueryResults([]nup.Song{}, t.QuerySongs("maxPlays=0")); err != nil {
 		tc.Error(err)
 	}
@@ -200,7 +199,7 @@ func TestUserData(tc *testing.T) {
 	}
 
 	log.Print("checking that play stats were updated")
-	doPlayTimeQueries(tc, t, &us, "artist="+url.QueryEscape(us.Artist)+"&")
+	doPlayTimeQueries(tc, t, &us, "")
 	for i := 0; i < 3; i++ {
 		if err := compareQueryResults([]nup.Song{}, t.QuerySongs("maxPlays="+strconv.Itoa(i))); err != nil {
 			tc.Error(err)
