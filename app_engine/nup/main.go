@@ -185,6 +185,7 @@ func init() {
 	http.HandleFunc("/clear", handleClear)
 	http.HandleFunc("/export", handleExport)
 	http.HandleFunc("/import", handleImport)
+	http.HandleFunc("/last_modified_usec", handleLastModifiedUsec)
 	http.HandleFunc("/list_tags", handleListTags)
 	http.HandleFunc("/query", handleQuery)
 	http.HandleFunc("/rate_and_tag", handleRateAndTag)
@@ -324,6 +325,24 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 	}
 	c.Debugf("Updated %v song(s)", numSongs)
 	writeTextResponse(w, "ok")
+}
+
+func handleLastModifiedUsec(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	if !checkRequest(c, w, r, "GET", false) {
+		return
+	}
+
+	t, err := getMaxLastModifiedTime(c)
+	if err != nil {
+		c.Errorf("Got error while getting max last-modified time: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	} else if t.IsZero() {
+		writeTextResponse(w, "0")
+	} else {
+		writeTextResponse(w, strconv.FormatInt(t.UnixNano()/1000, 10))
+	}
+	return
 }
 
 func handleListTags(w http.ResponseWriter, r *http.Request) {
@@ -472,27 +491,15 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle weird preliminary query from the Android app to get the max last-modified time.
-	if r.FormValue("getMaxLastModifiedUsec") == "1" {
-		t, err := getMaxLastModifiedTime(c)
-		if err != nil {
-			c.Errorf("Got error while getting max last-modified time: %v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		} else if t.IsZero() {
-			writeTextResponse(w, "0")
-		} else {
-			writeTextResponse(w, strconv.FormatInt(t.UnixNano()/1000, 10))
-		}
-		return
-	}
-
 	var minLastModifiedTime time.Time
 	if len(r.FormValue("minLastModifiedUsec")) > 0 {
 		var minLastModifiedUsec int64
 		if !parseIntParam(c, w, r, "minLastModifiedUsec", &minLastModifiedUsec) {
 			return
 		}
-		minLastModifiedTime = time.Unix(minLastModifiedUsec/(1000*1000), (minLastModifiedUsec%(1000*1000))*1000)
+		if minLastModifiedUsec > 0 {
+			minLastModifiedTime = time.Unix(minLastModifiedUsec/(1000*1000), (minLastModifiedUsec%(1000*1000))*1000)
+		}
 	}
 
 	songs, cursor, err := dumpSongsForAndroid(c, minLastModifiedTime, r.FormValue("cursor"), cfg.BaseSongUrl, cfg.BaseCoverUrl)

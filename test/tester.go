@@ -216,7 +216,7 @@ func (t *Tester) QuerySongs(params string) []nup.Song {
 }
 
 func (t *Tester) GetLastModified() time.Time {
-	resp := t.SendRequest(t.NewRequest("GET", "last_modified", nil))
+	resp := t.SendRequest(t.NewRequest("GET", "last_modified_usec", nil))
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
@@ -232,4 +232,49 @@ func (t *Tester) GetLastModified() time.Time {
 		panic(err)
 	}
 	return time.Unix(0, usec*1000)
+}
+
+func (t *Tester) GetSongsForAndroid(minLastModified time.Time) []nup.Song {
+	var usec int64 = -1
+	if !minLastModified.IsZero() {
+		usec = minLastModified.UnixNano() / 1000
+	}
+
+	songs := make([]nup.Song, 0)
+	var cursor string
+
+	for {
+		path := "songs?minLastModifiedUsec=" + strconv.FormatInt(usec, 10)
+		if len(cursor) > 0 {
+			path += "?cursor=" + cursor
+		}
+
+		resp := t.SendRequest(t.NewRequest("GET", path, nil))
+		defer resp.Body.Close()
+
+		data, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			panic(err)
+		}
+		var items []json.RawMessage
+		if err = json.Unmarshal(data, &items); err != nil && err != io.EOF {
+			panic(err)
+		}
+
+		cursor = ""
+		for _, item := range items {
+			s := nup.Song{}
+			if err = json.Unmarshal(item, &s); err == nil {
+				songs = append(songs, s)
+			} else if err := json.Unmarshal(item, &cursor); err != nil {
+				panic(err)
+			}
+		}
+
+		if len(cursor) == 0 {
+			break
+		}
+	}
+
+	return songs
 }

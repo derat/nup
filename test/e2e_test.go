@@ -25,7 +25,19 @@ func setUpTest() *Tester {
 	return t
 }
 
-func compareQueryResults(expected, actual []nup.Song) error {
+func compareQueryResults(expected, actual []nup.Song, compareOrder bool) error {
+	// Map from encoded path to original filename.
+	encodedPaths := make(map[string]string)
+
+	expectedCleaned := make([]nup.Song, len(expected))
+	for i := range expected {
+		s := expected[i]
+		s.Sha1 = ""
+		s.Plays = nil
+		expectedCleaned[i] = s
+		encodedPaths[nup.EncodePathForCloudStorage(s.Filename)] = s.Filename
+	}
+
 	actualCleaned := make([]nup.Song, len(actual))
 	for i := range actual {
 		s := actual[i]
@@ -38,22 +50,19 @@ func compareQueryResults(expected, actual []nup.Song) error {
 		if len(s.Tags) == 0 {
 			s.Tags = nil
 		}
-		if i < len(expected) && strings.HasSuffix(s.Url, nup.EncodePathForCloudStorage(expected[i].Filename)) {
-			s.Url = ""
-			s.Filename = expected[i].Filename
+
+		for p, fn := range encodedPaths {
+			if strings.HasSuffix(s.Url, p) {
+				s.Url = ""
+				s.Filename = fn
+				break
+			}
 		}
+
 		actualCleaned[i] = s
 	}
 
-	expectedCleaned := make([]nup.Song, len(expected))
-	for i := range expected {
-		s := expected[i]
-		s.Sha1 = ""
-		s.Plays = nil
-		expectedCleaned[i] = s
-	}
-
-	return CompareSongs(expectedCleaned, actualCleaned, true)
+	return CompareSongs(expectedCleaned, actualCleaned, compareOrder)
 }
 
 func doPlayTimeQueries(tt *testing.T, t *Tester, s *nup.Song, queryPrefix string) {
@@ -67,24 +76,24 @@ func doPlayTimeQueries(tt *testing.T, t *Tester, s *nup.Song, queryPrefix string
 	firstPlay := plays[0].StartTime
 	beforeFirstPlay := strconv.Itoa(int(time.Now().Sub(firstPlay)/time.Second) + 10)
 	songs := t.QuerySongs(queryPrefix + "firstPlayed=" + beforeFirstPlay)
-	if err := compareQueryResults([]nup.Song{*s}, songs); err != nil {
+	if err := compareQueryResults([]nup.Song{*s}, songs, false); err != nil {
 		tt.Error(err)
 	}
 	afterFirstPlay := strconv.Itoa(int(time.Now().Sub(firstPlay)/time.Second) - 10)
 	songs = t.QuerySongs(queryPrefix + "firstPlayed=" + afterFirstPlay)
-	if err := compareQueryResults([]nup.Song{}, songs); err != nil {
+	if err := compareQueryResults([]nup.Song{}, songs, false); err != nil {
 		tt.Error(err)
 	}
 
 	lastPlay := plays[len(plays)-1].StartTime
 	beforeLastPlay := strconv.Itoa(int(time.Now().Sub(lastPlay)/time.Second) + 10)
 	songs = t.QuerySongs(queryPrefix + "lastPlayed=" + beforeLastPlay)
-	if err := compareQueryResults([]nup.Song{}, songs); err != nil {
+	if err := compareQueryResults([]nup.Song{}, songs, false); err != nil {
 		tt.Error(err)
 	}
 	afterLastPlay := strconv.Itoa(int(time.Now().Sub(lastPlay)/time.Second) - 10)
 	songs = t.QuerySongs(queryPrefix + "lastPlayed=" + afterLastPlay)
-	if err := compareQueryResults([]nup.Song{*s}, songs); err != nil {
+	if err := compareQueryResults([]nup.Song{*s}, songs, false); err != nil {
 		tt.Error(err)
 	}
 }
@@ -102,13 +111,13 @@ func TestLegacy(tt *testing.T) {
 
 	log.Print("checking that play stats were generated correctly")
 	doPlayTimeQueries(tt, t, &LegacySong1, "tags=electronic&")
-	if err := compareQueryResults([]nup.Song{}, t.QuerySongs("maxPlays=0")); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.QuerySongs("maxPlays=0"), true); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{LegacySong2}, t.QuerySongs("maxPlays=1")); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong2}, t.QuerySongs("maxPlays=1"), true); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{LegacySong2, LegacySong1}, t.QuerySongs("maxPlays=2")); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong2, LegacySong1}, t.QuerySongs("maxPlays=2"), true); err != nil {
 		tt.Error(err)
 	}
 }
@@ -201,11 +210,11 @@ func TestUserData(tt *testing.T) {
 	log.Print("checking that play stats were updated")
 	doPlayTimeQueries(tt, t, &us, "")
 	for i := 0; i < 3; i++ {
-		if err := compareQueryResults([]nup.Song{}, t.QuerySongs("maxPlays="+strconv.Itoa(i))); err != nil {
+		if err := compareQueryResults([]nup.Song{}, t.QuerySongs("maxPlays="+strconv.Itoa(i)), false); err != nil {
 			tt.Error(err)
 		}
 	}
-	if err := compareQueryResults([]nup.Song{us}, t.QuerySongs("maxPlays=3")); err != nil {
+	if err := compareQueryResults([]nup.Song{us}, t.QuerySongs("maxPlays=3"), false); err != nil {
 		tt.Error(err)
 	}
 }
@@ -239,7 +248,7 @@ func TestQueries(tt *testing.T) {
 		{"tags=-electronic+instrumental", []nup.Song{LegacySong2}},
 		{"tags=instrumental&minRating=0.75", []nup.Song{LegacySong1}},
 	} {
-		if err := compareQueryResults(q.ExpectedSongs, t.QuerySongs(q.Query)); err != nil {
+		if err := compareQueryResults(q.ExpectedSongs, t.QuerySongs(q.Query), true); err != nil {
 			tt.Errorf("%v: %v", q.Query, err)
 		}
 	}
@@ -253,6 +262,9 @@ func TestAndroid(tt *testing.T) {
 	if !modTime.IsZero() {
 		tt.Errorf("got mod time %v from empty database", modTime)
 	}
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(time.Time{}), false); err != nil {
+		tt.Error(err)
+	}
 
 	log.Print("posting songs")
 	startTime := time.Now()
@@ -263,5 +275,11 @@ func TestAndroid(tt *testing.T) {
 	modTime = t.GetLastModified()
 	if modTime.Before(startTime) || modTime.After(endTime) {
 		tt.Errorf("got mod time %v after updating between %v and %v", modTime, startTime, endTime)
+	}
+	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(time.Time{}), false); err != nil {
+		tt.Error(err)
+	}
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(modTime.Add(time.Microsecond)), false); err != nil {
+		tt.Error(err)
 	}
 }
