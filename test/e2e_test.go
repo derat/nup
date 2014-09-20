@@ -72,26 +72,26 @@ func doPlayTimeQueries(tt *testing.T, t *Tester, s *nup.Song, queryPrefix string
 	plays := s.Plays
 	sort.Sort(PlayArray(plays))
 
-	firstPlay := plays[0].StartTime
-	beforeFirstPlay := strconv.Itoa(int(time.Now().Sub(firstPlay)/time.Second) + 10)
-	songs := t.QuerySongs(queryPrefix + "firstPlayed=" + beforeFirstPlay)
+	firstPlaySec := nup.TimeToSeconds(plays[0].StartTime)
+	beforeFirstPlay := strconv.FormatFloat(firstPlaySec-10, 'f', -1, 64)
+	songs := t.QuerySongs(queryPrefix + "minFirstPlayed=" + beforeFirstPlay)
 	if err := compareQueryResults([]nup.Song{*s}, songs, false); err != nil {
 		tt.Error(err)
 	}
-	afterFirstPlay := strconv.Itoa(int(time.Now().Sub(firstPlay)/time.Second) - 10)
-	songs = t.QuerySongs(queryPrefix + "firstPlayed=" + afterFirstPlay)
+	afterFirstPlay := strconv.FormatFloat(firstPlaySec+10, 'f', -1, 64)
+	songs = t.QuerySongs(queryPrefix + "minFirstPlayed=" + afterFirstPlay)
 	if err := compareQueryResults([]nup.Song{}, songs, false); err != nil {
 		tt.Error(err)
 	}
 
-	lastPlay := plays[len(plays)-1].StartTime
-	beforeLastPlay := strconv.Itoa(int(time.Now().Sub(lastPlay)/time.Second) + 10)
-	songs = t.QuerySongs(queryPrefix + "lastPlayed=" + beforeLastPlay)
+	lastPlaySec := nup.TimeToSeconds(plays[len(plays)-1].StartTime)
+	beforeLastPlay := strconv.FormatFloat(lastPlaySec-10, 'f', -1, 64)
+	songs = t.QuerySongs(queryPrefix + "maxLastPlayed=" + beforeLastPlay)
 	if err := compareQueryResults([]nup.Song{}, songs, false); err != nil {
 		tt.Error(err)
 	}
-	afterLastPlay := strconv.Itoa(int(time.Now().Sub(lastPlay)/time.Second) - 10)
-	songs = t.QuerySongs(queryPrefix + "lastPlayed=" + afterLastPlay)
+	afterLastPlay := strconv.FormatFloat(lastPlaySec+10, 'f', -1, 64)
+	songs = t.QuerySongs(queryPrefix + "maxLastPlayed=" + afterLastPlay)
 	if err := compareQueryResults([]nup.Song{*s}, songs, false); err != nil {
 		tt.Error(err)
 	}
@@ -267,7 +267,7 @@ func TestAndroid(tt *testing.T) {
 	if modTime.Before(startTime) || modTime.After(endTime) {
 		tt.Errorf("got mod time %v after updating between %v and %v", modTime, startTime, endTime)
 	}
-	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(modTime.Add(time.Microsecond)), false); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(modTime), false); err != nil {
 		tt.Error(err)
 	}
 
@@ -279,7 +279,7 @@ func TestAndroid(tt *testing.T) {
 	t.DoPost("rate_and_tag?songId="+id+"&rating=1.0", nil)
 	endTime = time.Now()
 
-	if err := compareQueryResults([]nup.Song{updatedLegacySong1}, t.GetSongsForAndroid(modTime.Add(time.Microsecond)), false); err != nil {
+	if err := compareQueryResults([]nup.Song{updatedLegacySong1}, t.GetSongsForAndroid(modTime), false); err != nil {
 		tt.Error(err)
 	}
 	modTime = t.GetLastModified()
@@ -292,7 +292,11 @@ func TestAndroid(tt *testing.T) {
 	p := nup.Play{time.Unix(1410746718, 0), "127.0.0.1"}
 	updatedLegacySong1.Plays = append(updatedLegacySong1.Plays, p)
 	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(p.StartTime.Unix(), 10), nil)
-	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(modTime.Add(time.Microsecond)), false); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(modTime), false); err != nil {
 		tt.Error(err)
+	}
+	newModTime := t.GetLastModified()
+	if !newModTime.Equal(modTime) {
+		tt.Errorf("mod time changed from %v to %v after reporting play", modTime, newModTime)
 	}
 }

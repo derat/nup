@@ -339,7 +339,7 @@ func handleLastModifiedUsec(w http.ResponseWriter, r *http.Request) {
 	} else if t.IsZero() {
 		writeTextResponse(w, "0")
 	} else {
-		writeTextResponse(w, strconv.FormatInt(t.UnixNano()/1000, 10))
+		writeTextResponse(w, strconv.FormatInt(nup.TimeToUsec(t), 10))
 	}
 	return
 }
@@ -392,19 +392,19 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		q.HasMaxPlays = true
 	}
 
-	if len(r.FormValue("firstPlayed")) > 0 {
-		var s int64
-		if !parseIntParam(c, w, r, "firstPlayed", &s) {
+	if len(r.FormValue("minFirstPlayed")) > 0 {
+		var s float64
+		if !parseFloatParam(c, w, r, "minFirstPlayed", &s) {
 			return
 		}
-		q.MinFirstStartTime = time.Now().Add(time.Duration(-s) * time.Second)
+		q.MinFirstStartTime = nup.SecondsToTime(s)
 	}
-	if len(r.FormValue("lastPlayed")) > 0 {
-		var s int64
-		if !parseIntParam(c, w, r, "lastPlayed", &s) {
+	if len(r.FormValue("maxLastPlayed")) > 0 {
+		var s float64
+		if !parseFloatParam(c, w, r, "maxLastPlayed", &s) {
 			return
 		}
-		q.MaxLastStartTime = time.Now().Add(time.Duration(-s) * time.Second)
+		q.MaxLastStartTime = nup.SecondsToTime(s)
 	}
 
 	for _, t := range strings.Fields(r.FormValue("tags")) {
@@ -475,7 +475,7 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 	if !parseIntParam(c, w, r, "songId", &id) || !parseFloatParam(c, w, r, "startTime", &startTimeFloat) {
 		return
 	}
-	startTime := time.Unix(0, int64(startTimeFloat*1000*1000*1000))
+	startTime := nup.SecondsToTime(startTimeFloat)
 
 	if err := addPlay(c, id, startTime, r.RemoteAddr); err != nil {
 		c.Errorf("Got error while recording play: %v", err)
@@ -495,18 +495,19 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var minLastModifiedTime time.Time
-	if len(r.FormValue("minLastModifiedUsec")) > 0 {
-		var minLastModifiedUsec int64
-		if !parseIntParam(c, w, r, "minLastModifiedUsec", &minLastModifiedUsec) {
+	var lastModified time.Time
+	if len(r.FormValue("lastModifiedUsec")) > 0 {
+		var lastModifiedUsec int64
+		if !parseIntParam(c, w, r, "lastModifiedUsec", &lastModifiedUsec) {
 			return
 		}
-		if minLastModifiedUsec > 0 {
-			minLastModifiedTime = time.Unix(minLastModifiedUsec/(1000*1000), (minLastModifiedUsec%(1000*1000))*1000)
+		if lastModifiedUsec > 0 {
+			lastModified = nup.UsecToTime(lastModifiedUsec)
 		}
 	}
 
-	songs, cursor, err := dumpSongsForAndroid(c, minLastModifiedTime, max, r.FormValue("cursor"), cfg.BaseSongUrl, cfg.BaseCoverUrl)
+	c.Debugf("returning songs modified after %v", lastModified)
+	songs, cursor, err := dumpSongsForAndroid(c, lastModified, max, r.FormValue("cursor"), cfg.BaseSongUrl, cfg.BaseCoverUrl)
 	if err != nil {
 		c.Errorf("Unable to get songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

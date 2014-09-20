@@ -142,9 +142,9 @@ Playlist.prototype.submitQuery = function(appendToQueue) {
   if (!isNaN(parseInt(this.maxPlaysInput.value)))
     terms.push('maxPlays=' + parseInt(this.maxPlaysInput.value));
   if (this.firstPlayedSelect.value != 0)
-    terms.push('firstPlayed=' + this.firstPlayedSelect.value);
+    terms.push('minFirstPlayed=' + (getCurrentTimeSec() - parseInt(this.firstPlayedSelect.value)));
   if (this.lastPlayedSelect.value != 0)
-    terms.push('lastPlayed=' + this.lastPlayedSelect.value);
+    terms.push('maxLastPlayed=' + (getCurrentTimeSec() - parseInt(this.lastPlayedSelect.value)));
 
   if (!terms.length) {
     alert('You must supply search terms.');

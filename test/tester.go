@@ -229,28 +229,26 @@ func (t *Tester) GetLastModified() time.Time {
 	if err != nil {
 		panic(err)
 	}
-	if string(b) == "0" {
-		return time.Time{}
-	}
-
 	usec, err := strconv.ParseInt(string(b), 10, 64)
 	if err != nil {
 		panic(err)
+	} else if usec <= 0 {
+		return time.Time{}
 	}
-	return time.Unix(0, usec*1000)
+	return nup.UsecToTime(usec)
 }
 
-func (t *Tester) GetSongsForAndroid(minLastModified time.Time) []nup.Song {
-	var usec int64 = -1
-	if !minLastModified.IsZero() {
-		usec = minLastModified.UnixNano() / 1000
+func (t *Tester) GetSongsForAndroid(lastModified time.Time) []nup.Song {
+	var usec int64
+	if !lastModified.IsZero() {
+		usec = nup.TimeToUsec(lastModified)
 	}
 
 	songs := make([]nup.Song, 0)
 	var cursor string
 
 	for {
-		path := fmt.Sprintf("songs?minLastModifiedUsec=%d&max=%d", usec, androidBatchSize)
+		path := fmt.Sprintf("songs?lastModifiedUsec=%d&max=%d", usec, androidBatchSize)
 		if len(cursor) > 0 {
 			path += "&cursor=" + cursor
 		}

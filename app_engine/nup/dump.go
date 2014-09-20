@@ -105,14 +105,14 @@ func dumpPlays(c appengine.Context, max int64, cursor string) (plays []nup.PlayD
 	return plays, nextCursor, nil
 }
 
-func dumpSongsForAndroid(c appengine.Context, minLastModified time.Time, max int64, cursor, baseSongUrl, baseCoverUrl string) (songs []nup.Song, nextCursor string, err error) {
+func dumpSongsForAndroid(c appengine.Context, lastModified time.Time, max int64, cursor, baseSongUrl, baseCoverUrl string) (songs []nup.Song, nextCursor string, err error) {
 	songs = make([]nup.Song, max)
 	songPtrs := make([]interface{}, max)
 	for i := range songs {
 		songPtrs[i] = &songs[i]
 	}
 
-	ids, _, nextCursor, err := dumpEntities(c, datastore.NewQuery(songKind).Filter("LastModifiedTime >= ", minLastModified), cursor, songPtrs)
+	ids, _, nextCursor, err := dumpEntities(c, datastore.NewQuery(songKind).Filter("LastModifiedTime > ", lastModified), cursor, songPtrs)
 	if err != nil {
 		return nil, "", err
 	}
