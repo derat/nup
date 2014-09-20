@@ -114,14 +114,15 @@ func getTags(c appengine.Context) ([]string, error) {
 }
 
 func runQueriesAndGetIds(c appengine.Context, qs []*datastore.Query) ([][]int64, error) {
-	type idsAndError struct {
-		ids []int64
-		err error
+	type queryResult struct {
+		Index int
+		Ids   []int64
+		Error error
 	}
-	ch := make(chan idsAndError)
+	ch := make(chan queryResult)
 
-	for _, q := range qs {
-		go func(q *datastore.Query) {
+	for i, q := range qs {
+		go func(index int, q *datastore.Query) {
 			ids := make([]int64, 0)
 			it := q.Run(c)
 			for {
@@ -130,22 +131,22 @@ func runQueriesAndGetIds(c appengine.Context, qs []*datastore.Query) ([][]int64,
 				} else if err == datastore.Done {
 					break
 				} else {
-					ch <- idsAndError{nil, err}
+					ch <- queryResult{index, nil, err}
 					return
 				}
 			}
 			sort.Sort(int64Array(ids))
-			ch <- idsAndError{ids, nil}
-		}(q)
+			ch <- queryResult{index, ids, nil}
+		}(i, q)
 	}
 
 	res := make([][]int64, len(qs))
-	for i := range qs {
-		iae := <-ch
-		if iae.err != nil {
-			return nil, iae.err
+	for _ = range qs {
+		qr := <-ch
+		if qr.Error != nil {
+			return nil, qr.Error
 		}
-		res[i] = iae.ids
+		res[qr.Index] = qr.Ids
 	}
 	return res, nil
 }

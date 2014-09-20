@@ -234,7 +234,6 @@ func TestQueries(tt *testing.T) {
 		{"unrated=1", []nup.Song{Song0s}},
 		{"tags=instrumental", []nup.Song{LegacySong2, LegacySong1}},
 		{"tags=electronic+instrumental", []nup.Song{LegacySong1}},
-		// This query is flaky; I have no idea why.
 		{"tags=-electronic+instrumental", []nup.Song{LegacySong2}},
 		{"tags=instrumental&minRating=0.75", []nup.Song{LegacySong1}},
 	} {
