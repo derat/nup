@@ -47,10 +47,15 @@ var cfg struct {
 	// Credentials of accounts using HTTP basic authentication.
 	BasicAuthUsers []basicAuthInfo
 
-	// Base URLs for song and cover files.
+	// Base URLs for song and cover files when accessed via web browsers.
 	// These should be something like "https://storage.cloud.google.com/my-bucket-name/".
-	BaseSongUrl  string
-	BaseCoverUrl string
+	WebBaseSongUrl  string
+	WebBaseCoverUrl string
+
+	// Base URLs for song and cover files when accessed via the Android client (i.e. OAuth2).
+	// These should be something like "https://my-bucket-name.storage.googleapis.com/".
+	AndroidBaseSongUrl  string
+	AndroidBaseCoverUrl string
 }
 
 // TODO: This is swiped from https://code.google.com/p/go/source/detail?r=5e03333d2dcf.
@@ -132,6 +137,7 @@ func checkRequest(c appengine.Context, w http.ResponseWriter, r *http.Request, m
 	if !allowed {
 		if len(username) == 0 && redirectToLogin {
 			loginUrl, _ := user.LoginURL(c, "/")
+			c.Debugf("Unauthenticated request for %v from %v; redirecting to login", r.URL.String(), username, r.RemoteAddr)
 			http.Redirect(w, r, loginUrl, http.StatusFound)
 		} else {
 			c.Debugf("Unauthorized request for %v from %q at %v", r.URL.String(), username, r.RemoteAddr)
@@ -410,7 +416,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	songs, err := doQuery(c, q, cfg.BaseSongUrl, cfg.BaseCoverUrl)
+	songs, err := doQuery(c, q, cfg.WebBaseSongUrl, cfg.WebBaseCoverUrl)
 	if err != nil {
 		c.Errorf("Unable to query songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -461,6 +467,7 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 
 func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
+	c.Debugf("Got request: %v", r.URL.String())
 	if !checkRequest(c, w, r, "POST", false) {
 		return
 	}
@@ -504,7 +511,7 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	songs, cursor, err := dumpSongsForAndroid(c, minLastModified, max, r.FormValue("cursor"), cfg.BaseSongUrl, cfg.BaseCoverUrl)
+	songs, cursor, err := dumpSongsForAndroid(c, minLastModified, max, r.FormValue("cursor"), cfg.AndroidBaseSongUrl, cfg.AndroidBaseCoverUrl)
 	if err != nil {
 		c.Errorf("Unable to get songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
