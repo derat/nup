@@ -39,6 +39,9 @@ function Player(playlistWindow) {
   // Song that was playing when the update div was opened.
   this.updateSong = null;
 
+  // Rating set in the update div.
+  this.updatedRating = -1.0;
+
   this.audio = $('audio');
   this.favicon = $('favicon');
   this.coverImage = $('coverImage');
@@ -53,7 +56,7 @@ function Player(playlistWindow) {
   this.playPauseButton = $('playPauseButton');
   this.updateDiv = $('updateDiv');
   this.updateCloseImage = $('updateCloseImage');
-  this.ratingRange = $('ratingRange');
+  this.ratingSpan = $('ratingSpan');
   this.ratingSpan = $('ratingSpan');
   this.tagTextarea = $('tagTextarea');
   this.tagSuggestionsDiv = $('tagSuggestionsDiv');
@@ -71,9 +74,7 @@ function Player(playlistWindow) {
   this.nextButton.addEventListener('click', this.cycleTrack.bind(this, 1), false);
   this.playPauseButton.addEventListener('click', this.togglePause.bind(this), false);
   this.updateCloseImage.addEventListener('click', this.hideUpdateDiv.bind(this, true), false);
-
-  this.ratingRange.addEventListener('change', this.handleRatingRangeChanged.bind(this), false);
-  this.ratingRange.addEventListener('keydown', this.handleRatingRangeKeyDown.bind(this), false);
+  this.ratingSpan.addEventListener('keydown', this.handleRatingSpanKeyDown.bind(this), false);
 
   this.tagTextarea.addEventListener('keydown', this.handleTagTextareaKeyDown.bind(this), false);
   this.tagTextarea.addEventListener('focus', this.handleTagTextareaFocus.bind(this), false);
@@ -217,7 +218,7 @@ Player.prototype.updateCoverTitleAttribute = function() {
 
 Player.prototype.updateRatingOverlay = function() {
   var song = this.getCurrentSong();
-  this.ratingOverlayDiv.innerText = (song && song.rating > 0.0) ? this.getRatingString(song.rating, false, false) : '';
+  this.ratingOverlayDiv.innerText = (song && song.rating >= 0.0) ? this.getRatingString(song.rating, false, false) : '';
 };
 
 Player.prototype.getRatingString = function(rating, withLabel, includeEmpty) {
@@ -225,8 +226,8 @@ Player.prototype.getRatingString = function(rating, withLabel, includeEmpty) {
     return "Unrated";
 
   ratingString = withLabel ? 'Rating: ' : '';
-  var numStars = Math.round(rating * 4);
-  for (var i = 1; i <= 4; ++i) {
+  var numStars = this.ratingToNumStars(rating);
+  for (var i = 1; i <= 5; ++i) {
     if (i <= numStars)
       ratingString += "\u2605";
     else if (includeEmpty)
@@ -334,7 +335,7 @@ Player.prototype.showUpdateDiv = function() {
   if (this.updateSong)
     return true;
 
-  this.setRating(song.rating < 0 ? -0.25 : song.rating);
+  this.setRating(song.rating);
   this.tagTextarea.value = song.tags.sort().join(' ');
   this.updateDiv.style.display = 'block';
   this.updateSong = song;
@@ -343,7 +344,7 @@ Player.prototype.showUpdateDiv = function() {
 
 Player.prototype.hideUpdateDiv = function(saveChanges) {
   this.updateDiv.style.display = 'none';
-  this.ratingRange.blur();
+  this.ratingSpan.blur();
   this.tagTextarea.blur();
 
   var song = this.updateSong;
@@ -352,10 +353,7 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
   if (!song || !saveChanges)
     return;
 
-  var newRating = this.ratingRange.value;
-  if (newRating < 0)
-    newRating = -1.0;
-  var ratingChanged = newRating != song.rating;
+  var ratingChanged = this.updatedRating != song.rating;
 
   var newRawTags = this.tagTextarea.value.trim().split(/\s+/);
   var newTags = [];
@@ -374,7 +372,7 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
 
   var url = 'rate_and_tag?songId=' + encodeURIComponent(song.songId);
   if (ratingChanged)
-    url += '&rating=' + encodeURIComponent(newRating);
+    url += '&rating=' + encodeURIComponent(this.updatedRating);
   if (tagsChanged)
     url += '&tags=' + encodeURIComponent(newTags.join(' '));
   console.log("Rating/tagging track: " + url);
@@ -382,7 +380,7 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
   req.open('POST', url, true);
   req.send();
 
-  song.rating = newRating;
+  song.rating = this.updatedRating;
   song.tags = newTags;
 
   this.updateCoverTitleAttribute();
@@ -390,31 +388,36 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
     this.updateRatingOverlay();
 };
 
-Player.prototype.handleRatingRangeChanged = function() {
-  while (this.ratingSpan.hasChildNodes())
-    this.ratingSpan.removeChild(this.ratingSpan.lastChild);
+Player.prototype.numStarsToRating = function(numStars) {
+  return (numStars <= 0) ? -1.0 : (Math.min(numStars, 5) - 1) / 4.0;
+};
 
-  var rating = this.ratingRange.value;
-  if (rating < 0) {
-    this.ratingSpan.innerText = "Unrated";
-    return;
+Player.prototype.ratingToNumStars = function(rating) {
+  return (rating < 0.0) ? 0 : 1 + Math.round(Math.min(rating, 1.0) * 4.0);
+};
+
+Player.prototype.setRating = function(rating) {
+  this.updatedRating = rating;
+
+  // Initialize the stars the first time we show them.
+  if (!this.ratingSpan.hasChildNodes()) {
+    for (var i = 1; i <= 5; ++i) {
+      var anchor = document.createElement('a');
+      anchor.addEventListener('click', this.setRating.bind(this, this.numStarsToRating(i)), false);
+      anchor.className = 'star';
+      this.ratingSpan.appendChild(anchor);
+    }
   }
 
-  this.ratingSpan.appendChild(document.createTextNode('Rating: '));
-  var numStars = Math.round(rating * 4);
-  for (var i = 1; i <= 4; ++i) {
-    var anchor = document.createElement('a');
-    anchor.innerText = (i <= numStars) ? "\u2605" : "\u2606";
-    anchor.addEventListener('click', this.setRating.bind(this, i / 4.0), false);
-    anchor.className = 'star';
-    this.ratingSpan.appendChild(anchor);
-  }
+  var numStars = this.ratingToNumStars(rating);
+  for (var i = 1; i <= 5; ++i)
+    this.ratingSpan.childNodes[i-1].innerText = (i <= numStars) ? "\u2605" : "\u2606";
 };
 
 Player.prototype.processAccelerator = function(e) {
   if (e.altKey && e.keyCode == KeyCodes.R) {
     if (this.showUpdateDiv())
-      this.ratingRange.focus();
+      this.ratingSpan.focus();
     return true;
   }
 
@@ -538,14 +541,15 @@ Player.prototype.handleTagTextareaBlur = function(e) {
   this.hideTagSuggestions();
 };
 
-Player.prototype.setRating = function(rating) {
-  this.ratingRange.value = rating;
-  this.handleRatingRangeChanged();
-};
-
-Player.prototype.handleRatingRangeKeyDown = function(e) {
-  if (e.keyCode >= KeyCodes.ZERO && e.keyCode <= KeyCodes.FOUR) {
-    this.setRating((e.keyCode - KeyCodes.ZERO) * 0.25);
+Player.prototype.handleRatingSpanKeyDown = function(e) {
+  if (e.keyCode >= KeyCodes.ZERO && e.keyCode <= KeyCodes.FIVE) {
+    this.setRating(this.numStarsToRating(e.keyCode - KeyCodes.ZERO));
+    e.preventDefault();
+    e.stopPropagation();
+  } else if (e.keyCode == KeyCodes.LEFT || e.keyCode == KeyCodes.RIGHT) {
+    var oldStars = this.ratingToNumStars(this.updatedRating);
+    var newStars = oldStars + (e.keyCode == KeyCodes.LEFT ? -1 : 1);
+    this.setRating(this.numStarsToRating(newStars));
     e.preventDefault();
     e.stopPropagation();
   }

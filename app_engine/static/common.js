@@ -37,5 +37,5 @@ var KeyCodes = {
   T:      84,
 
   ZERO:   48,
-  FOUR:   52
+  FIVE:   53
 };

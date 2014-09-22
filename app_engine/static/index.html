@@ -38,8 +38,7 @@
     <div id="updateDiv">
       <img id="updateCloseImage" src="images/update_close.png">
       <div id="ratingDiv">
-        <input id="ratingRange" type="range" min="-0.25" max="1" step="0.25">
-        <span id="ratingSpan">Unrated</span>
+        Rating: <span id="ratingSpan" tabindex="0"></span>
       </div>
       <textarea id="tagTextarea"></textarea>
       <div id="tagSuggestionsDiv"></div>
@@ -113,11 +112,11 @@
             <input id="unratedCheckbox" type="checkbox" value="unrated"></input>
             <label for="minRatingSelect">Min rating</label>
             <select id="minRatingSelect">
-              <option value="0.00">☆</option>
-              <option value="0.25">★</option>
-              <option value="0.50">★★</option>
-              <option value="0.75">★★★</option>
-              <option value="1.00">★★★★</option>
+              <option value="0.00">★</option>
+              <option value="0.25">★★</option>
+              <option value="0.50">★★★</option>
+              <option value="0.75">★★★★</option>
+              <option value="1.00">★★★★★</option>
             </select>
           </td>
         </tr>
