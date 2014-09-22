@@ -66,56 +66,102 @@ function Playlist(player) {
   this.appendButton.addEventListener('click', this.enqueueSearchResults.bind(this, false /* clearFirst */, false /* afterCurrent */), false);
   this.insertButton.addEventListener('click', this.enqueueSearchResults.bind(this, false, true), false);
   this.replaceButton.addEventListener('click', this.enqueueSearchResults.bind(this, true, false), false);
-  this.searchResultsCheckbox.addEventListener('click', this.handleSearchResultsCheckboxClicked.bind(this, -1), false);
+  this.searchResultsCheckbox.addEventListener('click', this.handleSearchResultsCheckboxClicked.bind(this, this.searchResultsCheckbox), false);
 
   this.refreshSongTable(this.playlistTable, this.player.songs);
   this.handleSongChange(this.player.currentIndex);
 };
 
-// Update |table| to contain |songs|.
-Playlist.prototype.refreshSongTable = function(table, songs) {
-  while (table.rows.length > 1)
-    table.deleteRow(-1);
+// Callback for the artist name being clicked in |row|.
+Playlist.prototype.selectSongTableRowArtist = function(row) {
+  this.resetSearchForm(row.song.artist, null, false);
+};
 
+// Callback for the album name being clicked in |row|.
+Playlist.prototype.selectSongTableRowAlbum = function(row) {
+  this.resetSearchForm(null, row.song.album, false);
+};
+
+// Initialize newly-created |row| to contain song data.
+Playlist.prototype.initSongTableRow = function(row, hasCheckbox) {
+  // Checkbox.
+  if (hasCheckbox) {
+    var cell = row.insertCell(-1);
+    cell.className = 'checkbox';
+    var checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = 'checked';
+    checkbox.addEventListener('click', this.handleSearchResultsCheckboxClicked.bind(this, checkbox), false);
+    cell.appendChild(checkbox);
+  }
+
+  // Artist.
+  var anchor = document.createElement('a');
+  anchor.addEventListener('click', this.selectSongTableRowArtist.bind(this, row), false);
+  row.insertCell(-1).appendChild(anchor);
+
+  // Title.
+  row.insertCell(-1);
+
+  // Album.
+  var anchor = document.createElement('a');
+  anchor.addEventListener('click', this.selectSongTableRowAlbum.bind(this, row), false);
+  row.insertCell(-1).appendChild(anchor);
+
+  // Time.
+  row.insertCell(-1).className = 'time';
+};
+
+// Update |row| to display data about |song|.
+Playlist.prototype.updateSongTableRow = function(row, song) {
+  row.song = song;
+
+  var updateCell = function(cell, text, updateChild) {
+    (updateChild ? cell.childNodes[0] : cell).innerText = text;
+    updateTitleAttributeForTruncation(cell, text);
+  };
+
+  // Skip the checkbox if present.
+  var artistCellIndex = (row.cells.length) == 5 ? 1 : 0;
+  updateCell(row.cells[artistCellIndex], song.artist, true);
+  updateCell(row.cells[artistCellIndex+1], song.title, false);
+  updateCell(row.cells[artistCellIndex+2], song.album, true);
+  updateCell(row.cells[artistCellIndex+3], formatTime(parseFloat(song.length)), false);
+};
+
+// Update |table| to contain |newSongs|.
+// Try to be smart about not doing any more work than necessary.
+Playlist.prototype.refreshSongTable = function(table, newSongs) {
+  // The first row of the table contains a header; use it to determine if there are checkboxes.
   var hasCheckboxes = table.rows[0].cells.length == 5;
-  for (var i = 0; i < songs.length; i++) {
-    var song = songs[i];
-    var row = table.insertRow(-1);
-    row.song = song;
 
-    if (hasCheckboxes) {
-      var cell = row.insertCell(-1);
-      cell.className = 'checkbox';
-      var checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.checked = 'checked';
-      checkbox.addEventListener('click', this.handleSearchResultsCheckboxClicked.bind(this, i), false);
-      cell.appendChild(checkbox);
-    }
+  var oldSongs = [];
+  for (var i = 1; i < table.rows.length; i++)  // Start at 1 to skip the header.
+    oldSongs.push(table.rows[i].song);
 
-    var cell = row.insertCell(-1);
-    cell.className = 'artist';
-    var anchor = document.createElement('a');
-    anchor.innerText = song.artist;
-    anchor.addEventListener('click', this.resetSearchForm.bind(this, song.artist, null, false), false);
-    cell.appendChild(anchor);
-    updateTitleAttributeForTruncation(cell, song.artist);
+  // Walk forward from the beginning and backward from the end to look for common runs of songs.
+  var minLength = Math.min(oldSongs.length, newSongs.length);
+  var startMatchLength = 0, endMatchLength = 0;
+  for (var i = 0; i < minLength && oldSongs[i].songId == newSongs[i].songId; i++)
+    startMatchLength++;
+  for (var i = 0; i < (minLength - startMatchLength) && oldSongs[oldSongs.length-i-1].songId == newSongs[newSongs.length-i-1].songId; i++)
+    endMatchLength++;
 
-    var cell = row.insertCell(-1);
-    cell.innerText = song.title;
-    cell.className = 'title';
-    updateTitleAttributeForTruncation(cell, song.title);
+  // Figure out how many songs in the middle differ.
+  var numOldMiddleSongs = oldSongs.length - startMatchLength - endMatchLength;
+  var numNewMiddleSongs = newSongs.length - startMatchLength - endMatchLength;
 
-    var cell = row.insertCell(-1);
-    var anchor = document.createElement('a');
-    anchor.innerText = song.album;
-    anchor.addEventListener('click', this.resetSearchForm.bind(this, null, song.album, false), false);
-    cell.appendChild(anchor);
-    updateTitleAttributeForTruncation(cell, song.album);
+  // Get to the correct number of rows.
+  for (var i = numOldMiddleSongs; i < numNewMiddleSongs; i++)
+    this.initSongTableRow(table.insertRow(startMatchLength+1), hasCheckboxes);
+  for (var i = numOldMiddleSongs; i > numNewMiddleSongs; i--)
+    table.deleteRow(startMatchLength+1);
 
-    var cell = row.insertCell(-1);
-    cell.innerText = formatTime(parseFloat(song.length));
-    cell.className = 'time';
+  // Update all of the rows in the middle to contain the correct data.
+  for (var i = 0; i < numNewMiddleSongs; i++) {
+    var song = newSongs[startMatchLength + i];
+    var row = table.rows[startMatchLength + i + 1];
+    this.updateSongTableRow(row, song);
   }
 };
 
@@ -157,26 +203,31 @@ Playlist.prototype.submitQuery = function(appendToQueue) {
   this.request = new XMLHttpRequest();
   this.request.onreadystatechange = function() {
     if (this.request.readyState == 4) {
+      var songs = [];
+
       try {
         var req = this.request;
         if (req.status && req.status == 200) {
           if (req.responseText) {
-            var songs = eval('(' + req.responseText + ')');
+            songs = eval('(' + req.responseText + ')');
             console.log('Got response with ' + songs.length + ' song(s)');
-
-            this.refreshSongTable(this.searchResultsTable, songs);
-            var checkbox = this.searchResultsCheckbox;
-            checkbox.checked = 'checked';
-            checkbox.className = 'opaque';
-            this.numSelectedSearchResults = songs.length;
-            this.searchResults = songs;
-            if (appendToQueue)
-              this.enqueueSearchResults(true, true);
+          } else {
+            console.log('No response text');
           }
         }
       } catch (e) {
         console.log('Caught exception while waiting for reply: ' + e);
       }
+
+      this.refreshSongTable(this.searchResultsTable, songs);
+      var checkbox = this.searchResultsCheckbox;
+      checkbox.checked = 'checked';
+      checkbox.className = 'opaque';
+      this.numSelectedSearchResults = songs.length;
+      this.searchResults = songs;
+      if (appendToQueue)
+        this.enqueueSearchResults(true, true);
+
       this.waitingDiv.style.display = 'none';
       this.request = null;
     }
@@ -262,21 +313,17 @@ Playlist.prototype.handleFormKeyDown = function(e) {
 };
 
 // Handle one of the checkboxes in the search results being clicked.
-// |index| is -1 for the checkbox in the heading and the 0-indexed position
-// of the search result otherwise.
-Playlist.prototype.handleSearchResultsCheckboxClicked = function(index) {
+Playlist.prototype.handleSearchResultsCheckboxClicked = function(checkbox) {
   var table = this.searchResultsTable;
   var headingCheckbox = this.searchResultsCheckbox;
+  var selected = checkbox.checked;
 
-  if (index == -1) {
-    var selected = headingCheckbox.checked;
+  if (checkbox == headingCheckbox) {
     for (var i = 0; i < this.searchResults.length; ++i)
       table.rows[i+1].cells[0].children[0].checked = selected ? 'checked' : null;
     this.numSelectedSearchResults = selected ? this.searchResults.length : 0;
     headingCheckbox.className = 'opaque';
-
   } else {
-    var selected = table.rows[index+1].cells[0].children[0].checked;
     if (selected)
       this.numSelectedSearchResults++;
     else
