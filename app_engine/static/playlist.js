@@ -135,6 +135,10 @@ Playlist.prototype.refreshSongTable = function(table, newSongs) {
   for (var i = 0; i < (minLength - startMatchLength) && oldSongs[oldSongs.length-i-1].songId == newSongs[newSongs.length-i-1].songId; i++)
     endMatchLength++;
 
+  // Clear any row highlighting that's already present.
+  if (this.currentIndex >= startMatchLength && this.currentIndex < oldSongs.length)
+    table.rows[this.currentIndex+1].className = null;
+
   // Figure out how many songs in the middle differ.
   var numOldMiddleSongs = oldSongs.length - startMatchLength - endMatchLength;
   var numNewMiddleSongs = newSongs.length - startMatchLength - endMatchLength;
