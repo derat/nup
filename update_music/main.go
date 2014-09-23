@@ -114,16 +114,17 @@ func main() {
 				log.Fatalf("Failed to find cover for %v (%v-%v)", s.Filename, s.Artist, s.Album)
 			}
 
-			if *dryRun {
-				log.Print(s)
-			} else {
-				log.Print("Sending ", s.Filename)
-				updateChan <- s
-			}
+			log.Print("Sending ", s.Filename)
+			updateChan <- s
 		}
 	}()
 
-	if !*dryRun {
+	if *dryRun {
+		e := json.NewEncoder(os.Stdout)
+		for i := 0; i < numSongs; i++ {
+			e.Encode(<-updateChan)
+		}
+	} else {
 		if err = updateSongs(cfg, updateChan, numSongs, replaceUserData); err != nil {
 			log.Fatal(err)
 		}

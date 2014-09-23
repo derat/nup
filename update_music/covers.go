@@ -39,7 +39,10 @@ func newCoverFinder(coverDir string) (*coverFinder, error) {
 		// following a hyphen to be a potential album.
 		cf.artistAlbumMap[base] = fn
 		for i := 1; i < len(parts); i++ {
-			cf.albumMap[strings.Join(parts[i:], "-")] = fn
+			album := strings.Join(parts[i:], "-")
+			if len(album) > 0 {
+				cf.albumMap[strings.Join(parts[i:], "-")] = fn
+			}
 		}
 	}
 	return cf, nil
