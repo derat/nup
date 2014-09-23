@@ -128,7 +128,7 @@ func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLeng
 }
 
 func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan SongAndError) {
-	s := &nup.Song{}
+	s := &nup.Song{Filename: relPath}
 	var err error
 	defer func() { updateChan <- SongAndError{s, err} }()
 
@@ -144,7 +144,6 @@ func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan SongA
 	if err != nil {
 		return
 	}
-	s.Filename = relPath
 	s.Artist = tag.Artist()
 	s.Title = tag.Title()
 	s.Album = tag.Album()
@@ -165,6 +164,16 @@ func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan SongA
 		return
 	}
 	s.Length = float64(lengthMs) / 1000
+}
+
+func getSongByPath(musicDir, relPath string, updateChan chan SongAndError) {
+	p := filepath.Join(musicDir, relPath)
+	fi, err := os.Stat(p)
+	if err != nil {
+		updateChan <- SongAndError{nil, err}
+		return
+	}
+	readFileDetails(p, relPath, fi, updateChan)
 }
 
 func scanForUpdatedSongs(musicDir, forceGlob string, lastUpdateTime time.Time, updateChan chan SongAndError, logProgress bool) (numUpdates int, err error) {

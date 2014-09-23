@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"log"
@@ -57,12 +58,14 @@ func main() {
 	importMinId := flag.Int64("import-min-id", 0, "Starting ID for --import-db (for resuming after failure)")
 	limit := flag.Int("limit", 0, "If positive, limits the number of songs to update (for testing)")
 	requireCovers := flag.Bool("require-covers", false, "Die if cover images aren't found for any songs")
+	songPathsFile := flag.String("song-paths-file", "", "Path to a file containing one relative path per line for songs to force updating")
 	flag.Parse()
 
 	var cfg Config
 	if err := cloud.ReadJson(*configFile, &cfg); err != nil {
 		log.Fatal("Unable to read config file: ", err)
 	}
+
 	log.Printf("Loading covers from %v", cfg.CoverDir)
 	cf, err := newCoverFinder(cfg.CoverDir)
 	if err != nil {
@@ -84,13 +87,28 @@ func main() {
 		if len(cfg.MusicDir) == 0 {
 			log.Fatal("MusicDir not set in config")
 		}
-		lastUpdateTime, err := getLastUpdateTime(cfg.LastUpdateTimeFile)
-		if err != nil {
-			log.Fatalf("Unable to get last update time: ", err)
-		}
-		log.Printf("Scanning for songs in %v updated since %v", cfg.MusicDir, lastUpdateTime.Local())
-		if numSongs, err = scanForUpdatedSongs(cfg.MusicDir, *forceGlob, lastUpdateTime, readChan, true); err != nil {
-			log.Fatal(err)
+
+		if len(*songPathsFile) > 0 {
+			f, err := os.Open(*songPathsFile)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer f.Close()
+
+			scanner := bufio.NewScanner(f)
+			for scanner.Scan() {
+				go func(relPath string) { getSongByPath(cfg.MusicDir, relPath, readChan) }(scanner.Text())
+				numSongs++
+			}
+		} else {
+			lastUpdateTime, err := getLastUpdateTime(cfg.LastUpdateTimeFile)
+			if err != nil {
+				log.Fatalf("Unable to get last update time: ", err)
+			}
+			log.Printf("Scanning for songs in %v updated since %v", cfg.MusicDir, lastUpdateTime.Local())
+			if numSongs, err = scanForUpdatedSongs(cfg.MusicDir, *forceGlob, lastUpdateTime, readChan, true); err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 
