@@ -23,21 +23,32 @@ const (
 	logProgressInterval = 100
 )
 
-func getId3FooterLength(f *os.File, fi os.FileInfo) (int64, error) {
+func readId3Footer(f *os.File, fi os.FileInfo) (length int64, artist, title, album string, err error) {
 	const (
-		length = 128
-		magic  = "TAG"
+		footerLength = 128
+		footerMagic  = "TAG"
+		titleLength  = 30
+		artistLength = 30
+		albumLength  = 30
+		// TODO: Add year (4 bytes), comment (30), and genre (1) if I ever care about them.
 	)
 
 	// Check for an ID3v1 footer.
-	buf := make([]byte, len(magic), len(magic))
-	if _, err := f.ReadAt(buf, fi.Size()-length); err != nil {
-		return 0, err
+	buf := make([]byte, footerLength)
+	if _, err := f.ReadAt(buf, fi.Size()-int64(len(buf))); err != nil {
+		return 0, "", "", "", err
 	}
-	if string(buf) == magic {
-		return length, nil
+
+	b := bytes.NewBuffer(buf)
+	if string(b.Next(len(footerMagic))) != footerMagic {
+		return 0, "", "", "", nil
 	}
-	return 0, nil
+
+	clean := func(b []byte) string { return string(bytes.TrimSpace(bytes.TrimRight(b, "\x00"))) }
+	title = clean(b.Next(titleLength))
+	artist = clean(b.Next(artistLength))
+	album = clean(b.Next(albumLength))
+	return footerLength, artist, title, album, nil
 }
 
 // computeAudioSha1 returns a SHA1 hash of the audio (i.e. non-metadata) portion of f.
@@ -139,27 +150,35 @@ func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan SongA
 	}
 	defer f.Close()
 
+	var footerLength int64
+	footerLength, s.Artist, s.Title, s.Album, err = readId3Footer(f, fi)
+	if err != nil {
+		return
+	}
+
+	var headerLength int64
 	var tag taglib.GenericTag
 	tag, err = taglib.Decode(f, fi.Size())
 	if err != nil {
-		return
+		// Tolerate missing ID3v2 tags if we got an artist and title from ID3v1.
+		if len(s.Artist) == 0 && len(s.Title) == 0 {
+			return
+		}
+		err = nil
+	} else {
+		s.Artist = tag.Artist()
+		s.Title = tag.Title()
+		s.Album = tag.Album()
+		s.Track = int(tag.Track())
+		s.Disc = int(tag.Disc())
+		headerLength = int64(tag.TagSize())
 	}
-	s.Artist = tag.Artist()
-	s.Title = tag.Title()
-	s.Album = tag.Album()
-	s.Track = int(tag.Track())
-	s.Disc = int(tag.Disc())
 
-	var footerLength int64
-	footerLength, err = getId3FooterLength(f, fi)
+	s.Sha1, err = computeAudioSha1(f, fi, headerLength, footerLength)
 	if err != nil {
 		return
 	}
-	s.Sha1, err = computeAudioSha1(f, fi, int64(tag.TagSize()), footerLength)
-	if err != nil {
-		return
-	}
-	lengthMs, err := computeAudioDurationMs(f, fi, int64(tag.TagSize()), footerLength)
+	lengthMs, err := computeAudioDurationMs(f, fi, headerLength, footerLength)
 	if err != nil {
 		return
 	}

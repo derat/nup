@@ -72,6 +72,10 @@ func TestScan(t *testing.T) {
 
 	scanAndCompareSongs(t, "force exact", dir, test.Song0sUpdated.Filename, updateTime, []nup.Song{test.Song0sUpdated})
 	scanAndCompareSongs(t, "force wildcard", dir, "foo/*", updateTime, []nup.Song{renamedSong1s})
+
+	updateTime = time.Now()
+	test.CopySongsToTempDir(dir, test.Id3v1Song.Filename)
+	scanAndCompareSongs(t, "id3v1", dir, "", updateTime, []nup.Song{test.Id3v1Song})
 }
 
 // TODO: Test errors, skipping bogus files, etc.

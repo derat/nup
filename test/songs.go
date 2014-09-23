@@ -54,6 +54,18 @@ var Song5s nup.Song = nup.Song{
 	Rating:   -1,
 }
 
+var Id3v1Song nup.Song = nup.Song{
+	Sha1:     "fefac74a1d5928316d7131747107c8a61b71ffe4",
+	Filename: "id3v1.mp3",
+	Artist:   "The Legacy Formats",
+	Title:    "Give It Up For ID3v1",
+	Album:    "UTF-8, Who Needs It?",
+	Track:    0,
+	Disc:     0,
+	Length:   0.026,
+	Rating:   -1,
+}
+
 var LegacySong1 nup.Song = nup.Song{
 	Sha1:     "1977c91fea860245695dcceea0805c14cede7559",
 	Filename: "arovane/atol_scrap/thaem_nue.mp3",
