@@ -76,6 +76,7 @@ func main() {
 	readChan := make(chan SongAndError)
 	startTime := time.Now()
 	replaceUserData := false
+	didFullScan := false
 
 	if len(*importDb) > 0 {
 		log.Printf("Reading songs from %v", *importDb)
@@ -109,6 +110,7 @@ func main() {
 			if numSongs, err = scanForUpdatedSongs(cfg.MusicDir, *forceGlob, lastUpdateTime, readChan, true); err != nil {
 				log.Fatal(err)
 			}
+			didFullScan = true
 		}
 	}
 
@@ -146,7 +148,7 @@ func main() {
 		if err = updateSongs(cfg, updateChan, numSongs, replaceUserData); err != nil {
 			log.Fatal(err)
 		}
-		if len(*importDb) == 0 && len(*forceGlob) == 0 {
+		if didFullScan {
 			if err = setLastUpdateTime(cfg.LastUpdateTimeFile, startTime); err != nil {
 				log.Fatal("Failed setting last-update time: ", err)
 			}
