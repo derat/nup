@@ -1,0 +1,45 @@
+table.songTable {
+  border-collapse: collapse;
+  padding-right: 10px;
+  table-layout: fixed;
+  width: 100%;
+}
+table.songTable th {
+  text-align: left;
+  padding-right: 10px;
+  border-bottom: solid 1px #ccc;
+  padding-left: 8px;
+  background-color: #f5f5f5;
+  -webkit-user-select: none;
+  cursor: default;
+}
+table.songTable td {
+  padding-left: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+table.songTable td a {
+  color: black;
+  text-decoration: none;
+  cursor: pointer;
+}
+table.songTable td a:hover {
+  color: #666;
+  text-decoration: underline;
+}
+table.songTable td.checkbox, table.songTable th.checkbox {
+  width: 1px;
+}
+table.songTable td.time, table.songTable th.artist {
+  padding-left: 6px;
+}
+table.songTable td.time, table.songTable th.time {
+  width: 3em;
+  text-align: right;
+  padding-right: 6px;
+  text-overflow: clip;
+}
+table.songTable tr.playing {
+  background-color: #bde;
+}

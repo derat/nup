@@ -13,8 +13,8 @@ function Playlist(player) {
   this.playlistTable = new SongTable(
       $('playlistTable'),
       false /* useCheckboxes */,
-      function(playlist, artist) { playlist.resetSearchForm(artist, null, false); }.bind(this),
-      function(playlist, album) { playlist.resetSearchForm(null, album, false); }.bind(this));
+      function(playlist, artist) { playlist.resetSearchForm(artist, null, false); }.bind(this, this),
+      function(playlist, album) { playlist.resetSearchForm(null, album, false); }.bind(this, this));
 
   this.rightPane = $('rightPane');
   this.keywordsInput = $('keywordsInput');
@@ -40,8 +40,8 @@ function Playlist(player) {
   this.searchResultsTable = new SongTable(
       $('searchResultsTable'),
       true /* useCheckboxes */,
-      function(playlist, artist) { playlist.resetSearchForm(artist, null, false); }.bind(this),
-      function(playlist, album) { playlist.resetSearchForm(null, album, false); }.bind(this));
+      function(playlist, artist) { playlist.resetSearchForm(artist, null, false); }.bind(this, this),
+      function(playlist, album) { playlist.resetSearchForm(null, album, false); }.bind(this, this));
 
   this.waitingDiv = $('waitingDiv');
 
