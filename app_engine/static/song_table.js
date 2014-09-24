@@ -1,7 +1,7 @@
 // Copyright 2014 Daniel Erat.
 // All rights reserved.
 
-function SongTable(table, useCheckboxes, artistClickedCallback, albumClickedCallback) {
+function SongTable(table, useCheckboxes, artistClickedCallback, albumClickedCallback, checkedSongsChangedCallback) {
   this.table_ = table;
   this.useCheckboxes_ = useCheckboxes;
   this.artistClickedCallback_ = artistClickedCallback;
@@ -10,6 +10,7 @@ function SongTable(table, useCheckboxes, artistClickedCallback, albumClickedCall
   if (useCheckboxes) {
     this.headingCheckbox_ = this.table_.rows[0].cells[0].childNodes[0];
     this.headingCheckbox_.addEventListener('click', this.handleCheckboxClicked_.bind(this, this.headingCheckbox_), false);
+    this.checkedSongsChangedCallback_ = checkedSongsChangedCallback;
     this.numCheckedSongs_ = 0;
   }
 }
@@ -59,11 +60,7 @@ SongTable.prototype.updateSongs = function(newSongs) {
   for (var i = 0; i < (minLength - startMatchLength) && oldSongs[oldSongs.length-i-1].songId == newSongs[newSongs.length-i-1].songId; i++)
     endMatchLength++;
 
-  /* FIXME
-  // Clear any row highlighting that's already present.
-  if (this.currentIndex >= startMatchLength && this.currentIndex < oldSongs.length)
-    table.rows[this.currentIndex+1].className = null;
-    */
+  // TODO: Clear highlighting and checkboxes?
 
   // Figure out how many songs in the middle differ.
   var numOldMiddleSongs = oldSongs.length - startMatchLength - endMatchLength;
@@ -162,4 +159,7 @@ SongTable.prototype.handleCheckboxClicked_ = function(checkbox) {
       head.className = (this.numCheckedSongs_ == this.getNumSongs()) ? 'opaque' : 'transparent';
     }
   }
+
+  if (this.checkedSongsChangedCallback_)
+    this.checkedSongsChangedCallback_(this.numCheckedSongs_);
 };

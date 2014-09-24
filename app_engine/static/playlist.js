@@ -41,7 +41,8 @@ function Playlist(player) {
       $('searchResultsTable'),
       true /* useCheckboxes */,
       function(playlist, artist) { playlist.resetSearchForm(artist, null, false); }.bind(this, this),
-      function(playlist, album) { playlist.resetSearchForm(null, album, false); }.bind(this, this));
+      function(playlist, album) { playlist.resetSearchForm(null, album, false); }.bind(this, this),
+      this.handleCheckedSongsChanged_.bind(this));
 
   this.waitingDiv = $('waitingDiv');
 
@@ -242,4 +243,8 @@ Playlist.prototype.handleSongChange = function(index) {
   } else {
     this.currentIndex = -1;
   }
+};
+
+Playlist.prototype.handleCheckedSongsChanged_ = function(numChecked) {
+  this.appendButton.disabled = this.insertButton.disabled = this.replaceButton.disabled = (numChecked == 0);
 };
