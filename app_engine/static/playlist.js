@@ -62,6 +62,8 @@ function Playlist(player) {
   this.insertButton.addEventListener('click', this.enqueueSearchResults.bind(this, false, true), false);
   this.replaceButton.addEventListener('click', this.enqueueSearchResults.bind(this, true, false), false);
 
+  document.body.addEventListener('keydown', this.handleBodyKeyDown_.bind(this), false);
+
   this.playlistTable.updateSongs(this.player.songs);
   this.handleSongChange(this.player.currentIndex);
 };
@@ -224,7 +226,8 @@ Playlist.prototype.handleFormKeyDown = function(e) {
     this.submitQuery(false);
   } else if (e.keyCode == KeyCodes.SPACE ||
              e.keyCode == KeyCodes.LEFT ||
-             e.keyCode == KeyCodes.RIGHT) {
+             e.keyCode == KeyCodes.RIGHT ||
+             e.keyCode == KeyCodes.SLASH) {
     e.stopPropagation();
   }
 };
@@ -248,3 +251,19 @@ Playlist.prototype.handleSongChange = function(index) {
 Playlist.prototype.handleCheckedSongsChanged_ = function(numChecked) {
   this.appendButton.disabled = this.insertButton.disabled = this.replaceButton.disabled = (numChecked == 0);
 };
+
+Playlist.prototype.handleBodyKeyDown_ = function(e) {
+  if (this.processAccelerator_(e)) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+};
+
+Playlist.prototype.processAccelerator_ = function(e) {
+  if (e.keyCode == KeyCodes.SLASH) {
+    this.keywordsInput.focus();
+    return true;
+  }
+
+  return false;
+}

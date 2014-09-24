@@ -23,6 +23,11 @@ indexes:
 
 - kind: Song
   properties:
+  - name: Keywords
+  - name: Rating
+
+- kind: Song
+  properties:
   - name: Tags
   - name: FirstStartTime
 

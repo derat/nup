@@ -24,18 +24,19 @@ function updateTitleAttributeForTruncation(element, text) {
 }
 
 var KeyCodes = {
-  ENTER:  13,
-  ESCAPE: 27,
-  LEFT:   37,
-  RIGHT:  39,
-  SPACE:  32,
-  TAB:     9,
+  ENTER:   13,
+  ESCAPE:  27,
+  LEFT:    37,
+  RIGHT:   39,
+  SPACE:   32,
+  TAB:      9,
+  SLASH:  191,
 
-  N:      78,
-  P:      80,
-  R:      82,
-  T:      84,
+  N:       78,
+  P:       80,
+  R:       82,
+  T:       84,
 
-  ZERO:   48,
-  FIVE:   53
+  ZERO:    48,
+  FIVE:    53
 };
