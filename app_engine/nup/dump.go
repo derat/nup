@@ -106,6 +106,10 @@ func dumpPlays(c appengine.Context, max int64, cursor string) (plays []nup.PlayD
 }
 
 func dumpSongsForAndroid(c appengine.Context, minLastModified time.Time, max int64, cursor, baseSongUrl, baseCoverUrl string) (songs []nup.Song, nextCursor string, err error) {
+	if len(baseSongUrl) == 0 || len(baseCoverUrl) == 0 {
+		return nil, "", fmt.Errorf("Invalid base song (%s) or cover (%s) URL for Android", baseSongUrl, baseCoverUrl)
+	}
+
 	songs = make([]nup.Song, max)
 	songPtrs := make([]interface{}, max)
 	for i := range songs {
