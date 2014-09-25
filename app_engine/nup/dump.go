@@ -4,6 +4,7 @@ import (
 	"appengine"
 	"appengine/datastore"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 
 const (
 	keyProperty = "__key__"
+
+	maxPlaysForSongDump = 256
 )
 
 func dumpEntities(c appengine.Context, q *datastore.Query, cursor string, entities []interface{}) (ids, parentIds []int64, nextCursor string, err error) {
@@ -126,4 +129,29 @@ func dumpSongsForAndroid(c appengine.Context, minLastModified time.Time, max int
 		prepareSongForSearchResult(&songs[i], id, baseSongUrl, baseCoverUrl)
 	}
 	return songs, nextCursor, nil
+}
+
+func dumpSingleSong(c appengine.Context, id int64) (*nup.Song, error) {
+	sk := datastore.NewKey(c, songKind, "", id, nil)
+	s := &nup.Song{}
+	if err := datastore.Get(c, sk, s); err != nil {
+		return nil, err
+	}
+	s.SongId = strconv.FormatInt(id, 10)
+
+	plays := make([]nup.PlayDump, maxPlaysForSongDump)
+	playPtrs := make([]interface{}, maxPlaysForSongDump)
+	for i := range plays {
+		playPtrs[i] = &plays[i].Play
+	}
+	pids, _, _, err := dumpEntities(c, datastore.NewQuery(playKind).Ancestor(sk), "", playPtrs)
+	if err != nil {
+		return nil, err
+	}
+	for i := range pids {
+		s.Plays = append(s.Plays, plays[i].Play)
+	}
+	sort.Sort(nup.PlayArray(s.Plays))
+
+	return s, nil
 }

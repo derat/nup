@@ -78,12 +78,6 @@ func (a SongArray) Len() int           { return len(a) }
 func (a SongArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a SongArray) Less(i, j int) bool { return a[i].Filename < a[j].Filename }
 
-type PlayArray []nup.Play
-
-func (a PlayArray) Len() int           { return len(a) }
-func (a PlayArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a PlayArray) Less(i, j int) bool { return a[i].StartTime.Before(a[j].StartTime) }
-
 func CompareSongs(expected, actual []nup.Song, compareOrder bool) error {
 	if !compareOrder {
 		sort.Sort(SongArray(expected))
@@ -97,7 +91,7 @@ func CompareSongs(expected, actual []nup.Song, compareOrder bool) error {
 			for j := range s.Plays {
 				s.Plays[j].StartTime = s.Plays[j].StartTime.UTC()
 			}
-			sort.Sort(PlayArray(s.Plays))
+			sort.Sort(nup.PlayArray(s.Plays))
 		}
 		b, err := json.Marshal(s)
 		if err != nil {

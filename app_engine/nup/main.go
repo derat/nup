@@ -3,6 +3,7 @@ package appengine
 import (
 	"appengine"
 	"appengine/user"
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -190,6 +191,7 @@ func init() {
 
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/clear", handleClear)
+	http.HandleFunc("/dump_song", handleDumpSong)
 	http.HandleFunc("/export", handleExport)
 	http.HandleFunc("/import", handleImport)
 	http.HandleFunc("/list_tags", handleListTags)
@@ -214,6 +216,35 @@ func handleClear(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeTextResponse(w, "ok")
+}
+
+func handleDumpSong(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	if !checkRequest(c, w, r, "GET", false) {
+		return
+	}
+
+	var id int64
+	if !parseIntParam(c, w, r, "id", &id) {
+		return
+	}
+	s, err := dumpSingleSong(c, id)
+	if err != nil {
+		c.Errorf("Dumping song %v failed: %v", id, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	b, err := json.Marshal(s)
+	if err != nil {
+		c.Errorf("Marshaling song %v failed: %v", id, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var out bytes.Buffer
+	json.Indent(&out, b, "", "  ")
+	w.Header().Set("Content-Type", "text/plain")
+	out.WriteTo(w)
 }
 
 func handleExport(w http.ResponseWriter, r *http.Request) {

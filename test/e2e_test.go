@@ -70,7 +70,7 @@ func doPlayTimeQueries(tt *testing.T, t *Tester, s *nup.Song, queryPrefix string
 	}
 
 	plays := s.Plays
-	sort.Sort(PlayArray(plays))
+	sort.Sort(nup.PlayArray(plays))
 
 	firstPlaySec := nup.TimeToSeconds(plays[0].StartTime)
 	beforeFirstPlay := strconv.FormatFloat(firstPlaySec-10, 'f', -1, 64)

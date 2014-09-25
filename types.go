@@ -83,6 +83,12 @@ type PlayDump struct {
 	Play Play `json:"play"`
 }
 
+type PlayArray []Play
+
+func (a PlayArray) Len() int           { return len(a) }
+func (a PlayArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a PlayArray) Less(i, j int) bool { return a[i].StartTime.Before(a[j].StartTime) }
+
 // ClientConfig holds configuration details shared across client binaries.
 type ClientConfig struct {
 	ServerUrl string
