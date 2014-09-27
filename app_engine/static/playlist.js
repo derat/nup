@@ -1,8 +1,8 @@
 // Copyright 2010 Daniel Erat.
 // All rights reserved.
 
-function initPlaylist(singleWindow) {
-  document.playlist = new Playlist(singleWindow ? document.player : window.opener.document.player);
+function initPlaylist() {
+  document.playlist = new Playlist(document.player);
 };
 
 function Playlist(player) {

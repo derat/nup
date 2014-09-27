@@ -1,13 +1,11 @@
 // Copyright 2010 Daniel Erat.
 // All rights reserved.
 
-function initPlayer(singleWindow) {
-  var player = document.player = new Player(singleWindow ? window : null);
-  if (!singleWindow)
-    player.openPlaylist();
+function initPlayer() {
+  document.player = new Player();
 };
 
-function Player(playlistWindow) {
+function Player() {
   this.songs = [];
 
   // Available tags.  Loaded from the server.
@@ -33,8 +31,6 @@ function Player(playlistWindow) {
 
   // Did we hit the end of the last song in the playlist?
   this.reachedEndOfSongs = false;
-
-  this.playlistWindow = playlistWindow;
 
   // Song that was playing when the update div was opened.
   this.updateSong = null;
@@ -68,8 +64,6 @@ function Player(playlistWindow) {
   this.audio.addEventListener('error', this.onError.bind(this), false);
 
   this.coverImage.addEventListener('click', this.showUpdateDiv.bind(this), false);
-  if (this.playlistButton)
-    this.playlistButton.addEventListener('click', this.openPlaylist.bind(this), false);
   this.prevButton.addEventListener('click', this.cycleTrack.bind(this, -1), false);
   this.nextButton.addEventListener('click', this.cycleTrack.bind(this, 1), false);
   this.playPauseButton.addEventListener('click', this.togglePause.bind(this), false);
@@ -82,11 +76,6 @@ function Player(playlistWindow) {
   this.tagTextarea.spellcheck = false;
 
   document.body.addEventListener('keydown', this.handleBodyKeyDown.bind(this), false);
-
-  window.onunload = function() {
-    if (this.playlistWindow && this.playlistWindow != window)
-      this.playlistWindow.close();
-  }.bind(this);
 
   var req = new XMLHttpRequest();
   req.open('GET', 'list_tags', true);
@@ -304,13 +293,8 @@ Player.prototype.onError = function(e) {
   console.log('got playback error: ' + error.code);
 };
 
-Player.prototype.openPlaylist = function(e) {
-  this.playlistWindow = window.open('playlist.html', 'playlist', '');
-};
-
 Player.prototype.notifyPlaylistAboutSongChange = function() {
-  if (this.playlistWindow && this.playlistWindow.document)
-    this.playlistWindow.document.playlist.handleSongChange(this.currentIndex);
+  document.playlist.handleSongChange(this.currentIndex);
 };
 
 Player.prototype.reportCurrentTrack = function() {
