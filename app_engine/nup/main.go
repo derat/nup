@@ -177,6 +177,9 @@ func init() {
 	if err := cloud.ReadJson(configPath, &cfg); err != nil {
 		panic(fmt.Sprintf("Unable to read %v: %v", configPath, err))
 	}
+	if len(cfg.SongBucket) == 0 || len(cfg.CoverBucket) == 0 {
+		panic(fmt.Sprintf("Invalid song bucket %q or cover bucket %q", cfg.SongBucket, cfg.CoverBucket))
+	}
 	if appengine.IsDevAppServer() {
 		cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, basicAuthInfo{test.TestUsername, test.TestPassword})
 	}
