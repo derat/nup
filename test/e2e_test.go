@@ -24,6 +24,7 @@ func setUpTest() *Tester {
 	t := newTester(server, binDir)
 	log.Printf("clearing all data on %v", server)
 	t.DoPost("clear", nil)
+	t.DoPost("flush_cache", nil)
 	return t
 }
 
@@ -281,6 +282,12 @@ func TestCaching(tt *testing.T) {
 	log.Print("updating and re-querying")
 	s.Artist = "The Artist Formerly Known As " + s.Artist
 	t.PostSongs([]nup.Song{s}, false)
+	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), false); err != nil {
+		tt.Error(err)
+	}
+
+	log.Print("flushing cache and re-querying")
+	t.DoPost("flush_cache", nil)
 	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), false); err != nil {
 		tt.Error(err)
 	}

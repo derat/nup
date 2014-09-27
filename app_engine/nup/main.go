@@ -2,6 +2,7 @@ package appengine
 
 import (
 	"appengine"
+	"appengine/memcache"
 	"appengine/user"
 	"bytes"
 	"encoding/base64"
@@ -190,6 +191,7 @@ func init() {
 	http.HandleFunc("/clear", handleClear)
 	http.HandleFunc("/dump_song", handleDumpSong)
 	http.HandleFunc("/export", handleExport)
+	http.HandleFunc("/flush_cache", handleFlushCache)
 	http.HandleFunc("/import", handleImport)
 	http.HandleFunc("/list_tags", handleListTags)
 	http.HandleFunc("/now_nsec", handleNowNsec)
@@ -309,6 +311,18 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+func handleFlushCache(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	if !checkRequest(c, w, r, "POST", false) {
+		return
+	}
+	if err := memcache.Flush(c); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeTextResponse(w, "ok")
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
