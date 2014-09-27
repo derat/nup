@@ -3,14 +3,17 @@ package test
 import (
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"erat.org/cloud"
 	"erat.org/nup"
 )
 
@@ -24,17 +27,32 @@ func setUpTest() *Tester {
 	return t
 }
 
-func compareQueryResults(expected, actual []nup.Song, compareOrder bool) error {
-	// Map from encoded path to original filename.
-	encodedPaths := make(map[string]string)
+// extractFilePathFromUrl extracts the (escaped for Cloud Storage but un-query-escaped) original file path from a URL.
+func extractFilePathFromUrl(s string) (string, error) {
+	u, err := url.Parse(s)
+	if err != nil {
+		return "", fmt.Errorf("unable to parse URL")
+	}
+	if u.Scheme != "https" {
+		return "", fmt.Errorf("non-HTTPS scheme %q", u.Scheme)
+	}
+	if u.Host == "storage.cloud.google.com" {
+		return regexp.MustCompile("^/[^/]+/").ReplaceAllLiteralString(u.Path, ""), nil
+	} else if strings.HasSuffix(u.Host, ".storage.googleapis.com") && len(u.Path) > 0 {
+		return u.Path[1:], nil
+	} else {
+		return "", fmt.Errorf("unrecognized URL")
+	}
+}
 
+func compareQueryResults(expected, actual []nup.Song, compareOrder bool) error {
 	expectedCleaned := make([]nup.Song, len(expected))
 	for i := range expected {
 		s := expected[i]
 		s.Sha1 = ""
 		s.Plays = nil
+		s.Filename = cloud.EscapeObjectName(s.Filename)
 		expectedCleaned[i] = s
-		encodedPaths[nup.EncodePathForCloudStorage(s.Filename)] = s.Filename
 	}
 
 	actualCleaned := make([]nup.Song, len(actual))
@@ -50,13 +68,11 @@ func compareQueryResults(expected, actual []nup.Song, compareOrder bool) error {
 			s.Tags = nil
 		}
 
-		for p, fn := range encodedPaths {
-			if strings.HasSuffix(s.Url, p) {
-				s.Url = ""
-				s.Filename = fn
-				break
-			}
+		var err error
+		if s.Filename, err = extractFilePathFromUrl(s.Url); err != nil {
+			return fmt.Errorf("song %v (%v) had bad URL: %v", i, s.Url, err)
 		}
+		s.Url = ""
 
 		actualCleaned[i] = s
 	}
@@ -280,3 +296,5 @@ func TestAndroid(tt *testing.T) {
 		tt.Error(err)
 	}
 }
+
+// TODO: covers

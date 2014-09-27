@@ -5,7 +5,6 @@ import (
 	"appengine/datastore"
 	"math/rand"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -63,29 +62,6 @@ func (a songArray) Less(i, j int) bool {
 		return false
 	}
 	return a[i].Track < a[j].Track
-}
-
-func prepareSongForSearchResult(s *nup.Song, id int64, baseSongUrl, baseCoverUrl string) {
-	// Set fields that are only present in search results (i.e. not in Datastore).
-	s.SongId = strconv.FormatInt(id, 10)
-	if len(s.Filename) > 0 {
-		s.Url = baseSongUrl + nup.EncodePathForCloudStorage(s.Filename)
-	}
-	if len(s.CoverFilename) > 0 {
-		s.CoverUrl = baseCoverUrl + nup.EncodePathForCloudStorage(s.CoverFilename)
-	}
-
-	// Create an empty tags slice so that clients don't need to check for null.
-	if s.Tags == nil {
-		s.Tags = make([]string, 0)
-	}
-
-	// Clear fields that are passed for updates (and hence not excluded from JSON)
-	// but that aren't needed in search results.
-	s.Sha1 = ""
-	s.Filename = ""
-	s.CoverFilename = ""
-	s.Plays = s.Plays[:0]
 }
 
 func getTags(c appengine.Context) ([]string, error) {
@@ -194,7 +170,7 @@ func shufflePartial(a []int64, n int) {
 	}
 }
 
-func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl string) ([]nup.Song, error) {
+func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error) {
 	// First, build a base query with all of the equality filters.
 	bq := datastore.NewQuery(songKind).KeysOnly()
 	if len(query.Artist) > 0 {
@@ -287,7 +263,7 @@ func doQuery(c appengine.Context, query *songQuery, baseSongUrl, baseCoverUrl st
 	c.Debugf("Fetched %v song(s) in %v ms", len(songs), time.Now().Sub(startTime).Nanoseconds()/(1000*1000))
 
 	for i := range songs {
-		prepareSongForSearchResult(&songs[i], keys[i].IntID(), baseSongUrl, baseCoverUrl)
+		prepareSongForClient(&songs[i], keys[i].IntID(), webClient)
 	}
 	if !query.Shuffle {
 		sort.Sort(songArray(songs))

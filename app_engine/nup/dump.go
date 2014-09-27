@@ -108,11 +108,7 @@ func dumpPlays(c appengine.Context, max int64, cursor string) (plays []nup.PlayD
 	return plays, nextCursor, nil
 }
 
-func dumpSongsForAndroid(c appengine.Context, minLastModified time.Time, max int64, cursor, baseSongUrl, baseCoverUrl string) (songs []nup.Song, nextCursor string, err error) {
-	if len(baseSongUrl) == 0 || len(baseCoverUrl) == 0 {
-		return nil, "", fmt.Errorf("Invalid base song (%s) or cover (%s) URL for Android", baseSongUrl, baseCoverUrl)
-	}
-
+func dumpSongsForAndroid(c appengine.Context, minLastModified time.Time, max int64, cursor string) (songs []nup.Song, nextCursor string, err error) {
 	songs = make([]nup.Song, max)
 	songPtrs := make([]interface{}, max)
 	for i := range songs {
@@ -126,7 +122,7 @@ func dumpSongsForAndroid(c appengine.Context, minLastModified time.Time, max int
 
 	songs = songs[0:len(ids)]
 	for i, id := range ids {
-		prepareSongForSearchResult(&songs[i], id, baseSongUrl, baseCoverUrl)
+		prepareSongForClient(&songs[i], id, androidClient)
 	}
 	return songs, nextCursor, nil
 }

@@ -48,15 +48,9 @@ var cfg struct {
 	// Credentials of accounts using HTTP basic authentication.
 	BasicAuthUsers []basicAuthInfo
 
-	// Base URLs for song and cover files when accessed via web browsers.
-	// These should be something like "https://storage.cloud.google.com/my-bucket-name/".
-	WebBaseSongUrl  string
-	WebBaseCoverUrl string
-
-	// Base URLs for song and cover files when accessed via the Android client (i.e. OAuth2).
-	// These should be something like "https://my-bucket-name.storage.googleapis.com/".
-	AndroidBaseSongUrl  string
-	AndroidBaseCoverUrl string
+	// Names of the Cloud Storage buckets where song and cover files are stored.
+	SongBucket  string
+	CoverBucket string
 }
 
 // TODO: This is swiped from https://code.google.com/p/go/source/detail?r=5e03333d2dcf.
@@ -447,7 +441,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	songs, err := doQuery(c, q, cfg.WebBaseSongUrl, cfg.WebBaseCoverUrl)
+	songs, err := getSongsForQuery(c, q)
 	if err != nil {
 		c.Errorf("Unable to query songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -542,7 +536,7 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	songs, cursor, err := dumpSongsForAndroid(c, minLastModified, max, r.FormValue("cursor"), cfg.AndroidBaseSongUrl, cfg.AndroidBaseCoverUrl)
+	songs, cursor, err := dumpSongsForAndroid(c, minLastModified, max, r.FormValue("cursor"))
 	if err != nil {
 		c.Errorf("Unable to get songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
