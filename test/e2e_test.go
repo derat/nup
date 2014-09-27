@@ -259,6 +259,33 @@ func TestQueries(tt *testing.T) {
 	}
 }
 
+func TestCaching(tt *testing.T) {
+	t := setUpTest()
+	defer os.RemoveAll(t.TempDir)
+
+	log.Print("posting and querying a song")
+	t.PostSongs([]nup.Song{LegacySong1}, true)
+	if err := compareQueryResults([]nup.Song{LegacySong1}, t.QuerySongs(""), false); err != nil {
+		tt.Error(err)
+	}
+
+	log.Print("rating and re-querying")
+	id := t.GetSongId(LegacySong1.Sha1)
+	s := LegacySong1
+	s.Rating = 1.0
+	t.DoPost("rate_and_tag?songId="+id+"&rating=1.0", nil)
+	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), false); err != nil {
+		tt.Error(err)
+	}
+
+	log.Print("updating and re-querying")
+	s.Artist = "The Artist Formerly Known As " + s.Artist
+	t.PostSongs([]nup.Song{s}, false)
+	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), false); err != nil {
+		tt.Error(err)
+	}
+}
+
 func TestAndroid(tt *testing.T) {
 	t := setUpTest()
 	defer os.RemoveAll(t.TempDir)

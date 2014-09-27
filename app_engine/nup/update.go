@@ -103,9 +103,9 @@ func replacePlays(c appengine.Context, songKey *datastore.Key, plays []nup.Play)
 }
 
 func updateExistingSong(c appengine.Context, id int64, f func(appengine.Context, *nup.Song) error) error {
-	return datastore.RunInTransaction(c, func(c appengine.Context) error {
+	song := &nup.Song{}
+	if err := datastore.RunInTransaction(c, func(c appengine.Context) error {
 		key := datastore.NewKey(c, songKind, "", id, nil)
-		song := &nup.Song{}
 		if err := datastore.Get(c, key, song); err != nil {
 			return err
 		}
@@ -120,7 +120,12 @@ func updateExistingSong(c appengine.Context, id int64, f func(appengine.Context,
 		}
 		c.Debugf("Updated song %v", id)
 		return nil
-	}, nil)
+	}, nil); err != nil {
+		return err
+	}
+
+	writeSongsToCache(c, []int64{id}, []nup.Song{*song})
+	return nil
 }
 
 func addPlay(c appengine.Context, id int64, startTime time.Time, ip string) error {
@@ -185,15 +190,16 @@ func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserD
 		return fmt.Errorf("Found %v songs with SHA1 %v; expected 0 or 1", sha1)
 	}
 
-	return datastore.RunInTransaction(c, func(c appengine.Context) error {
-		var key *datastore.Key
-		song := &nup.Song{}
+	var key *datastore.Key
+	song := &nup.Song{}
+
+	if err = datastore.RunInTransaction(c, func(c appengine.Context) error {
 		if len(queryKeys) == 1 {
 			c.Debugf("Updating %v with SHA1 %v", updatedSong.Filename, sha1)
 			key = queryKeys[0]
 			if !replaceUserData {
 				if err := datastore.Get(c, key, song); err != nil {
-					return fmt.Errorf("Getting %v failed: %v", sha1, key.IntID(), err)
+					return fmt.Errorf("Getting %v with key %v failed: %v", sha1, key.IntID(), err)
 				}
 			}
 		} else {
@@ -220,7 +226,12 @@ func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserD
 			}
 		}
 		return nil
-	}, nil)
+	}, nil); err != nil {
+		return err
+	}
+
+	writeSongsToCache(c, []int64{key.IntID()}, []nup.Song{*song})
+	return nil
 }
 
 func clearData(c appengine.Context) error {

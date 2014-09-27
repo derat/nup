@@ -228,7 +228,7 @@ func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error)
 	if err != nil {
 		return nil, err
 	}
-	c.Debugf("Ran %v query(s) in %v ms", len(qs), time.Now().Sub(startTime).Nanoseconds()/(1000*1000))
+	c.Debugf("Ran %v query(s) in %v ms", len(qs), getMsecSinceTime(startTime))
 
 	var mergedIds []int64
 	for i, a := range unmergedIds {
@@ -251,20 +251,53 @@ func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error)
 		shufflePartial(mergedIds, numResults)
 	}
 
-	startTime = time.Now()
-	keys := make([]*datastore.Key, numResults)
-	for i, id := range mergedIds[:numResults] {
-		keys[i] = datastore.NewKey(c, songKind, "", id, nil)
-	}
+	ids := mergedIds[:numResults]
 	songs := make([]nup.Song, numResults)
-	if err = datastore.GetMulti(c, keys, songs); err != nil {
-		return nil, err
-	}
-	c.Debugf("Fetched %v song(s) in %v ms", len(songs), time.Now().Sub(startTime).Nanoseconds()/(1000*1000))
 
-	for i := range songs {
-		prepareSongForClient(&songs[i], keys[i].IntID(), webClient)
+	cachedSongs := make(map[int64]nup.Song)
+	storedSongs := make([]nup.Song, 0)
+
+	// Get whatever we can from memcache.
+	if numResults > 0 {
+		startTime = time.Now()
+		cachedSongs = getSongsFromCache(c, ids)
+		c.Debugf("Got %v of %v song(s) from cache in %v ms", len(cachedSongs), len(songs), getMsecSinceTime(startTime))
 	}
+
+	// Get the remaining songs from datastore and write them back to memcache.
+	if len(cachedSongs) < numResults {
+		startTime = time.Now()
+		numStored := numResults - len(cachedSongs)
+		storedIds := make([]int64, 0, numStored)
+		keys := make([]*datastore.Key, 0, numStored)
+		for _, id := range ids {
+			if _, ok := cachedSongs[id]; !ok {
+				storedIds = append(storedIds, id)
+				keys = append(keys, datastore.NewKey(c, songKind, "", id, nil))
+			}
+		}
+		storedSongs = make([]nup.Song, len(keys))
+		if err = datastore.GetMulti(c, keys, storedSongs); err != nil {
+			return nil, err
+		}
+		c.Debugf("Fetched %v song(s) from datastore in %v ms", len(storedSongs), getMsecSinceTime(startTime))
+
+		startTime = time.Now()
+		writeSongsToCache(c, storedIds, storedSongs)
+		c.Debugf("Wrote %v song(s) to cache in %v ms", len(storedSongs), getMsecSinceTime(startTime))
+	}
+
+	storedIndex := 0
+	for i, id := range ids {
+		if s, ok := cachedSongs[id]; ok {
+			songs[i] = s
+		} else {
+			songs[i] = storedSongs[storedIndex]
+			storedIndex++
+		}
+		prepareSongForClient(&songs[i], id, webClient)
+	}
+
 	if !query.Shuffle {
 		sort.Sort(songArray(songs))
 	}

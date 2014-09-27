@@ -3,6 +3,7 @@ package appengine
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"erat.org/nup"
 )
@@ -46,4 +47,8 @@ func prepareSongForClient(s *nup.Song, id int64, client clientType) {
 	s.Filename = ""
 	s.CoverFilename = ""
 	s.Plays = s.Plays[:0]
+}
+
+func getMsecSinceTime(t time.Time) int64 {
+	return time.Now().Sub(t).Nanoseconds() / int64(time.Millisecond/time.Nanosecond)
 }
