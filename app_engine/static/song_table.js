@@ -60,8 +60,6 @@ SongTable.prototype.updateSongs = function(newSongs) {
   for (var i = 0; i < (minLength - startMatchLength) && oldSongs[oldSongs.length-i-1].songId == newSongs[newSongs.length-i-1].songId; i++)
     endMatchLength++;
 
-  // TODO: Clear highlighting and checkboxes?
-
   // Figure out how many songs in the middle differ.
   var numOldMiddleSongs = oldSongs.length - startMatchLength - endMatchLength;
   var numNewMiddleSongs = newSongs.length - startMatchLength - endMatchLength;
@@ -77,6 +75,16 @@ SongTable.prototype.updateSongs = function(newSongs) {
     var song = newSongs[startMatchLength + i];
     var row = this.table_.rows[startMatchLength + i + 1];
     this.updateRow_(row, song);
+  }
+
+  // Clear all of the checkboxes.
+  if (this.useCheckboxes_) {
+    for (var i = 1; i < this.table_.rows.length; i++)
+      this.table_.rows[i].cells[0].children[0].checked = null;
+    this.numCheckedSongs_ = 0;
+    this.updateHeadingCheckbox_();
+    if (this.checkedSongsChangedCallback_)
+      this.checkedSongsChangedCallback_(this.numCheckedSongs_);
   }
 };
 
@@ -120,11 +128,14 @@ SongTable.prototype.updateRow_ = function(row, song) {
   };
 
   // Skip the checkbox if present.
-  var artistCellIndex = (row.cells.length) == 5 ? 1 : 0;
+  var artistCellIndex = this.useCheckboxes_ ? 1 : 0;
   updateCell(row.cells[artistCellIndex], song.artist, true);
   updateCell(row.cells[artistCellIndex+1], song.title, false);
   updateCell(row.cells[artistCellIndex+2], song.album, true);
   updateCell(row.cells[artistCellIndex+3], formatTime(parseFloat(song.length)), false);
+
+  // Clear highlighting.
+  row.className = null;
 };
 
 // Callback for the artist name being clicked in |row|.
@@ -148,18 +159,23 @@ SongTable.prototype.handleCheckboxClicked_ = function(checkbox) {
     for (var i = 1; i < this.table_.rows.length; i++)
       this.table_.rows[i].cells[0].children[0].checked = checked ? 'checked' : null;
     this.numCheckedSongs_ = checked ? this.getNumSongs() : 0;
-    head.className = 'opaque';
   } else {
     this.numCheckedSongs_ += checked ? 1 : -1;
-    if (this.numCheckedSongs_ == 0) {
-      head.checked = null;
-      head.className = 'opaque';
-    } else {
-      head.checked = 'checked';
-      head.className = (this.numCheckedSongs_ == this.getNumSongs()) ? 'opaque' : 'transparent';
-    }
   }
+  this.updateHeadingCheckbox_();
 
   if (this.checkedSongsChangedCallback_)
     this.checkedSongsChangedCallback_(this.numCheckedSongs_);
+};
+
+// Update the |headingCheckbox_|'s visual state for the current number of checked songs.
+SongTable.prototype.updateHeadingCheckbox_ = function() {
+  var head = this.headingCheckbox_;
+  if (this.numCheckedSongs_ == 0) {
+    head.checked = null;
+    head.className = 'opaque';
+  } else {
+    head.checked = 'checked';
+    head.className = (this.numCheckedSongs_ == this.getNumSongs()) ? 'opaque' : 'transparent';
+  }
 };
