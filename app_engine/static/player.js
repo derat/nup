@@ -359,10 +359,16 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
   var newTags = [];
   for (var i = 0; i < newRawTags.length; ++i) {
     var tag = newRawTags[i].toLowerCase();
-    if (!this.tags.length || this.tags.indexOf(tag) != -1 || song.tags.indexOf(tag) != -1)
+    if (!this.tags.length || this.tags.indexOf(tag) != -1 || song.tags.indexOf(tag) != -1) {
       newTags.push(tag);
-    else
+    } else if (tag[0] == '+' && tag.length > 1) {
+      tag = tag.substring(1);
+      newTags.push(tag);
+      if (this.tags.indexOf(tag) == -1)
+        this.tags.push(tag);
+    } else {
       console.log('Skipping unknown tag "' + tag + '"');
+    }
   }
   newTags = newTags.sort()
   var tagsChanged = newTags.join(' ') != song.tags.sort().join(' ');
