@@ -54,6 +54,8 @@ function Player() {
   this.updateCloseImage = $('updateCloseImage');
   this.ratingSpan = $('ratingSpan');
   this.ratingSpan = $('ratingSpan');
+  this.dumpSongLink = $('dumpSongLink');
+  this.dumpSongCacheLink = $('dumpSongCacheLink');
   this.tagTextarea = $('tagTextarea');
   this.tagSuggestionsDiv = $('tagSuggestionsDiv');
 
@@ -320,6 +322,8 @@ Player.prototype.showUpdateDiv = function() {
     return true;
 
   this.setRating(song.rating);
+  this.dumpSongLink.href = 'dump_song?id=' + song.songId;
+  this.dumpSongCacheLink.href = 'dump_song?id=' + song.songId + '&cache=1';
   this.tagTextarea.value = song.tags.sort().join(' ');
   this.updateDiv.style.display = 'block';
   this.updateSong = song;
