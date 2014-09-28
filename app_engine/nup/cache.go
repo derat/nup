@@ -4,6 +4,7 @@ import (
 	"appengine"
 	"appengine/memcache"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -16,6 +17,13 @@ const (
 
 func getSongCacheKey(id int64) string {
 	return songCachePrefix + strconv.FormatInt(id, 10)
+}
+
+func flushSongFromCache(c appengine.Context, id int64) error {
+	if err := memcache.Delete(c, getSongCacheKey(id)); err != nil && err != memcache.ErrCacheMiss {
+		return err
+	}
+	return nil
 }
 
 func getSongsFromCache(c appengine.Context, ids []int64) map[int64]nup.Song {
@@ -52,10 +60,24 @@ func getSongsFromCache(c appengine.Context, ids []int64) map[int64]nup.Song {
 	return songs
 }
 
-func writeSongsToCache(c appengine.Context, ids []int64, songs []nup.Song) {
+func flushSongsFromCacheAfterMultiError(c appengine.Context, ids []int64, me appengine.MultiError) error {
+	for i, err := range me {
+		id := ids[i]
+		if err == memcache.ErrNotStored {
+			c.Debugf("Song %v already present in cache; flushing", id)
+			if err := flushSongFromCache(c, id); err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeSongsToCache(c appengine.Context, ids []int64, songs []nup.Song, flushIfAlreadyPresent bool) error {
 	if len(ids) != len(songs) {
-		c.Errorf("Got request to write %v ID(s) with %v song(s) to cache", len(ids), len(songs))
-		return
+		return fmt.Errorf("Got request to write %v ID(s) with %v song(s) to cache", len(ids), len(songs))
 	}
 
 	items := make([]*memcache.Item, len(songs))
@@ -63,7 +85,14 @@ func writeSongsToCache(c appengine.Context, ids []int64, songs []nup.Song) {
 		items[i] = &memcache.Item{Key: getSongCacheKey(id), Object: &songs[i]}
 	}
 	codec := memcache.Codec{Marshal: json.Marshal, Unmarshal: json.Unmarshal}
-	if err := codec.SetMulti(c, items); err != nil {
-		c.Errorf("Failed to write %v song(s) to cache: %v", len(items), err)
+	if err := codec.AddMulti(c, items); err != nil {
+		// Some of the songs might've been cached in response to a query in the meantime.
+		// memcache.Delete() is missing a lock duration (https://code.google.com/p/googleappengine/issues/detail?id=10983),
+		// so just do the best we can and try to delete the possibly-stale cached values.
+		if me, ok := err.(appengine.MultiError); ok && flushIfAlreadyPresent {
+			return flushSongsFromCacheAfterMultiError(c, ids, me)
+		}
+		return err
 	}
+	return nil
 }

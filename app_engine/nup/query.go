@@ -283,8 +283,11 @@ func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error)
 		c.Debugf("Fetched %v song(s) from datastore in %v ms", len(storedSongs), getMsecSinceTime(startTime))
 
 		startTime = time.Now()
-		writeSongsToCache(c, storedIds, storedSongs)
-		c.Debugf("Wrote %v song(s) to cache in %v ms", len(storedSongs), getMsecSinceTime(startTime))
+		if err := writeSongsToCache(c, storedIds, storedSongs, false); err != nil {
+			c.Errorf("Failed to write just-fetched song(s) to cache: %v", err)
+		} else {
+			c.Debugf("Wrote %v song(s) to cache in %v ms", len(storedSongs), getMsecSinceTime(startTime))
+		}
 	}
 
 	storedIndex := 0

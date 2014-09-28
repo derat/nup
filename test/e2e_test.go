@@ -291,6 +291,12 @@ func TestCaching(tt *testing.T) {
 	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), false); err != nil {
 		tt.Error(err)
 	}
+
+	log.Print("posting another song and querying")
+	t.PostSongs([]nup.Song{LegacySong2}, true)
+	if err := compareQueryResults([]nup.Song{LegacySong2, s}, t.QuerySongs(""), false); err != nil {
+		tt.Error(err)
+	}
 }
 
 func TestAndroid(tt *testing.T) {

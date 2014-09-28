@@ -103,9 +103,13 @@ func replacePlays(c appengine.Context, songKey *datastore.Key, plays []nup.Play)
 }
 
 func updateExistingSong(c appengine.Context, id int64, f func(appengine.Context, *nup.Song) error) error {
-	song := &nup.Song{}
-	if err := datastore.RunInTransaction(c, func(c appengine.Context) error {
+	if err := flushSongFromCache(c, id); err != nil {
+		return fmt.Errorf("Not updating song %v due to cache eviction error: %v", id, err)
+	}
+
+	return datastore.RunInTransaction(c, func(c appengine.Context) error {
 		key := datastore.NewKey(c, songKind, "", id, nil)
+		song := &nup.Song{}
 		if err := datastore.Get(c, key, song); err != nil {
 			return err
 		}
@@ -119,13 +123,11 @@ func updateExistingSong(c appengine.Context, id int64, f func(appengine.Context,
 			return err
 		}
 		c.Debugf("Updated song %v", id)
+		if err := writeSongsToCache(c, []int64{id}, []nup.Song{*song}, true); err != nil {
+			return err
+		}
 		return nil
-	}, nil); err != nil {
-		return err
-	}
-
-	writeSongsToCache(c, []int64{id}, []nup.Song{*song})
-	return nil
+	}, nil)
 }
 
 func addPlay(c appengine.Context, id int64, startTime time.Time, ip string) error {
@@ -190,13 +192,15 @@ func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserD
 		return fmt.Errorf("Found %v songs with SHA1 %v; expected 0 or 1", sha1)
 	}
 
-	var key *datastore.Key
-	song := &nup.Song{}
-
-	if err = datastore.RunInTransaction(c, func(c appengine.Context) error {
+	return datastore.RunInTransaction(c, func(c appengine.Context) error {
+		var key *datastore.Key
+		song := &nup.Song{}
 		if len(queryKeys) == 1 {
 			c.Debugf("Updating %v with SHA1 %v", updatedSong.Filename, sha1)
 			key = queryKeys[0]
+			if err := flushSongFromCache(c, key.IntID()); err != nil {
+				return fmt.Errorf("Not updating song %v due to cache eviction error: %v", key.IntID(), err)
+			}
 			if !replaceUserData {
 				if err := datastore.Get(c, key, song); err != nil {
 					return fmt.Errorf("Getting %v with key %v failed: %v", sha1, key.IntID(), err)
@@ -225,13 +229,11 @@ func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserD
 				return err
 			}
 		}
+		if err := writeSongsToCache(c, []int64{key.IntID()}, []nup.Song{*song}, true); err != nil {
+			return err
+		}
 		return nil
-	}, nil); err != nil {
-		return err
-	}
-
-	writeSongsToCache(c, []int64{key.IntID()}, []nup.Song{*song})
-	return nil
+	}, nil)
 }
 
 func clearData(c appengine.Context) error {
