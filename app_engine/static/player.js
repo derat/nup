@@ -152,9 +152,9 @@ Player.prototype.selectTrack = function(index) {
   this.updateSongDisplay();
   this.updateButtonState();
 
-  var url = this.getCurrentSong().url;
-  console.log('Switching to ' + url);
-  this.audio.src = url;
+  var song = this.getCurrentSong();
+  console.log('Switching to ' + song.songId + ' (' + song.url + ')');
+  this.audio.src = song.url;
   this.play();
   this.reachedEndOfSongs = false;
 };
