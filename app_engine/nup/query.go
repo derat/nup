@@ -260,11 +260,11 @@ func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error)
 	// Get whatever we can from memcache.
 	if numResults > 0 {
 		startTime = time.Now()
-		if songs, err := getSongsFromCache(c, ids); err != nil {
+		if hits, err := getSongsFromCache(c, ids); err != nil {
 			c.Errorf("Got error while querying cache: %v", err)
 		} else {
-			c.Debugf("Got %v of %v song(s) from cache in %v ms", len(cachedSongs), len(songs), getMsecSinceTime(startTime))
-			cachedSongs = songs
+			c.Debugf("Got %v of %v song(s) from cache in %v ms", len(hits), len(ids), getMsecSinceTime(startTime))
+			cachedSongs = hits
 		}
 	}
 
