@@ -480,6 +480,8 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		q.MaxLastStartTime = nup.SecondsToTime(s)
 	}
 
+	q.Tags = make([]string, 0)
+	q.NotTags = make([]string, 0)
 	for _, t := range strings.Fields(r.FormValue("tags")) {
 		if t[0] == '-' {
 			q.NotTags = append(q.NotTags, t[1:len(t)])
