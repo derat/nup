@@ -170,7 +170,7 @@ func shufflePartial(a []int64, n int) {
 	}
 }
 
-func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error) {
+func performQueryAgainstDatastore(c appengine.Context, query *songQuery) ([]int64, error) {
 	// First, build a base query with all of the equality filters.
 	bq := datastore.NewQuery(songKind).KeysOnly()
 	if len(query.Artist) > 0 {
@@ -240,18 +240,42 @@ func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error)
 			mergedIds = filterSortedIds(mergedIds, a)
 		}
 	}
+	return mergedIds, nil
+}
+
+func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error) {
+	startTime := time.Now()
+	ids, err := getCachedQueryResults(c, query)
+	if err != nil {
+		c.Errorf("Got error while getting cached query: %v", err)
+	} else if ids != nil {
+		c.Debugf("Got query result with %v song(s) from cache in %v ms", len(ids), getMsecSinceTime(startTime))
+	}
+
+	if ids == nil {
+		if ids, err = performQueryAgainstDatastore(c, query); err != nil {
+			return nil, err
+		}
+
+		startTime = time.Now()
+		if err = writeQueryResultsToCache(c, query, ids); err != nil {
+			c.Errorf("Got error while writing query results to cache: %v", err)
+		} else {
+			c.Debugf("Wrote query result with %v song(s) to cache in %v ms", len(ids), getMsecSinceTime(startTime))
+		}
+	}
 
 	// Oh, for generics...
-	numResults := len(mergedIds)
+	numResults := len(ids)
 	if numResults > maxQueryResults {
 		numResults = maxQueryResults
 	}
 
 	if query.Shuffle {
-		shufflePartial(mergedIds, numResults)
+		shufflePartial(ids, numResults)
 	}
 
-	ids := mergedIds[:numResults]
+	ids = ids[:numResults]
 	songs := make([]nup.Song, numResults)
 
 	cachedSongs := make(map[int64]nup.Song)
@@ -261,7 +285,7 @@ func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error)
 	if numResults > 0 {
 		startTime = time.Now()
 		if hits, err := getSongsFromCache(c, ids); err != nil {
-			c.Errorf("Got error while querying cache: %v", err)
+			c.Errorf("Got error while getting cached songs: %v", err)
 		} else {
 			c.Debugf("Got %v of %v song(s) from cache in %v ms", len(hits), len(ids), getMsecSinceTime(startTime))
 			cachedSongs = hits
@@ -270,7 +294,7 @@ func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error)
 
 	// Get the remaining songs from datastore and write them back to memcache.
 	if len(cachedSongs) < numResults {
-		startTime = time.Now()
+		startTime := time.Now()
 		numStored := numResults - len(cachedSongs)
 		storedIds := make([]int64, 0, numStored)
 		keys := make([]*datastore.Key, 0, numStored)

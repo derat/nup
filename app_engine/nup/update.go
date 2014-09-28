@@ -13,6 +13,13 @@ import (
 	"erat.org/nup"
 )
 
+const (
+	metadataUpdate = 1
+	ratingUpdate   = 2
+	tagsUpdate     = 4
+	playUpdate     = 8
+)
+
 var (
 	ErrSongUnchanged = errors.New("Song wasn't modified")
 )
@@ -135,7 +142,7 @@ func updateExistingSong(c appengine.Context, id int64, f func(appengine.Context,
 }
 
 func addPlay(c appengine.Context, id int64, startTime time.Time, ip string) error {
-	return updateExistingSong(c, id, func(c appengine.Context, s *nup.Song) error {
+	err := updateExistingSong(c, id, func(c appengine.Context, s *nup.Song) error {
 		songKey := datastore.NewKey(c, songKind, "", id, nil)
 		existingKeys, err := datastore.NewQuery(playKind).Ancestor(songKey).KeysOnly().Filter("StartTime =", startTime).Filter("IpAddress =", ip).GetAll(c, nil)
 		if err != nil {
@@ -158,32 +165,38 @@ func addPlay(c appengine.Context, id int64, startTime time.Time, ip string) erro
 		}
 		return nil
 	}, time.Duration(0))
+	if err != nil {
+		return err
+	}
+	return flushQueriesFromCacheForUpdate(c, playUpdate)
 }
 
 func updateRatingAndTags(c appengine.Context, id int64, hasRating bool, rating float64, tags []string, updateDelay time.Duration) error {
-	if err := updateExistingSong(c, id, func(c appengine.Context, s *nup.Song) error {
-		var updated bool
+	var updateType uint
+	err := updateExistingSong(c, id, func(c appengine.Context, s *nup.Song) error {
 		if hasRating && rating != s.Rating {
 			s.Rating = rating
-			updated = true
+			updateType |= ratingUpdate
 		}
 		if tags != nil {
 			sort.Strings(tags)
 			if !sortedStringSlicesMatch(tags, s.Tags) {
 				s.Tags = tags
-				updated = true
+				updateType |= tagsUpdate
 			}
 		}
-		if updated {
+		if updateType != 0 {
 			s.LastModifiedTime = time.Now()
 			return nil
 		} else {
 			return ErrSongUnchanged
 		}
-	}, updateDelay); err != nil && err != ErrSongUnchanged {
+	}, updateDelay)
+
+	if err != nil && err != ErrSongUnchanged {
 		return err
 	}
-	return nil
+	return flushQueriesFromCacheForUpdate(c, updateType)
 }
 
 func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserData bool, updateDelay time.Duration) error {

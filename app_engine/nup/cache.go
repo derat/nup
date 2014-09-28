@@ -3,6 +3,8 @@ package appengine
 import (
 	"appengine"
 	"appengine/memcache"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -13,7 +15,92 @@ import (
 
 const (
 	songCachePrefix = "song-"
+	queriesCacheKey = "queries"
 )
+
+var jsonCodec memcache.Codec = memcache.Codec{
+	Marshal:   json.Marshal,
+	Unmarshal: json.Unmarshal,
+}
+
+type cachedQuery struct {
+	Query songQuery
+	Ids   []int64
+}
+
+type cachedQueries map[string]cachedQuery
+
+func computeQueryHash(q *songQuery) (string, error) {
+	b, err := json.Marshal(q)
+	if err != nil {
+		return "", err
+	}
+	s := sha1.Sum(b)
+	return hex.EncodeToString(s[:]), nil
+}
+
+func getCachedQueryResults(c appengine.Context, query *songQuery) ([]int64, error) {
+	queries := make(cachedQueries)
+	if _, err := jsonCodec.Get(c, queriesCacheKey, &queries); err == memcache.ErrCacheMiss {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	queryHash, err := computeQueryHash(query)
+	if err != nil {
+		return nil, err
+	}
+	if q, ok := queries[queryHash]; ok {
+		return q.Ids, nil
+	}
+	return nil, nil
+}
+
+func updateCachedQueries(c appengine.Context, f func(cachedQueries) error) error {
+	queries := make(cachedQueries)
+	if _, err := jsonCodec.Get(c, queriesCacheKey, &queries); err != nil && err != memcache.ErrCacheMiss {
+		return err
+	}
+	if err := f(queries); err != nil {
+		return err
+	}
+	return jsonCodec.Set(c, &memcache.Item{Key: queriesCacheKey, Object: &queries})
+}
+
+func writeQueryResultsToCache(c appengine.Context, query *songQuery, ids []int64) error {
+	return updateCachedQueries(c, func(queries cachedQueries) error {
+		queryHash, err := computeQueryHash(query)
+		if err != nil {
+			return err
+		}
+		queries[queryHash] = cachedQuery{*query, ids}
+		return nil
+	})
+}
+
+func flushQueriesFromCacheForUpdate(c appengine.Context, updateType uint) error {
+	numFlushed := 0
+	if err := updateCachedQueries(c, func(queries cachedQueries) error {
+		for k, cq := range queries {
+			q := cq.Query
+			if (updateType&metadataUpdate) != 0 ||
+				((updateType&ratingUpdate) != 0 && (q.HasMinRating || q.Unrated)) ||
+				((updateType&tagsUpdate) != 0 && (len(q.Tags) > 0 || len(q.NotTags) > 0)) ||
+				((updateType&playUpdate) != 0 && (q.HasMaxPlays || !q.MinFirstStartTime.IsZero() || !q.MaxLastStartTime.IsZero())) {
+				delete(queries, k)
+				numFlushed++
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	if numFlushed > 0 {
+		c.Debugf("Flushed %v cached query(s) in response to update of type %v", numFlushed, updateType)
+	}
+	return nil
+}
 
 func getSongCacheKey(id int64) string {
 	return songCachePrefix + strconv.FormatInt(id, 10)
@@ -80,8 +167,7 @@ func writeSongsToCache(c appengine.Context, ids []int64, songs []nup.Song, flush
 	for i, id := range ids {
 		items[i] = &memcache.Item{Key: getSongCacheKey(id), Object: &songs[i]}
 	}
-	codec := memcache.Codec{Marshal: json.Marshal, Unmarshal: json.Unmarshal}
-	if err := codec.AddMulti(c, items); err != nil {
+	if err := jsonCodec.AddMulti(c, items); err != nil {
 		// Some of the songs might've been cached in response to a query in the meantime.
 		// memcache.Delete() is missing a lock duration (https://code.google.com/p/googleappengine/issues/detail?id=10983),
 		// so just do the best we can and try to delete the possibly-stale cached values.
