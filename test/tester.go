@@ -194,7 +194,7 @@ func (t *Tester) DoPost(pathAndQueryParams string, body io.Reader) {
 	resp.Body.Close()
 }
 
-func (t *Tester) PostSongs(songs []nup.Song, replaceUserData bool) {
+func (t *Tester) PostSongs(songs []nup.Song, replaceUserData bool, updateDelay time.Duration) {
 	var buf bytes.Buffer
 	e := json.NewEncoder(&buf)
 	for _, s := range songs {
@@ -202,9 +202,9 @@ func (t *Tester) PostSongs(songs []nup.Song, replaceUserData bool) {
 			panic(err)
 		}
 	}
-	path := "import"
+	path := fmt.Sprintf("import?updateDelayNsec=%v", int64(updateDelay*time.Nanosecond))
 	if replaceUserData {
-		path += "?replaceUserData=1"
+		path += "&replaceUserData=1"
 	}
 	t.DoPost(path, &buf)
 }

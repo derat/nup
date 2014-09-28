@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -231,8 +232,8 @@ func TestQueries(tt *testing.T) {
 	defer os.RemoveAll(t.TempDir)
 
 	log.Print("posting some songs")
-	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, true)
-	t.PostSongs([]nup.Song{Song0s}, false)
+	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, true, 0)
+	t.PostSongs([]nup.Song{Song0s}, false, 0)
 
 	log.Print("doing a bunch of queries")
 	for _, q := range []struct {
@@ -265,7 +266,7 @@ func TestCaching(tt *testing.T) {
 	defer os.RemoveAll(t.TempDir)
 
 	log.Print("posting and querying a song")
-	t.PostSongs([]nup.Song{LegacySong1}, true)
+	t.PostSongs([]nup.Song{LegacySong1}, true, 0)
 	if err := compareQueryResults([]nup.Song{LegacySong1}, t.QuerySongs(""), false); err != nil {
 		tt.Error(err)
 	}
@@ -281,7 +282,7 @@ func TestCaching(tt *testing.T) {
 
 	log.Print("updating and re-querying")
 	s.Artist = "The Artist Formerly Known As " + s.Artist
-	t.PostSongs([]nup.Song{s}, false)
+	t.PostSongs([]nup.Song{s}, false, 0)
 	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), false); err != nil {
 		tt.Error(err)
 	}
@@ -293,8 +294,70 @@ func TestCaching(tt *testing.T) {
 	}
 
 	log.Print("posting another song and querying")
-	t.PostSongs([]nup.Song{LegacySong2}, true)
+	t.PostSongs([]nup.Song{LegacySong2}, true, 0)
 	if err := compareQueryResults([]nup.Song{LegacySong2, s}, t.QuerySongs(""), false); err != nil {
+		tt.Error(err)
+	}
+}
+
+func TestCacheRace(tt *testing.T) {
+	t := setUpTest()
+	defer os.RemoveAll(t.TempDir)
+
+	log.Print("posting a song")
+	t.PostSongs([]nup.Song{LegacySong1}, true, 0)
+
+	// Start a goroutine that posts a request that should:
+	// a) Drop the song from the cache.
+	// b) Sleep for one second.
+	// c) Update the song.
+	// d) See that the song has been re-added to the cache by the subsequent query and drop it again.
+	log.Print("starting slow background update")
+	id := t.GetSongId(LegacySong1.Sha1)
+	s := LegacySong1
+	s.Rating = 1.0
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		t.DoPost("rate_and_tag?songId="+id+"&rating=1.0&updateDelayNsec=1000000000", nil)
+		wg.Done()
+	}()
+
+	// Meanwhile, sleep half a second and do a query. This should execute between b) and c) above (i.e.
+	// the original song should be returned), and it should also result in the original song being re-cached.
+	log.Print("querying for pre-update song")
+	time.Sleep(time.Duration(500) * time.Millisecond)
+	if err := compareQueryResults([]nup.Song{LegacySong1}, t.QuerySongs(""), false); err != nil {
+		tt.Error(err)
+	}
+
+	// After the update finally runs, the server should see that the song got re-cached in the meantime
+	// and drop it from the cache to ensure that stale data won't be served.
+	log.Print("waiting for update to finish and querying for post-update song")
+	wg.Wait()
+	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), false); err != nil {
+		tt.Error(err)
+	}
+
+	// Do the same thing with an import.
+	log.Print("starting slow background import")
+	s2 := s
+	s2.Artist = "Some Other Artist"
+	wg.Add(1)
+	go func() {
+		t.PostSongs([]nup.Song{s2}, false, time.Second)
+		wg.Done()
+	}()
+
+	log.Print("querying for pre-import song")
+	time.Sleep(time.Duration(500) * time.Millisecond)
+	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), false); err != nil {
+		tt.Error(err)
+	}
+
+	log.Print("waiting for import to finish and querying for post-import song")
+	wg.Wait()
+	if err := compareQueryResults([]nup.Song{s2}, t.QuerySongs(""), false); err != nil {
 		tt.Error(err)
 	}
 }
@@ -305,7 +368,7 @@ func TestAndroid(tt *testing.T) {
 
 	log.Print("posting songs")
 	now := t.GetNowFromServer()
-	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, true)
+	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, true, 0)
 	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(time.Time{}), false); err != nil {
 		tt.Error(err)
 	}

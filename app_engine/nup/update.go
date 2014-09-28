@@ -102,9 +102,13 @@ func replacePlays(c appengine.Context, songKey *datastore.Key, plays []nup.Play)
 	return nil
 }
 
-func updateExistingSong(c appengine.Context, id int64, f func(appengine.Context, *nup.Song) error) error {
+func updateExistingSong(c appengine.Context, id int64, f func(appengine.Context, *nup.Song) error, updateDelay time.Duration) error {
 	if err := flushSongFromCache(c, id); err != nil {
 		return fmt.Errorf("Not updating song %v due to cache eviction error: %v", id, err)
+	}
+
+	if updateDelay > 0 {
+		time.Sleep(updateDelay)
 	}
 
 	return datastore.RunInTransaction(c, func(c appengine.Context) error {
@@ -153,10 +157,10 @@ func addPlay(c appengine.Context, id int64, startTime time.Time, ip string) erro
 			return fmt.Errorf("Putting play failed: %v", err)
 		}
 		return nil
-	})
+	}, time.Duration(0))
 }
 
-func updateRatingAndTags(c appengine.Context, id int64, hasRating bool, rating float64, tags []string) error {
+func updateRatingAndTags(c appengine.Context, id int64, hasRating bool, rating float64, tags []string, updateDelay time.Duration) error {
 	if err := updateExistingSong(c, id, func(c appengine.Context, s *nup.Song) error {
 		var updated bool
 		if hasRating && rating != s.Rating {
@@ -176,13 +180,13 @@ func updateRatingAndTags(c appengine.Context, id int64, hasRating bool, rating f
 		} else {
 			return ErrSongUnchanged
 		}
-	}); err != nil && err != ErrSongUnchanged {
+	}, updateDelay); err != nil && err != ErrSongUnchanged {
 		return err
 	}
 	return nil
 }
 
-func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserData bool) error {
+func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserData bool, updateDelay time.Duration) error {
 	sha1 := updatedSong.Sha1
 	queryKeys, err := datastore.NewQuery(songKind).KeysOnly().Filter("Sha1 =", sha1).GetAll(c, nil)
 	if err != nil {
@@ -218,6 +222,10 @@ func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserD
 			copySongUserFields(song, updatedSong)
 		}
 		song.LastModifiedTime = time.Now()
+
+		if updateDelay > 0 {
+			time.Sleep(updateDelay)
+		}
 		key, err = datastore.Put(c, key, song)
 		if err != nil {
 			return fmt.Errorf("Putting %v failed: %v", key.IntID(), err)

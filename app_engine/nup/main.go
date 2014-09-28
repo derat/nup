@@ -356,6 +356,12 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var updateDelayNsec int64 = 0
+	if len(r.FormValue("updateDelayNsec")) > 0 && !parseIntParam(c, w, r, "updateDelayNsec", &updateDelayNsec) {
+		return
+	}
+	updateDelay := time.Nanosecond * time.Duration(updateDelayNsec)
+
 	numSongs := 0
 	replaceUserData := r.FormValue("replaceUserData") == "1"
 	d := json.NewDecoder(r.Body)
@@ -368,7 +374,7 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := updateOrInsertSong(c, s, replaceUserData); err != nil {
+		if err := updateOrInsertSong(c, s, replaceUserData, updateDelay); err != nil {
 			c.Errorf("Failed to update song with SHA1 %v: %v", s.Sha1, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -477,6 +483,12 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var updateDelayNsec int64 = 0
+	if len(r.FormValue("updateDelayNsec")) > 0 && !parseIntParam(c, w, r, "updateDelayNsec", &updateDelayNsec) {
+		return
+	}
+	updateDelay := time.Nanosecond * time.Duration(updateDelayNsec)
+
 	hasRating := false
 	var rating float64
 	var tags []string
@@ -499,7 +511,7 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "No rating or tags supplied", http.StatusBadRequest)
 		return
 	}
-	if err := updateRatingAndTags(c, id, hasRating, rating, tags); err != nil {
+	if err := updateRatingAndTags(c, id, hasRating, rating, tags, updateDelay); err != nil {
 		c.Errorf("Got error while rating/tagging song: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
