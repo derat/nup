@@ -334,6 +334,10 @@ func handleFlushCache(w http.ResponseWriter, r *http.Request) {
 	if !checkRequest(c, w, r, "POST", false) {
 		return
 	}
+	if !appengine.IsDevAppServer() {
+		http.Error(w, "Only works on dev server", http.StatusBadRequest)
+		return
+	}
 	if err := memcache.Flush(c); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
