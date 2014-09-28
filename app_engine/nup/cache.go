@@ -26,38 +26,34 @@ func flushSongFromCache(c appengine.Context, id int64) error {
 	return nil
 }
 
-func getSongsFromCache(c appengine.Context, ids []int64) map[int64]nup.Song {
+func getSongsFromCache(c appengine.Context, ids []int64) (songs map[int64]nup.Song, err error) {
 	keys := make([]string, len(ids))
 	for i, id := range ids {
 		keys[i] = getSongCacheKey(id)
 	}
 
 	// Uh, no memcache.Codec.GetMulti()?
-	songs := make(map[int64]nup.Song)
+	songs = make(map[int64]nup.Song)
 	items, err := memcache.GetMulti(c, keys)
 	if err != nil {
-		c.Errorf("Cache query for %d song(s) failed: %v", len(keys), err)
-		return songs
+		return nil, err
 	}
 
 	for idStr, item := range items {
 		if !strings.HasPrefix(idStr, songCachePrefix) {
-			c.Errorf("Got unexpected key %q from cache", idStr)
-			continue
+			return nil, fmt.Errorf("Got unexpected key %q from cache", idStr)
 		}
 		id, err := strconv.ParseInt(idStr[len(songCachePrefix):], 10, 64)
 		if err != nil {
-			c.Errorf("Failed to parse key %q from cache: %v", idStr, err)
-			continue
+			return nil, fmt.Errorf("Failed to parse key %q: %v", idStr, err)
 		}
 		s := nup.Song{}
 		if err = json.Unmarshal(item.Value, &s); err != nil {
-			c.Errorf("Failed to unmarshal cached song %v: %v", id, err)
-			continue
+			return nil, fmt.Errorf("Failed to unmarshal cached song %v: %v", id, err)
 		}
 		songs[id] = s
 	}
-	return songs
+	return songs, nil
 }
 
 func flushSongsFromCacheAfterMultiError(c appengine.Context, ids []int64, me appengine.MultiError) error {

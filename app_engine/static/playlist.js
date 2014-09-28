@@ -137,6 +137,7 @@ Playlist.prototype.submitQuery = function(appendToQueue) {
           if (req.responseText) {
             songs = eval('(' + req.responseText + ')');
             console.log('Got response with ' + songs.length + ' song(s)');
+            console.log(songs);
           } else {
             console.log('No response text');
           }

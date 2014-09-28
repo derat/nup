@@ -227,7 +227,23 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 	if !parseIntParam(c, w, r, "id", &id) {
 		return
 	}
-	s, err := dumpSingleSong(c, id)
+
+	var s *nup.Song
+	var err error
+	if r.FormValue("cache") == "1" {
+		var songs map[int64]nup.Song
+		if songs, err = getSongsFromCache(c, []int64{id}); err == nil {
+			if song, ok := songs[id]; ok {
+				s = &song
+				s.SongId = strconv.FormatInt(id, 10)
+			} else {
+				err = fmt.Errorf("Song %v missing from cache result", id)
+			}
+		}
+	} else {
+		s, err = dumpSingleSong(c, id)
+	}
+
 	if err != nil {
 		c.Errorf("Dumping song %v failed: %v", id, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
