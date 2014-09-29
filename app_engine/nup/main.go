@@ -52,6 +52,9 @@ var cfg struct {
 	// Names of the Cloud Storage buckets where song and cover files are stored.
 	SongBucket  string
 	CoverBucket string
+
+	CacheSongs   bool
+	CacheQueries bool
 }
 
 // TODO: This is swiped from https://code.google.com/p/go/source/detail?r=5e03333d2dcf.

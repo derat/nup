@@ -134,8 +134,11 @@ func updateExistingSong(c appengine.Context, id int64, f func(appengine.Context,
 			return err
 		}
 		c.Debugf("Updated song %v", id)
-		if err := writeSongsToCache(c, []int64{id}, []nup.Song{*song}, true); err != nil {
-			return err
+
+		if cfg.CacheSongs {
+			if err := writeSongsToCache(c, []int64{id}, []nup.Song{*song}, true); err != nil {
+				return err
+			}
 		}
 		return nil
 	}, nil)

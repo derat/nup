@@ -244,12 +244,17 @@ func performQueryAgainstDatastore(c appengine.Context, query *songQuery) ([]int6
 }
 
 func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error) {
-	startTime := time.Now()
-	ids, err := getCachedQueryResults(c, query)
-	if err != nil {
-		c.Errorf("Got error while getting cached query: %v", err)
-	} else if ids != nil {
-		c.Debugf("Got query result with %v song(s) from cache in %v ms", len(ids), getMsecSinceTime(startTime))
+	var ids []int64
+	var err error
+
+	if cfg.CacheQueries {
+		startTime := time.Now()
+		ids, err = getCachedQueryResults(c, query)
+		if err != nil {
+			c.Errorf("Got error while getting cached query: %v", err)
+		} else if ids != nil {
+			c.Debugf("Got query result with %v song(s) from cache in %v ms", len(ids), getMsecSinceTime(startTime))
+		}
 	}
 
 	if ids == nil {
@@ -257,11 +262,13 @@ func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error)
 			return nil, err
 		}
 
-		startTime = time.Now()
-		if err = writeQueryResultsToCache(c, query, ids); err != nil {
-			c.Errorf("Got error while writing query results to cache: %v", err)
-		} else {
-			c.Debugf("Wrote query result with %v song(s) to cache in %v ms", len(ids), getMsecSinceTime(startTime))
+		if cfg.CacheQueries {
+			startTime := time.Now()
+			if err = writeQueryResultsToCache(c, query, ids); err != nil {
+				c.Errorf("Got error while writing query results to cache: %v", err)
+			} else {
+				c.Debugf("Wrote query result with %v song(s) to cache in %v ms", len(ids), getMsecSinceTime(startTime))
+			}
 		}
 	}
 
@@ -278,12 +285,16 @@ func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error)
 	ids = ids[:numResults]
 	songs := make([]nup.Song, numResults)
 
+	if numResults == 0 {
+		return songs, nil
+	}
+
 	cachedSongs := make(map[int64]nup.Song)
 	storedSongs := make([]nup.Song, 0)
 
 	// Get whatever we can from memcache.
-	if numResults > 0 {
-		startTime = time.Now()
+	if cfg.CacheSongs {
+		startTime := time.Now()
 		if hits, err := getSongsFromCache(c, ids); err != nil {
 			c.Errorf("Got error while getting cached songs: %v", err)
 		} else {
@@ -310,11 +321,13 @@ func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error)
 		}
 		c.Debugf("Fetched %v song(s) from datastore in %v ms", len(storedSongs), getMsecSinceTime(startTime))
 
-		startTime = time.Now()
-		if err := writeSongsToCache(c, storedIds, storedSongs, false); err != nil {
-			c.Errorf("Failed to write just-fetched song(s) to cache: %v", err)
-		} else {
-			c.Debugf("Wrote %v song(s) to cache in %v ms", len(storedSongs), getMsecSinceTime(startTime))
+		if cfg.CacheSongs {
+			startTime = time.Now()
+			if err := writeSongsToCache(c, storedIds, storedSongs, false); err != nil {
+				c.Errorf("Failed to write just-fetched song(s) to cache: %v", err)
+			} else {
+				c.Debugf("Wrote %v song(s) to cache in %v ms", len(storedSongs), getMsecSinceTime(startTime))
+			}
 		}
 	}
 
