@@ -1,6 +1,7 @@
 package appengine
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -13,6 +14,10 @@ type clientType int
 const (
 	webClient clientType = iota
 	androidClient
+)
+
+var (
+	ErrUnmodified = errors.New("Object wasn't modified")
 )
 
 func prepareSongForClient(s *nup.Song, id int64, client clientType) {

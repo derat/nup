@@ -2,6 +2,7 @@ package appengine
 
 import (
 	"appengine"
+	"appengine/datastore"
 	"appengine/memcache"
 	"crypto/sha1"
 	"encoding/hex"
@@ -18,10 +19,12 @@ const (
 	queriesCacheKey = "queries"
 )
 
-var jsonCodec memcache.Codec = memcache.Codec{
-	Marshal:   json.Marshal,
-	Unmarshal: json.Unmarshal,
-}
+var (
+	jsonCodec = memcache.Codec{
+		Marshal:   json.Marshal,
+		Unmarshal: json.Unmarshal,
+	}
+)
 
 type cachedQuery struct {
 	Query songQuery
@@ -29,6 +32,15 @@ type cachedQuery struct {
 }
 
 type cachedQueries map[string]cachedQuery
+
+// Ugh.
+type encodedCachedQueries struct {
+	Data []byte
+}
+
+func getDatastoreCachedQueriesKey(c appengine.Context) *datastore.Key {
+	return datastore.NewKey(c, cachedQueriesKind, queriesCacheKey, 0, nil)
+}
 
 func computeQueryHash(q *songQuery) (string, error) {
 	b, err := json.Marshal(q)
@@ -39,12 +51,32 @@ func computeQueryHash(q *songQuery) (string, error) {
 	return hex.EncodeToString(s[:]), nil
 }
 
-func getCachedQueryResults(c appengine.Context, query *songQuery) ([]int64, error) {
+func getAllCachedQueries(c appengine.Context) (cachedQueries, error) {
 	queries := make(cachedQueries)
-	if _, err := jsonCodec.Get(c, queriesCacheKey, &queries); err == memcache.ErrCacheMiss {
-		return nil, nil
-	} else if err != nil {
+	if cfg.UseDatastoreForCachedQueries {
+		eq := encodedCachedQueries{}
+		if err := datastore.Get(c, getDatastoreCachedQueriesKey(c), &eq); err == nil {
+			if err := json.Unmarshal(eq.Data, &queries); err != nil {
+				return nil, err
+			}
+		} else if err != datastore.ErrNoSuchEntity {
+			return nil, err
+		}
+	} else {
+		if _, err := jsonCodec.Get(c, queriesCacheKey, &queries); err != nil && err != memcache.ErrCacheMiss {
+			return nil, err
+		}
+	}
+	return queries, nil
+}
+
+func getCachedQueryResults(c appengine.Context, query *songQuery) ([]int64, error) {
+	queries, err := getAllCachedQueries(c)
+	if err != nil {
 		return nil, err
+	}
+	if len(queries) == 0 {
+		return nil, nil
 	}
 
 	queryHash, err := computeQueryHash(query)
@@ -58,14 +90,27 @@ func getCachedQueryResults(c appengine.Context, query *songQuery) ([]int64, erro
 }
 
 func updateCachedQueries(c appengine.Context, f func(cachedQueries) error) error {
-	queries := make(cachedQueries)
-	if _, err := jsonCodec.Get(c, queriesCacheKey, &queries); err != nil && err != memcache.ErrCacheMiss {
+	queries, err := getAllCachedQueries(c)
+	if err != nil {
 		return err
 	}
-	if err := f(queries); err != nil {
+
+	if err := f(queries); err == ErrUnmodified {
+		return nil
+	} else if err != nil {
 		return err
 	}
-	return jsonCodec.Set(c, &memcache.Item{Key: queriesCacheKey, Object: &queries})
+
+	if cfg.UseDatastoreForCachedQueries {
+		b, err := json.Marshal(queries)
+		if err != nil {
+			return err
+		}
+		_, err = datastore.Put(c, getDatastoreCachedQueriesKey(c), &encodedCachedQueries{b})
+		return err
+	} else {
+		return jsonCodec.Set(c, &memcache.Item{Key: queriesCacheKey, Object: &queries})
+	}
 }
 
 func writeQueryResultsToCache(c appengine.Context, query *songQuery, ids []int64) error {
@@ -91,6 +136,9 @@ func flushQueriesFromCacheForUpdate(c appengine.Context, updateType uint) error 
 				delete(queries, k)
 				numFlushed++
 			}
+		}
+		if numFlushed == 0 {
+			return ErrUnmodified
 		}
 		return nil
 	}); err != nil {

@@ -29,8 +29,9 @@ const (
 	indexPath = "nup/index.html"
 
 	// Datastore kinds of various objects.
-	playKind = "Play"
-	songKind = "Song"
+	playKind          = "Play"
+	songKind          = "Song"
+	cachedQueriesKind = "CachedQueries"
 
 	// Default and maximum size of a batch of dumped entities.
 	defaultDumpBatchSize = 100
@@ -53,8 +54,12 @@ var cfg struct {
 	SongBucket  string
 	CoverBucket string
 
+	// Should songs and query results be cached?
 	CacheSongs   bool
 	CacheQueries bool
+
+	// Should datastore (rather than memcache) be used for caching query results?
+	UseDatastoreForCachedQueries bool
 }
 
 // TODO: This is swiped from https://code.google.com/p/go/source/detail?r=5e03333d2dcf.

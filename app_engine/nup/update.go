@@ -3,7 +3,6 @@ package appengine
 import (
 	"appengine"
 	"appengine/datastore"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -18,10 +17,6 @@ const (
 	ratingUpdate   = 2
 	tagsUpdate     = 4
 	playUpdate     = 8
-)
-
-var (
-	ErrSongUnchanged = errors.New("Song wasn't modified")
 )
 
 func sortedStringSlicesMatch(a, b []string) bool {
@@ -125,8 +120,9 @@ func updateExistingSong(c appengine.Context, id int64, f func(appengine.Context,
 			return err
 		}
 		if err := f(c, song); err != nil {
-			if err == ErrSongUnchanged {
+			if err == ErrUnmodified {
 				c.Debugf("Song %v wasn't changed", id)
+				return nil
 			}
 			return err
 		}
@@ -192,14 +188,17 @@ func updateRatingAndTags(c appengine.Context, id int64, hasRating bool, rating f
 			s.LastModifiedTime = time.Now()
 			return nil
 		} else {
-			return ErrSongUnchanged
+			return ErrUnmodified
 		}
 	}, updateDelay)
 
-	if err != nil && err != ErrSongUnchanged {
+	if err != nil {
 		return err
 	}
-	return flushQueriesFromCacheForUpdate(c, updateType)
+	if updateType != 0 {
+		return flushQueriesFromCacheForUpdate(c, updateType)
+	}
+	return nil
 }
 
 func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserData bool, updateDelay time.Duration) error {
