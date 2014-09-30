@@ -122,7 +122,7 @@ func dumpSongsForAndroid(c appengine.Context, minLastModified time.Time, max int
 
 	songs = songs[0:len(ids)]
 	for i, id := range ids {
-		prepareSongForClient(&songs[i], id, androidClient)
+		prepareSongForClient(&songs[i], id, nup.AndroidClient)
 	}
 	return songs, nextCursor, nil
 }

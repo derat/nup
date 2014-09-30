@@ -95,3 +95,28 @@ type ClientConfig struct {
 	Username  string
 	Password  string
 }
+
+type BasicAuthInfo struct {
+	Username string
+	Password string
+}
+
+// ClientConfig holds the App Engine server's configuration.
+type ServerConfig struct {
+	// Email addresses of Google users allowed to use the server.
+	GoogleUsers []string
+
+	// Credentials of accounts using HTTP basic authentication.
+	BasicAuthUsers []BasicAuthInfo
+
+	// Names of the Cloud Storage buckets where song and cover files are stored.
+	SongBucket  string
+	CoverBucket string
+
+	// Should songs and query results be cached?
+	CacheSongs   bool
+	CacheQueries bool
+
+	// Should datastore (rather than memcache) be used for caching query results?
+	UseDatastoreForCachedQueries bool
+}

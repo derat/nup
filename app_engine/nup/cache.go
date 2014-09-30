@@ -226,3 +226,13 @@ func writeSongsToCache(c appengine.Context, ids []int64, songs []nup.Song, flush
 	}
 	return nil
 }
+
+func flushCache(c appengine.Context) error {
+	if err := memcache.Flush(c); err != nil {
+		return err
+	}
+	if err := datastore.Delete(c, getDatastoreCachedQueriesKey(c)); err != nil && err != datastore.ErrNoSuchEntity {
+		return err
+	}
+	return nil
+}

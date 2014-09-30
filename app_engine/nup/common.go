@@ -2,43 +2,25 @@ package appengine
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"time"
 
 	"erat.org/nup"
 )
 
-type clientType int
-
-const (
-	webClient clientType = iota
-	androidClient
-)
-
 var (
 	ErrUnmodified = errors.New("Object wasn't modified")
 )
 
-func prepareSongForClient(s *nup.Song, id int64, client clientType) {
+func prepareSongForClient(s *nup.Song, id int64, client nup.ClientType) {
 	// Set fields that are only present in search results (i.e. not in Datastore).
 	s.SongId = strconv.FormatInt(id, 10)
 
-	getUrl := func(bucketName, filePath string) string {
-		switch client {
-		case webClient:
-			return fmt.Sprintf("https://storage.cloud.google.com/%s/%s", bucketName, nup.EncodePathForCloudStorage(filePath))
-		case androidClient:
-			return fmt.Sprintf("https://%s.storage.googleapis.com/%s", bucketName, nup.EncodePathForCloudStorage(filePath))
-		default:
-			return ""
-		}
-	}
 	if len(s.Filename) > 0 {
-		s.Url = getUrl(cfg.SongBucket, s.Filename)
+		s.Url = nup.GetCloudStorageUrl(cfg.SongBucket, s.Filename, client)
 	}
 	if len(s.CoverFilename) > 0 {
-		s.CoverUrl = getUrl(cfg.CoverBucket, s.CoverFilename)
+		s.CoverUrl = nup.GetCloudStorageUrl(cfg.CoverBucket, s.CoverFilename, client)
 	}
 
 	// Create an empty tags slice so that clients don't need to check for null.

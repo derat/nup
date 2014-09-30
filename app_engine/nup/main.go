@@ -2,7 +2,6 @@ package appengine
 
 import (
 	"appengine"
-	"appengine/memcache"
 	"appengine/user"
 	"bytes"
 	"encoding/base64"
@@ -38,29 +37,7 @@ const (
 	maxDumpBatchSize     = 5000
 )
 
-type basicAuthInfo struct {
-	Username string
-	Password string
-}
-
-var cfg struct {
-	// Email addresses of Google users allowed to use the server.
-	GoogleUsers []string
-
-	// Credentials of accounts using HTTP basic authentication.
-	BasicAuthUsers []basicAuthInfo
-
-	// Names of the Cloud Storage buckets where song and cover files are stored.
-	SongBucket  string
-	CoverBucket string
-
-	// Should songs and query results be cached?
-	CacheSongs   bool
-	CacheQueries bool
-
-	// Should datastore (rather than memcache) be used for caching query results?
-	UseDatastoreForCachedQueries bool
-}
+var cfg nup.ServerConfig
 
 // TODO: This is swiped from https://code.google.com/p/go/source/detail?r=5e03333d2dcf.
 // Switch to the version in net/http once it makes its way into App Engine.
@@ -182,21 +159,35 @@ func parseFloatParam(c appengine.Context, w http.ResponseWriter, r *http.Request
 	return true
 }
 
-func init() {
-	if err := cloud.ReadJson(configPath, &cfg); err != nil {
-		panic(fmt.Sprintf("Unable to read %v: %v", configPath, err))
+func loadConfig() (nup.ServerConfig, error) {
+	newCfg := nup.ServerConfig{}
+	if err := cloud.ReadJson(configPath, &newCfg); err != nil {
+		return newCfg, fmt.Errorf("Unable to read %v: %v", configPath, err)
 	}
-	if len(cfg.SongBucket) == 0 || len(cfg.CoverBucket) == 0 {
-		panic(fmt.Sprintf("Invalid song bucket %q or cover bucket %q", cfg.SongBucket, cfg.CoverBucket))
+	if len(newCfg.SongBucket) == 0 || len(newCfg.CoverBucket) == 0 {
+		return newCfg, fmt.Errorf("Invalid song bucket %q or cover bucket %q", newCfg.SongBucket, newCfg.CoverBucket)
+	}
+	return newCfg, nil
+}
+
+func addTestUserToConfig(c *nup.ServerConfig) {
+	c.BasicAuthUsers = append(c.BasicAuthUsers, nup.BasicAuthInfo{test.TestUsername, test.TestPassword})
+}
+
+func init() {
+	var err error
+	if cfg, err = loadConfig(); err != nil {
+		panic(err)
 	}
 	if appengine.IsDevAppServer() {
-		cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, basicAuthInfo{test.TestUsername, test.TestPassword})
+		addTestUserToConfig(&cfg)
 	}
 
 	rand.Seed(time.Now().UnixNano())
 
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/clear", handleClear)
+	http.HandleFunc("/config", handleConfig)
 	http.HandleFunc("/dump_song", handleDumpSong)
 	http.HandleFunc("/export", handleExport)
 	http.HandleFunc("/flush_cache", handleFlushCache)
@@ -222,6 +213,35 @@ func handleClear(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	writeTextResponse(w, "ok")
+}
+
+func handleConfig(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	if !checkRequest(c, w, r, "POST", false) {
+		return
+	}
+	if !appengine.IsDevAppServer() {
+		http.Error(w, "Only works on dev server", http.StatusBadRequest)
+		return
+	}
+
+	newCfg := nup.ServerConfig{}
+	if err := json.NewDecoder(r.Body).Decode(&newCfg); err == io.EOF {
+		// Load the config from disk.
+		if newCfg, err = loadConfig(); err != nil {
+			c.Errorf("Failed to reset config: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	} else if err != nil {
+		c.Errorf("Failed to decode config: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	addTestUserToConfig(&newCfg)
+	cfg = newCfg
 	writeTextResponse(w, "ok")
 }
 
@@ -346,7 +366,7 @@ func handleFlushCache(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only works on dev server", http.StatusBadRequest)
 		return
 	}
-	if err := memcache.Flush(c); err != nil {
+	if err := flushCache(c); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

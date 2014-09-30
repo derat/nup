@@ -339,7 +339,7 @@ func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error)
 			songs[i] = storedSongs[storedIndex]
 			storedIndex++
 		}
-		prepareSongForClient(&songs[i], id, webClient)
+		prepareSongForClient(&songs[i], id, nup.WebClient)
 	}
 
 	if !query.Shuffle {
