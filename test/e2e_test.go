@@ -117,7 +117,7 @@ func doPlayTimeQueries(tt *testing.T, t *Tester, s *nup.Song, queryPrefix string
 
 func TestLegacy(tt *testing.T) {
 	t := setUpTest()
-	defer os.RemoveAll(t.TempDir)
+	defer t.CleanUp()
 
 	log.Print("importing songs from legacy db")
 	t.ImportSongsFromLegacyDb(filepath.Join(GetDataDir(), "legacy.db"))
@@ -140,7 +140,7 @@ func TestLegacy(tt *testing.T) {
 
 func TestUpdate(tt *testing.T) {
 	t := setUpTest()
-	defer os.RemoveAll(t.TempDir)
+	defer t.CleanUp()
 
 	log.Print("importing songs from music dir")
 	CopySongsToTempDir(t.MusicDir, Song0s.Filename, Song1s.Filename)
@@ -167,7 +167,7 @@ func TestUpdate(tt *testing.T) {
 
 func TestUserData(tt *testing.T) {
 	t := setUpTest()
-	defer os.RemoveAll(t.TempDir)
+	defer t.CleanUp()
 
 	log.Print("importing a song")
 	CopySongsToTempDir(t.MusicDir, Song0s.Filename)
@@ -229,7 +229,7 @@ func TestUserData(tt *testing.T) {
 
 func TestQueries(tt *testing.T) {
 	t := setUpTest()
-	defer os.RemoveAll(t.TempDir)
+	defer t.CleanUp()
 
 	log.Print("posting some songs")
 	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, true, 0)
@@ -263,7 +263,7 @@ func TestQueries(tt *testing.T) {
 
 func TestCaching(tt *testing.T) {
 	t := setUpTest()
-	defer os.RemoveAll(t.TempDir)
+	defer t.CleanUp()
 
 	log.Print("posting and querying a song")
 	t.PostSongs([]nup.Song{LegacySong1}, true, 0)
@@ -302,7 +302,7 @@ func TestCaching(tt *testing.T) {
 
 func TestCacheRace(tt *testing.T) {
 	t := setUpTest()
-	defer os.RemoveAll(t.TempDir)
+	defer t.CleanUp()
 
 	log.Print("posting a song")
 	t.PostSongs([]nup.Song{LegacySong1}, true, 0)
@@ -364,7 +364,7 @@ func TestCacheRace(tt *testing.T) {
 
 func TestAndroid(tt *testing.T) {
 	t := setUpTest()
-	defer os.RemoveAll(t.TempDir)
+	defer t.CleanUp()
 
 	log.Print("posting songs")
 	now := t.GetNowFromServer()
