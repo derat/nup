@@ -15,16 +15,20 @@ import (
 )
 
 const (
-	songCachePrefix = "song-"
+	// Datastore kind for cached queries.
+	cachedQueriesKind = "CachedQueries"
+
+	// Memcache key (and also datastore ID :-/) for cached queries.
 	queriesCacheKey = "queries"
+
+	// Memcache key prefix for cached songs.
+	songCachePrefix = "song-"
 )
 
-var (
-	jsonCodec = memcache.Codec{
-		Marshal:   json.Marshal,
-		Unmarshal: json.Unmarshal,
-	}
-)
+var jsonCodec = memcache.Codec{
+	Marshal:   json.Marshal,
+	Unmarshal: json.Unmarshal,
+}
 
 type cachedQuery struct {
 	Query songQuery
@@ -53,7 +57,7 @@ func computeQueryHash(q *songQuery) (string, error) {
 
 func getAllCachedQueries(c appengine.Context) (cachedQueries, error) {
 	queries := make(cachedQueries)
-	if cfg.UseDatastoreForCachedQueries {
+	if getConfig(c).UseDatastoreForCachedQueries {
 		eq := encodedCachedQueries{}
 		if err := datastore.Get(c, getDatastoreCachedQueriesKey(c), &eq); err == nil {
 			if err := json.Unmarshal(eq.Data, &queries); err != nil {
@@ -101,7 +105,7 @@ func updateCachedQueries(c appengine.Context, f func(cachedQueries) error) error
 		return err
 	}
 
-	if cfg.UseDatastoreForCachedQueries {
+	if getConfig(c).UseDatastoreForCachedQueries {
 		b, err := json.Marshal(queries)
 		if err != nil {
 			return err

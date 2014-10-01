@@ -195,7 +195,10 @@ func (t *Tester) DoPost(pathAndQueryParams string, body io.Reader) {
 	req := t.NewRequest("POST", pathAndQueryParams, body)
 	req.Header.Set("Content-Type", "text/plain")
 	resp := t.SendRequest(req)
-	resp.Body.Close()
+	defer resp.Body.Close()
+	if _, err := ioutil.ReadAll(resp.Body); err != nil {
+		panic(err)
+	}
 }
 
 func (t *Tester) PostSongs(songs []nup.Song, replaceUserData bool, updateDelay time.Duration) {

@@ -15,29 +15,17 @@ import (
 	"strings"
 	"time"
 
-	"erat.org/cloud"
 	"erat.org/nup"
-	"erat.org/nup/test"
 )
 
 const (
-	// Config file path relative to base app directory.
-	configPath = "config.json"
-
 	// Path to the index file.
 	indexPath = "nup/index.html"
-
-	// Datastore kinds of various objects.
-	playKind          = "Play"
-	songKind          = "Song"
-	cachedQueriesKind = "CachedQueries"
 
 	// Default and maximum size of a batch of dumped entities.
 	defaultDumpBatchSize = 100
 	maxDumpBatchSize     = 5000
 )
-
-var cfg nup.ServerConfig
 
 // TODO: This is swiped from https://code.google.com/p/go/source/detail?r=5e03333d2dcf.
 // Switch to the version in net/http once it makes its way into App Engine.
@@ -82,7 +70,7 @@ func writeTextResponse(w http.ResponseWriter, s string) {
 	w.Write([]byte(s))
 }
 
-func hasAllowedGoogleAuth(c appengine.Context, r *http.Request) (email string, allowed bool) {
+func hasAllowedGoogleAuth(c appengine.Context, r *http.Request, cfg *nup.ServerConfig) (email string, allowed bool) {
 	u := user.Current(c)
 	if u == nil {
 		return "", false
@@ -96,7 +84,7 @@ func hasAllowedGoogleAuth(c appengine.Context, r *http.Request) (email string, a
 	return u.Email, false
 }
 
-func hasAllowedBasicAuth(r *http.Request) (username string, allowed bool) {
+func hasAllowedBasicAuth(r *http.Request, cfg *nup.ServerConfig) (username string, allowed bool) {
 	username, password, ok := basicAuth(r)
 	if !ok {
 		return "", false
@@ -111,9 +99,10 @@ func hasAllowedBasicAuth(r *http.Request) (username string, allowed bool) {
 }
 
 func checkRequest(c appengine.Context, w http.ResponseWriter, r *http.Request, method string, redirectToLogin bool) bool {
-	username, allowed := hasAllowedGoogleAuth(c, r)
+	cfg := getConfig(c)
+	username, allowed := hasAllowedGoogleAuth(c, r, cfg)
 	if !allowed && len(username) == 0 {
-		username, allowed = hasAllowedBasicAuth(r)
+		username, allowed = hasAllowedBasicAuth(r, cfg)
 	}
 	if !allowed {
 		if len(username) == 0 && redirectToLogin {
@@ -159,30 +148,8 @@ func parseFloatParam(c appengine.Context, w http.ResponseWriter, r *http.Request
 	return true
 }
 
-func loadConfig() (nup.ServerConfig, error) {
-	newCfg := nup.ServerConfig{}
-	if err := cloud.ReadJson(configPath, &newCfg); err != nil {
-		return newCfg, fmt.Errorf("Unable to read %v: %v", configPath, err)
-	}
-	if len(newCfg.SongBucket) == 0 || len(newCfg.CoverBucket) == 0 {
-		return newCfg, fmt.Errorf("Invalid song bucket %q or cover bucket %q", newCfg.SongBucket, newCfg.CoverBucket)
-	}
-	return newCfg, nil
-}
-
-func addTestUserToConfig(c *nup.ServerConfig) {
-	c.BasicAuthUsers = append(c.BasicAuthUsers, nup.BasicAuthInfo{test.TestUsername, test.TestPassword})
-}
-
 func init() {
-	var err error
-	if cfg, err = loadConfig(); err != nil {
-		panic(err)
-	}
-	if appengine.IsDevAppServer() {
-		addTestUserToConfig(&cfg)
-	}
-
+	loadBaseConfig()
 	rand.Seed(time.Now().UnixNano())
 
 	http.HandleFunc("/", handleIndex)
@@ -226,22 +193,18 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newCfg := nup.ServerConfig{}
-	if err := json.NewDecoder(r.Body).Decode(&newCfg); err == io.EOF {
-		// Load the config from disk.
-		if newCfg, err = loadConfig(); err != nil {
-			c.Errorf("Failed to reset config: %v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	} else if err != nil {
+	cfg := nup.ServerConfig{}
+	if err := json.NewDecoder(r.Body).Decode(&cfg); err == nil {
+		addTestUserToConfig(&cfg)
+		saveTestConfig(c, &cfg)
+	} else if err == io.EOF {
+		clearTestConfig(c)
+	} else {
 		c.Errorf("Failed to decode config: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	addTestUserToConfig(&newCfg)
-	cfg = newCfg
 	writeTextResponse(w, "ok")
 }
 

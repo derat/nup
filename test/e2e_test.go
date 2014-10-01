@@ -27,7 +27,16 @@ const (
 
 var binDir string = filepath.Join(os.Getenv("GOPATH"), "bin")
 
-func setUpTest() *Tester {
+type cachePolicy int
+
+const (
+	noCaching cachePolicy = iota
+	cacheOnlySongs
+	cacheOnlyQueries
+	cacheSongsAndQueries
+)
+
+func setUpTest(cp cachePolicy) *Tester {
 	t := newTester(server, binDir)
 	log.Printf("clearing all data on %v", server)
 	t.DoPost("clear", nil)
@@ -36,8 +45,8 @@ func setUpTest() *Tester {
 	b, err := json.Marshal(nup.ServerConfig{
 		SongBucket:                   songBucket,
 		CoverBucket:                  coverBucket,
-		CacheSongs:                   false,
-		CacheQueries:                 false,
+		CacheSongs:                   cp == cacheOnlySongs || cp == cacheSongsAndQueries,
+		CacheQueries:                 cp == cacheOnlyQueries || cp == cacheSongsAndQueries,
 		UseDatastoreForCachedQueries: false,
 	})
 	if err != nil {
@@ -46,6 +55,11 @@ func setUpTest() *Tester {
 	t.DoPost("config", bytes.NewBuffer(b))
 
 	return t
+}
+
+func cleanUpTest(t *Tester) {
+	t.DoPost("config", nil)
+	t.CleanUp()
 }
 
 // extractFilePathFromUrl extracts the (escaped for Cloud Storage but un-query-escaped) original file path from a URL.
@@ -130,8 +144,8 @@ func doPlayTimeQueries(tt *testing.T, t *Tester, s *nup.Song, queryPrefix string
 }
 
 func TestLegacy(tt *testing.T) {
-	t := setUpTest()
-	defer t.CleanUp()
+	t := setUpTest(noCaching)
+	defer cleanUpTest(t)
 
 	log.Print("importing songs from legacy db")
 	t.ImportSongsFromLegacyDb(filepath.Join(GetDataDir(), "legacy.db"))
@@ -153,8 +167,8 @@ func TestLegacy(tt *testing.T) {
 }
 
 func TestUpdate(tt *testing.T) {
-	t := setUpTest()
-	defer t.CleanUp()
+	t := setUpTest(noCaching)
+	defer cleanUpTest(t)
 
 	log.Print("importing songs from music dir")
 	CopySongsToTempDir(t.MusicDir, Song0s.Filename, Song1s.Filename)
@@ -180,8 +194,8 @@ func TestUpdate(tt *testing.T) {
 }
 
 func TestUserData(tt *testing.T) {
-	t := setUpTest()
-	defer t.CleanUp()
+	t := setUpTest(noCaching)
+	defer cleanUpTest(t)
 
 	log.Print("importing a song")
 	CopySongsToTempDir(t.MusicDir, Song0s.Filename)
@@ -242,8 +256,8 @@ func TestUserData(tt *testing.T) {
 }
 
 func TestQueries(tt *testing.T) {
-	t := setUpTest()
-	defer t.CleanUp()
+	t := setUpTest(noCaching)
+	defer cleanUpTest(t)
 
 	log.Print("posting some songs")
 	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, true, 0)
@@ -276,8 +290,8 @@ func TestQueries(tt *testing.T) {
 }
 
 func TestCaching(tt *testing.T) {
-	t := setUpTest()
-	defer t.CleanUp()
+	t := setUpTest(cacheSongsAndQueries)
+	defer cleanUpTest(t)
 
 	log.Print("posting and querying a song")
 	t.PostSongs([]nup.Song{LegacySong1}, true, 0)
@@ -315,8 +329,8 @@ func TestCaching(tt *testing.T) {
 }
 
 func TestCacheRace(tt *testing.T) {
-	t := setUpTest()
-	defer t.CleanUp()
+	t := setUpTest(cacheSongsAndQueries)
+	defer cleanUpTest(t)
 
 	log.Print("posting a song")
 	t.PostSongs([]nup.Song{LegacySong1}, true, 0)
@@ -377,8 +391,8 @@ func TestCacheRace(tt *testing.T) {
 }
 
 func TestAndroid(tt *testing.T) {
-	t := setUpTest()
-	defer t.CleanUp()
+	t := setUpTest(noCaching)
+	defer cleanUpTest(t)
 
 	log.Print("posting songs")
 	now := t.GetNowFromServer()

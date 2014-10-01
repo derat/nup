@@ -8,11 +8,17 @@ import (
 	"erat.org/nup"
 )
 
+const (
+	// Datastore kinds of various objects.
+	playKind = "Play"
+	songKind = "Song"
+)
+
 var (
 	ErrUnmodified = errors.New("Object wasn't modified")
 )
 
-func prepareSongForClient(s *nup.Song, id int64, client nup.ClientType) {
+func prepareSongForClient(s *nup.Song, id int64, cfg *nup.ServerConfig, client nup.ClientType) {
 	// Set fields that are only present in search results (i.e. not in Datastore).
 	s.SongId = strconv.FormatInt(id, 10)
 

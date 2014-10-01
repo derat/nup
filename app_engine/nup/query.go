@@ -247,6 +247,7 @@ func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error)
 	var ids []int64
 	var err error
 
+	cfg := getConfig(c)
 	if cfg.CacheQueries {
 		startTime := time.Now()
 		ids, err = getCachedQueryResults(c, query)
@@ -339,7 +340,7 @@ func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error)
 			songs[i] = storedSongs[storedIndex]
 			storedIndex++
 		}
-		prepareSongForClient(&songs[i], id, nup.WebClient)
+		prepareSongForClient(&songs[i], id, cfg, nup.WebClient)
 	}
 
 	if !query.Shuffle {

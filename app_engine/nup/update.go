@@ -113,6 +113,7 @@ func updateExistingSong(c appengine.Context, id int64, f func(appengine.Context,
 		time.Sleep(updateDelay)
 	}
 
+	cfg := getConfig(c)
 	return datastore.RunInTransaction(c, func(c appengine.Context) error {
 		key := datastore.NewKey(c, songKind, "", id, nil)
 		song := &nup.Song{}
