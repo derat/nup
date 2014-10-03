@@ -263,7 +263,7 @@ func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error)
 			return nil, err
 		}
 
-		if cfg.CacheQueries {
+		if cfg.CacheQueries && shouldCacheQuery(query) {
 			startTime := time.Now()
 			if err = writeQueryResultsToCache(c, query, ids); err != nil {
 				c.Errorf("Got error while writing query results to cache: %v", err)
