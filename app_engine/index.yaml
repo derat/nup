@@ -12,6 +12,11 @@ indexes:
 
 - kind: Song
   properties:
+  - name: AlbumLower
+  - name: Rating
+
+- kind: Song
+  properties:
   - name: ArtistLower
   - name: Rating
 
