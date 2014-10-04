@@ -228,6 +228,18 @@ func (t *Tester) QuerySongs(params string) []nup.Song {
 	return songs
 }
 
+func (t *Tester) GetTags() string {
+	resp := t.SendRequest(t.NewRequest("GET", "list_tags", nil))
+	defer resp.Body.Close()
+
+	tags := make([]string, 0)
+	d := json.NewDecoder(resp.Body)
+	if err := d.Decode(&tags); err != nil {
+		panic(err)
+	}
+	return strings.Join(tags, ",")
+}
+
 func (t *Tester) GetNowFromServer() time.Time {
 	resp := t.SendRequest(t.NewRequest("GET", "now_nsec", nil))
 	defer resp.Body.Close()

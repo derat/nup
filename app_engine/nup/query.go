@@ -64,14 +64,26 @@ func (a songArray) Less(i, j int) bool {
 	return a[i].Track < a[j].Track
 }
 
-func getTags(c appengine.Context) ([]string, error) {
-	tags := make(map[string]bool)
+func getTags(c appengine.Context) (tags []string, err error) {
+	cfg := getConfig(c)
+	if cfg.CacheTags {
+		startTime := time.Now()
+		if tags, err = getTagsFromCache(c); err != nil {
+			c.Errorf("Got error while getting cached tags: %v", err)
+		} else if tags != nil {
+			c.Debugf("Got %v tag(s) from cache in %v ms", len(tags), getMsecSinceTime(startTime))
+			return tags, nil
+		}
+	}
+
+	startTime := time.Now()
+	tagMap := make(map[string]bool)
 	it := datastore.NewQuery(songKind).Project("Tags").Distinct().Run(c)
 	for {
 		song := &nup.Song{}
 		if _, err := it.Next(song); err == nil {
 			for _, t := range song.Tags {
-				tags[t] = true
+				tagMap[t] = true
 			}
 		} else if err == datastore.Done {
 			break
@@ -79,14 +91,25 @@ func getTags(c appengine.Context) ([]string, error) {
 			return nil, err
 		}
 	}
-
-	res := make([]string, len(tags))
+	tags = make([]string, len(tagMap))
 	i := 0
-	for t := range tags {
-		res[i] = t
+	for t := range tagMap {
+		tags[i] = t
 		i++
 	}
-	return res, nil
+	sort.Strings(tags)
+	c.Debugf("Got %v tag(s) from datastore in %v ms", len(tags), getMsecSinceTime(startTime))
+
+	if cfg.CacheTags {
+		startTime = time.Now()
+		if err = writeTagsToCache(c, tags); err != nil {
+			c.Errorf("Got error while writing tags to cache: %v", err)
+		} else {
+			c.Debugf("Wrote %v tag(s) to cache in %v ms", len(tags), getMsecSinceTime(startTime))
+		}
+	}
+
+	return tags, nil
 }
 
 func runQueriesAndGetIds(c appengine.Context, qs []*datastore.Query) ([][]int64, error) {

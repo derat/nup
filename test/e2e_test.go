@@ -31,9 +31,7 @@ type cachePolicy int
 
 const (
 	noCaching cachePolicy = iota
-	cacheOnlySongs
-	cacheOnlyQueries
-	cacheSongsAndQueries
+	cacheData
 )
 
 func setUpTest(cp cachePolicy) *Tester {
@@ -43,11 +41,12 @@ func setUpTest(cp cachePolicy) *Tester {
 	t.DoPost("flush_cache", nil)
 
 	b, err := json.Marshal(nup.ServerConfig{
-		SongBucket:                   songBucket,
-		CoverBucket:                  coverBucket,
-		CacheSongs:                   cp == cacheOnlySongs || cp == cacheSongsAndQueries,
-		CacheQueries:                 cp == cacheOnlyQueries || cp == cacheSongsAndQueries,
-		UseDatastoreForCachedQueries: false,
+		SongBucket:           songBucket,
+		CoverBucket:          coverBucket,
+		CacheSongs:           cp == cacheData,
+		CacheQueries:         cp == cacheData,
+		CacheTags:            cp == cacheData,
+		UseDatastoreForCache: false,
 	})
 	if err != nil {
 		panic(err)
@@ -290,7 +289,7 @@ func TestQueries(tt *testing.T) {
 }
 
 func TestCaching(tt *testing.T) {
-	t := setUpTest(cacheSongsAndQueries)
+	t := setUpTest(cacheData)
 	defer cleanUpTest(t)
 
 	log.Print("posting and querying a song")
@@ -343,7 +342,7 @@ func TestCaching(tt *testing.T) {
 }
 
 func TestCacheRace(tt *testing.T) {
-	t := setUpTest(cacheSongsAndQueries)
+	t := setUpTest(cacheData)
 	defer cleanUpTest(t)
 
 	log.Print("posting a song")
@@ -439,6 +438,35 @@ func TestAndroid(tt *testing.T) {
 	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(p.StartTime.Unix(), 10), nil)
 	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(now), false, nup.AndroidClient); err != nil {
 		tt.Error(err)
+	}
+}
+
+func TestTags(tt *testing.T) {
+	t := setUpTest(cacheData)
+	defer cleanUpTest(t)
+
+	log.Print("getting hopefully-empty tag list")
+	if tags := t.GetTags(); len(tags) > 0 {
+		tt.Error("got unexpected tags %q", tags)
+	}
+
+	log.Print("posting song and getting tags")
+	t.PostSongs([]nup.Song{LegacySong1}, true, 0)
+	if tags := t.GetTags(); tags != "electronic,instrumental" {
+		tt.Error("got tags %q", tags)
+	}
+
+	log.Print("posting another song and getting tags")
+	t.PostSongs([]nup.Song{LegacySong2}, true, 0)
+	if tags := t.GetTags(); tags != "electronic,instrumental,rock" {
+		tt.Error("got tags %q", tags)
+	}
+
+	log.Print("adding tags and checking that they're returned")
+	id := t.GetSongId(LegacySong1.Sha1)
+	t.DoPost("rate_and_tag?songId="+id+"&tags=electronic+instrumental+drums+idm", nil)
+	if tags := t.GetTags(); tags != "drums,electronic,idm,instrumental,rock" {
+		tt.Error("got tags %q", tags)
 	}
 }
 

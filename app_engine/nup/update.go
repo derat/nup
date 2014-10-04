@@ -168,7 +168,7 @@ func addPlay(c appengine.Context, id int64, startTime time.Time, ip string) erro
 	if err != nil {
 		return err
 	}
-	return flushQueriesFromCacheForUpdate(c, playUpdate)
+	return flushDataFromCacheForUpdate(c, playUpdate)
 }
 
 func updateRatingAndTags(c appengine.Context, id int64, hasRating bool, rating float64, tags []string, updateDelay time.Duration) error {
@@ -197,7 +197,7 @@ func updateRatingAndTags(c appengine.Context, id int64, hasRating bool, rating f
 		return err
 	}
 	if updateType != 0 {
-		return flushQueriesFromCacheForUpdate(c, updateType)
+		return flushDataFromCacheForUpdate(c, updateType)
 	}
 	return nil
 }

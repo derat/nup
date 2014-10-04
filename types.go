@@ -113,10 +113,11 @@ type ServerConfig struct {
 	SongBucket  string
 	CoverBucket string
 
-	// Should songs and query results be cached?
+	// Should songs, query results, and tags be cached?
 	CacheSongs   bool
 	CacheQueries bool
+	CacheTags    bool
 
-	// Should datastore (rather than memcache) be used for caching query results?
-	UseDatastoreForCachedQueries bool
+	// Should datastore (rather than memcache) be used for caching query results and tags?
+	UseDatastoreForCache bool
 }

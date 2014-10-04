@@ -15,11 +15,13 @@ import (
 )
 
 const (
-	// Datastore kind for cached queries.
+	// Datastore kind for cached queries and tags.
 	cachedQueriesKind = "CachedQueries"
+	cachedTagsKind    = "CachedTags"
 
-	// Memcache key (and also datastore ID :-/) for cached queries.
+	// Memcache key (and also datastore ID :-/) for cached queries and tags.
 	queriesCacheKey = "queries"
+	tagsCacheKey    = "tags"
 
 	// Memcache key prefix for cached songs.
 	songCachePrefix = "song-"
@@ -42,6 +44,10 @@ type encodedCachedQueries struct {
 	Data []byte
 }
 
+type cachedTags struct {
+	Tags []string
+}
+
 func getDatastoreCachedQueriesKey(c appengine.Context) *datastore.Key {
 	return datastore.NewKey(c, cachedQueriesKind, queriesCacheKey, 0, nil)
 }
@@ -61,7 +67,7 @@ func computeQueryHash(q *songQuery) (string, error) {
 
 func getAllCachedQueries(c appengine.Context) (cachedQueries, error) {
 	queries := make(cachedQueries)
-	if getConfig(c).UseDatastoreForCachedQueries {
+	if getConfig(c).UseDatastoreForCache {
 		eq := encodedCachedQueries{}
 		if err := datastore.Get(c, getDatastoreCachedQueriesKey(c), &eq); err == nil {
 			if err := json.Unmarshal(eq.Data, &queries); err != nil {
@@ -109,7 +115,7 @@ func updateCachedQueries(c appengine.Context, f func(cachedQueries) error) error
 		return err
 	}
 
-	if getConfig(c).UseDatastoreForCachedQueries {
+	if getConfig(c).UseDatastoreForCache {
 		b, err := json.Marshal(queries)
 		if err != nil {
 			return err
@@ -132,7 +138,7 @@ func writeQueryResultsToCache(c appengine.Context, query *songQuery, ids []int64
 	})
 }
 
-func flushQueriesFromCacheForUpdate(c appengine.Context, updateType uint) error {
+func flushDataFromCacheForUpdate(c appengine.Context, updateType uint) error {
 	numFlushed := 0
 	if err := updateCachedQueries(c, func(queries cachedQueries) error {
 		for k, cq := range queries {
@@ -154,6 +160,57 @@ func flushQueriesFromCacheForUpdate(c appengine.Context, updateType uint) error 
 	}
 	if numFlushed > 0 {
 		c.Debugf("Flushed %v cached query(s) in response to update of type %v", numFlushed, updateType)
+	}
+
+	if updateType&tagsUpdate != 0 || updateType&metadataUpdate != 0 {
+		if err := flushTagsFromCache(c); err != nil {
+			return err
+		}
+		c.Debugf("Flushed cached tags in response to update of type %v", updateType)
+	}
+
+	return nil
+}
+
+func getDatastoreCachedTagsKey(c appengine.Context) *datastore.Key {
+	return datastore.NewKey(c, cachedTagsKind, tagsCacheKey, 0, nil)
+}
+
+func getTagsFromCache(c appengine.Context) ([]string, error) {
+	t := cachedTags{}
+	if getConfig(c).UseDatastoreForCache {
+		if err := datastore.Get(c, getDatastoreCachedTagsKey(c), &t); err == datastore.ErrNoSuchEntity {
+			return nil, nil
+		} else if err != nil {
+			return nil, err
+		}
+	} else {
+		if _, err := jsonCodec.Get(c, tagsCacheKey, &t); err != nil && err != memcache.ErrCacheMiss {
+			return nil, err
+		}
+	}
+	return t.Tags, nil
+}
+
+func writeTagsToCache(c appengine.Context, tags []string) error {
+	t := cachedTags{tags}
+	if getConfig(c).UseDatastoreForCache {
+		_, err := datastore.Put(c, getDatastoreCachedTagsKey(c), &t)
+		return err
+	} else {
+		return jsonCodec.Set(c, &memcache.Item{Key: tagsCacheKey, Object: &t})
+	}
+}
+
+func flushTagsFromCache(c appengine.Context) error {
+	if getConfig(c).UseDatastoreForCache {
+		if err := datastore.Delete(c, getDatastoreCachedTagsKey(c)); err != nil && err != datastore.ErrNoSuchEntity {
+			return err
+		}
+	} else {
+		if err := memcache.Delete(c, tagsCacheKey); err != nil && err != memcache.ErrCacheMiss {
+			return err
+		}
 	}
 	return nil
 }
