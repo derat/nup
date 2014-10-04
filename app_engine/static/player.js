@@ -14,17 +14,15 @@ function Player() {
   // Index into |songs| of the track currently being played.
   this.currentIndex = -1;
 
-  // Time at which we started playing the current track, as seconds since
-  // the epoch.
+  // Time at which we started playing the current track as seconds since the epoch.
   this.startTime = -1;
 
-  // Total number of milliseconds that we've spent playing the current
+  // Total number of seconds that we've spent playing the current
   // track (ignoring paused periods).
-  this.totalPlayedMs = 0;
+  this.totalPlayedSec = 0;
 
-  // Time at which |onTimeUpdate()| was last invoked, as milliseconds since
-  // the epoch.
-  this.lastUpdateMs = -1;
+  // Time at which |onTimeUpdate()| was last invoked, as seconds since the epoch.
+  this.lastUpdateTime = -1;
 
   // Have we already reported the current track as having been played?
   this.reportedCurrentTrack = false;
@@ -146,8 +144,8 @@ Player.prototype.selectTrack = function(index) {
 
   this.currentIndex = index;
   this.startTime = getCurrentTimeSec();
-  this.totalPlayedMs = 0;
-  this.lastUpdateMs = -1;
+  this.totalPlayedSec = 0;
+  this.lastUpdateTime = -1;
   this.reportedCurrentTrack = false;
 
   this.notifyPlaylistAboutSongChange();
@@ -264,28 +262,30 @@ Player.prototype.onEnded = function(e) {
 
 Player.prototype.onPause = function(e) {
   this.playPauseButton.value = 'Play';
-  this.lastUpdateMs = -1;
+  this.lastUpdateTime = -1;
 };
 
 Player.prototype.onPlay = function(e) {
   this.playPauseButton.value = 'Pause';
-  this.lastUpdateMs = getCurrentTimeMs();
+  this.lastUpdateTime = getCurrentTimeSec();
 };
 
 Player.prototype.onTimeUpdate = function(e) {
+  var song = this.getCurrentSong();
+  var duration = song ? song.length : this.audio.duration;
+
   this.timeDiv.innerText =
       this.audio.duration > 0 ?
-      '[' + formatTime(this.audio.currentTime) + ' / ' + formatTime(this.audio.duration) + ']' :
+      '[' + formatTime(this.audio.currentTime) + ' / ' + formatTime(duration) + ']' :
       '';
 
-  var nowMs = getCurrentTimeMs();
-  if (this.lastUpdateMs > 0)
-    this.totalPlayedMs += (nowMs - this.lastUpdateMs);
-  this.lastUpdateMs = nowMs;
+  var now = getCurrentTimeSec();
+  if (this.lastUpdateTime > 0)
+    this.totalPlayedSec += (now - this.lastUpdateTime);
+  this.lastUpdateTime = now;
 
   if (!this.reportedCurrentTrack) {
-    var totalSec = this.totalPlayedMs / 1000;
-    if (totalSec >= 240 || totalSec > this.audio.duration / 2)
+    if (this.totalPlayedSec >= 240 || this.totalPlayedSec > duration / 2)
       this.reportCurrentTrack();
   }
 };

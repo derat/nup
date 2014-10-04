@@ -11,12 +11,8 @@ function formatTime(sec) {
   return parseInt(sec / 60) + ':' + pad(parseInt(sec % 60), 2);
 }
 
-function getCurrentTimeMs() {
-  return new Date().getTime();
-}
-
 function getCurrentTimeSec() {
-  return getCurrentTimeMs() / 1000;
+  return new Date().getTime() / 1000.0;
 }
 
 function updateTitleAttributeForTruncation(element, text) {
