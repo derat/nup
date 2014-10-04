@@ -228,7 +228,7 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 				s = &song
 				s.SongId = strconv.FormatInt(id, 10)
 			} else {
-				err = fmt.Errorf("Song %v missing from cache result", id)
+				err = fmt.Errorf("Song %v not cached", id)
 			}
 		}
 	} else {
