@@ -294,17 +294,19 @@ func TestCaching(tt *testing.T) {
 	defer cleanUpTest(t)
 
 	log.Print("posting and querying a song")
+	cacheParam := "cacheOnly=1"
 	t.PostSongs([]nup.Song{LegacySong1}, true, 0)
 	if err := compareQueryResults([]nup.Song{LegacySong1}, t.QuerySongs(""), false, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 
+	// After rating the song, the query results should still be served from the cache.
 	log.Print("rating and re-querying")
 	id := t.GetSongId(LegacySong1.Sha1)
 	s := LegacySong1
 	s.Rating = 1.0
 	t.DoPost("rate_and_tag?songId="+id+"&rating=1.0", nil)
-	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), false, nup.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(cacheParam), false, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 
@@ -315,9 +317,21 @@ func TestCaching(tt *testing.T) {
 		tt.Error(err)
 	}
 
-	log.Print("flushing cache and re-querying")
-	t.DoPost("flush_cache", nil)
-	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), false, nup.WebClient); err != nil {
+	log.Print("checking that time-based queries aren't cached")
+	timeParam := fmt.Sprintf("maxLastPlayed=%d", s.Plays[1].StartTime.Unix()+1)
+	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(timeParam), false, nup.WebClient); err != nil {
+		tt.Error(err)
+	}
+	if err := compareQueryResults([]nup.Song{}, t.QuerySongs(timeParam+"&"+cacheParam), false, nup.WebClient); err != nil {
+		tt.Error(err)
+	}
+
+	log.Print("checking that play-count-based queries aren't cached")
+	playParam := "maxPlays=10"
+	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(playParam), false, nup.WebClient); err != nil {
+		tt.Error(err)
+	}
+	if err := compareQueryResults([]nup.Song{}, t.QuerySongs(playParam+"&"+cacheParam), false, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 

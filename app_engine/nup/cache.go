@@ -47,7 +47,7 @@ func getDatastoreCachedQueriesKey(c appengine.Context) *datastore.Key {
 }
 
 func shouldCacheQuery(q *songQuery) bool {
-	return !q.HasMaxPlays && q.MinFirstStartTime.IsZero() || q.MaxLastStartTime.IsZero()
+	return !q.HasMaxPlays && q.MinFirstStartTime.IsZero() && q.MaxLastStartTime.IsZero()
 }
 
 func computeQueryHash(q *songQuery) (string, error) {

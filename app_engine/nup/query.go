@@ -243,7 +243,7 @@ func performQueryAgainstDatastore(c appengine.Context, query *songQuery) ([]int6
 	return mergedIds, nil
 }
 
-func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error) {
+func getSongsForQuery(c appengine.Context, query *songQuery, cacheOnly bool) ([]nup.Song, error) {
 	var ids []int64
 	var err error
 
@@ -259,16 +259,19 @@ func getSongsForQuery(c appengine.Context, query *songQuery) ([]nup.Song, error)
 	}
 
 	if ids == nil {
-		if ids, err = performQueryAgainstDatastore(c, query); err != nil {
-			return nil, err
-		}
-
-		if cfg.CacheQueries && shouldCacheQuery(query) {
-			startTime := time.Now()
-			if err = writeQueryResultsToCache(c, query, ids); err != nil {
-				c.Errorf("Got error while writing query results to cache: %v", err)
-			} else {
-				c.Debugf("Wrote query result with %v song(s) to cache in %v ms", len(ids), getMsecSinceTime(startTime))
+		if cacheOnly {
+			ids = make([]int64, 0)
+		} else {
+			if ids, err = performQueryAgainstDatastore(c, query); err != nil {
+				return nil, err
+			}
+			if cfg.CacheQueries && shouldCacheQuery(query) {
+				startTime := time.Now()
+				if err = writeQueryResultsToCache(c, query, ids); err != nil {
+					c.Errorf("Got error while writing query results to cache: %v", err)
+				} else {
+					c.Debugf("Wrote query result with %v song(s) to cache in %v ms", len(ids), getMsecSinceTime(startTime))
+				}
 			}
 		}
 	}

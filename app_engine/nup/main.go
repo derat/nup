@@ -428,6 +428,8 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cacheOnly := r.FormValue("cacheOnly") == "1"
+
 	q := &songQuery{}
 	q.Artist = r.FormValue("artist")
 	q.Title = r.FormValue("title")
@@ -481,7 +483,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	songs, err := getSongsForQuery(c, q)
+	songs, err := getSongsForQuery(c, q, cacheOnly)
 	if err != nil {
 		c.Errorf("Unable to query songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
