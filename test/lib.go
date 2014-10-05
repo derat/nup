@@ -74,9 +74,14 @@ func RemoveFromTempDir(dir string, filenames ...string) {
 
 type SongArray []nup.Song
 
-func (a SongArray) Len() int           { return len(a) }
-func (a SongArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a SongArray) Less(i, j int) bool { return a[i].Filename < a[j].Filename }
+func (a SongArray) Len() int      { return len(a) }
+func (a SongArray) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a SongArray) Less(i, j int) bool {
+	if a[i].Filename != a[j].Filename {
+		return a[i].Filename < a[j].Filename
+	}
+	return a[i].Url < a[j].Url
+}
 
 func CompareSongs(expected, actual []nup.Song, compareOrder bool) error {
 	if !compareOrder {

@@ -87,6 +87,10 @@ func compareQueryResults(expected, actual []nup.Song, compareOrder bool, client 
 		s.Plays = nil
 		s.Url = nup.GetCloudStorageUrl(songBucket, s.Filename, client)
 		s.Filename = ""
+		if len(s.CoverFilename) > 0 {
+			s.CoverUrl = nup.GetCloudStorageUrl(coverBucket, s.CoverFilename, client)
+			s.CoverFilename = ""
+		}
 		expectedCleaned[i] = s
 	}
 
@@ -470,4 +474,36 @@ func TestTags(tt *testing.T) {
 	}
 }
 
-// TODO: covers
+func TestCovers(tt *testing.T) {
+	t := setUpTest(cacheData)
+	defer cleanUpTest(t)
+
+	createCover := func(fn string) {
+		f, err := os.Create(filepath.Join(t.CoverDir, fn))
+		if err != nil {
+			panic(err)
+		}
+		f.Close()
+	}
+
+	log.Print("writing cover and updating songs")
+	CopySongsToTempDir(t.MusicDir, Song0s.Filename, Song5s.Filename)
+	s5 := Song5s
+	s5.CoverFilename = fmt.Sprintf("Various Artists-%s.jpg", s5.Album)
+	createCover(s5.CoverFilename)
+	t.UpdateSongs()
+	if err := compareQueryResults([]nup.Song{Song0s, s5}, t.QuerySongs(""), false, nup.WebClient); err != nil {
+		tt.Error(err)
+	}
+
+	log.Print("writing another cover and updating again")
+	RemoveFromTempDir(t.MusicDir, Song0s.Filename)
+	CopySongsToTempDir(t.MusicDir, Song0sUpdated.Filename)
+	s0 := Song0sUpdated
+	s0.CoverFilename = fmt.Sprintf("%s-%s.jpg", s0.Artist, s0.Album)
+	createCover(s0.CoverFilename)
+	t.UpdateSongs()
+	if err := compareQueryResults([]nup.Song{s0, s5}, t.QuerySongs(""), false, nup.WebClient); err != nil {
+		tt.Error(err)
+	}
+}
