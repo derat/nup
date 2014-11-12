@@ -239,6 +239,13 @@ func TestUserData(tt *testing.T) {
 		tt.Error(err)
 	}
 
+	log.Print("checking that duplicate tags are ignored")
+	us.Tags = []string{"electronic", "rock"}
+	t.DoPost("rate_and_tag?songId="+id+"&tags=electronic+electronic+rock+electronic", nil)
+	if err := CompareSongs([]nup.Song{us}, t.DumpSongs(true), false); err != nil {
+		tt.Fatal(err)
+	}
+
 	log.Print("clearing tags")
 	us.Tags = nil
 	t.DoPost("rate_and_tag?songId="+id+"&tags=", nil)
@@ -451,26 +458,26 @@ func TestTags(tt *testing.T) {
 
 	log.Print("getting hopefully-empty tag list")
 	if tags := t.GetTags(); len(tags) > 0 {
-		tt.Error("got unexpected tags %q", tags)
+		tt.Errorf("got unexpected tags %q", tags)
 	}
 
 	log.Print("posting song and getting tags")
 	t.PostSongs([]nup.Song{LegacySong1}, true, 0)
 	if tags := t.GetTags(); tags != "electronic,instrumental" {
-		tt.Error("got tags %q", tags)
+		tt.Errorf("got tags %q", tags)
 	}
 
 	log.Print("posting another song and getting tags")
 	t.PostSongs([]nup.Song{LegacySong2}, true, 0)
 	if tags := t.GetTags(); tags != "electronic,instrumental,rock" {
-		tt.Error("got tags %q", tags)
+		tt.Errorf("got tags %q", tags)
 	}
 
 	log.Print("adding tags and checking that they're returned")
 	id := t.GetSongId(LegacySong1.Sha1)
 	t.DoPost("rate_and_tag?songId="+id+"&tags=electronic+instrumental+drums+idm", nil)
 	if tags := t.GetTags(); tags != "drums,electronic,idm,instrumental,rock" {
-		tt.Error("got tags %q", tags)
+		tt.Errorf("got tags %q", tags)
 	}
 }
 

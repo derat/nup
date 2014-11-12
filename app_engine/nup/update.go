@@ -180,8 +180,16 @@ func updateRatingAndTags(c appengine.Context, id int64, hasRating bool, rating f
 		}
 		if tags != nil {
 			sort.Strings(tags)
-			if !sortedStringSlicesMatch(tags, s.Tags) {
-				s.Tags = tags
+			seenTags := make(map[string]bool)
+			uniqueTags := make([]string, 0, len(tags))
+			for _, tag := range tags {
+				if _, seen := seenTags[tag]; !seen {
+					uniqueTags = append(uniqueTags, tag)
+					seenTags[tag] = true
+				}
+			}
+			if !sortedStringSlicesMatch(uniqueTags, s.Tags) {
+				s.Tags = uniqueTags
 				updateType |= tagsUpdate
 			}
 		}
