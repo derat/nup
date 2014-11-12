@@ -358,7 +358,9 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
       console.log('Skipping unknown tag "' + tag + '"');
     }
   }
-  newTags = newTags.sort()
+  newTags = newTags.sort().filter(function(item, pos, self) {
+    return self.indexOf(item) == pos;
+  });
   var tagsChanged = newTags.join(' ') != song.tags.sort().join(' ');
 
   if (!ratingChanged && !tagsChanged)
