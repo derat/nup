@@ -100,6 +100,10 @@ Player.prototype.getCurrentSong = function() {
   return (this.currentIndex >= 0 && this.currentIndex < this.songs.length) ? this.songs[this.currentIndex] : null;
 };
 
+Player.prototype.getDumpSongUrl = function(song, cache) {
+  return 'dump_song?id=' + song.songId + (cache ? '&cache=1' : '');
+};
+
 Player.prototype.setSongs = function(songs) {
   var oldCurrentSong = this.getCurrentSong();
 
@@ -322,8 +326,8 @@ Player.prototype.showUpdateDiv = function() {
     return true;
 
   this.setRating(song.rating);
-  this.dumpSongLink.href = 'dump_song?id=' + song.songId;
-  this.dumpSongCacheLink.href = 'dump_song?id=' + song.songId + '&cache=1';
+  this.dumpSongLink.href = this.getDumpSongUrl(song, false);
+  this.dumpSongCacheLink.href = this.getDumpSongUrl(song, true);
   this.tagTextarea.value = song.tags.sort().join(' ');
   this.updateDiv.style.display = 'block';
   this.updateSong = song;
@@ -411,49 +415,38 @@ Player.prototype.setRating = function(rating) {
 };
 
 Player.prototype.processAccelerator = function(e) {
-  if (e.altKey && e.keyCode == KeyCodes.R) {
+  if (e.altKey && e.keyCode == KeyCodes.D) {
+    var song = this.getCurrentSong();
+    if (song)
+      window.open(this.getDumpSongUrl(song, false), '_blank');
+    return true;
+  } else if (e.altKey && e.keyCode == KeyCodes.N) {
+    this.cycleTrack(1);
+    return true;
+  } else if (e.altKey && e.keyCode == KeyCodes.P) {
+    this.cycleTrack(-1);
+    return true;
+  } else if (e.altKey && e.keyCode == KeyCodes.R) {
     if (this.showUpdateDiv())
       this.ratingSpan.focus();
     return true;
-  }
-
-  if (e.altKey && e.keyCode == KeyCodes.T) {
+  } else if (e.altKey && e.keyCode == KeyCodes.T) {
     if (this.showUpdateDiv())
       this.tagTextarea.focus();
     return true;
-  }
-
-  if (e.altKey && e.keyCode == KeyCodes.N) {
-    this.cycleTrack(1);
-    return true;
-  }
-
-  if (e.altKey && e.keyCode == KeyCodes.P) {
-    this.cycleTrack(-1);
-    return true;
-  }
-
-  if (e.keyCode == KeyCodes.SPACE && !this.updateSong) {
+  } else if (e.keyCode == KeyCodes.SPACE && !this.updateSong) {
     this.togglePause();
     return true;
-  }
-
-  if (e.keyCode == KeyCodes.ENTER && this.updateSong) {
+  } else if (e.keyCode == KeyCodes.ENTER && this.updateSong) {
     this.hideUpdateDiv(true);
     return true;
-  }
-
-  if (e.keyCode == KeyCodes.ESCAPE && this.updateSong) {
+  } else if (e.keyCode == KeyCodes.ESCAPE && this.updateSong) {
     this.hideUpdateDiv(false);
     return true;
-  }
-
-  if (e.keyCode == KeyCodes.LEFT && !this.updateSong) {
+  } else if (e.keyCode == KeyCodes.LEFT && !this.updateSong) {
     this.seek(-Player.SEEK_SECONDS);
     return true;
-  }
-
-  if (e.keyCode == KeyCodes.RIGHT && !this.updateSong) {
+  } else if (e.keyCode == KeyCodes.RIGHT && !this.updateSong) {
     this.seek(Player.SEEK_SECONDS);
     return true;
   }

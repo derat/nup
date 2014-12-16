@@ -28,6 +28,7 @@ var KeyCodes = {
   TAB:      9,
   SLASH:  191,
 
+  D:       68,
   N:       78,
   P:       80,
   R:       82,
