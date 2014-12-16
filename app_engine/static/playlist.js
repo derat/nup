@@ -179,6 +179,9 @@ Playlist.prototype.enqueueSearchResults = function(clearFirst, afterCurrent) {
 
   this.playlistTable.updateSongs(newSongs);
   this.player.setSongs(newSongs);
+
+  if (checkedSongs.length == this.searchResultsTable.getNumSongs())
+    this.searchResultsTable.updateSongs([]);
 };
 
 // Reset all of the fields in the search form.  If |artist| or |album| are
