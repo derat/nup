@@ -51,9 +51,9 @@ type songArray []nup.Song
 func (a songArray) Len() int      { return len(a) }
 func (a songArray) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a songArray) Less(i, j int) bool {
-	if a[i].Album < a[j].Album {
+	if a[i].AlbumLower < a[j].AlbumLower {
 		return true
-	} else if a[i].Album > a[j].Album {
+	} else if a[i].AlbumLower > a[j].AlbumLower {
 		return false
 	}
 	if a[i].Disc < a[j].Disc {

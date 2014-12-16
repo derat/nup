@@ -38,7 +38,7 @@ type Song struct {
 	Title  string `datastore:",noindex" json:"title"`
 	Album  string `datastore:",noindex" json:"album"`
 
-	// Lowercase versions used for searching.
+	// Lowercase versions used for searching and sorting.
 	ArtistLower string `json:"-"`
 	TitleLower  string `json:"-"`
 	AlbumLower  string `json:"-"`
