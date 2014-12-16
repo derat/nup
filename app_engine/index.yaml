@@ -44,4 +44,9 @@ indexes:
 - kind: Song
   properties:
   - name: Tags
+  - name: NumPlays
+
+- kind: Song
+  properties:
+  - name: Tags
   - name: Rating
