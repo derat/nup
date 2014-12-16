@@ -133,12 +133,16 @@ Playlist.prototype.submitQuery = function(appendToQueue) {
 
       try {
         var req = this.request;
-        if (req.status && req.status == 200) {
-          if (req.responseText) {
-            songs = eval('(' + req.responseText + ')');
-            console.log('Got response with ' + songs.length + ' song(s)');
+        if (req.status) {
+          if (req.status == 200) {
+            if (req.responseText) {
+              songs = eval('(' + req.responseText + ')');
+              console.log('Got response with ' + songs.length + ' song(s)');
+            } else {
+              console.log('No response text');
+            }
           } else {
-            console.log('No response text');
+            alert("Got " + req.status + ": " + req.responseText);
           }
         }
       } catch (e) {
