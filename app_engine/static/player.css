@@ -15,6 +15,7 @@ body {
   padding-left: 2px;
   padding-right: 5px;
   cursor: pointer;
+  -webkit-user-select: none;
 }
 
 #ratingOverlayDiv {
@@ -25,7 +26,7 @@ body {
   text-shadow: 0 0 4px black;
   font-family: Arial, Helvetica, sans-serif;
   font-size: 13px;
-  user-select: none;
+  -webkit-user-select: none;
   pointer-events: none;
 }
 
@@ -52,6 +53,7 @@ body {
 #controlsDiv {
   padding: 5px;
   clear: both;
+  -webkit-user-select: none;
 }
 
 #updateDiv {
@@ -125,7 +127,7 @@ a.debugLink {
   border-radius: 6px;
   opacity: 0;
   -webkit-transition: opacity 200ms ease-out;
-  user-select: none;
+  -webkit-user-select: none;
   pointer-events: none;
   max-width: 210px;
   max-height: 26px;

@@ -49,6 +49,7 @@ body {
   border: 0;
   margin-top: 5px;
   border-collapse: collapse;
+  -webkit-user-select: none;
 }
 #searchLeftColumn {
   width: 4em;
@@ -98,6 +99,7 @@ body {
   margin-top: 10px;
   padding-top: 10px;
   padding-left: 10px;
+  -webkit-user-select: none;
 }
 
 #searchResultsTable {
