@@ -55,7 +55,6 @@ function Player() {
   this.dumpSongLink = $('dumpSongLink');
   this.dumpSongCacheLink = $('dumpSongCacheLink');
   this.tagTextarea = $('tagTextarea');
-  this.tagSuggestionsDiv = $('tagSuggestionsDiv');
 
   this.audio.addEventListener('ended', this.onEnded.bind(this), false);
   this.audio.addEventListener('pause', this.onPause.bind(this), false);
@@ -70,10 +69,7 @@ function Player() {
   this.updateCloseImage.addEventListener('click', this.hideUpdateDiv.bind(this, true), false);
   this.ratingSpan.addEventListener('keydown', this.handleRatingSpanKeyDown.bind(this), false);
 
-  this.tagTextarea.addEventListener('keydown', this.handleTagTextareaKeyDown.bind(this), false);
-  this.tagTextarea.addEventListener('focus', this.handleTagTextareaFocus.bind(this), false);
-  this.tagTextarea.addEventListener('blur', this.handleTagTextareaBlur.bind(this), false);
-  this.tagTextarea.spellcheck = false;
+  this.tagSuggester = new Suggester(this.tagTextarea, $('tagSuggestionsDiv'), []);
 
   document.body.addEventListener('keydown', this.handleBodyKeyDown.bind(this), false);
 
@@ -84,6 +80,7 @@ function Player() {
     if (req.readyState == 4) {
       if (req.status == 200) {
         this.tags = JSON.parse(req.responseText);
+        this.tagSuggester.setWords(this.tags);
         console.log('Loaded ' + this.tags.length + ' tags');
       } else {
         console.log('Got ' + req.status + ' while loading tags');
@@ -461,75 +458,6 @@ Player.prototype.handleBodyKeyDown = function(e) {
   }
 };
 
-Player.prototype.findTagsWithPrefix = function(tags, prefix) {
-  var matchingTags = [];
-  for (var i = 0; i < tags.length; ++i) {
-    if (tags[i].indexOf(prefix) == 0)
-      matchingTags.push(tags[i]);
-  }
-  return matchingTags;
-};
-
-Player.prototype.handleTagTextareaKeyDown = function(e) {
-  this.hideTagSuggestions();
-
-  if (e.keyCode == KeyCodes.TAB) {
-    var text = this.tagTextarea.value;
-
-    var tagStart = this.tagTextarea.selectionStart;
-    while (tagStart > 0 && text[tagStart - 1] != ' ')
-      tagStart--;
-
-    var tagEnd = this.tagTextarea.selectionStart;
-    while (tagEnd < text.length && text[tagEnd] != ' ')
-      tagEnd++;
-
-    var before = text.substring(0, tagStart);
-    var after = text.substring(tagEnd, text.length);
-    var tagPrefix = text.substring(tagStart, tagEnd);
-    var matchingTags = this.findTagsWithPrefix(this.tags, tagPrefix);
-
-    if (matchingTags.length == 1) {
-      var tag = matchingTags[0];
-      text = before + tag + (after.length == 0 ? ' ' : after);
-      this.tagTextarea.value = text;
-
-      var nextTagStart = tagStart + tag.length;
-      while (nextTagStart < text.length && text[nextTagStart] == ' ')
-        nextTagStart++;
-      this.tagTextarea.selectionStart = this.tagTextarea.selectionEnd = nextTagStart;
-    } else if (matchingTags.length > 1) {
-      var longestSharedPrefix = tagPrefix;
-      for (var length = tagPrefix.length + 1; length <= matchingTags[0].length; ++length) {
-        var newPrefix = matchingTags[0].substring(0, length);
-        if (this.findTagsWithPrefix(matchingTags, newPrefix).length == matchingTags.length)
-          longestSharedPrefix = newPrefix;
-        else
-          break;
-      }
-
-      this.tagTextarea.value = before + longestSharedPrefix + after;
-      this.tagTextarea.selectionStart = this.tagTextarea.selectionEnd = before.length + longestSharedPrefix.length;
-      this.showTagSuggestions(matchingTags);
-    }
-
-    e.preventDefault();
-    e.stopPropagation();
-  }
-};
-
-Player.prototype.handleTagTextareaFocus = function(e) {
-  var text = this.tagTextarea.value;
-  if (text.length > 0 && text[text.length - 1] != ' ')
-    this.tagTextarea.value += ' ';
-  this.tagTextarea.selectionStart = this.tagTextarea.selectionEnd = this.tagTextarea.value.length;
-};
-
-
-Player.prototype.handleTagTextareaBlur = function(e) {
-  this.hideTagSuggestions();
-};
-
 Player.prototype.handleRatingSpanKeyDown = function(e) {
   if (e.keyCode >= KeyCodes.ZERO && e.keyCode <= KeyCodes.FIVE) {
     this.setRating(this.numStarsToRating(e.keyCode - KeyCodes.ZERO));
@@ -542,13 +470,4 @@ Player.prototype.handleRatingSpanKeyDown = function(e) {
     e.preventDefault();
     e.stopPropagation();
   }
-};
-
-Player.prototype.showTagSuggestions = function(tags) {
-  this.tagSuggestionsDiv.innerText = tags.sort().join(' ');
-  this.tagSuggestionsDiv.className = 'shown';
-};
-
-Player.prototype.hideTagSuggestions = function() {
-  this.tagSuggestionsDiv.className = '';
 };
