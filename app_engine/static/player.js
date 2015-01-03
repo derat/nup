@@ -78,9 +78,7 @@ function Player() {
   req.onreadystatechange = function() {
     if (req.readyState == 4) {
       if (req.status == 200) {
-        this.tags = JSON.parse(req.responseText);
-        this.tagSuggester.setWords(this.tags);
-        document.playlist.handleTagsLoaded(this.tags);
+        this.updateTags(JSON.parse(req.responseText));
         console.log('Loaded ' + this.tags.length + ' tags');
       } else {
         console.log('Got ' + req.status + ' while loading tags');
@@ -158,6 +156,12 @@ Player.prototype.selectTrack = function(index) {
   this.audio.src = song.url;
   this.play();
   this.reachedEndOfSongs = false;
+};
+
+Player.prototype.updateTags = function(tags) {
+  this.tags = tags.slice(0);
+  this.tagSuggester.setWords(this.tags);
+  document.playlist.handleTagsUpdated(this.tags);
 };
 
 Player.prototype.updateButtonState = function() {
@@ -346,6 +350,7 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
 
   var newRawTags = this.tagTextarea.value.trim().split(/\s+/);
   var newTags = [];
+  var createdTags = [];
   for (var i = 0; i < newRawTags.length; ++i) {
     var tag = newRawTags[i].toLowerCase();
     if (!this.tags.length || this.tags.indexOf(tag) != -1 || song.tags.indexOf(tag) != -1) {
@@ -354,7 +359,7 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
       tag = tag.substring(1);
       newTags.push(tag);
       if (this.tags.indexOf(tag) == -1)
-        this.tags.push(tag);
+        createdTags.push(tag);
     } else {
       console.log('Skipping unknown tag "' + tag + '"');
     }
@@ -363,6 +368,9 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
     return self.indexOf(item) == pos;
   });
   var tagsChanged = newTags.join(' ') != song.tags.sort().join(' ');
+
+  if (createdTags.length > 0)
+    this.updateTags(this.tags.concat(createdTags));
 
   if (!ratingChanged && !tagsChanged)
     return;

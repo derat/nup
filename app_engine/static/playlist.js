@@ -70,7 +70,7 @@ function Playlist(player) {
   this.handleSongChange(this.player.currentIndex);
 };
 
-Playlist.prototype.handleTagsLoaded = function(tags) {
+Playlist.prototype.handleTagsUpdated = function(tags) {
   this.tagSuggester.setWords(tags);
 };
 
