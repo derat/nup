@@ -23,3 +23,8 @@ div.suggestions.shown {
   opacity: 1.0;
   -webkit-transition: opacity 0s;
 }
+
+div.suggestions span:hover {
+  color: #666;
+  cursor: pointer;
+}
