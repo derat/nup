@@ -62,10 +62,16 @@ function Playlist(player) {
   this.insertButton.addEventListener('click', this.enqueueSearchResults.bind(this, false, true), false);
   this.replaceButton.addEventListener('click', this.enqueueSearchResults.bind(this, true, false), false);
 
+  this.tagSuggester = new Suggester(tagsInput, $('tagsInputSuggestionsDiv'), []);
+
   document.body.addEventListener('keydown', this.handleBodyKeyDown_.bind(this), false);
 
   this.playlistTable.updateSongs(this.player.songs);
   this.handleSongChange(this.player.currentIndex);
+};
+
+Playlist.prototype.handleTagsLoaded = function(tags) {
+  this.tagSuggester.setWords(tags);
 };
 
 Playlist.prototype.parseQueryString = function(text) {

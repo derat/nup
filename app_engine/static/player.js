@@ -44,7 +44,6 @@ function Player() {
   this.titleDiv = $('titleDiv');
   this.albumDiv = $('albumDiv');
   this.timeDiv = $('timeDiv');
-  this.playlistButton = $('playlistButton');
   this.prevButton = $('prevButton');
   this.nextButton = $('nextButton');
   this.playPauseButton = $('playPauseButton');
@@ -81,6 +80,7 @@ function Player() {
       if (req.status == 200) {
         this.tags = JSON.parse(req.responseText);
         this.tagSuggester.setWords(this.tags);
+        document.playlist.handleTagsLoaded(this.tags);
         console.log('Loaded ' + this.tags.length + ' tags');
       } else {
         console.log('Got ' + req.status + ' while loading tags');

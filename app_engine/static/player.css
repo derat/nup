@@ -112,3 +112,11 @@ a.debugLink {
   resize: none;
   font-family: Arial, Helvetica, sans-serif;
 }
+
+#tagSuggestionsDiv {
+  position: absolute;
+  left: 4px;
+  bottom: 52px;
+  max-width: 210px;
+  max-height: 26px;
+}

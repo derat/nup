@@ -69,6 +69,16 @@ body {
 #artistInput, #titleInput, #albumInput, #keywordsInput, #tagsInput, #minRatingInput {
   padding-right: 17px;
 }
+#tagsInputDiv {
+  position: relative;
+}
+#tagsInputSuggestionsDiv {
+  position: absolute;
+  left: 4px;
+  top: 26px;
+  max-width: 210px;
+  max-height: 26px;
+}
 #artistClearButton, #titleClearButton, #albumClearButton, #keywordsClearButton, #tagsClearButton {
   position: relative;
   left: -22px;
