@@ -6,6 +6,8 @@ function Suggester(textarea, suggestionsDiv, words) {
   this.suggestionsDiv = suggestionsDiv;
   this.words = words;
 
+  addClassName(this.suggestionsDiv, 'suggestions');
+
   textarea.addEventListener('keydown', this.handleTextareaKeyDown.bind(this), false);
   textarea.addEventListener('focus', this.handleTextareaFocus.bind(this), false);
   textarea.addEventListener('blur', this.handleTextareaBlur.bind(this), false);
@@ -88,9 +90,9 @@ Suggester.prototype.handleTextareaBlur = function(e) {
 
 Suggester.prototype.showSuggestions = function(words) {
   this.suggestionsDiv.innerText = words.sort().join(' ');
-  this.suggestionsDiv.className = 'shown';
+  addClassName(this.suggestionsDiv, 'shown');
 };
 
 Suggester.prototype.hideSuggestions = function() {
-  this.suggestionsDiv.className = '';
+  removeClassName(this.suggestionsDiv, 'shown');
 };

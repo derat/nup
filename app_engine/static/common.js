@@ -19,6 +19,22 @@ function updateTitleAttributeForTruncation(element, text) {
   element.title = (element.scrollWidth > element.offsetWidth) ? text : '';
 }
 
+function createClassNameRegExp(className) {
+  return new RegExp('(^|\\s+)' + className + '($|\\s+)');
+};
+
+function addClassName(element, className) {
+  var re = createClassNameRegExp(className);
+  if (!element.className.match(re)) {
+    element.className += ' ' + className;
+  }
+}
+
+function removeClassName(element, className) {
+  var re = createClassNameRegExp(className);
+  element.className = element.className.replace(re, ' ');
+}
+
 var KeyCodes = {
   ENTER:   13,
   ESCAPE:  27,
