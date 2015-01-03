@@ -53,12 +53,19 @@ Suggester.prototype.handleTextareaKeyDown = function(e) {
     return;
 
   var parts = this.getTextParts();
+  if (parts.word.length == 0)
+    return;
+
   var matchingWords = this.findWordsWithPrefix(this.words, parts.word);
 
   if (matchingWords.length == 1) {
     var word = matchingWords[0];
+    if (word == parts.word)
+      return;
+
     var text = parts.before + word + (parts.after.length == 0 ? ' ' : parts.after);
     this.textarea.value = text;
+
     var nextWordStart = parts.wordStart + word.length;
     while (nextWordStart < text.length && text[nextWordStart] == ' ')
       nextWordStart++;
