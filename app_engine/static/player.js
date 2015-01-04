@@ -68,7 +68,7 @@ function Player() {
   this.updateCloseImage.addEventListener('click', this.hideUpdateDiv.bind(this, true), false);
   this.ratingSpan.addEventListener('keydown', this.handleRatingSpanKeyDown.bind(this), false);
 
-  this.tagSuggester = new Suggester(this.tagTextarea, $('tagSuggestionsDiv'), []);
+  this.tagSuggester = new Suggester(this.tagTextarea, $('tagSuggestionsDiv'), [], false);
 
   document.body.addEventListener('keydown', this.handleBodyKeyDown.bind(this), false);
 

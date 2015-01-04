@@ -62,7 +62,7 @@ function Playlist(player) {
   this.insertButton.addEventListener('click', this.enqueueSearchResults.bind(this, false, true), false);
   this.replaceButton.addEventListener('click', this.enqueueSearchResults.bind(this, true, false), false);
 
-  this.tagSuggester = new Suggester(tagsInput, $('tagsInputSuggestionsDiv'), []);
+  this.tagSuggester = new Suggester(tagsInput, $('tagsInputSuggestionsDiv'), [], true);
 
   document.body.addEventListener('keydown', this.handleBodyKeyDown_.bind(this), false);
 

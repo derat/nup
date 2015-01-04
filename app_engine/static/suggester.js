@@ -1,10 +1,11 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
-function Suggester(textarea, suggestionsDiv, words) {
+function Suggester(textarea, suggestionsDiv, words, tabAdvancesFocus) {
   this.textarea = textarea;
   this.suggestionsDiv = suggestionsDiv;
   this.words = words;
+  this.tabAdvancesFocus = tabAdvancesFocus;
 
   addClassName(this.suggestionsDiv, 'suggestions');
 
@@ -53,14 +54,14 @@ Suggester.prototype.handleTextareaKeyDown = function(e) {
     return;
 
   var parts = this.getTextParts();
-  if (parts.word.length == 0)
+  if (parts.word.length == 0 && this.tabAdvancesFocus)
     return;
 
   var matchingWords = this.findWordsWithPrefix(this.words, parts.word);
 
   if (matchingWords.length == 1) {
     var word = matchingWords[0];
-    if (word == parts.word)
+    if (word == parts.word && this.tabAdvancesFocus)
       return;
 
     var text = parts.before + word + (parts.after.length == 0 ? ' ' : parts.after);
