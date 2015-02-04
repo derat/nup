@@ -99,10 +99,13 @@ Suggester.prototype.handleTextareaFocus = function(e) {
 
 
 Suggester.prototype.handleTextareaBlur = function(e) {
-  this.hideSuggestions();
+  // If a suggestion got clicked, let it handle the event.
+  if (e.target != this.textarea)
+    this.hideSuggestions();
 };
 
 Suggester.prototype.handleSuggestionClicked = function(word, e) {
+  this.hideSuggestions();
   var parts = this.getTextParts();
   this.textarea.value = parts.before + word + parts.after;
   this.textarea.focus();
