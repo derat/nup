@@ -14,6 +14,12 @@ function Player() {
   // Index into |songs| of the track currently being played.
   this.currentIndex = -1;
 
+  // Playback position when onTimeUpdate() was last called.
+  this.lastPositionSec = 0;
+
+  // Number of consecutive playback errors.
+  this.numErrors = 0;
+
   // Time at which we started playing the current track as seconds since the epoch.
   this.startTime = -1;
 
@@ -21,7 +27,7 @@ function Player() {
   // track (ignoring paused periods).
   this.totalPlayedSec = 0;
 
-  // Time at which |onTimeUpdate()| was last invoked, as seconds since the epoch.
+  // Time at which onTimeUpdate() was last invoked, as seconds since the epoch.
   this.lastUpdateTime = -1;
 
   // Have we already reported the current track as having been played?
@@ -91,6 +97,9 @@ function Player() {
 // Number of seconds that a seek operation should traverse.
 Player.SEEK_SECONDS = 10;
 
+// Number of times to retry playback after consecutive errors.
+Player.MAX_RETRIES = 2;
+
 Player.prototype.getCurrentSong = function() {
   return (this.currentIndex >= 0 && this.currentIndex < this.songs.length) ? this.songs[this.currentIndex] : null;
 };
@@ -142,6 +151,8 @@ Player.prototype.selectTrack = function(index) {
     return;
 
   this.currentIndex = index;
+  this.lastPositionSec = 0;
+  this.numErrors = 0;
   this.startTime = getCurrentTimeSec();
   this.totalPlayedSec = 0;
   this.lastUpdateTime = -1;
@@ -283,6 +294,8 @@ Player.prototype.onTimeUpdate = function(e) {
       this.audio.duration > 0 ?
       '[' + formatTime(this.audio.currentTime) + ' / ' + formatTime(duration) + ']' :
       '';
+  this.lastPositionSec = this.audio.currentTime;
+  this.numErrors = 0;
 
   var now = getCurrentTimeSec();
   if (this.lastUpdateTime > 0)
@@ -296,8 +309,28 @@ Player.prototype.onTimeUpdate = function(e) {
 };
 
 Player.prototype.onError = function(e) {
-  var error = this.audio.error;
-  console.log('got playback error: ' + error.code);
+  this.numErrors++;
+
+  var error = e.target.error;
+  console.log('Got playback error: ' + error.code);
+  switch (error.code) {
+    case error.MEDIA_ERR_ABORTED:  // 1
+      break;
+    case error.MEDIA_ERR_NETWORK:            // 2
+    case error.MEDIA_ERR_DECODE:             // 3
+    case error.MEDIA_ERR_SRC_NOT_SUPPORTED:  // 4
+      if (this.numErrors <= Player.MAX_RETRIES) {
+        // TODO: Set a timeout?
+        var url = this.getCurrentSong().url;
+        console.log('Retrying ' + url + ' from position ' + this.lastPositionSec);
+        this.audio.src = url;
+        this.audio.currentTime = this.lastPositionSec;
+      } else {
+        console.log('Giving up after ' + this.numErrors + ' error(s)');
+        this.cycleTrack(1);
+      }
+      break;
+  }
 };
 
 Player.prototype.notifyPlaylistAboutSongChange = function() {
