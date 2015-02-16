@@ -11,8 +11,9 @@ function Suggester(textarea, suggestionsDiv, words, tabAdvancesFocus) {
 
   textarea.addEventListener('keydown', this.handleTextareaKeyDown.bind(this), false);
   textarea.addEventListener('focus', this.handleTextareaFocus.bind(this), false);
-  textarea.addEventListener('blur', this.handleTextareaBlur.bind(this), false);
   textarea.spellcheck = false;
+
+  document.addEventListener('click', this.handleDocumentClick.bind(this), false);
 }
 
 Suggester.prototype.setWords = function(words) {
@@ -97,14 +98,11 @@ Suggester.prototype.handleTextareaFocus = function(e) {
   this.textarea.selectionStart = this.textarea.selectionEnd = this.textarea.value.length;
 };
 
-
-Suggester.prototype.handleTextareaBlur = function(e) {
-  // If a suggestion got clicked, let it handle the event.
-  if (e.target != this.textarea)
-    this.hideSuggestions();
+Suggester.prototype.handleDocumentClick = function(e) {
+  this.hideSuggestions();
 };
 
-Suggester.prototype.handleSuggestionClicked = function(word, e) {
+Suggester.prototype.handleSuggestionClick = function(word, e) {
   this.hideSuggestions();
   var parts = this.getTextParts();
   this.textarea.value = parts.before + word + parts.after;
@@ -121,7 +119,7 @@ Suggester.prototype.showSuggestions = function(words) {
       div.appendChild(document.createTextNode(' '));
     var span = document.createElement('span');
     span.innerText = words[i];
-    span.addEventListener('click', this.handleSuggestionClicked.bind(this, words[i]), false);
+    span.addEventListener('click', this.handleSuggestionClick.bind(this, words[i]), false);
     div.appendChild(span);
   }
 
