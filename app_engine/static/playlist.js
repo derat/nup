@@ -167,7 +167,7 @@ Playlist.prototype.submitQuery = function(appendToQueue) {
 
   this.waitingDiv.style.display = 'block';
   var url = 'query?' + terms.join('&');
-  console.log(url);
+  console.log('Sending query: ' + url);
   this.request.open('GET', url, true);
   this.request.send();
 };
