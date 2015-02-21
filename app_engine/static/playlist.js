@@ -91,7 +91,9 @@ Playlist.prototype.parseQueryString = function(text) {
       }
     } else {
       var match = text.match(/^(\S+)(.*)/);
-      keywords.push(match[1]);
+      // The server splits on non-alphanumeric characters to make keywords.
+      // Split on miscellaneous punctuation here to at least handle some of this.
+      keywords = keywords.concat(match[1].split(/[-_+=~!?@#$%^&*()'".,:;]+/).filter(function(s) { return s.length; }));
       text = match[2];
     }
     text = text.trim();
