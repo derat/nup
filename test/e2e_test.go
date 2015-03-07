@@ -514,3 +514,20 @@ func TestCovers(tt *testing.T) {
 		tt.Error(err)
 	}
 }
+
+func TestJsonImport(tt *testing.T) {
+	t := setUpTest(noCaching)
+	defer cleanUpTest(t)
+
+	log.Print("importing songs from json file")
+	t.ImportSongsFromJsonFile(filepath.Join(GetDataDir(), "import.json"))
+	if err := CompareSongs([]nup.Song{LegacySong1, LegacySong2}, t.DumpSongs(true), false); err != nil {
+		tt.Error(err)
+	}
+
+	log.Print("updating song from json file")
+	t.ImportSongsFromJsonFile(filepath.Join(GetDataDir(), "update.json"))
+	if err := CompareSongs([]nup.Song{LegacySong1Updated, LegacySong2}, t.DumpSongs(true), false); err != nil {
+		tt.Error(err)
+	}
+}

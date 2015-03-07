@@ -55,6 +55,7 @@ func main() {
 	dryRun := flag.Bool("dry-run", false, "Only print what would be updated")
 	forceGlob := flag.String("force-glob", "", "Glob pattern relative to music dir for files to scan and update even if they haven't changed")
 	importDb := flag.String("import-db", "", "If non-empty, path to legacy SQLite database to read info from")
+	importJsonFile := flag.String("import-json-file", "", "If non-empty, path to JSON file containing a stream of Song objects to import")
 	importMinId := flag.Int64("import-min-id", 0, "Starting ID for --import-db (for resuming after failure)")
 	limit := flag.Int("limit", 0, "If positive, limits the number of songs to update (for testing)")
 	requireCovers := flag.Bool("require-covers", false, "Die if cover images aren't found for any songs")
@@ -81,6 +82,12 @@ func main() {
 	if len(*importDb) > 0 {
 		log.Printf("Reading songs from %v", *importDb)
 		if numSongs, err = getSongsFromLegacyDb(*importDb, *importMinId, readChan); err != nil {
+			log.Fatal(err)
+		}
+		replaceUserData = true
+	} else if len(*importJsonFile) > 0 {
+		log.Printf("Reading songs from %v", *importJsonFile)
+		if numSongs, err = getSongsFromJsonFile(*importJsonFile, readChan); err != nil {
 			log.Fatal(err)
 		}
 		replaceUserData = true

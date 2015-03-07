@@ -28,9 +28,8 @@ func TestUpdate(t *testing.T) {
 				break
 			} else if err != nil {
 				t.Errorf("failed to decode song: %v", err)
-			} else {
-				receivedSongs = append(receivedSongs, s)
 			}
+			receivedSongs = append(receivedSongs, s)
 		}
 
 		w.Header().Set("Content-Type", "text/plain")

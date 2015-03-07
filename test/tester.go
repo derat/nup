@@ -165,6 +165,12 @@ func (t *Tester) ImportSongsFromLegacyDb(path string) {
 	}
 }
 
+func (t *Tester) ImportSongsFromJsonFile(path string) {
+	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile, "-import-json-file="+path); err != nil {
+		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
+	}
+}
+
 func (t *Tester) UpdateSongs() {
 	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
