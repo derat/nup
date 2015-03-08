@@ -122,7 +122,14 @@ func (t *Tester) CleanUp() {
 	os.RemoveAll(t.TempDir)
 }
 
-func (t *Tester) DumpSongs(stripIds bool) []nup.Song {
+type stripPolicy int
+
+const (
+	stripIds stripPolicy = iota
+	retainIds
+)
+
+func (t *Tester) DumpSongs(strip stripPolicy) []nup.Song {
 	stdout, stderr, err := runCommand(filepath.Join(t.binDir, "dump_music"), "-config="+t.dumpConfigFile,
 		"-song-batch-size="+strconv.Itoa(dumpBatchSize), "-play-batch-size="+strconv.Itoa(dumpBatchSize))
 	if err != nil {
@@ -142,7 +149,7 @@ func (t *Tester) DumpSongs(stripIds bool) []nup.Song {
 			}
 			panic(fmt.Sprintf("unable to unmarshal song %q: %v", l, err))
 		}
-		if stripIds {
+		if strip == stripIds {
 			s.SongId = ""
 		}
 		songs = append(songs, s)
@@ -151,7 +158,7 @@ func (t *Tester) DumpSongs(stripIds bool) []nup.Song {
 }
 
 func (t *Tester) GetSongId(sha1 string) string {
-	for _, s := range t.DumpSongs(false) {
+	for _, s := range t.DumpSongs(retainIds) {
 		if s.Sha1 == sha1 {
 			return s.SongId
 		}
@@ -207,7 +214,14 @@ func (t *Tester) DoPost(pathAndQueryParams string, body io.Reader) {
 	}
 }
 
-func (t *Tester) PostSongs(songs []nup.Song, replaceUserData bool, updateDelay time.Duration) {
+type userDataPolicy int
+
+const (
+	replaceUserData userDataPolicy = iota
+	keepUserData
+)
+
+func (t *Tester) PostSongs(songs []nup.Song, userData userDataPolicy, updateDelay time.Duration) {
 	var buf bytes.Buffer
 	e := json.NewEncoder(&buf)
 	for _, s := range songs {
@@ -216,7 +230,7 @@ func (t *Tester) PostSongs(songs []nup.Song, replaceUserData bool, updateDelay t
 		}
 	}
 	path := fmt.Sprintf("import?updateDelayNsec=%v", int64(updateDelay*time.Nanosecond))
-	if replaceUserData {
+	if userData == replaceUserData {
 		path += "&replaceUserData=1"
 	}
 	t.DoPost(path, &buf)
@@ -263,13 +277,20 @@ func (t *Tester) GetNowFromServer() time.Time {
 	return time.Unix(0, nsec)
 }
 
-func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted bool) []nup.Song {
+type deletionPolicy int
+
+const (
+	getRegularSongs deletionPolicy = iota
+	getDeletedSongs
+)
+
+func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted deletionPolicy) []nup.Song {
 	var nsec int64
 	if !minLastModified.IsZero() {
 		nsec = minLastModified.UnixNano()
 	}
 	deletedVal := 0
-	if deleted {
+	if deleted == getDeletedSongs {
 		deletedVal = 1
 	}
 

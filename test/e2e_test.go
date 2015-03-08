@@ -152,7 +152,7 @@ func TestLegacy(tt *testing.T) {
 
 	log.Print("importing songs from legacy db")
 	t.ImportSongsFromLegacyDb(filepath.Join(GetDataDir(), "legacy.db"))
-	if err := CompareSongs([]nup.Song{LegacySong1, LegacySong2}, t.DumpSongs(true), IgnoreOrder); err != nil {
+	if err := CompareSongs([]nup.Song{LegacySong1, LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
@@ -176,14 +176,14 @@ func TestUpdate(tt *testing.T) {
 	log.Print("importing songs from music dir")
 	CopySongsToTempDir(t.MusicDir, Song0s.Filename, Song1s.Filename)
 	t.UpdateSongs()
-	if err := CompareSongs([]nup.Song{Song0s, Song1s}, t.DumpSongs(true), IgnoreOrder); err != nil {
+	if err := CompareSongs([]nup.Song{Song0s, Song1s}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("importing another song")
 	CopySongsToTempDir(t.MusicDir, Song5s.Filename)
 	t.UpdateSongs()
-	if err := CompareSongs([]nup.Song{Song0s, Song1s, Song5s}, t.DumpSongs(true), IgnoreOrder); err != nil {
+	if err := CompareSongs([]nup.Song{Song0s, Song1s, Song5s}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
@@ -191,7 +191,7 @@ func TestUpdate(tt *testing.T) {
 	RemoveFromTempDir(t.MusicDir, Song0s.Filename)
 	CopySongsToTempDir(t.MusicDir, Song0sUpdated.Filename)
 	t.UpdateSongs()
-	if err := CompareSongs([]nup.Song{Song0sUpdated, Song1s, Song5s}, t.DumpSongs(true), IgnoreOrder); err != nil {
+	if err := CompareSongs([]nup.Song{Song0sUpdated, Song1s, Song5s}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 }
@@ -210,7 +210,7 @@ func TestUserData(tt *testing.T) {
 	s.Rating = 0.75
 	s.Tags = []string{"electronic", "instrumental"}
 	t.DoPost("rate_and_tag?songId="+id+"&rating=0.75&tags=electronic+instrumental", nil)
-	if err := CompareSongs([]nup.Song{s}, t.DumpSongs(true), IgnoreOrder); err != nil {
+	if err := CompareSongs([]nup.Song{s}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Fatal(err)
 	}
 
@@ -223,7 +223,7 @@ func TestUserData(tt *testing.T) {
 	for _, p := range s.Plays {
 		t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(p.StartTime.Unix(), 10), nil)
 	}
-	if err := CompareSongs([]nup.Song{s}, t.DumpSongs(true), IgnoreOrder); err != nil {
+	if err := CompareSongs([]nup.Song{s}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Fatal(err)
 	}
 
@@ -235,21 +235,21 @@ func TestUserData(tt *testing.T) {
 	us.Plays = s.Plays
 	CopySongsToTempDir(t.MusicDir, us.Filename)
 	t.UpdateSongs()
-	if err := CompareSongs([]nup.Song{us}, t.DumpSongs(true), IgnoreOrder); err != nil {
+	if err := CompareSongs([]nup.Song{us}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that duplicate tags are ignored")
 	us.Tags = []string{"electronic", "rock"}
 	t.DoPost("rate_and_tag?songId="+id+"&tags=electronic+electronic+rock+electronic", nil)
-	if err := CompareSongs([]nup.Song{us}, t.DumpSongs(true), IgnoreOrder); err != nil {
+	if err := CompareSongs([]nup.Song{us}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Fatal(err)
 	}
 
 	log.Print("clearing tags")
 	us.Tags = nil
 	t.DoPost("rate_and_tag?songId="+id+"&tags=", nil)
-	if err := CompareSongs([]nup.Song{us}, t.DumpSongs(true), IgnoreOrder); err != nil {
+	if err := CompareSongs([]nup.Song{us}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Fatal(err)
 	}
 
@@ -270,8 +270,8 @@ func TestQueries(tt *testing.T) {
 	defer cleanUpTest(t)
 
 	log.Print("posting some songs")
-	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, true, 0)
-	t.PostSongs([]nup.Song{Song0s}, false, 0)
+	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, replaceUserData, 0)
+	t.PostSongs([]nup.Song{Song0s}, keepUserData, 0)
 
 	log.Print("doing a bunch of queries")
 	for _, q := range []struct {
@@ -305,7 +305,7 @@ func TestCaching(tt *testing.T) {
 
 	log.Print("posting and querying a song")
 	cacheParam := "cacheOnly=1"
-	t.PostSongs([]nup.Song{LegacySong1}, true, 0)
+	t.PostSongs([]nup.Song{LegacySong1}, replaceUserData, 0)
 	if err := compareQueryResults([]nup.Song{LegacySong1}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
@@ -322,7 +322,7 @@ func TestCaching(tt *testing.T) {
 
 	log.Print("updating and re-querying")
 	s.Artist = "The Artist Formerly Known As " + s.Artist
-	t.PostSongs([]nup.Song{s}, false, 0)
+	t.PostSongs([]nup.Song{s}, keepUserData, 0)
 	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
@@ -346,7 +346,7 @@ func TestCaching(tt *testing.T) {
 	}
 
 	log.Print("posting another song and querying")
-	t.PostSongs([]nup.Song{LegacySong2}, true, 0)
+	t.PostSongs([]nup.Song{LegacySong2}, replaceUserData, 0)
 	if err := compareQueryResults([]nup.Song{LegacySong2, s}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
@@ -357,7 +357,7 @@ func TestCacheRace(tt *testing.T) {
 	defer cleanUpTest(t)
 
 	log.Print("posting a song")
-	t.PostSongs([]nup.Song{LegacySong1}, true, 0)
+	t.PostSongs([]nup.Song{LegacySong1}, replaceUserData, 0)
 
 	// Start a goroutine that posts a request that should:
 	// a) Drop the song from the cache.
@@ -397,7 +397,7 @@ func TestCacheRace(tt *testing.T) {
 	s2.Artist = "Some Other Artist"
 	wg.Add(1)
 	go func() {
-		t.PostSongs([]nup.Song{s2}, false, time.Second)
+		t.PostSongs([]nup.Song{s2}, keepUserData, time.Second)
 		wg.Done()
 	}()
 
@@ -420,14 +420,14 @@ func TestAndroid(tt *testing.T) {
 
 	log.Print("posting songs")
 	now := t.GetNowFromServer()
-	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, true, 0)
-	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(time.Time{}, false), IgnoreOrder, nup.AndroidClient); err != nil {
+	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, replaceUserData, 0)
+	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(time.Time{}, getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(now, false), IgnoreOrder, nup.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(now, getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(t.GetNowFromServer(), false), IgnoreOrder, nup.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(t.GetNowFromServer(), getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
 
@@ -437,7 +437,7 @@ func TestAndroid(tt *testing.T) {
 	updatedLegacySong1.Rating = 1.0
 	now = t.GetNowFromServer()
 	t.DoPost("rate_and_tag?songId="+id+"&rating=1.0", nil)
-	if err := compareQueryResults([]nup.Song{updatedLegacySong1}, t.GetSongsForAndroid(now, false), IgnoreOrder, nup.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{updatedLegacySong1}, t.GetSongsForAndroid(now, getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
 
@@ -447,7 +447,7 @@ func TestAndroid(tt *testing.T) {
 	updatedLegacySong1.Plays = append(updatedLegacySong1.Plays, p)
 	now = t.GetNowFromServer()
 	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(p.StartTime.Unix(), 10), nil)
-	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(now, false), IgnoreOrder, nup.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(now, getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
 }
@@ -462,13 +462,13 @@ func TestTags(tt *testing.T) {
 	}
 
 	log.Print("posting song and getting tags")
-	t.PostSongs([]nup.Song{LegacySong1}, true, 0)
+	t.PostSongs([]nup.Song{LegacySong1}, replaceUserData, 0)
 	if tags := t.GetTags(); tags != "electronic,instrumental" {
 		tt.Errorf("got tags %q", tags)
 	}
 
 	log.Print("posting another song and getting tags")
-	t.PostSongs([]nup.Song{LegacySong2}, true, 0)
+	t.PostSongs([]nup.Song{LegacySong2}, replaceUserData, 0)
 	if tags := t.GetTags(); tags != "electronic,instrumental,rock" {
 		tt.Errorf("got tags %q", tags)
 	}
@@ -521,13 +521,13 @@ func TestJsonImport(tt *testing.T) {
 
 	log.Print("importing songs from json file")
 	t.ImportSongsFromJsonFile(filepath.Join(GetDataDir(), "import.json"))
-	if err := CompareSongs([]nup.Song{LegacySong1, LegacySong2}, t.DumpSongs(true), IgnoreOrder); err != nil {
+	if err := CompareSongs([]nup.Song{LegacySong1, LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("updating song from json file")
 	t.ImportSongsFromJsonFile(filepath.Join(GetDataDir(), "update.json"))
-	if err := CompareSongs([]nup.Song{LegacySong1Updated, LegacySong2}, t.DumpSongs(true), IgnoreOrder); err != nil {
+	if err := CompareSongs([]nup.Song{LegacySong1Updated, LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 }
@@ -538,7 +538,7 @@ func TestDeleteSong(tt *testing.T) {
 
 	log.Print("posting songs and deleting first song")
 	postTime := t.GetNowFromServer()
-	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, true, 0)
+	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, replaceUserData, 0)
 	id1 := t.GetSongId(LegacySong1.Sha1)
 	t.DoPost("delete_song?songId="+id1, nil)
 
@@ -546,18 +546,18 @@ func TestDeleteSong(tt *testing.T) {
 	if err := compareQueryResults([]nup.Song{LegacySong2}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{LegacySong2}, t.GetSongsForAndroid(time.Time{}, false), IgnoreOrder, nup.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong2}, t.GetSongsForAndroid(time.Time{}, getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{LegacySong2}, t.GetSongsForAndroid(postTime, false), IgnoreOrder, nup.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong2}, t.GetSongsForAndroid(postTime, getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
-	if err := CompareSongs([]nup.Song{LegacySong2}, t.DumpSongs(true), IgnoreOrder); err != nil {
+	if err := CompareSongs([]nup.Song{LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that deleted song is in android query")
-	deletedSongs := t.GetSongsForAndroid(postTime, true)
+	deletedSongs := t.GetSongsForAndroid(postTime, getDeletedSongs)
 	if err := compareQueryResults([]nup.Song{LegacySong1}, deletedSongs, IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
@@ -574,15 +574,15 @@ func TestDeleteSong(tt *testing.T) {
 	if err := compareQueryResults([]nup.Song{}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(time.Time{}, false), IgnoreOrder, nup.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(time.Time{}, getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
-	if err := CompareSongs([]nup.Song{}, t.DumpSongs(true), IgnoreOrder); err != nil {
+	if err := CompareSongs([]nup.Song{}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that both deleted songs are in android query")
-	deletedSongs = t.GetSongsForAndroid(laterTime, true)
+	deletedSongs = t.GetSongsForAndroid(laterTime, getDeletedSongs)
 	if err := compareQueryResults([]nup.Song{LegacySong2}, deletedSongs, IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
