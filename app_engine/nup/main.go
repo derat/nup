@@ -155,6 +155,7 @@ func init() {
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/clear", handleClear)
 	http.HandleFunc("/config", handleConfig)
+	http.HandleFunc("/delete_song", handleDeleteSong)
 	http.HandleFunc("/dump_song", handleDumpSong)
 	http.HandleFunc("/export", handleExport)
 	http.HandleFunc("/flush_cache", handleFlushCache)
@@ -205,6 +206,24 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	writeTextResponse(w, "ok")
+}
+
+func handleDeleteSong(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	c.Debugf("Got request: %v", r.URL.String())
+	if !checkRequest(c, w, r, "POST", false) {
+		return
+	}
+
+	var id int64
+	if !parseIntParam(c, w, r, "songId", &id) {
+		return
+	}
+	if err := deleteSong(c, id); err != nil {
+		c.Errorf("Got error while deleting song: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 	writeTextResponse(w, "ok")
 }
 
@@ -584,7 +603,12 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	songs, cursor, err := dumpSongsForAndroid(c, minLastModified, max, r.FormValue("cursor"))
+	var deleted int64
+	if len(r.FormValue("deleted")) > 0 && !parseIntParam(c, w, r, "deleted", &deleted) {
+		return
+	}
+
+	songs, cursor, err := dumpSongsForAndroid(c, minLastModified, deleted != 0, max, r.FormValue("cursor"))
 	if err != nil {
 		c.Errorf("Unable to get songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

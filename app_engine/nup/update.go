@@ -268,6 +268,49 @@ func updateOrInsertSong(c appengine.Context, updatedSong *nup.Song, replaceUserD
 	}, nil)
 }
 
+func deleteSong(c appengine.Context, id int64) error {
+	if err := flushSongFromCache(c, id); err != nil {
+		return fmt.Errorf("Not deleting song %v due to cache eviction error: %v", id, err)
+	}
+
+	return datastore.RunInTransaction(c, func(c appengine.Context) error {
+		songKey := datastore.NewKey(c, songKind, "", id, nil)
+		song := nup.Song{}
+		if err := datastore.Get(c, songKey, &song); err != nil {
+			return fmt.Errorf("Getting song %v failed: %v", id, err)
+		}
+		plays := make([]nup.Play, 0)
+		playKeys, err := datastore.NewQuery(playKind).Ancestor(songKey).GetAll(c, &plays)
+		if err != nil {
+			return fmt.Errorf("Getting plays for song %v failed: %v", id, err)
+		}
+
+		// Delete the old song and plays.
+		if err = datastore.Delete(c, songKey); err != nil {
+			return fmt.Errorf("Deleting song %v failed: %v", id, err)
+		}
+		if err = datastore.DeleteMulti(c, playKeys); err != nil {
+			return fmt.Errorf("Deleting %v play(s) for song %v failed: %v", len(playKeys), id, err)
+		}
+
+		// Put the deleted song and plays.
+		song.LastModifiedTime = time.Now()
+		delSongKey := datastore.NewKey(c, deletedSongKind, "", id, nil)
+		if _, err := datastore.Put(c, delSongKey, &song); err != nil {
+			return fmt.Errorf("Putting deleted song %v failed: %v", id, err)
+		}
+		delPlayKeys := make([]*datastore.Key, len(plays))
+		for i := range plays {
+			delPlayKeys[i] = datastore.NewIncompleteKey(c, deletedPlayKind, delSongKey)
+		}
+		if _, err = datastore.PutMulti(c, delPlayKeys, plays); err != nil {
+			return fmt.Errorf("Putting %v deleted play(s) for song %v failed: %v", len(plays), id, err)
+		}
+
+		return nil
+	}, &datastore.TransactionOptions{XG: true})
+}
+
 func clearData(c appengine.Context) error {
 	// Can't be too careful.
 	if !appengine.IsDevAppServer() {

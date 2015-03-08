@@ -263,17 +263,21 @@ func (t *Tester) GetNowFromServer() time.Time {
 	return time.Unix(0, nsec)
 }
 
-func (t *Tester) GetSongsForAndroid(minLastModified time.Time) []nup.Song {
+func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted bool) []nup.Song {
 	var nsec int64
 	if !minLastModified.IsZero() {
 		nsec = minLastModified.UnixNano()
+	}
+	deletedVal := 0
+	if deleted {
+		deletedVal = 1
 	}
 
 	songs := make([]nup.Song, 0)
 	var cursor string
 
 	for {
-		path := fmt.Sprintf("songs?minLastModifiedNsec=%d&max=%d", nsec, androidBatchSize)
+		path := fmt.Sprintf("songs?minLastModifiedNsec=%d&deleted=%d&max=%d", nsec, deletedVal, androidBatchSize)
 		if len(cursor) > 0 {
 			path += "&cursor=" + cursor
 		}

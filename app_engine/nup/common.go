@@ -10,8 +10,10 @@ import (
 
 const (
 	// Datastore kinds of various objects.
-	playKind = "Play"
-	songKind = "Song"
+	playKind        = "Play"
+	songKind        = "Song"
+	deletedPlayKind = "DeletedPlay"
+	deletedSongKind = "DeletedSong"
 )
 
 var (

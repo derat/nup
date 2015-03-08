@@ -421,13 +421,13 @@ func TestAndroid(tt *testing.T) {
 	log.Print("posting songs")
 	now := t.GetNowFromServer()
 	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, true, 0)
-	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(time.Time{}), false, nup.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(time.Time{}, false), false, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(now), false, nup.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(now, false), false, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(t.GetNowFromServer()), false, nup.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(t.GetNowFromServer(), false), false, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
 
@@ -437,7 +437,7 @@ func TestAndroid(tt *testing.T) {
 	updatedLegacySong1.Rating = 1.0
 	now = t.GetNowFromServer()
 	t.DoPost("rate_and_tag?songId="+id+"&rating=1.0", nil)
-	if err := compareQueryResults([]nup.Song{updatedLegacySong1}, t.GetSongsForAndroid(now), false, nup.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{updatedLegacySong1}, t.GetSongsForAndroid(now, false), false, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
 
@@ -447,7 +447,7 @@ func TestAndroid(tt *testing.T) {
 	updatedLegacySong1.Plays = append(updatedLegacySong1.Plays, p)
 	now = t.GetNowFromServer()
 	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(p.StartTime.Unix(), 10), nil)
-	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(now), false, nup.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(now, false), false, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
 }
@@ -529,5 +529,64 @@ func TestJsonImport(tt *testing.T) {
 	t.ImportSongsFromJsonFile(filepath.Join(GetDataDir(), "update.json"))
 	if err := CompareSongs([]nup.Song{LegacySong1Updated, LegacySong2}, t.DumpSongs(true), false); err != nil {
 		tt.Error(err)
+	}
+}
+
+func TestDeleteSong(tt *testing.T) {
+	t := setUpTest(noCaching)
+	defer cleanUpTest(t)
+
+	log.Print("posting songs and deleting first song")
+	postTime := t.GetNowFromServer()
+	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, true, 0)
+	id1 := t.GetSongId(LegacySong1.Sha1)
+	t.DoPost("delete_song?songId="+id1, nil)
+
+	log.Print("checking non-deleted song")
+	if err := compareQueryResults([]nup.Song{LegacySong2}, t.QuerySongs(""), false, nup.WebClient); err != nil {
+		tt.Error(err)
+	}
+	if err := compareQueryResults([]nup.Song{LegacySong2}, t.GetSongsForAndroid(time.Time{}, false), false, nup.AndroidClient); err != nil {
+		tt.Error(err)
+	}
+	if err := compareQueryResults([]nup.Song{LegacySong2}, t.GetSongsForAndroid(postTime, false), false, nup.AndroidClient); err != nil {
+		tt.Error(err)
+	}
+	if err := CompareSongs([]nup.Song{LegacySong2}, t.DumpSongs(true), false); err != nil {
+		tt.Error(err)
+	}
+
+	log.Print("checking that deleted song is in android query")
+	deletedSongs := t.GetSongsForAndroid(postTime, true)
+	if err := compareQueryResults([]nup.Song{LegacySong1}, deletedSongs, false, nup.AndroidClient); err != nil {
+		tt.Error(err)
+	}
+	if deletedSongs[0].SongId != id1 {
+		tt.Errorf("deleted song's id (%v) didn't match original id (%v)", deletedSongs[0].SongId, id1)
+	}
+
+	log.Print("deleting second song")
+	laterTime := t.GetNowFromServer()
+	id2 := t.GetSongId(LegacySong2.Sha1)
+	t.DoPost("delete_song?songId="+id2, nil)
+
+	log.Print("checking no non-deleted songs")
+	if err := compareQueryResults([]nup.Song{}, t.QuerySongs(""), false, nup.WebClient); err != nil {
+		tt.Error(err)
+	}
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(time.Time{}, false), false, nup.AndroidClient); err != nil {
+		tt.Error(err)
+	}
+	if err := CompareSongs([]nup.Song{}, t.DumpSongs(true), false); err != nil {
+		tt.Error(err)
+	}
+
+	log.Print("checking that both deleted songs are in android query")
+	deletedSongs = t.GetSongsForAndroid(laterTime, true)
+	if err := compareQueryResults([]nup.Song{LegacySong2}, deletedSongs, false, nup.AndroidClient); err != nil {
+		tt.Error(err)
+	}
+	if deletedSongs[0].SongId != id2 {
+		tt.Errorf("deleted song's id (%v) didn't match original id (%v)", deletedSongs[0].SongId, id2)
 	}
 }
