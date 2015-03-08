@@ -83,8 +83,15 @@ func (a SongArray) Less(i, j int) bool {
 	return a[i].Url < a[j].Url
 }
 
-func CompareSongs(expected, actual []nup.Song, compareOrder bool) error {
-	if !compareOrder {
+type OrderPolicy int
+
+const (
+	CompareOrder OrderPolicy = iota
+	IgnoreOrder
+)
+
+func CompareSongs(expected, actual []nup.Song, order OrderPolicy) error {
+	if order == IgnoreOrder {
 		sort.Sort(SongArray(expected))
 		sort.Sort(SongArray(actual))
 	}

@@ -73,7 +73,7 @@ func TestUpdate(t *testing.T) {
 	if err := updateSongs(cfg, ch, 2, true); err != nil {
 		t.Fatalf("failed to send songs: %v", err)
 	}
-	if err := test.CompareSongs([]nup.Song{s0, s1}, receivedSongs, true); err != nil {
+	if err := test.CompareSongs([]nup.Song{s0, s1}, receivedSongs, test.CompareOrder); err != nil {
 		t.Error(err)
 	}
 	if replace != "1" {
@@ -91,7 +91,7 @@ func TestUpdate(t *testing.T) {
 	if err := updateSongs(cfg, ch, len(sentSongs), false); err != nil {
 		t.Fatalf("failed to send songs: %v", err)
 	}
-	if err := test.CompareSongs(sentSongs, receivedSongs, true); err != nil {
+	if err := test.CompareSongs(sentSongs, receivedSongs, test.CompareOrder); err != nil {
 		t.Error(err)
 	}
 	if len(replace) > 0 {

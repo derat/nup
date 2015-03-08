@@ -18,7 +18,7 @@ func testLegacyQuery(expected []nup.Song, minId int64) error {
 	if err != nil {
 		return err
 	}
-	return test.CompareSongs(expected, actual, true)
+	return test.CompareSongs(expected, actual, test.CompareOrder)
 }
 
 func TestLegacy(t *testing.T) {

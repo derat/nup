@@ -26,7 +26,7 @@ func scanAndCompareSongs(t *testing.T, desc, dir, forceGlob string, lastUpdateTi
 	for i := range expected {
 		expected[i].Rating = 0
 	}
-	if err = test.CompareSongs(expected, actual, true); err != nil {
+	if err = test.CompareSongs(expected, actual, test.CompareOrder); err != nil {
 		t.Errorf("%v: %v", desc, err)
 	}
 }
