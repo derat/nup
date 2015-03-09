@@ -6,12 +6,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"erat.org/nup"
 )
 
 const (
 	batchSize = 100
+
+	deletePath        = "delete_song"
+	deleteSongIdParam = "songId"
 
 	// Server path to import songs and query params.
 	importPath         = "import"
@@ -70,6 +74,31 @@ func updateSongs(cfg Config, ch chan nup.Song, numSongs int, replaceUserData boo
 		if err = sendFunc(&buf); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func deleteSong(cfg Config, songId int64) error {
+	u, err := nup.GetServerUrl(cfg.ServerUrl, deletePath)
+	if err != nil {
+		return err
+	}
+	u.RawQuery = deleteSongIdParam + "=" + strconv.FormatInt(songId, 10)
+	req, err := http.NewRequest("POST", u.String(), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "text/plain")
+	req.SetBasicAuth(cfg.Username, cfg.Password)
+
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Got non-OK status: %v", resp.Status)
 	}
 	return nil
 }

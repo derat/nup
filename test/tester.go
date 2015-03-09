@@ -184,6 +184,12 @@ func (t *Tester) UpdateSongs() {
 	}
 }
 
+func (t *Tester) DeleteSong(songId string) {
+	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile, "-delete-song-id="+songId); err != nil {
+		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
+	}
+}
+
 func (t *Tester) NewRequest(method, path string, body io.Reader) *http.Request {
 	req, err := http.NewRequest(method, t.serverUrl+path, body)
 	if err != nil {

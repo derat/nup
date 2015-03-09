@@ -540,7 +540,7 @@ func TestDeleteSong(tt *testing.T) {
 	postTime := t.GetNowFromServer()
 	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, replaceUserData, 0)
 	id1 := t.GetSongId(LegacySong1.Sha1)
-	t.DoPost("delete_song?songId="+id1, nil)
+	t.DeleteSong(id1)
 
 	log.Print("checking non-deleted song")
 	if err := compareQueryResults([]nup.Song{LegacySong2}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
@@ -568,7 +568,7 @@ func TestDeleteSong(tt *testing.T) {
 	log.Print("deleting second song")
 	laterTime := t.GetNowFromServer()
 	id2 := t.GetSongId(LegacySong2.Sha1)
-	t.DoPost("delete_song?songId="+id2, nil)
+	t.DeleteSong(id2)
 
 	log.Print("checking no non-deleted songs")
 	if err := compareQueryResults([]nup.Song{}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {

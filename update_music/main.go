@@ -52,6 +52,7 @@ func setLastUpdateTime(path string, t time.Time) error {
 
 func main() {
 	configFile := flag.String("config", "", "Path to config file")
+	deleteSongId := flag.Int64("delete-song-id", 0, "Delete song with given ID")
 	dryRun := flag.Bool("dry-run", false, "Only print what would be updated")
 	forceGlob := flag.String("force-glob", "", "Glob pattern relative to music dir for files to scan and update even if they haven't changed")
 	importDb := flag.String("import-db", "", "If non-empty, path to legacy SQLite database to read info from")
@@ -71,6 +72,12 @@ func main() {
 	cf, err := newCoverFinder(cfg.CoverDir)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if *deleteSongId > 0 {
+		log.Printf("Deleting song %v", *deleteSongId)
+		deleteSong(cfg, *deleteSongId)
+		return
 	}
 
 	numSongs := 0
