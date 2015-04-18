@@ -21,7 +21,7 @@ function updateTitleAttributeForTruncation(element, text) {
 
 function createClassNameRegExp(className) {
   return new RegExp('(^|\\s+)' + className + '($|\\s+)');
-};
+}
 
 function addClassName(element, className) {
   var re = createClassNameRegExp(className);
