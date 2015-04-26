@@ -37,9 +37,10 @@ func TestCoversFindPath(t *testing.T) {
 		{"Weird-Band-We", "Like-Hyphens", "Weird-Band-We-Like-Hyphens.jpg"},
 		{"Weird-Band-We-Like", "Hyphens", "Weird-Band-We-Like-Hyphens.jpg"},
 		{"Some Guy", "Hyphens", "Weird-Band-We-Like-Hyphens.jpg"},
-		{"Not There", "At All", ""}, // No matches.
-		{"Pearl Jam", "", ""},       // Artist matches but album doesn't.
-		{"", "", ""},                // Missing artist/album.
+		{"Albumless", "", "Albumless-.jpg"}, // Unset album.
+		{"Not There", "At All", ""},         // No matches.
+		{"Pearl Jam", "", ""},               // Artist matches but album doesn't.
+		{"", "", ""},                        // Missing artist/album.
 	} {
 		actual := cf.findPath(tc.artist, tc.album)
 		if actual != tc.expected {
