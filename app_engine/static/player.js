@@ -170,7 +170,8 @@ Player.prototype.selectTrack = function(index) {
   this.notifyPlaylistAboutSongChange();
   this.updateSongDisplay();
   this.updateButtonState();
-  this.showNotification();
+  if (!document.hasFocus())
+    this.showNotification();
 
   var song = this.getCurrentSong();
   console.log('Switching to ' + song.songId + ' (' + song.url + ')');
