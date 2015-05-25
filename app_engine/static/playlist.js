@@ -28,6 +28,7 @@ function Playlist(player) {
   this.maxPlaysInput = $('maxPlaysInput');
   this.firstPlayedSelect = $('firstPlayedSelect');
   this.lastPlayedSelect = $('lastPlayedSelect');
+  this.presetSelect = $('presetSelect');
 
   this.searchButton = $('searchButton');
   this.resetButton = $('resetButton');
@@ -55,6 +56,7 @@ function Playlist(player) {
   this.unratedCheckbox.addEventListener('keydown', this.handleFormKeyDown.bind(this), false);
   this.unratedCheckbox.addEventListener('change', this.handleUnratedCheckboxChanged.bind(this), false);
   this.maxPlaysInput.addEventListener('keydown', this.handleFormKeyDown.bind(this), false);
+  this.presetSelect.addEventListener('change', this.handlePresetSelectChanged.bind(this), false);
   this.searchButton.addEventListener('click', this.submitQuery.bind(this, false), false);
   this.resetButton.addEventListener('click', this.resetSearchForm.bind(this, null, null, true), false);
   this.luckyButton.addEventListener('click', this.doLuckySearch.bind(this), false);
@@ -212,6 +214,7 @@ Playlist.prototype.resetSearchForm = function(artist, album, clearResults) {
   this.maxPlaysInput.value = null;
   this.firstPlayedSelect.selectedIndex = 0;
   this.lastPlayedSelect.selectedIndex = 0;
+  this.presetSelect.selectedIndex = 0;
   if (clearResults)
     this.searchResultsTable.updateSongs([]);
   this.rightPane.scrollIntoView();
@@ -250,6 +253,43 @@ Playlist.prototype.handleFormKeyDown = function(e) {
 Playlist.prototype.handleUnratedCheckboxChanged = function(event) {
   this.minRatingSelect.disabled = this.unratedCheckbox.checked;
 };
+
+Playlist.prototype.handlePresetSelectChanged = function(event) {
+  if (this.presetSelect.value == "")
+    return;
+
+  var index = this.presetSelect.selectedIndex;
+  this.resetSearchForm(null, null, false);
+  this.presetSelect.selectedIndex = index;
+
+  var play = false;
+
+  var vals = this.presetSelect.value.split(';');
+  for (var i = 0; i < vals.length; i++) {
+    var parts = vals[i].split('=');
+    if (parts[0] == 'fp')
+      this.firstPlayedSelect.selectedIndex = parts[1];
+    else if (parts[0] == 'ft')
+      this.firstTrackCheckbox.checked = !!parts[1];
+    else if (parts[0] == 'lp')
+      this.lastPlayedSelect.selectedIndex = parts[1];
+    else if (parts[0] == 'mr')
+      this.minRatingSelect.selectedIndex = parts[1];
+    else if (parts[0] == 'play')
+      play = !!parts[1];
+    else if (parts[0] == 's')
+      this.shuffleCheckbox.checked = !!parts[1];
+    else if (parts[0] == 't')
+      this.tagsInput.value = parts[1];
+    else if (parts[0] == 'u')
+      this.unratedCheckbox.checked = !!parts[1];
+    else
+      console.log('Unknown preset setting ' + vals[i]);
+  }
+
+  this.submitQuery(play);
+};
+
 
 // Handle notification from the player that the current song has changed.
 Playlist.prototype.handleSongChange = function(index) {

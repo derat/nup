@@ -87,17 +87,21 @@
           </td>
         </tr>
         <tr>
-          <td colspan="2">
+          <td>
             <label for="shuffleCheckbox">Shuffle</label>
             <input id="shuffleCheckbox" type="checkbox" value="shuffle"></input>
+          </td>
+          <td>
             <label for="firstTrackCheckbox">First track</label>
             <input id="firstTrackCheckbox" type="checkbox" value="firstTrack"></input>
           </td>
         </tr>
         <tr>
-          <td colspan="2">
+          <td>
             <label for="unratedCheckbox">Unrated</label>
             <input id="unratedCheckbox" type="checkbox" value="unrated"></input>
+          </td>
+          <td>
             <label for="minRatingSelect">Min rating</label>
             <select id="minRatingSelect">
               <option value="0.00">★</option>
@@ -116,8 +120,10 @@
           </td>
         </tr>
         <tr>
-          <td colspan="2">
+          <td>
             <label id="firstPlayedLabel" for="firstPlayedSelect">First played</label>
+          </td>
+          <td>
             <select id="firstPlayedSelect">
               <option value="0">...</option>
               <option value="86400">one day</option>
@@ -132,8 +138,10 @@
           </td>
         </tr>
         <tr>
-          <td colspan="2">
+          <td>
             <label id="lastPlayedLabel" for="lastPlayedSelect">Last played</label>
+          </td>
+          <td>
             <select id="lastPlayedSelect">
               <option value="0">...</option>
               <option value="86400">one day</option>
@@ -145,6 +153,21 @@
               <option value="94608000">three years</option>
             </select>
             <label for="lastPlayedSelect">or longer ago</label>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <label id="presetLabel" for="presetSelect">Preset</label>
+          </td>
+          <td>
+            <select id="presetSelect">
+              <option value="">...</option>
+              <option value="mr=3;t=instrumental;s=1;play=1">instrumental</option>
+              <option value="mr=3;t=mellow;s=1;play=1">mellow</option>
+              <option value="mr=3;lp=7;s=1;play=1">old</option>
+              <option value="ft=1;fp=3">new albums</option>
+              <option value="u=1">unrated</option>
+            </select>
           </td>
         </tr>
         <tr>

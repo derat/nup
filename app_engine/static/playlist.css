@@ -50,6 +50,7 @@ body {
   margin-top: 5px;
   border-collapse: collapse;
   -webkit-user-select: none;
+  white-space: nowrap;
 }
 #searchLeftColumn {
   width: 4em;
@@ -84,9 +85,6 @@ body {
   left: -22px;
   top: 2px;
   cursor: pointer;
-}
-#firstTrackCheckbox, #shuffleCheckbox, #unratedCheckbox {
-  margin-right: 15px;
 }
 #maxPlaysInput {
   padding-right: 2px;
