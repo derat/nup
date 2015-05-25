@@ -42,6 +42,12 @@ function Player() {
   // Rating set in the update div.
   this.updatedRating = -1.0;
 
+  // Song notification currently being shown or null.
+  this.notification = null;
+
+  // Timeout ID for calling closeNotification().
+  this.closeNotificationTimeoutId = 0;
+
   this.audio = $('audio');
   this.favicon = $('favicon');
   this.coverImage = $('coverImage');
@@ -99,6 +105,9 @@ Player.SEEK_SECONDS = 10;
 
 // Number of times to retry playback after consecutive errors.
 Player.MAX_RETRIES = 2;
+
+// Number of seconds that a notification is shown when the song changes.
+Player.NOTIFICATION_SECONDS = 5;
 
 Player.prototype.getCurrentSong = function() {
   return (this.currentIndex >= 0 && this.currentIndex < this.songs.length) ? this.songs[this.currentIndex] : null;
@@ -161,6 +170,7 @@ Player.prototype.selectTrack = function(index) {
   this.notifyPlaylistAboutSongChange();
   this.updateSongDisplay();
   this.updateButtonState();
+  this.showNotification();
 
   var song = this.getCurrentSong();
   console.log('Switching to ' + song.songId + ' (' + song.url + ')');
@@ -241,6 +251,45 @@ Player.prototype.getRatingString = function(rating, withLabel, includeEmpty) {
       break;
   }
   return ratingString;
+};
+
+Player.prototype.showNotification = function() {
+  console.log('showNotification');
+  if (!('Notification' in window))
+    return;
+
+  if (Notification.permission !== 'granted') {
+    if (Notification.permission !== 'denied')
+      Notification.requestPermission();
+    return;
+  }
+
+  if (this.notification) {
+    window.clearTimeout(this.closeNotificationTimeoutId);
+    this.closeNotification();
+  }
+
+  var song = this.getCurrentSong();
+  if (!song)
+    return;
+
+  this.notification = new Notification(
+      song.artist + "\n" + song.title,
+      {
+        body: song.album + "\n" + formatTime(song.length),
+        icon: song.coverUrl
+      });
+  this.closeNotificationTimeoutId = window.setTimeout(
+      this.closeNotification.bind(this), Player.NOTIFICATION_SECONDS * 1000);
+};
+
+Player.prototype.closeNotification = function() {
+  if (!this.notification)
+    return;
+
+  this.notification.close();
+  this.notification = null;
+  this.closeNotificationTimeoutId = 0;
 };
 
 Player.prototype.play = function() {
