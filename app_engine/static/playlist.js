@@ -187,6 +187,12 @@ Playlist.prototype.enqueueSearchResults = function(clearFirst, afterCurrent) {
   for (var i = 0; i < checkedSongs.length; i++)
     newSongs.splice(index++, 0, checkedSongs[i]);
 
+  // If we're replacing the current songs but e.g. the last song was highlighted
+  // and is the same for both the old and new lists, make sure that the
+  // highlighting on it gets cleared.
+  if (clearFirst)
+    this.playlistTable.highlightRow(this.currentIndex, false);
+
   this.playlistTable.updateSongs(newSongs);
   this.player.setSongs(newSongs);
 
