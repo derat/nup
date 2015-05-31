@@ -68,16 +68,16 @@ func main() {
 		log.Fatal("Unable to read config file: ", err)
 	}
 
-	log.Printf("Loading covers from %v", cfg.CoverDir)
-	cf, err := newCoverFinder(cfg.CoverDir)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	if *deleteSongId > 0 {
 		log.Printf("Deleting song %v", *deleteSongId)
 		deleteSong(cfg, *deleteSongId)
 		return
+	}
+
+	log.Printf("Loading covers from %v", cfg.CoverDir)
+	cf, err := newCoverFinder(cfg.CoverDir)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	numSongs := 0
