@@ -83,6 +83,7 @@ function Player() {
   this.tagSuggester = new Suggester(this.tagTextarea, $('tagSuggestionsDiv'), [], false);
 
   document.body.addEventListener('keydown', this.handleBodyKeyDown.bind(this), false);
+  window.addEventListener('beforeunload', this.handleBeforeUnload.bind(this), false);
 
   var req = new XMLHttpRequest();
   req.open('GET', 'list_tags', true);
@@ -547,6 +548,11 @@ Player.prototype.handleBodyKeyDown = function(e) {
     e.preventDefault();
     e.stopPropagation();
   }
+};
+
+Player.prototype.handleBeforeUnload = function(e) {
+  this.closeNotification();
+  return null;
 };
 
 Player.prototype.handleRatingSpanKeyDown = function(e) {
