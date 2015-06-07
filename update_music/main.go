@@ -13,9 +13,9 @@ import (
 	"erat.org/nup"
 )
 
-type SongAndError struct {
-	Song  *nup.Song
-	Error error
+type SongOrErr struct {
+	*nup.Song
+	Err error
 }
 
 type Config struct {
@@ -81,7 +81,7 @@ func main() {
 	}
 
 	numSongs := 0
-	readChan := make(chan SongAndError)
+	readChan := make(chan SongOrErr)
 	startTime := time.Now()
 	replaceUserData := false
 	didFullScan := false
@@ -138,18 +138,17 @@ func main() {
 	updateChan := make(chan nup.Song)
 	go func() {
 		for i := 0; i < numSongs; i++ {
-			songAndError := <-readChan
-			if songAndError.Error != nil {
-				log.Fatalf("Got error for %v: %v\n", songAndError.Song.Filename, songAndError.Error)
+			s := <-readChan
+			if s.Err != nil {
+				log.Fatalf("Got error for %v: %v\n", s.Filename, s.Err)
 			}
-			s := *songAndError.Song
 			s.CoverFilename = cf.findPath(s.Artist, s.Album)
 			if *requireCovers && len(s.CoverFilename) == 0 {
 				log.Fatalf("Failed to find cover for %v (%v-%v)", s.Filename, s.Artist, s.Album)
 			}
 
 			log.Print("Sending ", s.Filename)
-			updateChan <- s
+			updateChan <- *s.Song
 		}
 	}()
 

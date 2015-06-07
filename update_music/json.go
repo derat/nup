@@ -8,7 +8,7 @@ import (
 	"erat.org/nup"
 )
 
-func getSongsFromJsonFile(path string, updateChan chan SongAndError) (numUpdates int, err error) {
+func getSongsFromJsonFile(path string, updateChan chan SongOrErr) (numUpdates int, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, err
@@ -23,7 +23,7 @@ func getSongsFromJsonFile(path string, updateChan chan SongAndError) (numUpdates
 		} else if err != nil {
 			return 0, err
 		}
-		go func() { updateChan <- SongAndError{&s, nil} }()
+		go func() { updateChan <- SongOrErr{&s, nil} }()
 		numUpdates += 1
 	}
 

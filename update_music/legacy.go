@@ -24,7 +24,7 @@ func doQuery(db *sql.DB, q string, f func(*sql.Rows) error) error {
 	return nil
 }
 
-func getSongsFromLegacyDb(path string, minId int64, updateChan chan SongAndError) (numUpdates int, err error) {
+func getSongsFromLegacyDb(path string, minId int64, updateChan chan SongOrErr) (numUpdates int, err error) {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		return 0, err
@@ -95,7 +95,7 @@ func getSongsFromLegacyDb(path string, minId int64, updateChan chan SongAndError
 		}
 		sort.Ints(keys)
 		for _, id := range keys {
-			updateChan <- SongAndError{songs[id], nil}
+			updateChan <- SongOrErr{songs[id], nil}
 		}
 	}()
 	return len(songs), nil

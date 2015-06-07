@@ -9,7 +9,7 @@ import (
 )
 
 func TestJson(t *testing.T) {
-	ch := make(chan SongAndError)
+	ch := make(chan SongOrErr)
 	num, err := getSongsFromJsonFile(filepath.Join(test.GetDataDir(), "import.json"), ch)
 	if err != nil {
 		t.Error(err)

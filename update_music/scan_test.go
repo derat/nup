@@ -12,7 +12,7 @@ import (
 )
 
 func scanAndCompareSongs(t *testing.T, desc, dir, forceGlob string, lastUpdateTime time.Time, expected []nup.Song) {
-	ch := make(chan SongAndError)
+	ch := make(chan SongOrErr)
 	num, err := scanForUpdatedSongs(dir, forceGlob, lastUpdateTime, ch, false)
 	if err != nil {
 		t.Errorf("%v: %v", desc, err)

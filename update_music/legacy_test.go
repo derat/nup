@@ -9,7 +9,7 @@ import (
 )
 
 func testLegacyQuery(expected []nup.Song, minId int64) error {
-	ch := make(chan SongAndError)
+	ch := make(chan SongOrErr)
 	num, err := getSongsFromLegacyDb(filepath.Join(test.GetDataDir(), "legacy.db"), minId, ch)
 	if err != nil {
 		return err
