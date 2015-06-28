@@ -82,15 +82,33 @@ Playlist.prototype.parseQueryString = function(text) {
 
   text = text.trim();
   while (text.length > 0) {
-    if (text.indexOf("artist:") == 0 || text.indexOf("title:") == 0 || text.indexOf("album:") == 0) {
-      var match = text.match(/^([a-z]+):\s*("[^"]*"|\S+)(.*)/);
-      if (match != null) {
-        var value = match[2];
-        if (value[0] == '"' && value[value.length-1] == '"')
-          value = value.substring(1, value.length-1);
-        terms.push(match[1] + '=' + encodeURIComponent(value));
-        text = match[3];
+    if (text.indexOf('artist:') == 0 || text.indexOf('title:') == 0 || text.indexOf('album:') == 0) {
+      var key = text.substring(0, text.indexOf(':'));
+
+      // Skip over key and leading whitespace.
+      var index = key.length + 1;
+      for (; index < text.length && text[index] == ' '; index++);
+
+      var value = '';
+      var inEscape = false;
+      var inQuote = false;
+      for (; index < text.length; index++) {
+        var ch = text[index];
+        if (ch == '\\' && !inEscape) {
+          inEscape = true;
+        } else if (ch == '"' && !inEscape) {
+          inQuote = !inQuote;
+        } else if (ch == ' ' && !inQuote) {
+          break;
+        } else {
+          value += ch;
+          inEscape = false;
+        }
       }
+
+      if (value.length > 0)
+        terms.push(key + '=' + encodeURIComponent(value));
+      text = text.substring(index);
     } else {
       var match = text.match(/^(\S+)(.*)/);
       // The server splits on non-alphanumeric characters to make keywords.
@@ -205,10 +223,16 @@ Playlist.prototype.enqueueSearchResults = function(clearFirst, afterCurrent) {
 // page so the form is visible.
 Playlist.prototype.resetSearchForm = function(artist, album, clearResults) {
   var keywords = [];
+  var clean = function(s) {
+    var s = s.replace(/"/g, '\\"');
+    if (s.indexOf(' ') != -1)
+      s = '"' + s + '"';
+    return s;
+  }
   if (artist)
-    keywords.push('artist:"' + artist + '" ');
+    keywords.push('artist:' + clean(artist));
   if (album)
-    keywords.push('album:"' + album + '" ');
+    keywords.push('album:' + clean(album));
 
   this.keywordsInput.value = keywords.join(' ');
   this.tagsInput.value = null;
