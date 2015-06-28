@@ -72,6 +72,22 @@ func RemoveFromTempDir(dir string, filenames ...string) {
 	}
 }
 
+func WriteSongsToJsonFile(dir string, songs []nup.Song) (path string) {
+	f, err := ioutil.TempFile(dir, "songs-json.")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	e := json.NewEncoder(f)
+	for _, s := range songs {
+		if err = e.Encode(s); err != nil {
+			panic(err)
+		}
+	}
+	return f.Name()
+}
+
 type SongArray []nup.Song
 
 func (a SongArray) Len() int      { return len(a) }

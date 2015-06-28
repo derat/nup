@@ -525,36 +525,86 @@ func TestJsonImport(tt *testing.T) {
 	defer cleanUpTest(t)
 
 	log.Print("importing songs from json file")
-	t.ImportSongsFromJsonFile(filepath.Join(GetDataDir(), "import.json"), replaceUserData)
+	t.ImportSongsFromJsonFile(WriteSongsToJsonFile(t.TempDir, []nup.Song{LegacySong1, LegacySong2}), replaceUserData)
 	if err := CompareSongs([]nup.Song{LegacySong1, LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("updating song from json file")
-	t.ImportSongsFromJsonFile(filepath.Join(GetDataDir(), "update.json"), replaceUserData)
-	if err := CompareSongs([]nup.Song{LegacySong1Updated, LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
+	us := LegacySong1
+	us.Artist += " bogus"
+	us.Title += " bogus"
+	us.Album += " bogus"
+	us.Track += 1
+	us.Disc += 1
+	us.Length *= 2
+	us.Rating /= 2.0
+	us.Plays = us.Plays[0:1]
+	us.Tags = []string{"bogus"}
+	t.ImportSongsFromJsonFile(WriteSongsToJsonFile(t.TempDir, []nup.Song{us, LegacySong2}), replaceUserData)
+	if err := CompareSongs([]nup.Song{us, LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("reporting play")
-	id := t.GetSongId(LegacySong1.Sha1)
+	id := t.GetSongId(us.Sha1)
 	st := time.Unix(1410746718, 0)
 	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(st.Unix(), 10), nil)
-
-	newPlays := append(LegacySong1Updated.Plays, nup.Play{st, "127.0.0.1"})
-	s1 := LegacySong1Updated
-	s1.Plays = newPlays
-	if err := CompareSongs([]nup.Song{s1, LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
+	us.Plays = append(us.Plays, nup.Play{st, "127.0.0.1"})
+	if err := CompareSongs([]nup.Song{us, LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("updating song from json file but preserving user data")
-	t.ImportSongsFromJsonFile(filepath.Join(GetDataDir(), "import.json"), keepUserData)
-	s1 = LegacySong1
-	s1.Rating = LegacySong1Updated.Rating
-	s1.Tags = LegacySong1Updated.Tags
-	s1.Plays = newPlays
-	if err := CompareSongs([]nup.Song{s1, LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
+	t.ImportSongsFromJsonFile(WriteSongsToJsonFile(t.TempDir, []nup.Song{LegacySong1, LegacySong2}), keepUserData)
+	us2 := LegacySong1
+	us2.Rating = us.Rating
+	us2.Tags = us.Tags
+	us2.Plays = us.Plays
+	if err := CompareSongs([]nup.Song{us2, LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
+		tt.Error(err)
+	}
+}
+
+func TestSorting(tt *testing.T) {
+	t := setUpTest(noCaching)
+	defer cleanUpTest(t)
+
+	songs := make([]nup.Song, 0)
+	for _, s := range []struct {
+		Artist  string
+		Album   string
+		AlbumId string
+		Disc    int
+		Track   int
+	}{
+		// Sorting should be [Album, AlbumId, Disc, Track].
+		{"b", "album1", "23", 1, 1},
+		{"b", "album1", "23", 1, 2},
+		{"b", "album1", "23", 2, 1},
+		{"b", "album1", "23", 2, 2},
+		{"b", "album1", "23", 2, 3},
+		{"a", "album1", "56", 1, 1},
+		{"a", "album1", "56", 1, 2},
+		{"a", "album1", "56", 1, 3},
+		{"b", "album2", "10", 1, 1},
+	} {
+		id := fmt.Sprintf("%s-%s-%d-%d", s.Artist, s.Album, s.Disc, s.Track)
+		songs = append(songs, nup.Song{
+			Sha1:     id,
+			Filename: id + ".mp3",
+			Artist:   s.Artist,
+			Title:    fmt.Sprintf("Track %d", s.Track),
+			Album:    s.Album,
+			AlbumId:  s.AlbumId,
+			Track:    s.Track,
+			Disc:     s.Disc,
+		})
+	}
+
+	log.Print("importing songs and checking sort order")
+	t.ImportSongsFromJsonFile(WriteSongsToJsonFile(t.TempDir, songs), replaceUserData)
+	if err := compareQueryResults(songs, t.QuerySongs(""), CompareOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 }

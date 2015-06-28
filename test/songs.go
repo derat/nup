@@ -83,20 +83,6 @@ var LegacySong1 nup.Song = nup.Song{
 	Tags:     []string{"electronic", "instrumental"},
 }
 
-var LegacySong1Updated nup.Song = nup.Song{
-	Sha1:     "1977c91fea860245695dcceea0805c14cede7559",
-	Filename: "arovane/atol_scrap/ThaemNue.mp3",
-	Artist:   "arovane",
-	Title:    "thaem nue",
-	Album:    "atol scrap",
-	Track:    4,
-	Disc:     2,
-	Length:   400,
-	Rating:   0.5,
-	Plays:    []nup.Play{{time.Unix(1276057171, 0).UTC(), "1.1.1.1"}},
-	Tags:     []string{"idm"},
-}
-
 var LegacySong2 nup.Song = nup.Song{
 	Sha1:     "b70984a4ac5084999b70478cdf163218b90cefdb",
 	Filename: "gary_hoey/animal_instinct/motown_fever.mp3",

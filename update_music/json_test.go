@@ -1,7 +1,8 @@
 package main
 
 import (
-	"path/filepath"
+	"io/ioutil"
+	"os"
 	"testing"
 
 	"erat.org/nup"
@@ -9,8 +10,15 @@ import (
 )
 
 func TestJson(t *testing.T) {
+	dir, err := ioutil.TempDir("", "update_music.")
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(dir)
+
+	songs := []nup.Song{test.LegacySong1, test.LegacySong2}
 	ch := make(chan SongOrErr)
-	num, err := getSongsFromJsonFile(filepath.Join(test.GetDataDir(), "import.json"), ch)
+	num, err := getSongsFromJsonFile(test.WriteSongsToJsonFile(dir, songs), ch)
 	if err != nil {
 		t.Error(err)
 	}
@@ -18,7 +26,7 @@ func TestJson(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if err = test.CompareSongs([]nup.Song{test.LegacySong1, test.LegacySong2}, actual, test.CompareOrder); err != nil {
+	if err = test.CompareSongs(songs, actual, test.CompareOrder); err != nil {
 		t.Error(err)
 	}
 }
