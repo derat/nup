@@ -38,6 +38,7 @@ func copySongFileFields(dest, src *nup.Song) {
 	dest.Artist = src.Artist
 	dest.Title = src.Title
 	dest.Album = src.Album
+	dest.AlbumId = src.AlbumId
 	dest.Track = src.Track
 	dest.Disc = src.Disc
 	dest.Length = src.Length

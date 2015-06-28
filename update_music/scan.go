@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	mp3Extension        = ".mp3"
+	albumIdTag          = "MusicBrainz Album Id"
 	logProgressInterval = 100
+	mp3Extension        = ".mp3"
 )
 
 func readId3Footer(f *os.File, fi os.FileInfo) (length int64, artist, title, album string, err error) {
@@ -169,6 +170,7 @@ func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan SongO
 		s.Artist = tag.Artist()
 		s.Title = tag.Title()
 		s.Album = tag.Album()
+		s.AlbumId = tag.CustomFrames()[albumIdTag]
 		s.Track = int(tag.Track())
 		s.Disc = int(tag.Disc())
 		headerLength = int64(tag.TagSize())

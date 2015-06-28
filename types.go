@@ -46,6 +46,10 @@ type Song struct {
 	// Words from ArtistLower, TitleLower, and AlbumLower used for searching.
 	Keywords []string `json:"-"`
 
+	// Opaque ID uniquely identifying the album (generally, a MusicBrainz
+	// release ID taken from a "MusicBrainz Album Id" ID3v2 tag).
+	AlbumId string `json:"albumId,omitempty"`
+
 	// Track and disc number or 0 if unset.
 	Track int `json:"track"`
 	Disc  int `json:"disc"`
