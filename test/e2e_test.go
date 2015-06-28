@@ -525,14 +525,36 @@ func TestJsonImport(tt *testing.T) {
 	defer cleanUpTest(t)
 
 	log.Print("importing songs from json file")
-	t.ImportSongsFromJsonFile(filepath.Join(GetDataDir(), "import.json"))
+	t.ImportSongsFromJsonFile(filepath.Join(GetDataDir(), "import.json"), replaceUserData)
 	if err := CompareSongs([]nup.Song{LegacySong1, LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("updating song from json file")
-	t.ImportSongsFromJsonFile(filepath.Join(GetDataDir(), "update.json"))
+	t.ImportSongsFromJsonFile(filepath.Join(GetDataDir(), "update.json"), replaceUserData)
 	if err := CompareSongs([]nup.Song{LegacySong1Updated, LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
+		tt.Error(err)
+	}
+
+	log.Print("reporting play")
+	id := t.GetSongId(LegacySong1.Sha1)
+	st := time.Unix(1410746718, 0)
+	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(st.Unix(), 10), nil)
+
+	newPlays := append(LegacySong1Updated.Plays, nup.Play{st, "127.0.0.1"})
+	s1 := LegacySong1Updated
+	s1.Plays = newPlays
+	if err := CompareSongs([]nup.Song{s1, LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
+		tt.Error(err)
+	}
+
+	log.Print("updating song from json file but preserving user data")
+	t.ImportSongsFromJsonFile(filepath.Join(GetDataDir(), "import.json"), keepUserData)
+	s1 = LegacySong1
+	s1.Rating = LegacySong1Updated.Rating
+	s1.Tags = LegacySong1Updated.Tags
+	s1.Plays = newPlays
+	if err := CompareSongs([]nup.Song{s1, LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 }

@@ -144,8 +144,7 @@ func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan SongO
 	var err error
 	defer func() { updateChan <- SongOrErr{s, err} }()
 
-	var f *os.File
-	f, err = os.Open(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return
 	}
@@ -158,8 +157,7 @@ func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan SongO
 	}
 
 	var headerLength int64
-	var tag taglib.GenericTag
-	tag, err = taglib.Decode(f, fi.Size())
+	tag, err := taglib.Decode(f, fi.Size())
 	if err != nil {
 		// Tolerate missing ID3v2 tags if we got an artist and title from ID3v1.
 		if len(s.Artist) == 0 && len(s.Title) == 0 {

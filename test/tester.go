@@ -22,6 +22,13 @@ const (
 	androidBatchSize = 1
 )
 
+type userDataPolicy int
+
+const (
+	replaceUserData userDataPolicy = iota
+	keepUserData
+)
+
 func runCommand(p string, args ...string) (stdout, stderr string, err error) {
 	cmd := exec.Command(p, args...)
 	outPipe, err := cmd.StdoutPipe()
@@ -172,8 +179,12 @@ func (t *Tester) ImportSongsFromLegacyDb(path string) {
 	}
 }
 
-func (t *Tester) ImportSongsFromJsonFile(path string) {
-	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile, "-import-json-file="+path); err != nil {
+func (t *Tester) ImportSongsFromJsonFile(path string, policy userDataPolicy) {
+	userDataValue := "false"
+	if policy == replaceUserData {
+		userDataValue = "true"
+	}
+	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile, "-import-json-file="+path, "-import-user-data="+userDataValue); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
 }
@@ -228,13 +239,6 @@ func (t *Tester) DoPost(pathAndQueryParams string, body io.Reader) {
 		panic(err)
 	}
 }
-
-type userDataPolicy int
-
-const (
-	replaceUserData userDataPolicy = iota
-	keepUserData
-)
 
 func (t *Tester) PostSongs(songs []nup.Song, userData userDataPolicy, updateDelay time.Duration) {
 	var buf bytes.Buffer
