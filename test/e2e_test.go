@@ -36,6 +36,11 @@ const (
 
 func setUpTest(cp cachePolicy) *Tester {
 	t := newTester(server, binDir)
+	if err := t.PingServer(); err != nil {
+		log.Printf("Unable to connect to server: %v\n", err)
+		log.Printf("Run e.g. \"dev_appserver.py --host=0.0.0.0 --datastore_consistency_policy=consistent .\", maybe?")
+		os.Exit(1)
+	}
 	log.Printf("clearing all data on %v", server)
 	t.DoPost("clear", nil)
 	t.DoPost("flush_cache", nil)

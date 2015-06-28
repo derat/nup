@@ -210,6 +210,15 @@ func (t *Tester) SendRequest(req *http.Request) *http.Response {
 	return resp
 }
 
+func (t *Tester) PingServer() error {
+	if resp, err := t.client.Do(t.NewRequest("HEAD", "", nil)); err != nil {
+		return err
+	} else {
+		resp.Body.Close()
+		return nil
+	}
+}
+
 func (t *Tester) DoPost(pathAndQueryParams string, body io.Reader) {
 	req := t.NewRequest("POST", pathAndQueryParams, body)
 	req.Header.Set("Content-Type", "text/plain")
