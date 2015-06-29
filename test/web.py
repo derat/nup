@@ -52,7 +52,7 @@ def wait(f, timeout_sec=10, sleep_sec=0.1):
         time.sleep(sleep_sec)
 
 def select_option(select, value):
-    for option in select.find_elements_by_xpath('.//option'):
+    for option in select.find_elements_by_tag_name('option'):
         if option.text == value:
             option.click()
             return
@@ -108,10 +108,10 @@ class Test(unittest.TestCase):
     def get_results(self):
         results = []
         table = driver.find_element_by_id('searchResultsTable')
-        rows = table.find_elements_by_xpath('.//tr')
+        rows = table.find_elements_by_tag_name('tr')
         for i in range(1, len(rows)):
             row = rows[i]
-            cols = row.find_elements_by_xpath('.//td')
+            cols = row.find_elements_by_tag_name('td')
             results.append({
                 'artist': cols[1].text,
                 'title': cols[2].text,
