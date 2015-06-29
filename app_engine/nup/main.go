@@ -98,16 +98,27 @@ func hasAllowedBasicAuth(r *http.Request, cfg *nup.ServerConfig) (username strin
 	return username, false
 }
 
+func hasWebdriverCookie(r *http.Request) bool {
+	if _, err := r.Cookie("webdriver"); err != nil {
+		return false
+	}
+	return true
+}
+
 func checkRequest(c appengine.Context, w http.ResponseWriter, r *http.Request, method string, redirectToLogin bool) bool {
 	cfg := getConfig(c)
 	username, allowed := hasAllowedGoogleAuth(c, r, cfg)
 	if !allowed && len(username) == 0 {
 		username, allowed = hasAllowedBasicAuth(r, cfg)
 	}
+	// Ugly hack since Webdriver doesn't support basic auth.
+	if !allowed && appengine.IsDevAppServer() && hasWebdriverCookie(r) {
+		allowed = true
+	}
 	if !allowed {
 		if len(username) == 0 && redirectToLogin {
 			loginUrl, _ := user.LoginURL(c, "/")
-			c.Debugf("Unauthenticated request for %v from %v; redirecting to login", r.URL.String(), username, r.RemoteAddr)
+			c.Debugf("Unauthenticated request for %v from %v; redirecting to login", r.URL.String(), r.RemoteAddr)
 			http.Redirect(w, r, loginUrl, http.StatusFound)
 		} else {
 			c.Debugf("Unauthorized request for %v from %q at %v", r.URL.String(), username, r.RemoteAddr)
