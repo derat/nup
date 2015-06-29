@@ -6,7 +6,10 @@ import json
 import os
 import pprint
 import sha
+import SimpleHTTPServer
+import SocketServer
 import subprocess
+import threading
 import time
 import unittest
 
@@ -15,7 +18,10 @@ from selenium import webdriver
 HOSTNAME = 'localhost:8080'
 BASE_URL = 'http://' + HOSTNAME
 AUTH_COOKIE = 'webdriver'
+MUSIC_PATH = 'data/music'
+MUSIC_FILE = '5s.mp3'
 
+file_thread = None
 server = None
 driver = None
 
@@ -27,10 +33,9 @@ class TimeoutError(Exception):
 
 def make_song(artist, title, album, track=0, disc=0, rating=-1, tags=[]):
     '''Returns a dictionary describing a song, suitable for JSONification.'''
-    path = os.path.join(artist, album, title + '.mp3')
     return {
-        'sha1': sha.new(path).hexdigest(),
-        'filename': path,
+        'sha1': sha.new('%s-%s-%s' % (artist, album, title)).hexdigest(),
+        'filename': MUSIC_FILE,
         'artist': artist,
         'title': title,
         'album': album,
@@ -58,12 +63,30 @@ def select_option(select, value):
             return
     raise RuntimeError('Failed to find option "%s"' % value)
 
+class FileServerThread(threading.Thread):
+    def __init__(self, path):
+        threading.Thread.__init__(self)
+        os.chdir(path)
+        handler = SimpleHTTPServer.SimpleHTTPRequestHandler
+        self.server = SocketServer.TCPServer(("", 0), handler)
+
+    def server_address(self):
+        return self.server.server_address
+
+    def run(self):
+        self.server.serve_forever()
+
+    def stop(self):
+        self.server.shutdown()
+        self.join()
+
 class Server:
     def __init__(self, hostname):
         self.conn = httplib.HTTPConnection(hostname)
         self.headers = {
             'Cookie': '%s=1' % AUTH_COOKIE,
         }
+        # TODO: Need to configure server to give URLs to local file server.
 
     def clear_data(self):
         self.conn.request('POST', '/clear', None, self.headers)
@@ -82,6 +105,10 @@ class Server:
             raise RuntimeError('Got %s: %s' % (resp.status, resp.reason))
 
 def setUpModule():
+    global file_thread
+    file_thread = FileServerThread(MUSIC_PATH)
+    file_thread.start()
+
     global server
     server = Server(HOSTNAME)
 
@@ -99,6 +126,7 @@ def setUpModule():
     driver.get(BASE_URL)
 
 def tearDownModule():
+    file_thread.stop()
     driver.close()
 
 class Test(unittest.TestCase):
@@ -138,6 +166,27 @@ class Test(unittest.TestCase):
             self.fail("Timed out waiting for expected results. Received:\n" +
                       pprint.pformat(self.get_results()))
 
+    def get_current_song(self):
+        return {
+            'artist': driver.find_element_by_id('artistDiv').text,
+            'title': driver.find_element_by_id('titleDiv').text,
+            'album': driver.find_element_by_id('albumDiv').text,
+        }
+
+    def wait_for_song(self, song):
+        def is_current():
+            current = self.get_current_song()
+            # TODO: Make sure that it's actually playing once music-file-serving
+            # is working.
+            return current['artist'] == song['artist'] and \
+                   current['title'] == song['title'] and \
+                   current['album'] == song['album']
+        try:
+            wait(is_current, timeout_sec=5)
+        except TimeoutError as e:
+            self.fail("Timed out waiting for song. Received:\n" +
+                      pprint.pformat(self.get_current_song()))
+
     def test_queries(self):
         album1 = [
             make_song('ar1', 'tr1', 'al1', 1, 1, 0.5),
@@ -150,6 +199,7 @@ class Test(unittest.TestCase):
         ]
         server.import_songs(album1 + album2)
 
+        driver.find_element_by_id('resetButton').click()
         driver.find_element_by_id('keywordsInput').send_keys('album:al1')
         driver.find_element_by_id('searchButton').click()
         self.wait_for_results(album1)
@@ -173,6 +223,15 @@ class Test(unittest.TestCase):
         select_option(driver.find_element_by_id('minRatingSelect'), u'★★★★')
         driver.find_element_by_id('searchButton').click()
         self.wait_for_results([album1[1], album2[0]])
+
+    def test_playback(self):
+        song = make_song('artist', 'track', 'album')
+        server.import_songs([song])
+
+        driver.find_element_by_id('resetButton').click()
+        driver.find_element_by_id('keywordsInput').send_keys(song['artist'])
+        driver.find_element_by_id('luckyButton').click()
+        self.wait_for_song(song)
 
 if __name__ == '__main__':
     unittest.main()
