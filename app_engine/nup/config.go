@@ -3,7 +3,6 @@ package appengine
 import (
 	"appengine"
 	"appengine/datastore"
-	"fmt"
 
 	"erat.org/cloud"
 	"erat.org/nup"
@@ -25,14 +24,34 @@ func addTestUserToConfig(cfg *nup.ServerConfig) {
 	cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, nup.BasicAuthInfo{test.TestUsername, test.TestPassword})
 }
 
+// cleanBaseUrl appends a trailing slash to u if not already present.
+// Does nothing if u is empty.
+func cleanBaseUrl(u *string) {
+	if len(*u) > 0 && (*u)[len(*u)-1] != '/' {
+		*u += "/"
+	}
+}
+
 func loadBaseConfig() {
 	baseConfig = &nup.ServerConfig{}
 	if err := cloud.ReadJson(configPath, baseConfig); err != nil {
 		panic(err)
 	}
-	if len(baseConfig.SongBucket) == 0 || len(baseConfig.CoverBucket) == 0 {
-		panic(fmt.Sprintf("Invalid song bucket %q or cover bucket %q", baseConfig.SongBucket, baseConfig.CoverBucket))
+
+	cleanBaseUrl(&baseConfig.SongBaseUrl)
+	haveSongBucket := len(baseConfig.SongBucket) > 0
+	haveSongUrl := len(baseConfig.SongBaseUrl) > 0
+	if (haveSongBucket && haveSongUrl) || !(haveSongBucket || haveSongUrl) {
+		panic("Exactly one of SongBucket and SongBaseUrl must be set")
 	}
+
+	cleanBaseUrl(&baseConfig.CoverBaseUrl)
+	haveCoverBucket := len(baseConfig.CoverBucket) > 0
+	haveCoverUrl := len(baseConfig.CoverBaseUrl) > 0
+	if (haveCoverBucket && haveCoverUrl) || !(haveCoverBucket || haveCoverUrl) {
+		panic("Exactly one of CoverBucket and CoverBaseUrl must be set")
+	}
+
 	if appengine.IsDevAppServer() {
 		addTestUserToConfig(baseConfig)
 	}

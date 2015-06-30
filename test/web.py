@@ -15,8 +15,8 @@ import unittest
 
 from selenium import webdriver
 
-HOSTNAME = 'localhost:8080'
-BASE_URL = 'http://' + HOSTNAME
+HOSTNAME = 'localhost'
+PORT = 8080
 AUTH_COOKIE = 'webdriver'
 MUSIC_PATH = 'data/music'
 MUSIC_FILE = '5s.mp3'
@@ -68,9 +68,9 @@ class FileServerThread(threading.Thread):
         threading.Thread.__init__(self)
         os.chdir(path)
         handler = SimpleHTTPServer.SimpleHTTPRequestHandler
-        self.server = SocketServer.TCPServer(("", 0), handler)
+        self.server = SocketServer.TCPServer(('localhost', 0), handler)
 
-    def server_address(self):
+    def host_port(self):
         return self.server.server_address
 
     def run(self):
@@ -81,28 +81,32 @@ class FileServerThread(threading.Thread):
         self.join()
 
 class Server:
-    def __init__(self, hostname):
-        self.conn = httplib.HTTPConnection(hostname)
+    def __init__(self, appengine_host_port, music_host_port):
+        self.conn = httplib.HTTPConnection(*appengine_host_port)
         self.headers = {
             'Cookie': '%s=1' % AUTH_COOKIE,
         }
-        # TODO: Need to configure server to give URLs to local file server.
+        self.post_request('/config', json.dumps({
+            'SongBaseUrl': 'http://%s:%d/' % music_host_port,
+            'CoverBaseUrl': '',
+            'CacheSongs': False,
+            'CacheQueries': False,
+            'CacheTags': False,
+        }))
 
-    def clear_data(self):
-        self.conn.request('POST', '/clear', None, self.headers)
-        resp = self.conn.getresponse()
-        resp.read()
-        if resp.status != httplib.OK:
-            raise RuntimeError('Got %s: %s' % (resp.status, resp.reason))
-
-    def import_songs(self, songs):
-        path = '/import?replaceUserData=1'
-        body = '\n'.join([json.dumps(s) for s in songs])
+    def post_request(self, path, body):
         self.conn.request('POST', path, body, self.headers)
         resp = self.conn.getresponse()
         resp.read()
         if resp.status != httplib.OK:
             raise RuntimeError('Got %s: %s' % (resp.status, resp.reason))
+
+    def clear_data(self):
+        self.post_request('/clear', None)
+
+    def import_songs(self, songs):
+        self.post_request('/import?replaceUserData=1',
+                          '\n'.join([json.dumps(s) for s in songs]))
 
 def setUpModule():
     global file_thread
@@ -110,7 +114,7 @@ def setUpModule():
     file_thread.start()
 
     global server
-    server = Server(HOSTNAME)
+    server = Server((HOSTNAME, PORT), file_thread.host_port())
 
     global driver
     driver = webdriver.Chrome()
@@ -118,12 +122,13 @@ def setUpModule():
     # Makes no sense: Chrome starts at a data: URL, so I get a "Cookies are
     # disabled inside 'data:' URLs" exception if I try to add the cookie before
     # loading a page.
-    driver.get(BASE_URL)
+    base_url = 'http://%s:%d' % (HOSTNAME, PORT)
+    driver.get(base_url)
     driver.add_cookie({
         'name': AUTH_COOKIE,
         'value': 1,
     })
-    driver.get(BASE_URL)
+    driver.get(base_url)
 
 def tearDownModule():
     file_thread.stop()
@@ -132,6 +137,7 @@ def tearDownModule():
 class Test(unittest.TestCase):
     def setUp(self):
         server.clear_data()
+        self.base_music_url = 'http://%s:%d/' % file_thread.host_port()
 
     def get_results(self):
         results = []
@@ -167,20 +173,25 @@ class Test(unittest.TestCase):
                       pprint.pformat(self.get_results()))
 
     def get_current_song(self):
+        audio = driver.find_element_by_id('audio')
         return {
             'artist': driver.find_element_by_id('artistDiv').text,
             'title': driver.find_element_by_id('titleDiv').text,
             'album': driver.find_element_by_id('albumDiv').text,
+            'src': audio.get_attribute('src'),
+            'paused': audio.get_attribute('paused') is not None,
         }
 
-    def wait_for_song(self, song):
+    def wait_for_song(self, song, paused):
+        url = self.base_music_url + song['filename']
+
         def is_current():
             current = self.get_current_song()
-            # TODO: Make sure that it's actually playing once music-file-serving
-            # is working.
             return current['artist'] == song['artist'] and \
                    current['title'] == song['title'] and \
-                   current['album'] == song['album']
+                   current['album'] == song['album'] and \
+                   current['src'] == url and \
+                   current['paused'] == paused
         try:
             wait(is_current, timeout_sec=5)
         except TimeoutError as e:
@@ -231,8 +242,11 @@ class Test(unittest.TestCase):
         driver.find_element_by_id('resetButton').click()
         driver.find_element_by_id('keywordsInput').send_keys(song['artist'])
         driver.find_element_by_id('luckyButton').click()
-        self.wait_for_song(song)
+        self.wait_for_song(song, False)
+        driver.find_element_by_id('playPauseButton').click()
+        self.wait_for_song(song, True)
+        driver.find_element_by_id('playPauseButton').click()
+        self.wait_for_song(song, False)
 
 if __name__ == '__main__':
     unittest.main()
-

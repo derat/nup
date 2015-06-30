@@ -24,12 +24,18 @@ func prepareSongForClient(s *nup.Song, id int64, cfg *nup.ServerConfig, client n
 	// Set fields that are only present in search results (i.e. not in Datastore).
 	s.SongId = strconv.FormatInt(id, 10)
 
-	if len(s.Filename) > 0 {
-		s.Url = nup.GetCloudStorageUrl(cfg.SongBucket, s.Filename, client)
+	// Turn the bare music and cover filenames into URLs.
+	getUrl := func(filename, bucket, baseUrl string) string {
+		if len(filename) == 0 {
+			return ""
+		}
+		if len(bucket) > 0 {
+			return nup.GetCloudStorageUrl(bucket, filename, client)
+		}
+		return baseUrl + filename
 	}
-	if len(s.CoverFilename) > 0 {
-		s.CoverUrl = nup.GetCloudStorageUrl(cfg.CoverBucket, s.CoverFilename, client)
-	}
+	s.Url = getUrl(s.Filename, cfg.SongBucket, cfg.SongBaseUrl)
+	s.CoverUrl = getUrl(s.CoverFilename, cfg.CoverBucket, cfg.CoverBaseUrl)
 
 	// Create an empty tags slice so that clients don't need to check for null.
 	if s.Tags == nil {

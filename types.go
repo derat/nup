@@ -117,6 +117,11 @@ type ServerConfig struct {
 	SongBucket  string
 	CoverBucket string
 
+	// Base URLs where song and cover files are stored.
+	// Exactly one of *Bucket and *BaseUrl must be set.
+	SongBaseUrl  string
+	CoverBaseUrl string
+
 	// Should songs, query results, and tags be cached?
 	CacheSongs   bool
 	CacheQueries bool
