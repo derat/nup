@@ -85,39 +85,39 @@ class Test(unittest.TestCase):
         server.import_songs(album1 + album2 + album3)
 
         page = Page(driver)
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         page.keywords = 'album:al1'
-        page.click_search_button()
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, album1)
 
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         page.keywords = 'album:al2'
-        page.click_search_button()
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, album2)
 
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         page.keywords = 'artist:ar1'
-        page.click_search_button()
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, album1)
 
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         page.keywords = 'artist:"artist with space"'
-        page.click_search_button()
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, album3)
 
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         page.keywords = 'ti2'
-        page.click_search_button()
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [album1[1], album2[1]])
 
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         page.keywords = 'AR2 ti1'
-        page.click_search_button()
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [album2[0]])
 
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         page.keywords = 'ar1 bogus'
-        page.click_search_button()
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [])
 
     def test_tag_query(self):
@@ -127,24 +127,24 @@ class Test(unittest.TestCase):
         server.import_songs([song1, song2, song3])
 
         page = Page(driver)
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         page.tags = 'electronic'
-        page.click_search_button()
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song1])
 
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         page.tags = 'guitar rock'
-        page.click_search_button()
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song2])
 
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         page.tags = 'instrumental'
-        page.click_search_button()
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song1, song3])
 
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         page.tags = 'instrumental -electronic'
-        page.click_search_button()
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song3])
 
     def test_rating_query(self):
@@ -157,26 +157,26 @@ class Test(unittest.TestCase):
         server.import_songs([song1, song2, song3, song4, song5, song6])
 
         page = Page(driver)
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         # Need to set something to avoid an alert.
         page.keywords = 't'
-        page.click_search_button()
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(
             page, [song1, song2, song3, song4, song5, song6])
 
-        page.click_reset_button()
-        page.click_rating_select(3)
-        page.click_search_button()
+        page.click(page.RESET_BUTTON)
+        page.select(page.MIN_RATING_SELECT, page.THREE_STARS)
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song3, song4, song5])
 
-        page.click_reset_button()
-        page.click_rating_select(5)
-        page.click_search_button()
+        page.click(page.RESET_BUTTON)
+        page.select(page.MIN_RATING_SELECT, page.FIVE_STARS)
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song5])
 
-        page.click_reset_button()
-        page.click_unrated_checkbox()
-        page.click_search_button()
+        page.click(page.RESET_BUTTON)
+        page.click(page.UNRATED_CHECKBOX)
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song6])
 
     def test_first_track_query(self):
@@ -192,9 +192,9 @@ class Test(unittest.TestCase):
         server.import_songs(album1 + album2)
 
         page = Page(driver)
-        page.click_reset_button()
-        page.click_first_track_checkbox()
-        page.click_search_button()
+        page.click(page.RESET_BUTTON)
+        page.click(page.FIRST_TRACK_CHECKBOX)
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [album1[0], album2[0]])
 
     def test_max_plays_query(self):
@@ -204,19 +204,19 @@ class Test(unittest.TestCase):
         server.import_songs([song1, song2, song3])
 
         page = Page(driver)
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         page.max_plays = '2'
-        page.click_search_button()
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song1, song3])
 
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         page.max_plays = '3'
-        page.click_search_button()
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song1, song2, song3])
 
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         page.max_plays = '0'
-        page.click_search_button()
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song3])
 
     def test_play_time_query(self):
@@ -225,34 +225,34 @@ class Test(unittest.TestCase):
         server.import_songs([song1, song2])
 
         page = Page(driver)
-        page.click_reset_button()
-        page.click_first_played_select(page.ONE_DAY)
-        page.click_search_button()
+        page.click(page.RESET_BUTTON)
+        page.select(page.FIRST_PLAYED_SELECT, page.ONE_DAY)
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [])
 
-        page.click_reset_button()
-        page.click_first_played_select(page.ONE_WEEK)
-        page.click_search_button()
+        page.click(page.RESET_BUTTON)
+        page.select(page.FIRST_PLAYED_SELECT, page.ONE_WEEK)
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song1])
 
-        page.click_reset_button()
-        page.click_first_played_select(page.ONE_YEAR)
-        page.click_search_button()
+        page.click(page.RESET_BUTTON)
+        page.select(page.FIRST_PLAYED_SELECT, page.ONE_YEAR)
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song1, song2])
 
-        page.click_reset_button()
-        page.click_last_played_select(page.ONE_YEAR)
-        page.click_search_button()
+        page.click(page.RESET_BUTTON)
+        page.select(page.LAST_PLAYED_SELECT, page.ONE_YEAR)
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [])
 
-        page.click_reset_button()
-        page.click_last_played_select(page.ONE_MONTH)
-        page.click_search_button()
+        page.click(page.RESET_BUTTON)
+        page.select(page.LAST_PLAYED_SELECT, page.ONE_MONTH)
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song2])
 
-        page.click_reset_button()
-        page.click_last_played_select(page.ONE_DAY)
-        page.click_search_button()
+        page.click(page.RESET_BUTTON)
+        page.select(page.LAST_PLAYED_SELECT, page.ONE_DAY)
+        page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song1, song2])
 
     def test_playback(self):
@@ -260,13 +260,13 @@ class Test(unittest.TestCase):
         server.import_songs([song])
 
         page = Page(driver)
-        page.click_reset_button()
+        page.click(page.RESET_BUTTON)
         page.keywords = song.artist
-        page.click_lucky_button()
+        page.click(page.LUCKY_BUTTON)
         self.wait_for_song(page, song, False)
-        page.click_play_pause_button()
+        page.click(page.PLAY_PAUSE_BUTTON)
         self.wait_for_song(page, song, True)
-        page.click_play_pause_button()
+        page.click(page.PLAY_PAUSE_BUTTON)
         self.wait_for_song(page, song, False)
 
 if __name__ == '__main__':

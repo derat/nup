@@ -6,34 +6,17 @@ from selenium.webdriver.common.by import By
 
 from song import Song
 
+def get_element(driver, locator):
+    utils.wait(lambda: driver.find_element(*locator))
+    return driver.find_element(*locator)
+
 # Loosely based on https://selenium-python.readthedocs.org/page-objects.html.
-
-class Locators(object):
-    ALBUM_DIV = (By.ID, 'albumDiv')
-    ARTIST_DIV = (By.ID, 'artistDiv')
-    AUDIO = (By.ID, 'audio')
-    FIRST_PLAYED_SELECT = (By.ID, 'firstPlayedSelect')
-    FIRST_TRACK_CHECKBOX = (By.ID, 'firstTrackCheckbox')
-    LAST_PLAYED_SELECT = (By.ID, 'lastPlayedSelect')
-    LUCKY_BUTTON = (By.ID, 'luckyButton')
-    MIN_RATING_SELECT = (By.ID, 'minRatingSelect')
-    PLAY_PAUSE_BUTTON = (By.ID, 'playPauseButton')
-    RESET_BUTTON = (By.ID, 'resetButton')
-    SEARCH_BUTTON = (By.ID, 'searchButton')
-    SEARCH_RESULTS_TABLE = (By.ID, 'searchResultsTable')
-    TITLE_DIV = (By.ID, 'titleDiv')
-    UNRATED_CHECKBOX = (By.ID, 'unratedCheckbox')
-
 class InputElement(object):
     def __set__(self, obj, value):
-        self.get_element(obj.driver).send_keys(value)
+        get_element(obj.driver, self.locator).send_keys(value)
 
     def __get__(self, obj, owner):
-        return self.get_element(obj.driver).get_attribute("value")
-
-    def get_element(self, driver):
-        utils.wait(lambda: driver.find_element(*self.locator))
-        return driver.find_element(*self.locator)
+        return get_element(obj.driver, self.locator).get_attribute("value")
 
 class KeywordsInput(InputElement):
     locator = (By.ID, 'keywordsInput')
@@ -49,7 +32,24 @@ class Page(object):
     tags = TagsInput()
     max_plays = MaxPlaysInput()
 
-    # Values for click_first_played_select() and click_last_played_select().
+    # Locators for various elements.
+    ALBUM_DIV = (By.ID, 'albumDiv')
+    ARTIST_DIV = (By.ID, 'artistDiv')
+    AUDIO = (By.ID, 'audio')
+    FIRST_PLAYED_SELECT = (By.ID, 'firstPlayedSelect')
+    FIRST_TRACK_CHECKBOX = (By.ID, 'firstTrackCheckbox')
+    LAST_PLAYED_SELECT = (By.ID, 'lastPlayedSelect')
+    LUCKY_BUTTON = (By.ID, 'luckyButton')
+    MIN_RATING_SELECT = (By.ID, 'minRatingSelect')
+    PLAY_PAUSE_BUTTON = (By.ID, 'playPauseButton')
+    PLAYLIST_TABLE = (By.ID, 'playlistTable')
+    RESET_BUTTON = (By.ID, 'resetButton')
+    SEARCH_BUTTON = (By.ID, 'searchButton')
+    SEARCH_RESULTS_TABLE = (By.ID, 'searchResultsTable')
+    TITLE_DIV = (By.ID, 'titleDiv')
+    UNRATED_CHECKBOX = (By.ID, 'unratedCheckbox')
+
+    # Values for FIRST_PLAYED_SELECT and LAST_PLAYED_SELECT.
     ONE_DAY = 'one day'
     ONE_WEEK = 'one week'
     ONE_MONTH = 'one month'
@@ -58,18 +58,38 @@ class Page(object):
     ONE_YEAR = 'one year'
     THREE_YEARS = 'three years'
 
+    # Values for MIN_RATING_SELECT.
+    ONE_STAR = u'★';
+    TWO_STARS = u'★★';
+    THREE_STARS = u'★★★';
+    FOUR_STARS = u'★★★★';
+    FIVE_STARS = u'★★★★★';
+
     def __init__(self, driver):
         self.driver = driver
 
-    def get_search_results(self):
-        results = []
-        table = self.driver.find_element(*Locators.SEARCH_RESULTS_TABLE)
+    def get_songs_from_table(self, table, has_checkbox):
+        songs = []
         # Skip header.
         for row in table.find_elements_by_tag_name('tr')[1:]:
             cols = row.find_elements_by_tag_name('td')
-            # TODO: Do something with the time from cols[4].text?
-            results.append(Song(cols[1].text, cols[2].text, cols[3].text))
-        return results
+            artist_index = 1 if has_checkbox else 0
+            songs.append(Song(cols[artist_index].text,
+                              cols[artist_index+1].text,
+                              cols[artist_index+2].text))
+            # TODO: Copy more stuff:
+            # - time from last column
+            # - highlighting state
+            # - checkbox state
+        return songs
+
+    def get_search_results(self):
+        return self.get_songs_from_table(
+            get_element(self.driver, Page.SEARCH_RESULTS_TABLE), True)
+
+    def get_playlist(self):
+        return self.get_songs_from_table(
+            get_element(self.driver, Page.PLAYLIST_TABLE), False)
 
     def get_current_song(self):
         '''Gets information about the currently-playing song.
@@ -79,45 +99,19 @@ class Page(object):
                <audio> src (string)
                <audio> paused state (bool)
         '''
-        audio = self.driver.find_element(*Locators.AUDIO)
-        song = Song(self.driver.find_element(*Locators.ARTIST_DIV).text,
-                    self.driver.find_element(*Locators.TITLE_DIV).text,
-                    self.driver.find_element(*Locators.ALBUM_DIV).text)
+        audio = self.driver.find_element(*Page.AUDIO)
+        song = Song(get_element(self.driver, Page.ARTIST_DIV).text,
+                    get_element(self.driver, Page.TITLE_DIV).text,
+                    get_element(self.driver, Page.ALBUM_DIV).text)
         return (song, audio.get_attribute('src'),
                 audio.get_attribute('paused') is not None)
 
-    def click_first_played_select(self, value):
-        self.select_option(
-            self.driver.find_element(*Locators.FIRST_PLAYED_SELECT), value)
+    def click(self, locator):
+        # TODO: Wait for element as above.
+        self.driver.find_element(*locator).click()
 
-    def click_first_track_checkbox(self):
-        self.driver.find_element(*Locators.FIRST_TRACK_CHECKBOX).click()
-
-    def click_last_played_select(self, value):
-        self.select_option(
-            self.driver.find_element(*Locators.LAST_PLAYED_SELECT), value)
-
-    def click_lucky_button(self):
-        self.driver.find_element(*Locators.LUCKY_BUTTON).click()
-
-    def click_play_pause_button(self):
-        self.driver.find_element(*Locators.PLAY_PAUSE_BUTTON).click()
-
-    def click_rating_select(self, num_stars):
-        self.select_option(
-            self.driver.find_element(*Locators.MIN_RATING_SELECT),
-            u'★' * num_stars)
-
-    def click_reset_button(self):
-        self.driver.find_element(*Locators.RESET_BUTTON).click()
-
-    def click_search_button(self):
-        self.driver.find_element(*Locators.SEARCH_BUTTON).click()
-
-    def click_unrated_checkbox(self):
-        self.driver.find_element(*Locators.UNRATED_CHECKBOX).click()
-
-    def select_option(self, select, value):
+    def select(self, locator, value):
+        select = self.driver.find_element(*locator)
         for option in select.find_elements_by_tag_name('option'):
             if option.text == value:
                 option.click()
