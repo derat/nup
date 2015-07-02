@@ -202,9 +202,9 @@ Player.prototype.updateSongDisplay = function() {
   this.albumDiv.innerText = song ? song.album : '';
   this.timeDiv.innerText = '';
 
-  updateTitleAttributeForTruncation(this.artistDiv, song.artist);
-  updateTitleAttributeForTruncation(this.titleDiv, song.title);
-  updateTitleAttributeForTruncation(this.albumDiv, song.album);
+  updateTitleAttributeForTruncation(this.artistDiv, song ? song.artist : '');
+  updateTitleAttributeForTruncation(this.titleDiv, song ? song.title : '');
+  updateTitleAttributeForTruncation(this.albumDiv, song ? song.album : '');
 
   if (song && song.coverUrl) {
     this.coverImage.src = song.coverUrl;

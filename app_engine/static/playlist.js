@@ -72,6 +72,12 @@ function Playlist(player) {
   this.handleSongChange(this.player.currentIndex);
 };
 
+Playlist.prototype.resetForTesting = function() {
+  this.resetSearchForm(null, null, true);
+  this.playlistTable.updateSongs([]);
+  this.player.setSongs([]);
+};
+
 Playlist.prototype.handleTagsUpdated = function(tags) {
   this.tagSuggester.setWords(tags);
 };

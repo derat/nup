@@ -67,6 +67,10 @@ class Page(object):
 
     def __init__(self, driver):
         self.driver = driver
+        self.reset()
+
+    def reset(self):
+        self.driver.execute_script('document.playlist.resetForTesting()')
 
     def get_songs_from_table(self, table, has_checkbox):
         songs = []

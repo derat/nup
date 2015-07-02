@@ -85,7 +85,6 @@ class Test(unittest.TestCase):
         server.import_songs(album1 + album2 + album3)
 
         page = Page(driver)
-        page.click(page.RESET_BUTTON)
         page.keywords = 'album:al1'
         page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, album1)
@@ -127,7 +126,6 @@ class Test(unittest.TestCase):
         server.import_songs([song1, song2, song3])
 
         page = Page(driver)
-        page.click(page.RESET_BUTTON)
         page.tags = 'electronic'
         page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song1])
@@ -157,7 +155,6 @@ class Test(unittest.TestCase):
         server.import_songs([song1, song2, song3, song4, song5, song6])
 
         page = Page(driver)
-        page.click(page.RESET_BUTTON)
         # Need to set something to avoid an alert.
         page.keywords = 't'
         page.click(page.SEARCH_BUTTON)
@@ -192,7 +189,6 @@ class Test(unittest.TestCase):
         server.import_songs(album1 + album2)
 
         page = Page(driver)
-        page.click(page.RESET_BUTTON)
         page.click(page.FIRST_TRACK_CHECKBOX)
         page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [album1[0], album2[0]])
@@ -204,7 +200,6 @@ class Test(unittest.TestCase):
         server.import_songs([song1, song2, song3])
 
         page = Page(driver)
-        page.click(page.RESET_BUTTON)
         page.max_plays = '2'
         page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song1, song3])
@@ -225,7 +220,6 @@ class Test(unittest.TestCase):
         server.import_songs([song1, song2])
 
         page = Page(driver)
-        page.click(page.RESET_BUTTON)
         page.select(page.FIRST_PLAYED_SELECT, page.ONE_DAY)
         page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [])
@@ -260,7 +254,6 @@ class Test(unittest.TestCase):
         server.import_songs([song])
 
         page = Page(driver)
-        page.click(page.RESET_BUTTON)
         page.keywords = song.artist
         page.click(page.LUCKY_BUTTON)
         self.wait_for_song(page, song, False)
