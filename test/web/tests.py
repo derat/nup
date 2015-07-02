@@ -1,42 +1,19 @@
 #!/usr/bin/python
-# coding=UTF-8
 
-import time
 import unittest
 from selenium import webdriver
 
 # Local imports.
 import constants
+import utils
 from file_server_thread import FileServerThread
+from page import Page
 from server import Server
 from song import Song
 
 file_thread = None
 server = None
 driver = None
-
-class TimeoutError(Exception):
-    def __init__(self, value):
-        self.value = value
-    def __str__(self):
-        return repr(self.value)
-
-def wait(f, timeout_sec=10, sleep_sec=0.1):
-    '''Waits for a function to return true.'''
-    start = time.time()
-    while True:
-        if f():
-            return
-        if time.time() - start >= timeout_sec:
-            raise TimeoutError('Timed out waiting for condition')
-        time.sleep(sleep_sec)
-
-def select_option(select, value):
-    for option in select.find_elements_by_tag_name('option'):
-        if option.text == value:
-            option.click()
-            return
-    raise RuntimeError('Failed to find option "%s"' % value)
 
 def setUpModule():
     global file_thread
@@ -82,8 +59,8 @@ class Test(unittest.TestCase):
 
     def wait_for_results(self, songs):
         try:
-            wait(lambda: self.get_results() == songs, timeout_sec=3)
-        except TimeoutError as e:
+            utils.wait(lambda: self.get_results() == songs, timeout_sec=3)
+        except utils.TimeoutError as e:
             self.fail('Timed out waiting for expected results. Received:\n' +
                       self.get_results())
 
@@ -109,8 +86,8 @@ class Test(unittest.TestCase):
                    current_src == self.base_music_url + song.filename and \
                    current_paused == paused
         try:
-            wait(is_current, timeout_sec=5)
-        except TimeoutError as e:
+            utils.wait(is_current, timeout_sec=5)
+        except utils.TimeoutError as e:
             self.fail('Timed out waiting for song. Received:\n' +
                       self.get_current_song())
 
@@ -126,42 +103,44 @@ class Test(unittest.TestCase):
         ]
         server.import_songs(album1 + album2)
 
-        driver.find_element_by_id('resetButton').click()
-        driver.find_element_by_id('keywordsInput').send_keys('album:al1')
-        driver.find_element_by_id('searchButton').click()
+        page = Page(driver)
+        page.click_reset_button()
+        page.keywords = 'album:al1'
+        page.click_search_button()
         self.wait_for_results(album1)
 
-        driver.find_element_by_id('resetButton').click()
-        driver.find_element_by_id('keywordsInput').send_keys('album:al2')
-        driver.find_element_by_id('searchButton').click()
+        page.click_reset_button()
+        page.keywords = 'album:al2'
+        page.click_search_button()
         self.wait_for_results(album2)
 
-        driver.find_element_by_id('resetButton').click()
-        driver.find_element_by_id('keywordsInput').send_keys('tr2')
-        driver.find_element_by_id('searchButton').click()
+        page.click_reset_button()
+        page.keywords = 'tr2'
+        page.click_search_button()
         self.wait_for_results([album1[1], album2[1]])
 
-        driver.find_element_by_id('resetButton').click()
-        driver.find_element_by_id('firstTrackCheckbox').click()
-        driver.find_element_by_id('searchButton').click()
+        page.click_reset_button()
+        page.click_first_track_checkbox()
+        page.click_search_button()
         self.wait_for_results([album1[0], album2[0]])
 
-        driver.find_element_by_id('resetButton').click()
-        select_option(driver.find_element_by_id('minRatingSelect'), u'★★★★')
-        driver.find_element_by_id('searchButton').click()
+        page.click_reset_button()
+        page.click_rating_select(4)
+        page.click_search_button()
         self.wait_for_results([album1[1], album2[0]])
 
     def test_playback(self):
         song = Song('artist', 'track', 'album')
         server.import_songs([song])
 
-        driver.find_element_by_id('resetButton').click()
-        driver.find_element_by_id('keywordsInput').send_keys(song.artist)
-        driver.find_element_by_id('luckyButton').click()
+        page = Page(driver)
+        page.click_reset_button()
+        page.keywords = song.artist
+        page.click_lucky_button()
         self.wait_for_song(song, False)
-        driver.find_element_by_id('playPauseButton').click()
+        page.click_play_pause_button()
         self.wait_for_song(song, True)
-        driver.find_element_by_id('playPauseButton').click()
+        page.click_play_pause_button()
         self.wait_for_song(song, False)
 
 if __name__ == '__main__':
