@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import pprint
 import unittest
 from selenium import webdriver
 
@@ -53,7 +54,7 @@ class Test(unittest.TestCase):
                        timeout_sec=3)
         except utils.TimeoutError as e:
             self.fail('Timed out waiting for expected results. Received:\n' +
-                      page.get_search_results())
+                      pprint.pformat(page.get_search_results()))
 
     def wait_for_song(self, page, song, paused):
         '''Waits until the page is playing the expected song.'''
@@ -65,20 +66,23 @@ class Test(unittest.TestCase):
         try:
             utils.wait(is_current, timeout_sec=5)
         except utils.TimeoutError as e:
-            self.fail('Timed out waiting for song. Received:\n' +
+            self.fail('Timed out waiting for song. Received ' +
                       page.get_current_song())
 
-    def test_queries(self):
+    def test_keyword_query(self):
         album1 = [
-            Song('ar1', 'ti1', 'al1', 1, 1, 0.5),
-            Song('ar1', 'ti2', 'al1', 2, 1, 0.75),
-            Song('ar1', 'ti3', 'al1', 3, 1, 0.25),
+            Song('ar1', 'ti1', 'al1', 1),
+            Song('ar1', 'ti2', 'al1', 2),
+            Song('ar1', 'ti3', 'al1', 3),
         ]
         album2 = [
-            Song('ar2', 'ti1', 'al2', 1, 1, 1.0),
-            Song('ar2', 'ti2', 'al2', 2, 1, 0.0),
+            Song('ar2', 'ti1', 'al2', 1),
+            Song('ar2', 'ti2', 'al2', 2),
         ]
-        server.import_songs(album1 + album2)
+        album3 = [
+            Song('artist with space', 'ti1', 'al3', 1),
+        ]
+        server.import_songs(album1 + album2 + album3)
 
         page = Page(driver)
         page.click_reset_button()
@@ -92,21 +96,31 @@ class Test(unittest.TestCase):
         self.wait_for_search_results(page, album2)
 
         page.click_reset_button()
+        page.keywords = 'artist:ar1'
+        page.click_search_button()
+        self.wait_for_search_results(page, album1)
+
+        page.click_reset_button()
+        page.keywords = 'artist:"artist with space"'
+        page.click_search_button()
+        self.wait_for_search_results(page, album3)
+
+        page.click_reset_button()
         page.keywords = 'ti2'
         page.click_search_button()
         self.wait_for_search_results(page, [album1[1], album2[1]])
 
         page.click_reset_button()
-        page.click_first_track_checkbox()
+        page.keywords = 'AR2 ti1'
         page.click_search_button()
-        self.wait_for_search_results(page, [album1[0], album2[0]])
+        self.wait_for_search_results(page, [album2[0]])
 
         page.click_reset_button()
-        page.click_rating_select(4)
+        page.keywords = 'ar1 bogus'
         page.click_search_button()
-        self.wait_for_search_results(page, [album1[1], album2[0]])
+        self.wait_for_search_results(page, [])
 
-    def test_tag_queries(self):
+    def test_tag_query(self):
         song1 = Song('ar1', 'ti1', 'al1', tags=['electronic', 'instrumental'])
         song2 = Song('ar2', 'ti2', 'al2', tags=['rock', 'guitar'])
         song3 = Song('ar3', 'ti3', 'al3', tags=['instrumental', 'rock'])
@@ -132,6 +146,56 @@ class Test(unittest.TestCase):
         page.tags = 'instrumental -electronic'
         page.click_search_button()
         self.wait_for_search_results(page, [song3])
+
+    def test_rating_query(self):
+        song1 = Song('a', 't', 'al1', rating=0.0)
+        song2 = Song('a', 't', 'al2', rating=0.25)
+        song3 = Song('a', 't', 'al3', rating=0.5)
+        song4 = Song('a', 't', 'al4', rating=0.75)
+        song5 = Song('a', 't', 'al5', rating=1.0)
+        song6 = Song('a', 't', 'al6', rating=-1.0)
+        server.import_songs([song1, song2, song3, song4, song5, song6])
+
+        page = Page(driver)
+        page.click_reset_button()
+        # Need to set something to avoid an alert.
+        page.keywords = 't'
+        page.click_search_button()
+        self.wait_for_search_results(
+            page, [song1, song2, song3, song4, song5, song6])
+
+        page.click_reset_button()
+        page.click_rating_select(3)
+        page.click_search_button()
+        self.wait_for_search_results(page, [song3, song4, song5])
+
+        page.click_reset_button()
+        page.click_rating_select(5)
+        page.click_search_button()
+        self.wait_for_search_results(page, [song5])
+
+        page.click_reset_button()
+        page.click_unrated_checkbox()
+        page.click_search_button()
+        self.wait_for_search_results(page, [song6])
+
+    def test_first_track_query(self):
+        album1 = [
+            Song('ar1', 'ti1', 'al1', 1, 1),
+            Song('ar1', 'ti2', 'al1', 2, 1),
+            Song('ar1', 'ti3', 'al1', 3, 1),
+        ]
+        album2 = [
+            Song('ar2', 'ti1', 'al2', 1, 1),
+            Song('ar2', 'ti2', 'al2', 2, 1),
+        ]
+        server.import_songs(album1 + album2)
+
+        page = Page(driver)
+        page.click_reset_button()
+        page.click_first_track_checkbox()
+        page.click_search_button()
+        self.wait_for_search_results(page, [album1[0], album2[0]])
 
     def test_playback(self):
         song = Song('artist', 'track', 'album')

@@ -20,6 +20,7 @@ class Locators(object):
     SEARCH_BUTTON = (By.ID, 'searchButton')
     SEARCH_RESULTS_TABLE = (By.ID, 'searchResultsTable')
     TITLE_DIV = (By.ID, 'titleDiv')
+    UNRATED_CHECKBOX = (By.ID, 'unratedCheckbox')
 
 class InputElement(object):
     def __set__(self, obj, value):
@@ -89,6 +90,9 @@ class Page(object):
 
     def click_search_button(self):
         self.driver.find_element(*Locators.SEARCH_BUTTON).click()
+
+    def click_unrated_checkbox(self):
+        self.driver.find_element(*Locators.UNRATED_CHECKBOX).click()
 
     def select_option(self, select, value):
         for option in select.find_elements_by_tag_name('option'):
