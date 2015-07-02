@@ -35,8 +35,12 @@ class InputElement(object):
 class KeywordsInput(InputElement):
     locator = (By.ID, 'keywordsInput')
 
+class TagsInput(InputElement):
+    locator = (By.ID, 'tagsInput')
+
 class Page(object):
     keywords = KeywordsInput()
+    tags = TagsInput()
 
     def __init__(self, driver):
         self.driver = driver

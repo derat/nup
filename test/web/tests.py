@@ -70,13 +70,13 @@ class Test(unittest.TestCase):
 
     def test_queries(self):
         album1 = [
-            Song('ar1', 'tr1', 'al1', 1, 1, 0.5),
-            Song('ar1', 'tr2', 'al1', 2, 1, 0.75),
-            Song('ar1', 'tr3', 'al1', 3, 1, 0.25),
+            Song('ar1', 'ti1', 'al1', 1, 1, 0.5),
+            Song('ar1', 'ti2', 'al1', 2, 1, 0.75),
+            Song('ar1', 'ti3', 'al1', 3, 1, 0.25),
         ]
         album2 = [
-            Song('ar2', 'tr1', 'al2', 1, 1, 1.0),
-            Song('ar2', 'tr2', 'al2', 2, 1, 0.0),
+            Song('ar2', 'ti1', 'al2', 1, 1, 1.0),
+            Song('ar2', 'ti2', 'al2', 2, 1, 0.0),
         ]
         server.import_songs(album1 + album2)
 
@@ -92,7 +92,7 @@ class Test(unittest.TestCase):
         self.wait_for_search_results(page, album2)
 
         page.click_reset_button()
-        page.keywords = 'tr2'
+        page.keywords = 'ti2'
         page.click_search_button()
         self.wait_for_search_results(page, [album1[1], album2[1]])
 
@@ -105,6 +105,33 @@ class Test(unittest.TestCase):
         page.click_rating_select(4)
         page.click_search_button()
         self.wait_for_search_results(page, [album1[1], album2[0]])
+
+    def test_tag_queries(self):
+        song1 = Song('ar1', 'ti1', 'al1', tags=['electronic', 'instrumental'])
+        song2 = Song('ar2', 'ti2', 'al2', tags=['rock', 'guitar'])
+        song3 = Song('ar3', 'ti3', 'al3', tags=['instrumental', 'rock'])
+        server.import_songs([song1, song2, song3])
+
+        page = Page(driver)
+        page.click_reset_button()
+        page.tags = 'electronic'
+        page.click_search_button()
+        self.wait_for_search_results(page, [song1])
+
+        page.click_reset_button()
+        page.tags = 'guitar rock'
+        page.click_search_button()
+        self.wait_for_search_results(page, [song2])
+
+        page.click_reset_button()
+        page.tags = 'instrumental'
+        page.click_search_button()
+        self.wait_for_search_results(page, [song1, song3])
+
+        page.click_reset_button()
+        page.tags = 'instrumental -electronic'
+        page.click_search_button()
+        self.wait_for_search_results(page, [song3])
 
     def test_playback(self):
         song = Song('artist', 'track', 'album')
