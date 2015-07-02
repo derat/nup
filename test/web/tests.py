@@ -197,6 +197,64 @@ class Test(unittest.TestCase):
         page.click_search_button()
         self.wait_for_search_results(page, [album1[0], album2[0]])
 
+    def test_max_plays_query(self):
+        song1 = Song('ar1', 'ti1', 'al1', plays=[(1, ''), (2, '')])
+        song2 = Song('ar2', 'ti2', 'al2', plays=[(1, ''), (2, ''), (3, '')])
+        song3 = Song('ar3', 'ti3', 'al3', plays=[])
+        server.import_songs([song1, song2, song3])
+
+        page = Page(driver)
+        page.click_reset_button()
+        page.max_plays = '2'
+        page.click_search_button()
+        self.wait_for_search_results(page, [song1, song3])
+
+        page.click_reset_button()
+        page.max_plays = '3'
+        page.click_search_button()
+        self.wait_for_search_results(page, [song1, song2, song3])
+
+        page.click_reset_button()
+        page.max_plays = '0'
+        page.click_search_button()
+        self.wait_for_search_results(page, [song3])
+
+    def test_play_time_query(self):
+        song1 = Song('ar1', 'ti1', 'al1', plays=[(5, '')])
+        song2 = Song('ar2', 'ti2', 'al2', plays=[(90, '')])
+        server.import_songs([song1, song2])
+
+        page = Page(driver)
+        page.click_reset_button()
+        page.click_first_played_select('one day')
+        page.click_search_button()
+        self.wait_for_search_results(page, [])
+
+        page.click_reset_button()
+        page.click_first_played_select('one week')
+        page.click_search_button()
+        self.wait_for_search_results(page, [song1])
+
+        page.click_reset_button()
+        page.click_first_played_select('one year')
+        page.click_search_button()
+        self.wait_for_search_results(page, [song1, song2])
+
+        page.click_reset_button()
+        page.click_last_played_select('one year')
+        page.click_search_button()
+        self.wait_for_search_results(page, [])
+
+        page.click_reset_button()
+        page.click_last_played_select('one month')
+        page.click_search_button()
+        self.wait_for_search_results(page, [song2])
+
+        page.click_reset_button()
+        page.click_last_played_select('one day')
+        page.click_search_button()
+        self.wait_for_search_results(page, [song1, song2])
+
     def test_playback(self):
         song = Song('artist', 'track', 'album')
         server.import_songs([song])

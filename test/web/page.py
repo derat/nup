@@ -6,13 +6,15 @@ from selenium.webdriver.common.by import By
 
 from song import Song
 
-# Based on https://selenium-python.readthedocs.org/page-objects.html.
+# Loosely based on https://selenium-python.readthedocs.org/page-objects.html.
 
 class Locators(object):
     ALBUM_DIV = (By.ID, 'albumDiv')
     ARTIST_DIV = (By.ID, 'artistDiv')
     AUDIO = (By.ID, 'audio')
+    FIRST_PLAYED_SELECT = (By.ID, 'firstPlayedSelect')
     FIRST_TRACK_CHECKBOX = (By.ID, 'firstTrackCheckbox')
+    LAST_PLAYED_SELECT = (By.ID, 'lastPlayedSelect')
     LUCKY_BUTTON = (By.ID, 'luckyButton')
     MIN_RATING_SELECT = (By.ID, 'minRatingSelect')
     PLAY_PAUSE_BUTTON = (By.ID, 'playPauseButton')
@@ -36,12 +38,16 @@ class InputElement(object):
 class KeywordsInput(InputElement):
     locator = (By.ID, 'keywordsInput')
 
+class MaxPlaysInput(InputElement):
+    locator = (By.ID, 'maxPlaysInput')
+
 class TagsInput(InputElement):
     locator = (By.ID, 'tagsInput')
 
 class Page(object):
     keywords = KeywordsInput()
     tags = TagsInput()
+    max_plays = MaxPlaysInput()
 
     def __init__(self, driver):
         self.driver = driver
@@ -71,8 +77,16 @@ class Page(object):
         return (song, audio.get_attribute('src'),
                 audio.get_attribute('paused') is not None)
 
+    def click_first_played_select(self, value):
+        self.select_option(
+            self.driver.find_element(*Locators.FIRST_PLAYED_SELECT), value)
+
     def click_first_track_checkbox(self):
         self.driver.find_element(*Locators.FIRST_TRACK_CHECKBOX).click()
+
+    def click_last_played_select(self, value):
+        self.select_option(
+            self.driver.find_element(*Locators.LAST_PLAYED_SELECT), value)
 
     def click_lucky_button(self):
         self.driver.find_element(*Locators.LUCKY_BUTTON).click()
