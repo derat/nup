@@ -46,42 +46,19 @@ class Test(unittest.TestCase):
         server.clear_data()
         self.base_music_url = 'http://%s:%d/' % file_thread.host_port()
 
-    def get_results(self):
-        results = []
-        table = driver.find_element_by_id('searchResultsTable')
-        rows = table.find_elements_by_tag_name('tr')
-        for i in range(1, len(rows)):
-            row = rows[i]
-            cols = row.find_elements_by_tag_name('td')
-            # TODO: Do something with the time from cols[4].text?
-            results.append(Song(cols[1].text, cols[2].text, cols[3].text))
-        return results
-
-    def wait_for_results(self, songs):
+    def wait_for_search_results(self, page, songs):
+        '''Waits until the page is displaying the expected search results.'''
         try:
-            utils.wait(lambda: self.get_results() == songs, timeout_sec=3)
+            utils.wait(lambda: page.get_search_results() == songs,
+                       timeout_sec=3)
         except utils.TimeoutError as e:
             self.fail('Timed out waiting for expected results. Received:\n' +
-                      self.get_results())
+                      page.get_search_results())
 
-    def get_current_song(self):
-        '''Returns information about the currently-playing song.
-
-           Return values:
-               song: Song being displayed
-               src: string from <audio>
-               paused: bool from <audio>
-        '''
-        audio = driver.find_element_by_id('audio')
-        song = Song(driver.find_element_by_id('artistDiv').text,
-                    driver.find_element_by_id('titleDiv').text,
-                    driver.find_element_by_id('albumDiv').text)
-        return (song, audio.get_attribute('src'),
-                audio.get_attribute('paused') is not None)
-
-    def wait_for_song(self, song, paused):
+    def wait_for_song(self, page, song, paused):
+        '''Waits until the page is playing the expected song.'''
         def is_current():
-            current, current_src, current_paused = self.get_current_song()
+            current, current_src, current_paused = page.get_current_song()
             return current == song and \
                    current_src == self.base_music_url + song.filename and \
                    current_paused == paused
@@ -89,7 +66,7 @@ class Test(unittest.TestCase):
             utils.wait(is_current, timeout_sec=5)
         except utils.TimeoutError as e:
             self.fail('Timed out waiting for song. Received:\n' +
-                      self.get_current_song())
+                      page.get_current_song())
 
     def test_queries(self):
         album1 = [
@@ -107,27 +84,27 @@ class Test(unittest.TestCase):
         page.click_reset_button()
         page.keywords = 'album:al1'
         page.click_search_button()
-        self.wait_for_results(album1)
+        self.wait_for_search_results(page, album1)
 
         page.click_reset_button()
         page.keywords = 'album:al2'
         page.click_search_button()
-        self.wait_for_results(album2)
+        self.wait_for_search_results(page, album2)
 
         page.click_reset_button()
         page.keywords = 'tr2'
         page.click_search_button()
-        self.wait_for_results([album1[1], album2[1]])
+        self.wait_for_search_results(page, [album1[1], album2[1]])
 
         page.click_reset_button()
         page.click_first_track_checkbox()
         page.click_search_button()
-        self.wait_for_results([album1[0], album2[0]])
+        self.wait_for_search_results(page, [album1[0], album2[0]])
 
         page.click_reset_button()
         page.click_rating_select(4)
         page.click_search_button()
-        self.wait_for_results([album1[1], album2[0]])
+        self.wait_for_search_results(page, [album1[1], album2[0]])
 
     def test_playback(self):
         song = Song('artist', 'track', 'album')
@@ -137,11 +114,11 @@ class Test(unittest.TestCase):
         page.click_reset_button()
         page.keywords = song.artist
         page.click_lucky_button()
-        self.wait_for_song(song, False)
+        self.wait_for_song(page, song, False)
         page.click_play_pause_button()
-        self.wait_for_song(song, True)
+        self.wait_for_song(page, song, True)
         page.click_play_pause_button()
-        self.wait_for_song(song, False)
+        self.wait_for_song(page, song, False)
 
 if __name__ == '__main__':
     unittest.main()
