@@ -226,32 +226,32 @@ class Test(unittest.TestCase):
 
         page = Page(driver)
         page.click_reset_button()
-        page.click_first_played_select('one day')
+        page.click_first_played_select(page.ONE_DAY)
         page.click_search_button()
         self.wait_for_search_results(page, [])
 
         page.click_reset_button()
-        page.click_first_played_select('one week')
+        page.click_first_played_select(page.ONE_WEEK)
         page.click_search_button()
         self.wait_for_search_results(page, [song1])
 
         page.click_reset_button()
-        page.click_first_played_select('one year')
+        page.click_first_played_select(page.ONE_YEAR)
         page.click_search_button()
         self.wait_for_search_results(page, [song1, song2])
 
         page.click_reset_button()
-        page.click_last_played_select('one year')
+        page.click_last_played_select(page.ONE_YEAR)
         page.click_search_button()
         self.wait_for_search_results(page, [])
 
         page.click_reset_button()
-        page.click_last_played_select('one month')
+        page.click_last_played_select(page.ONE_MONTH)
         page.click_search_button()
         self.wait_for_search_results(page, [song2])
 
         page.click_reset_button()
-        page.click_last_played_select('one day')
+        page.click_last_played_select(page.ONE_DAY)
         page.click_search_button()
         self.wait_for_search_results(page, [song1, song2])
 

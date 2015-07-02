@@ -49,6 +49,15 @@ class Page(object):
     tags = TagsInput()
     max_plays = MaxPlaysInput()
 
+    # Values for click_first_played_select() and click_last_played_select().
+    ONE_DAY = 'one day'
+    ONE_WEEK = 'one week'
+    ONE_MONTH = 'one month'
+    THREE_MONTHS = 'three months'
+    SIX_MONTHS = 'six months'
+    ONE_YEAR = 'one year'
+    THREE_YEARS = 'three years'
+
     def __init__(self, driver):
         self.driver = driver
 

@@ -10,7 +10,12 @@ class FileServerThread(threading.Thread):
         threading.Thread.__init__(self)
         os.chdir(path)
         handler = SimpleHTTPServer.SimpleHTTPRequestHandler
+        handler.log_message = self.log
+        self.requests = []
         self.server = SocketServer.TCPServer(('localhost', 0), handler)
+
+    def log(self, fmt, *args):
+        self.requests.append(fmt % args)
 
     def host_port(self):
         return self.server.server_address
