@@ -56,6 +56,14 @@ class Test(unittest.TestCase):
             self.fail('Timed out waiting for expected results. Received:\n' +
                       pprint.pformat(page.get_search_results()))
 
+    def wait_for_playlist(self, page, songs):
+        '''Waits until the page is displaying the expected playlist.'''
+        try:
+            utils.wait(lambda: page.get_playlist() == songs, timeout_sec=3)
+        except utils.TimeoutError as e:
+            self.fail('Timed out waiting for expected playlist. Received:\n' +
+                      pprint.pformat(page.get_playlist()))
+
     def wait_for_song(self, page, song, paused):
         '''Waits until the page is playing the expected song.'''
         def is_current():
@@ -248,6 +256,20 @@ class Test(unittest.TestCase):
         page.select(page.LAST_PLAYED_SELECT, page.ONE_DAY)
         page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song1, song2])
+
+    def test_add_to_playlist(self):
+        song1 = Song('a', 't1', 'al1', 1)
+        song2 = Song('a', 't2', 'al1', 2)
+        song3 = Song('a', 't3', 'al2', 1)
+        song4 = Song('a', 't4', 'al2', 2)
+        server.import_songs([song1, song2, song3, song4])
+
+        page = Page(driver)
+        page.keywords = 'al1'
+        page.click(page.SEARCH_BUTTON)
+        self.wait_for_search_results(page, [song1, song2])
+        page.click(page.APPEND_BUTTON)
+        self.wait_for_playlist(page, [song1, song2])
 
     def test_playback(self):
         song = Song('artist', 'track', 'album')

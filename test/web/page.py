@@ -34,15 +34,18 @@ class Page(object):
 
     # Locators for various elements.
     ALBUM_DIV = (By.ID, 'albumDiv')
+    APPEND_BUTTON = (By.ID, 'appendButton')
     ARTIST_DIV = (By.ID, 'artistDiv')
     AUDIO = (By.ID, 'audio')
     FIRST_PLAYED_SELECT = (By.ID, 'firstPlayedSelect')
     FIRST_TRACK_CHECKBOX = (By.ID, 'firstTrackCheckbox')
+    INSERT_BUTTON = (By.ID, 'insertButton')
     LAST_PLAYED_SELECT = (By.ID, 'lastPlayedSelect')
     LUCKY_BUTTON = (By.ID, 'luckyButton')
     MIN_RATING_SELECT = (By.ID, 'minRatingSelect')
     PLAY_PAUSE_BUTTON = (By.ID, 'playPauseButton')
     PLAYLIST_TABLE = (By.ID, 'playlistTable')
+    REPLACE_BUTTON = (By.ID, 'replaceButton')
     RESET_BUTTON = (By.ID, 'resetButton')
     SEARCH_BUTTON = (By.ID, 'searchButton')
     SEARCH_RESULTS_TABLE = (By.ID, 'searchResultsTable')
