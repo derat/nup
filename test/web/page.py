@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # coding=UTF-8
 
+import selenium
 import utils
 from selenium.webdriver.common.by import By
 
@@ -13,6 +14,7 @@ def get_element(driver, locator):
 # Loosely based on https://selenium-python.readthedocs.org/page-objects.html.
 class InputElement(object):
     def __set__(self, obj, value):
+        # TODO: This is misleading. It's not assigning text; it's appending it.
         get_element(obj.driver, self.locator).send_keys(value)
 
     def __get__(self, obj, owner):
@@ -77,17 +79,21 @@ class Page(object):
 
     def get_songs_from_table(self, table, has_checkbox):
         songs = []
-        # Skip header.
-        for row in table.find_elements_by_tag_name('tr')[1:]:
-            cols = row.find_elements_by_tag_name('td')
-            artist_index = 1 if has_checkbox else 0
-            songs.append(Song(cols[artist_index].text,
-                              cols[artist_index+1].text,
-                              cols[artist_index+2].text))
-            # TODO: Copy more stuff:
-            # - time from last column
-            # - highlighting state
-            # - checkbox state
+        try:
+            # Skip header.
+            for row in table.find_elements_by_tag_name('tr')[1:]:
+                cols = row.find_elements_by_tag_name('td')
+                artist_index = 1 if has_checkbox else 0
+                songs.append(Song(cols[artist_index].text,
+                                  cols[artist_index+1].text,
+                                  cols[artist_index+2].text))
+                # TODO: Copy more stuff:
+                # - time from last column
+                # - highlighting state
+                # - checkbox state
+        except selenium.common.exceptions.StaleElementReferenceException:
+            # Handle the case where the table is getting rewritten. :-/
+            return songs
         return songs
 
     def get_search_results(self):
@@ -114,11 +120,10 @@ class Page(object):
                 audio.get_attribute('paused') is not None)
 
     def click(self, locator):
-        # TODO: Wait for element as above.
-        self.driver.find_element(*locator).click()
+        get_element(self.driver, locator).click()
 
     def select(self, locator, value):
-        select = self.driver.find_element(*locator)
+        select = get_element(self.driver, locator)
         for option in select.find_elements_by_tag_name('option'):
             if option.text == value:
                 option.click()
