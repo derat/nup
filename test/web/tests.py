@@ -59,10 +59,20 @@ class Test(unittest.TestCase):
                       '.\nReceived:\n' +
                       pprint.pformat(page.get_search_results()))
 
-    def wait_for_playlist(self, page, songs, msg=''):
+    def wait_for_playlist(self, page, songs, highlighted_index=-1, msg=''):
         '''Waits until the page is displaying the expected playlist.'''
+        def is_expected():
+            playlist = page.get_playlist()
+            if playlist != songs:
+                return False
+            if highlighted_index >= 0:
+                for i, song in enumerate(playlist):
+                    if (highlighted_index == i and not song.highlighted) or \
+                       (highlighted_index != i and song.highlighted):
+                        return False
+            return True
         try:
-            utils.wait(lambda: page.get_playlist() == songs, timeout_sec=3)
+            utils.wait(is_expected, timeout_sec=3)
         except utils.TimeoutError as e:
             msg = ' (' + msg + ')' if msg else ''
             self.fail('Timed out waiting for expected playlist' + msg +
@@ -217,7 +227,7 @@ class Test(unittest.TestCase):
         page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song1, song2])
         page.click(page.APPEND_BUTTON)
-        self.wait_for_playlist(page, [song1, song2])
+        self.wait_for_playlist(page, [song1, song2], 0)
 
         # Pause so we don't advance through the playlist mid-test.
         self.wait_for_song(page, song1, False)
@@ -229,7 +239,7 @@ class Test(unittest.TestCase):
         page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song3, song4])
         page.click(page.INSERT_BUTTON)
-        self.wait_for_playlist(page, [song1, song3, song4, song2])
+        self.wait_for_playlist(page, [song1, song3, song4, song2], 0)
         self.wait_for_song(page, song1, True)
 
         # Replacing should result in the new first track being played.
@@ -237,7 +247,7 @@ class Test(unittest.TestCase):
         page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song5, song6])
         page.click(page.REPLACE_BUTTON)
-        self.wait_for_playlist(page, [song5, song6])
+        self.wait_for_playlist(page, [song5, song6], 0)
         self.wait_for_song(page, song5, False)
 
         # Appending should leave the first track playing.
@@ -245,28 +255,50 @@ class Test(unittest.TestCase):
         page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song1, song2])
         page.click(page.APPEND_BUTTON)
-        self.wait_for_playlist(page, [song5, song6, song1, song2])
+        self.wait_for_playlist(page, [song5, song6, song1, song2], 0)
         self.wait_for_song(page, song5, False)
 
         # The "I'm feeling lucky" button should replace the current playlist and
         # start playing the new first song.
         page.keywords = 'al2'
         page.click(page.LUCKY_BUTTON)
-        self.wait_for_playlist(page, [song3, song4])
+        self.wait_for_playlist(page, [song3, song4], 0)
         self.wait_for_song(page, song3, False)
 
     def test_playback_buttons(self):
-        song = Song('artist', 'track', 'album')
-        server.import_songs([song])
+        song1 = Song('artist', 'track1', 'album', 1)
+        song2 = Song('artist', 'track2', 'album', 2)
+        server.import_songs([song1, song2])
 
         page = Page(driver)
-        page.keywords = song.artist
+        page.keywords = song1.artist
         page.click(page.LUCKY_BUTTON)
-        self.wait_for_song(page, song, False)
+        self.wait_for_song(page, song1, False)
+        self.wait_for_playlist(page, [song1, song2], 0)
+
         page.click(page.PLAY_PAUSE_BUTTON)
-        self.wait_for_song(page, song, True)
+        self.wait_for_song(page, song1, True)
+        self.wait_for_playlist(page, [song1, song2], 0)
+
         page.click(page.PLAY_PAUSE_BUTTON)
-        self.wait_for_song(page, song, False)
+        self.wait_for_song(page, song1, False)
+        self.wait_for_playlist(page, [song1, song2], 0)
+
+        page.click(page.NEXT_BUTTON)
+        self.wait_for_song(page, song2, False)
+        self.wait_for_playlist(page, [song1, song2], 1)
+
+        page.click(page.NEXT_BUTTON)
+        self.wait_for_song(page, song2, False)
+        self.wait_for_playlist(page, [song1, song2], 1)
+
+        page.click(page.PREV_BUTTON)
+        self.wait_for_song(page, song1, False)
+        self.wait_for_playlist(page, [song1, song2], 0)
+
+        page.click(page.PREV_BUTTON)
+        self.wait_for_song(page, song1, False)
+        self.wait_for_playlist(page, [song1, song2], 0)
 
 if __name__ == '__main__':
     unittest.main()

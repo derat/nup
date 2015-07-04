@@ -46,8 +46,10 @@ class Page(object):
     LAST_PLAYED_SELECT = (By.ID, 'lastPlayedSelect')
     LUCKY_BUTTON = (By.ID, 'luckyButton')
     MIN_RATING_SELECT = (By.ID, 'minRatingSelect')
+    NEXT_BUTTON = (By.ID, 'nextButton')
     PLAY_PAUSE_BUTTON = (By.ID, 'playPauseButton')
     PLAYLIST_TABLE = (By.ID, 'playlistTable')
+    PREV_BUTTON = (By.ID, 'prevButton')
     REPLACE_BUTTON = (By.ID, 'replaceButton')
     RESET_BUTTON = (By.ID, 'resetButton')
     SEARCH_BUTTON = (By.ID, 'searchButton')
@@ -79,20 +81,20 @@ class Page(object):
     def reset(self):
         self.driver.execute_script('document.playlist.resetForTesting()')
 
-    def get_songs_from_table(self, table, has_checkbox):
+    def get_songs_from_table(self, table):
         songs = []
         try:
             # Skip header.
             for row in table.find_elements_by_tag_name('tr')[1:]:
                 cols = row.find_elements_by_tag_name('td')
-                artist_index = 1 if has_checkbox else 0
-                songs.append(Song(cols[artist_index].text,
-                                  cols[artist_index+1].text,
-                                  cols[artist_index+2].text))
-                # TODO: Copy more stuff:
-                # - time from last column
-                # - highlighting state
-                # - checkbox state
+                # Final column is time; first column may be checkbox.
+                song = Song(cols[len(cols)-4].text,
+                            cols[len(cols)-3].text,
+                            cols[len(cols)-2].text)
+                # TODO: Copy time from last column.
+                song.highlighted = 'playing' in row.get_attribute('class')
+                song.checked = len(cols) == 5 and cols[0].is_selected()
+                songs.append(song)
         except selenium.common.exceptions.StaleElementReferenceException:
             # Handle the case where the table is getting rewritten. :-/
             return songs
@@ -100,11 +102,11 @@ class Page(object):
 
     def get_search_results(self):
         return self.get_songs_from_table(
-            get_element(self.driver, Page.SEARCH_RESULTS_TABLE), True)
+            get_element(self.driver, Page.SEARCH_RESULTS_TABLE))
 
     def get_playlist(self):
         return self.get_songs_from_table(
-            get_element(self.driver, Page.PLAYLIST_TABLE), False)
+            get_element(self.driver, Page.PLAYLIST_TABLE))
 
     def get_current_song(self):
         '''Gets information about the currently-playing song.

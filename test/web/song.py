@@ -25,6 +25,10 @@ class Song:
         self.album_id = '%s-%s' % (artist, album)
         self.filename = MUSIC_FILE
 
+        # Used for playlist entries and search results, respectively.
+        self.highlighted = False
+        self.checked = False
+
     def to_dict(self):
         def get_time(days_past):
             t = datetime.datetime.utcnow() - datetime.timedelta(days=days_past)
@@ -45,7 +49,13 @@ class Song:
         }
 
     def __str__(self):
-        return '[%s, %s, %s]' % (self.artist, self.title, self.album)
+        info = ''
+        if self.highlighted:
+            info += ' (highlighted)'
+        if self.checked:
+            info += ' (checked)'
+        highlighted = self.highlighted 
+        return '[%s, %s, %s%s]' % (self.artist, self.title, self.album, info)
 
     def __repr__(self):
         return self.__str__()
