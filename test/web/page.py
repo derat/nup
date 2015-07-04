@@ -14,8 +14,9 @@ def get_element(driver, locator):
 # Loosely based on https://selenium-python.readthedocs.org/page-objects.html.
 class InputElement(object):
     def __set__(self, obj, value):
-        # TODO: This is misleading. It's not assigning text; it's appending it.
-        get_element(obj.driver, self.locator).send_keys(value)
+        element = get_element(obj.driver, self.locator)
+        element.clear()
+        element.send_keys(value)
 
     def __get__(self, obj, owner):
         return get_element(obj.driver, self.locator).get_attribute("value")
@@ -55,6 +56,7 @@ class Page(object):
     UNRATED_CHECKBOX = (By.ID, 'unratedCheckbox')
 
     # Values for FIRST_PLAYED_SELECT and LAST_PLAYED_SELECT.
+    UNSET_TIME = '...'
     ONE_DAY = 'one day'
     ONE_WEEK = 'one week'
     ONE_MONTH = 'one month'

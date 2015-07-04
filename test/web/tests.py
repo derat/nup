@@ -48,24 +48,27 @@ class Test(unittest.TestCase):
         server.clear_data()
         self.base_music_url = 'http://%s:%d/' % file_thread.host_port()
 
-    def wait_for_search_results(self, page, songs):
+    def wait_for_search_results(self, page, songs, msg=''):
         '''Waits until the page is displaying the expected search results.'''
         try:
             utils.wait(lambda: page.get_search_results() == songs,
                        timeout_sec=3)
         except utils.TimeoutError as e:
-            self.fail('Timed out waiting for expected results. Received:\n' +
+            msg = ' (' + msg + ')' if msg else ''
+            self.fail('Timed out waiting for expected results' + msg +
+                      '.\nReceived:\n' +
                       pprint.pformat(page.get_search_results()))
 
-    def wait_for_playlist(self, page, songs):
+    def wait_for_playlist(self, page, songs, msg=''):
         '''Waits until the page is displaying the expected playlist.'''
         try:
             utils.wait(lambda: page.get_playlist() == songs, timeout_sec=3)
         except utils.TimeoutError as e:
-            self.fail('Timed out waiting for expected playlist. Received:\n' +
-                      pprint.pformat(page.get_playlist()))
+            msg = ' (' + msg + ')' if msg else ''
+            self.fail('Timed out waiting for expected playlist' + msg +
+                      '.\nReceived:\n' + pprint.pformat(page.get_playlist()))
 
-    def wait_for_song(self, page, song, paused):
+    def wait_for_song(self, page, song, paused, msg=''):
         '''Waits until the page is playing the expected song.'''
         def is_current():
             current, current_src, current_paused = page.get_current_song()
@@ -75,7 +78,8 @@ class Test(unittest.TestCase):
         try:
             utils.wait(is_current, timeout_sec=5)
         except utils.TimeoutError as e:
-            self.fail('Timed out waiting for song. Received ' +
+            msg = ' (' + msg + ')' if msg else ''
+            self.fail('Timed out waiting for song' + msg + '.\nReceived ' +
                       page.get_current_song())
 
     def test_keyword_query(self):
@@ -94,39 +98,16 @@ class Test(unittest.TestCase):
         server.import_songs(album1 + album2 + album3)
 
         page = Page(driver)
-        page.keywords = 'album:al1'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, album1)
-
-        page.click(page.RESET_BUTTON)
-        page.keywords = 'album:al2'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, album2)
-
-        page.click(page.RESET_BUTTON)
-        page.keywords = 'artist:ar1'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, album1)
-
-        page.click(page.RESET_BUTTON)
-        page.keywords = 'artist:"artist with space"'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, album3)
-
-        page.click(page.RESET_BUTTON)
-        page.keywords = 'ti2'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [album1[1], album2[1]])
-
-        page.click(page.RESET_BUTTON)
-        page.keywords = 'AR2 ti1'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [album2[0]])
-
-        page.click(page.RESET_BUTTON)
-        page.keywords = 'ar1 bogus'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [])
+        for kw, res in (('album:al1', album1),
+                        ('album:al2', album2),
+                        ('artist:ar1', album1),
+                        ('artist:"artist with space"', album3),
+                        ('ti2', [album1[1], album2[1]]),
+                        ('AR2 ti1', [album2[0]]),
+                        ('ar1 bogus', [])):
+            page.keywords = kw
+            page.click(page.SEARCH_BUTTON)
+            self.wait_for_search_results(page, res, kw)
 
     def test_tag_query(self):
         song1 = Song('ar1', 'ti1', 'al1', tags=['electronic', 'instrumental'])
@@ -135,24 +116,13 @@ class Test(unittest.TestCase):
         server.import_songs([song1, song2, song3])
 
         page = Page(driver)
-        page.tags = 'electronic'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song1])
-
-        page.click(page.RESET_BUTTON)
-        page.tags = 'guitar rock'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song2])
-
-        page.click(page.RESET_BUTTON)
-        page.tags = 'instrumental'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song1, song3])
-
-        page.click(page.RESET_BUTTON)
-        page.tags = 'instrumental -electronic'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song3])
+        for tags, res in (('electronic', [song1]),
+                          ('guitar rock', [song2]),
+                          ('instrumental', [song1, song3]),
+                          ('instrumental -electronic', [song3])):
+            page.tags = tags
+            page.click(page.SEARCH_BUTTON)
+            self.wait_for_search_results(page, res, tags)
 
     def test_rating_query(self):
         song1 = Song('a', 't', 'al1', rating=0.0)
@@ -171,14 +141,13 @@ class Test(unittest.TestCase):
             page, [song1, song2, song3, song4, song5, song6])
 
         page.click(page.RESET_BUTTON)
-        page.select(page.MIN_RATING_SELECT, page.THREE_STARS)
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song3, song4, song5])
-
-        page.click(page.RESET_BUTTON)
-        page.select(page.MIN_RATING_SELECT, page.FIVE_STARS)
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song5])
+        for rating, res in ((page.TWO_STARS, [song2, song3, song4, song5]),
+                            (page.THREE_STARS, [song3, song4, song5]),
+                            (page.FOUR_STARS, [song4, song5]),
+                            (page.FIVE_STARS, [song5])):
+            page.select(page.MIN_RATING_SELECT, rating)
+            page.click(page.SEARCH_BUTTON)
+            self.wait_for_search_results(page, res, rating)
 
         page.click(page.RESET_BUTTON)
         page.click(page.UNRATED_CHECKBOX)
@@ -209,19 +178,12 @@ class Test(unittest.TestCase):
         server.import_songs([song1, song2, song3])
 
         page = Page(driver)
-        page.max_plays = '2'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song1, song3])
-
-        page.click(page.RESET_BUTTON)
-        page.max_plays = '3'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song1, song2, song3])
-
-        page.click(page.RESET_BUTTON)
-        page.max_plays = '0'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song3])
+        for plays, res in (('2', [song1, song3]),
+                           ('3', [song1, song2, song3]),
+                           ('0', [song3])):
+            page.max_plays = plays
+            page.click(page.SEARCH_BUTTON)
+            self.wait_for_search_results(page, res, plays)
 
     def test_play_time_query(self):
         song1 = Song('ar1', 'ti1', 'al1', plays=[(5, '')])
@@ -229,34 +191,17 @@ class Test(unittest.TestCase):
         server.import_songs([song1, song2])
 
         page = Page(driver)
-        page.select(page.FIRST_PLAYED_SELECT, page.ONE_DAY)
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [])
-
-        page.click(page.RESET_BUTTON)
-        page.select(page.FIRST_PLAYED_SELECT, page.ONE_WEEK)
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song1])
-
-        page.click(page.RESET_BUTTON)
-        page.select(page.FIRST_PLAYED_SELECT, page.ONE_YEAR)
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song1, song2])
-
-        page.click(page.RESET_BUTTON)
-        page.select(page.LAST_PLAYED_SELECT, page.ONE_YEAR)
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [])
-
-        page.click(page.RESET_BUTTON)
-        page.select(page.LAST_PLAYED_SELECT, page.ONE_MONTH)
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song2])
-
-        page.click(page.RESET_BUTTON)
-        page.select(page.LAST_PLAYED_SELECT, page.ONE_DAY)
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song1, song2])
+        for first, last, res in \
+                ((page.ONE_DAY, page.UNSET_TIME, []),
+                 (page.ONE_WEEK, page.UNSET_TIME, [song1]),
+                 (page.ONE_YEAR, page.UNSET_TIME, [song1, song2]),
+                 (page.UNSET_TIME, page.ONE_YEAR, []),
+                 (page.UNSET_TIME, page.ONE_MONTH, [song2]),
+                 (page.UNSET_TIME, page.ONE_DAY, [song1, song2])):
+            page.select(page.FIRST_PLAYED_SELECT, first)
+            page.select(page.LAST_PLAYED_SELECT, last)
+            page.click(page.SEARCH_BUTTON)
+            self.wait_for_search_results(page, res, '%s/%s' % (first, last))
 
     def test_add_to_playlist(self):
         song1 = Song('a', 't1', 'al1', 1)
@@ -280,7 +225,6 @@ class Test(unittest.TestCase):
         self.wait_for_song(page, song1, True)
 
         # Inserting should leave the current track paused.
-        page.click(page.RESET_BUTTON)
         page.keywords = 'al2'
         page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song3, song4])
@@ -289,7 +233,6 @@ class Test(unittest.TestCase):
         self.wait_for_song(page, song1, True)
 
         # Replacing should result in the new first track being played.
-        page.click(page.RESET_BUTTON)
         page.keywords = 'al3'
         page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song5, song6])
@@ -298,7 +241,6 @@ class Test(unittest.TestCase):
         self.wait_for_song(page, song5, False)
 
         # Appending should leave the first track playing.
-        page.click(page.RESET_BUTTON)
         page.keywords = 'al1'
         page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, [song1, song2])
@@ -308,13 +250,12 @@ class Test(unittest.TestCase):
 
         # The "I'm feeling lucky" button should replace the current playlist and
         # start playing the new first song.
-        page.click(page.RESET_BUTTON)
         page.keywords = 'al2'
         page.click(page.LUCKY_BUTTON)
         self.wait_for_playlist(page, [song3, song4])
         self.wait_for_song(page, song3, False)
 
-    def test_playback(self):
+    def test_playback_buttons(self):
         song = Song('artist', 'track', 'album')
         server.import_songs([song])
 
