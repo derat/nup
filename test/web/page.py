@@ -53,6 +53,7 @@ class Page(object):
     REPLACE_BUTTON = (By.ID, 'replaceButton')
     RESET_BUTTON = (By.ID, 'resetButton')
     SEARCH_BUTTON = (By.ID, 'searchButton')
+    SEARCH_RESULTS_CHECKBOX = (By.ID, 'searchResultsCheckbox')
     SEARCH_RESULTS_TABLE = (By.ID, 'searchResultsTable')
     TITLE_DIV = (By.ID, 'titleDiv')
     UNRATED_CHECKBOX = (By.ID, 'unratedCheckbox')
@@ -93,7 +94,9 @@ class Page(object):
                             cols[len(cols)-2].text)
                 # TODO: Copy time from last column.
                 song.highlighted = 'playing' in row.get_attribute('class')
-                song.checked = len(cols) == 5 and cols[0].is_selected()
+                song.checked = \
+                    len(cols) == 5 and \
+                    cols[0].find_elements_by_tag_name('input')[0].is_selected()
                 songs.append(song)
         except selenium.common.exceptions.StaleElementReferenceException:
             # Handle the case where the table is getting rewritten. :-/

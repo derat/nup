@@ -54,7 +54,6 @@ class Song:
             info += ' (highlighted)'
         if self.checked:
             info += ' (checked)'
-        highlighted = self.highlighted 
         return '[%s, %s, %s%s]' % (self.artist, self.title, self.album, info)
 
     def __repr__(self):

@@ -48,11 +48,19 @@ class Test(unittest.TestCase):
         server.clear_data()
         self.base_music_url = 'http://%s:%d/' % file_thread.host_port()
 
-    def wait_for_search_results(self, page, songs, msg=''):
+    def wait_for_search_results(self, page, songs, checked=None, msg=''):
         '''Waits until the page is displaying the expected search results.'''
+        def is_expected():
+            results = page.get_search_results()
+            if results != songs:
+                return False
+            if checked is not None:
+                for i in range(len(checked)):
+                    if results[i].checked != checked[i]:
+                        return False
+            return True
         try:
-            utils.wait(lambda: page.get_search_results() == songs,
-                       timeout_sec=3)
+            utils.wait(is_expected, timeout_sec=3)
         except utils.TimeoutError as e:
             msg = ' (' + msg + ')' if msg else ''
             self.fail('Timed out waiting for expected results' + msg +
@@ -117,7 +125,7 @@ class Test(unittest.TestCase):
                         ('ar1 bogus', [])):
             page.keywords = kw
             page.click(page.SEARCH_BUTTON)
-            self.wait_for_search_results(page, res, kw)
+            self.wait_for_search_results(page, res, msg=kw)
 
     def test_tag_query(self):
         song1 = Song('ar1', 'ti1', 'al1', tags=['electronic', 'instrumental'])
@@ -132,7 +140,7 @@ class Test(unittest.TestCase):
                           ('instrumental -electronic', [song3])):
             page.tags = tags
             page.click(page.SEARCH_BUTTON)
-            self.wait_for_search_results(page, res, tags)
+            self.wait_for_search_results(page, res, msg=tags)
 
     def test_rating_query(self):
         song1 = Song('a', 't', 'al1', rating=0.0)
@@ -157,7 +165,7 @@ class Test(unittest.TestCase):
                             (page.FIVE_STARS, [song5])):
             page.select(page.MIN_RATING_SELECT, rating)
             page.click(page.SEARCH_BUTTON)
-            self.wait_for_search_results(page, res, rating)
+            self.wait_for_search_results(page, res, msg=rating)
 
         page.click(page.RESET_BUTTON)
         page.click(page.UNRATED_CHECKBOX)
@@ -193,7 +201,7 @@ class Test(unittest.TestCase):
                            ('0', [song3])):
             page.max_plays = plays
             page.click(page.SEARCH_BUTTON)
-            self.wait_for_search_results(page, res, plays)
+            self.wait_for_search_results(page, res, msg=plays)
 
     def test_play_time_query(self):
         song1 = Song('ar1', 'ti1', 'al1', plays=[(5, '')])
@@ -211,7 +219,26 @@ class Test(unittest.TestCase):
             page.select(page.FIRST_PLAYED_SELECT, first)
             page.select(page.LAST_PLAYED_SELECT, last)
             page.click(page.SEARCH_BUTTON)
-            self.wait_for_search_results(page, res, '%s/%s' % (first, last))
+            self.wait_for_search_results(page, res, msg='%s/%s' % (first, last))
+
+    def test_search_result_checkboxes(self):
+        songs = [Song('a', 't1', 'al1', 1),
+                 Song('a', 't2', 'al1', 2),
+                 Song('a', 't3', 'al1', 3)]
+        server.import_songs(songs)
+
+        page = Page(driver)
+        page.keywords = songs[0].artist
+        page.click(page.SEARCH_BUTTON)
+        self.wait_for_search_results(page, songs, [True, True, True])
+
+        page.click(page.SEARCH_RESULTS_CHECKBOX)
+        self.wait_for_search_results(page, songs, [False, False, False])
+
+        page.click(page.SEARCH_RESULTS_CHECKBOX)
+        self.wait_for_search_results(page, songs, [True, True, True])
+
+        # TODO: Also test clicking checkboxes on individual results.
 
     def test_add_to_playlist(self):
         song1 = Song('a', 't1', 'al1', 1)
