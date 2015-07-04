@@ -93,7 +93,7 @@ class Page(object):
                             cols[len(cols)-3].text,
                             cols[len(cols)-2].text)
                 # TODO: Copy time from last column.
-                song.highlighted = 'playing' in row.get_attribute('class')
+                song.highlighted = 'highlight' in row.get_attribute('class')
                 song.checked = \
                     len(cols) == 5 and \
                     cols[0].find_elements_by_tag_name('input')[0].is_selected()

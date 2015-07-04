@@ -40,6 +40,6 @@ table.songTable td.time, table.songTable th.time {
   padding-right: 6px;
   text-overflow: clip;
 }
-table.songTable tr.playing {
+table.songTable tr.highlight {
   background-color: #bde;
 }

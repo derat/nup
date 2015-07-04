@@ -21,7 +21,7 @@ SongTable.prototype.getNumSongs = function() {
 
 SongTable.prototype.highlightRow = function(index, highlight) {
   if (index >= 0 && index < this.getNumSongs())
-    this.table_.rows[index+1].className = highlight ? 'playing' : null;
+    this.table_.rows[index+1].className = highlight ? 'highlight' : '';
 };
 
 SongTable.prototype.getCheckedSongs = function() {
