@@ -227,18 +227,48 @@ class Test(unittest.TestCase):
                  Song('a', 't3', 'al1', 3)]
         server.import_songs(songs)
 
+
         page = Page(driver)
+
+        def check_selected(selected, opaque):
+            checkbox = page.get(page.SEARCH_RESULTS_CHECKBOX)
+            if checkbox.is_selected() != selected:
+                self.fail('Selected state (%d) didn\'t match expected (%d)' %
+                          (checkbox.is_selected(), selected))
+            actual_opaque = 'transparent' not in checkbox.get_attribute('class')
+            if actual_opaque != opaque:
+                self.fail('Opaque state (%d) didn\'t match expected (%d)' %
+                          (actual_opaque, opaque))
+
         page.keywords = songs[0].artist
         page.click(page.SEARCH_BUTTON)
         self.wait_for_search_results(page, songs, [True, True, True])
+        check_selected(True, True)
 
         page.click(page.SEARCH_RESULTS_CHECKBOX)
         self.wait_for_search_results(page, songs, [False, False, False])
+        check_selected(False, True)
 
         page.click(page.SEARCH_RESULTS_CHECKBOX)
         self.wait_for_search_results(page, songs, [True, True, True])
+        check_selected(True, True)
 
-        # TODO: Also test clicking checkboxes on individual results.
+        page.click_search_result_checkbox(0)
+        self.wait_for_search_results(page, songs, [False, True, True])
+        check_selected(True, False)
+
+        page.click(page.SEARCH_RESULTS_CHECKBOX)
+        self.wait_for_search_results(page, songs, [False, False, False])
+        check_selected(False, True)
+
+        page.click_search_result_checkbox(0)
+        page.click_search_result_checkbox(1)
+        self.wait_for_search_results(page, songs, [True, True, False])
+        check_selected(True, False)
+
+        page.click_search_result_checkbox(2)
+        self.wait_for_search_results(page, songs, [True, True, True])
+        check_selected(True, True)
 
     def test_add_to_playlist(self):
         song1 = Song('a', 't1', 'al1', 1)

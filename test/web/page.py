@@ -7,19 +7,15 @@ from selenium.webdriver.common.by import By
 
 from song import Song
 
-def get_element(driver, locator):
-    utils.wait(lambda: driver.find_element(*locator))
-    return driver.find_element(*locator)
-
 # Loosely based on https://selenium-python.readthedocs.org/page-objects.html.
 class InputElement(object):
     def __set__(self, obj, value):
-        element = get_element(obj.driver, self.locator)
+        element = obj.get(self.locator)
         element.clear()
         element.send_keys(value)
 
     def __get__(self, obj, owner):
-        return get_element(obj.driver, self.locator).get_attribute("value")
+        return obj.get(self.locator).get_attribute("value")
 
 class KeywordsInput(InputElement):
     locator = (By.ID, 'keywordsInput')
@@ -105,11 +101,11 @@ class Page(object):
 
     def get_search_results(self):
         return self.get_songs_from_table(
-            get_element(self.driver, Page.SEARCH_RESULTS_TABLE))
+            self.get(Page.SEARCH_RESULTS_TABLE))
 
     def get_playlist(self):
         return self.get_songs_from_table(
-            get_element(self.driver, Page.PLAYLIST_TABLE))
+            self.get(Page.PLAYLIST_TABLE))
 
     def get_current_song(self):
         '''Gets information about the currently-playing song.
@@ -120,19 +116,29 @@ class Page(object):
                <audio> paused state (bool)
         '''
         audio = self.driver.find_element(*Page.AUDIO)
-        song = Song(get_element(self.driver, Page.ARTIST_DIV).text,
-                    get_element(self.driver, Page.TITLE_DIV).text,
-                    get_element(self.driver, Page.ALBUM_DIV).text)
+        song = Song(self.get(Page.ARTIST_DIV).text,
+                    self.get(Page.TITLE_DIV).text,
+                    self.get(Page.ALBUM_DIV).text)
         return (song, audio.get_attribute('src'),
                 audio.get_attribute('paused') is not None)
 
+    def get(self, locator):
+        utils.wait(lambda: self.driver.find_element(*locator))
+        return self.driver.find_element(*locator)
+
     def click(self, locator):
-        get_element(self.driver, locator).click()
+        self.get(locator).click()
 
     def select(self, locator, value):
-        select = get_element(self.driver, locator)
+        select = self.get(locator)
         for option in select.find_elements_by_tag_name('option'):
             if option.text == value:
                 option.click()
                 return
         raise RuntimeError('Failed to find option "%s"' % value)
+
+    def click_search_result_checkbox(self, row_index):
+        self.get(Page.SEARCH_RESULTS_TABLE).\
+            find_elements_by_tag_name('tr')[row_index + 1].\
+            find_elements_by_tag_name('td')[0].\
+            find_elements_by_tag_name('input')[0].click()
