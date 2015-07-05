@@ -376,8 +376,7 @@ class Test(unittest.TestCase):
         self.wait_for_playlist(page, [song1, song2], 1)
 
     def test_display_time_while_playing(self):
-        song = Song('artist', 'title', 'album', 1, filename=Song.FILE_5S,
-                    length=5.0)
+        song = Song('ar', 't', 'al', 1, filename=Song.FILE_5S, length=5.0)
         server.import_songs([song])
 
         page = Page(driver)
@@ -389,6 +388,54 @@ class Test(unittest.TestCase):
         self.wait_for_song(page, song, False, time_str='[0:03 / 0:05]')
         self.wait_for_song(page, song, False, time_str='[0:04 / 0:05]')
         self.wait_for_song(page, song, True, time_str='[0:05 / 0:05]')
+
+    def test_report_played(self):
+        song1 = Song('ar', 't1', 'al', 1, filename=Song.FILE_5S, length=5.0)
+        song2 = Song('ar', 't2', 'al', 2, filename=Song.FILE_1S, length=1.0)
+        server.import_songs([song1, song2])
+
+        # Skip the first song early on, but listen to all of the second song.
+        page = Page(driver)
+        page.keywords = song1.artist
+        page.click(page.LUCKY_BUTTON)
+        self.wait_for_song(page, song1, False, time_str='[0:01 / 0:05]')
+        start_time = int(time.time())
+        page.click(page.NEXT_BUTTON)
+        self.wait_for_song(page, song2, True, time_str='[0:01 / 0:01]')
+        end_time = int(time.time() + 1.0)  # Lawls.
+
+        # Only the second song should've been reported.
+        exported = server.export_songs()
+        if len(exported[song1.sha1].plays) != 0:
+            self.fail('Unexpected plays: ' + str(exported[song1.sha1].plays))
+        if len(exported[song2.sha1].plays) != 1:
+            self.fail('Missing plays: ' + str(exported[song2.sha1].plays))
+        p = exported[song2.sha1].plays[0]
+        if p[0] < start_time or p[0] > end_time:
+            self.fail('Bad start time %d; expected [%d, %d]' %
+                      (p[0], start_time, end_time))
+
+        # Go back to the first song but pause it after one second.
+        start_time = int(time.time())
+        page.click(page.PREV_BUTTON)
+        self.wait_for_song(page, song1, False, time_str='[0:01 / 0:05]')
+        end_time = int(time.time() + 1.0)
+        page.click(page.PLAY_PAUSE_BUTTON)
+        exported = server.export_songs()
+        if len(exported[song1.sha1].plays) != 0:
+            self.fail('Unexpected plays: ' + str(exported[song1.sha1].plays))
+
+        # After more than half of the first song has played, it should be
+        # reported.
+        page.click(page.PLAY_PAUSE_BUTTON)
+        self.wait_for_song(page, song1, False, time_str='[0:04 / 0:05]')
+        exported = server.export_songs()
+        if len(exported[song1.sha1].plays) != 1:
+            self.fail('Missing plays: ' + str(exported[song1.sha1].plays))
+        p = exported[song1.sha1].plays[0]
+        if p[0] < start_time or p[0] > end_time:
+            self.fail('Bad start time %d; expected [%d, %d]' %
+                      (p[0], start_time, end_time))
 
 if __name__ == '__main__':
     unittest.main()

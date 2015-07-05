@@ -3,7 +3,6 @@
 import datetime
 import sha
 
-
 class Song:
     # Various MP3 files that can be used as a song's filename.
     FILE_0S = '0s.mp3'
@@ -11,7 +10,7 @@ class Song:
     FILE_5S = '5s.mp3'
 
     def __init__(self, artist, title, album, track=0, disc=0, rating=-1.0,
-                 filename=FILE_5S, length=5.0, tags=[], plays=[]):
+                 filename=FILE_5S, length=5.0, tags=None, plays=None):
         '''tags: List of strings.
            plays: List of (timestamp, ip) tuples.
                   past_days is float, ip is string.
@@ -24,8 +23,8 @@ class Song:
         self.rating = rating
         self.filename = filename
         self.length = length
-        self.tags = tags
-        self.plays = plays
+        self.tags = tags or []
+        self.plays = plays or []
 
         self.sha1 = sha.new('%s-%s-%s' % (artist, album, title)).hexdigest()
         self.album_id = '%s-%s' % (artist, album)
