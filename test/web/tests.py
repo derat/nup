@@ -2,6 +2,7 @@
 # coding=UTF-8
 
 import pprint
+import time
 import unittest
 from selenium import webdriver
 
@@ -206,8 +207,10 @@ class Test(unittest.TestCase):
             self.wait_for_search_results(page, res, msg=plays)
 
     def test_play_time_query(self):
-        song1 = Song('ar1', 'ti1', 'al1', plays=[(5, '')])
-        song2 = Song('ar2', 'ti2', 'al2', plays=[(90, '')])
+        now = time.time()
+        day = 86400
+        song1 = Song('ar1', 'ti1', 'al1', plays=[(now - 5 * day, '')])
+        song2 = Song('ar2', 'ti2', 'al2', plays=[(now - 90 * day, '')])
         server.import_songs([song1, song2])
 
         page = Page(driver)

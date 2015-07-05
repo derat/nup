@@ -10,11 +10,11 @@ class Song:
     FILE_1S = '1s.mp3'
     FILE_5S = '5s.mp3'
 
-    def __init__(self, artist, title, album, track=0, disc=0, rating=-1,
+    def __init__(self, artist, title, album, track=0, disc=0, rating=-1.0,
                  filename=FILE_5S, length=5.0, tags=[], plays=[]):
         '''tags: List of strings.
-           plays: List of (past_days, ip) tuples.
-                  past_days is int, ip is string.
+           plays: List of (timestamp, ip) tuples.
+                  past_days is float, ip is string.
         '''
         self.artist = artist
         self.title = title
@@ -35,10 +35,8 @@ class Song:
         self.checked = False
 
     def to_dict(self):
-        def get_time(days_past):
-            t = datetime.datetime.utcnow() - datetime.timedelta(days=days_past)
-            return t.isoformat('T') + 'Z'
-
+        def get_time(ts):
+            return datetime.datetime.utcfromtimestamp(ts).isoformat('T') + 'Z'
         return {
             'sha1': self.sha1,
             'filename': self.filename,
