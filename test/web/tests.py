@@ -86,19 +86,21 @@ class Test(unittest.TestCase):
             self.fail('Timed out waiting for expected playlist' + msg +
                       '.\nReceived:\n' + pprint.pformat(page.get_playlist()))
 
-    def wait_for_song(self, page, song, paused, msg=''):
+    def wait_for_song(self, page, song, paused, time_str='', msg=''):
         '''Waits until the page is playing the expected song.'''
         def is_current():
-            current, current_src, current_paused = page.get_current_song()
+            current, current_src, current_paused, current_time_str = \
+                page.get_current_song()
             return current == song and \
                    current_src == self.base_music_url + song.filename and \
-                   current_paused == paused
+                   current_paused == paused and \
+                   (not time_str or current_time_str == time_str)
         try:
             utils.wait(is_current, timeout_sec=5)
         except utils.TimeoutError as e:
             msg = ' (' + msg + ')' if msg else ''
             self.fail('Timed out waiting for song' + msg + '.\nReceived ' +
-                      page.get_current_song())
+                      str(page.get_current_song()))
 
     def test_keyword_query(self):
         album1 = [
@@ -356,6 +358,34 @@ class Test(unittest.TestCase):
         page.click(page.PREV_BUTTON)
         self.wait_for_song(page, song1, False)
         self.wait_for_playlist(page, [song1, song2], 0)
+
+    def test_play_through_songs(self):
+        song1 = Song('artist', 'track1', 'album', 1, filename=Song.FILE_1S)
+        song2 = Song('artist', 'track2', 'album', 2, filename=Song.FILE_5S)
+        server.import_songs([song1, song2])
+
+        page = Page(driver)
+        page.keywords = song1.artist
+        page.click(page.LUCKY_BUTTON)
+        self.wait_for_song(page, song1, False)
+        self.wait_for_playlist(page, [song1, song2], 0)
+        self.wait_for_song(page, song2, False)
+        self.wait_for_playlist(page, [song1, song2], 1)
+
+    def test_display_time_while_playing(self):
+        song = Song('artist', 'title', 'album', 1, filename=Song.FILE_5S,
+                    length=5.0)
+        server.import_songs([song])
+
+        page = Page(driver)
+        page.keywords = song.artist
+        page.click(page.LUCKY_BUTTON)
+        self.wait_for_song(page, song, False, time_str='[0:00 / 0:05]')
+        self.wait_for_song(page, song, False, time_str='[0:01 / 0:05]')
+        self.wait_for_song(page, song, False, time_str='[0:02 / 0:05]')
+        self.wait_for_song(page, song, False, time_str='[0:03 / 0:05]')
+        self.wait_for_song(page, song, False, time_str='[0:04 / 0:05]')
+        self.wait_for_song(page, song, True, time_str='[0:05 / 0:05]')
 
 if __name__ == '__main__':
     unittest.main()

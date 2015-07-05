@@ -3,11 +3,15 @@
 import datetime
 import sha
 
-MUSIC_FILE = '5s.mp3'
 
 class Song:
+    # Various MP3 files that can be used as a song's filename.
+    FILE_0S = '0s.mp3'
+    FILE_1S = '1s.mp3'
+    FILE_5S = '5s.mp3'
+
     def __init__(self, artist, title, album, track=0, disc=0, rating=-1,
-                 tags=[], plays=[]):
+                 filename=FILE_5S, length=5.0, tags=[], plays=[]):
         '''tags: List of strings.
            plays: List of (past_days, ip) tuples.
                   past_days is int, ip is string.
@@ -18,12 +22,13 @@ class Song:
         self.track = track
         self.disc = disc
         self.rating = rating
+        self.filename = filename
+        self.length = length
         self.tags = tags
         self.plays = plays
 
         self.sha1 = sha.new('%s-%s-%s' % (artist, album, title)).hexdigest()
         self.album_id = '%s-%s' % (artist, album)
-        self.filename = MUSIC_FILE
 
         # Used for playlist entries and search results, respectively.
         self.highlighted = False
@@ -43,6 +48,7 @@ class Song:
             'albumId': self.album_id,
             'track': self.track,
             'disc': self.disc,
+            'length': self.length,
             'rating': self.rating,
             'tags': self.tags,
             'plays': [{'t': get_time(p[0]), 'ip': p[1]} for p in self.plays],

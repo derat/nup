@@ -51,6 +51,7 @@ class Page(object):
     SEARCH_BUTTON = (By.ID, 'searchButton')
     SEARCH_RESULTS_CHECKBOX = (By.ID, 'searchResultsCheckbox')
     SEARCH_RESULTS_TABLE = (By.ID, 'searchResultsTable')
+    TIME_DIV = (By.ID, 'timeDiv')
     TITLE_DIV = (By.ID, 'titleDiv')
     UNRATED_CHECKBOX = (By.ID, 'unratedCheckbox')
 
@@ -110,17 +111,19 @@ class Page(object):
     def get_current_song(self):
         '''Gets information about the currently-playing song.
 
-           Returns a 3-tuple containing:
+           Returns a 4-tuple containing:
                Song being displayed
                <audio> src (string)
                <audio> paused state (bool)
+               string displaying playback time (e.g. "[0:05 / 3:23]")
         '''
-        audio = self.driver.find_element(*Page.AUDIO)
+        audio = self.get(Page.AUDIO)
         song = Song(self.get(Page.ARTIST_DIV).text,
                     self.get(Page.TITLE_DIV).text,
                     self.get(Page.ALBUM_DIV).text)
         return (song, audio.get_attribute('src'),
-                audio.get_attribute('paused') is not None)
+                audio.get_attribute('paused') is not None,
+                self.get(Page.TIME_DIV).text)
 
     def get(self, locator):
         utils.wait(lambda: self.driver.find_element(*locator))
