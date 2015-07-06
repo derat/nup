@@ -87,21 +87,64 @@ class Test(unittest.TestCase):
             self.fail('Timed out waiting for expected playlist' + msg +
                       '.\nReceived:\n' + pprint.pformat(page.get_playlist()))
 
-    def wait_for_song(self, page, song, paused, time_str='', msg=''):
+    def wait_for_song(self, page, song, paused=None, time=None,
+                      rating=None, title=None, msg=''):
         '''Waits until the page is playing the expected song.'''
         def is_current():
-            current, current_src, current_paused, current_time_str = \
-                page.get_current_song()
+            current, current_src, current_paused, current_time, \
+                current_rating, current_title = page.get_current_song()
             return current == song and \
                    current_src == self.base_music_url + song.filename and \
-                   current_paused == paused and \
-                   (not time_str or current_time_str == time_str)
+                   (paused is None or current_paused == paused) and \
+                   (time is None or current_time == time) and \
+                   (rating is None or current_rating == rating) and \
+                   (title is None or current_title == title)
         try:
             utils.wait(is_current, timeout_sec=5)
         except utils.TimeoutError as e:
             msg = ' (' + msg + ')' if msg else ''
             self.fail('Timed out waiting for song' + msg + '.\nReceived ' +
                       str(page.get_current_song()))
+
+    def wait_for_server_user_data(self, songs, msg=''):
+        '''Waits until the server contains the expected user data.
+
+        Takes a map from song SHA1s to 3-tuples, each of which consists of:
+
+            rating (float)
+            tags (list of strings)
+            plays (list of (start_timestamp, end_timestamp) tuples
+
+        Values may be None to be ignored.
+        '''
+        def is_expected():
+            exported = server.export_songs()
+            for sha1, expected in songs.items():
+                exp_rating, exp_tags, exp_plays = expected
+                exp_tags = sorted(exp_tags) if exp_tags else exp_tags
+                exp_plays = sorted(exp_plays) if exp_plays else exp_plays
+                actual = exported[sha1]
+                if (exp_rating is not None and actual.rating != exp_rating) or \
+                   (exp_tags is not None and sorted(actual.tags) != exp_tags):
+                    return False
+                if exp_plays is not None:
+                    if len(exp_plays) != len(actual.plays):
+                        return False
+                    for i, play in enumerate(sorted(actual.plays)):
+                        actual_ts = play[0]
+                        exp_start, exp_end = exp_plays[i]
+                        if actual_ts < exp_start or actual_ts > exp_end:
+                            return False
+            return True
+        try:
+            utils.wait(is_expected, timeout_sec=5)
+        except utils.TimeoutError as e:
+            msg = ' (' + msg + ')' if msg else ''
+            actual = ['[%s, %s, %s, %s]' %
+                      (str(s), str(s.rating), str(s.tags), str(s.plays))
+                      for s in server.export_songs().values()]
+            self.fail('Timed out waiting for server data' + msg + '.\n' +
+                      'Received ' + str(actual))
 
     def test_keyword_query(self):
         album1 = [
@@ -382,12 +425,12 @@ class Test(unittest.TestCase):
         page = Page(driver)
         page.keywords = song.artist
         page.click(page.LUCKY_BUTTON)
-        self.wait_for_song(page, song, False, time_str='[0:00 / 0:05]')
-        self.wait_for_song(page, song, False, time_str='[0:01 / 0:05]')
-        self.wait_for_song(page, song, False, time_str='[0:02 / 0:05]')
-        self.wait_for_song(page, song, False, time_str='[0:03 / 0:05]')
-        self.wait_for_song(page, song, False, time_str='[0:04 / 0:05]')
-        self.wait_for_song(page, song, True, time_str='[0:05 / 0:05]')
+        self.wait_for_song(page, song, False, time='[0:00 / 0:05]')
+        self.wait_for_song(page, song, False, time='[0:01 / 0:05]')
+        self.wait_for_song(page, song, False, time='[0:02 / 0:05]')
+        self.wait_for_song(page, song, False, time='[0:03 / 0:05]')
+        self.wait_for_song(page, song, False, time='[0:04 / 0:05]')
+        self.wait_for_song(page, song, True, time='[0:05 / 0:05]')
 
     def test_report_played(self):
         song1 = Song('ar', 't1', 'al', 1, filename=Song.FILE_5S, length=5.0)
@@ -398,44 +441,68 @@ class Test(unittest.TestCase):
         page = Page(driver)
         page.keywords = song1.artist
         page.click(page.LUCKY_BUTTON)
-        self.wait_for_song(page, song1, False, time_str='[0:01 / 0:05]')
-        start_time = int(time.time())
+        self.wait_for_song(page, song1, False, time='[0:01 / 0:05]')
+        song2_start_time = int(time.time())
         page.click(page.NEXT_BUTTON)
-        self.wait_for_song(page, song2, True, time_str='[0:01 / 0:01]')
-        end_time = int(time.time() + 1.0)  # Lawls.
+        self.wait_for_song(page, song2, True, time='[0:01 / 0:01]')
+        song2_end_time = int(time.time() + 1.0)  # Lawls.
 
         # Only the second song should've been reported.
-        exported = server.export_songs()
-        if len(exported[song1.sha1].plays) != 0:
-            self.fail('Unexpected plays: ' + str(exported[song1.sha1].plays))
-        if len(exported[song2.sha1].plays) != 1:
-            self.fail('Missing plays: ' + str(exported[song2.sha1].plays))
-        p = exported[song2.sha1].plays[0]
-        if p[0] < start_time or p[0] > end_time:
-            self.fail('Bad start time %d; expected [%d, %d]' %
-                      (p[0], start_time, end_time))
+        self.wait_for_server_user_data({
+            song1.sha1: (None, None, []),
+            song2.sha1: (None, None, [(song2_start_time, song2_end_time)]),
+        })
 
         # Go back to the first song but pause it after one second.
-        start_time = int(time.time())
+        song1_start_time = int(time.time())
         page.click(page.PREV_BUTTON)
-        self.wait_for_song(page, song1, False, time_str='[0:01 / 0:05]')
-        end_time = int(time.time() + 1.0)
+        self.wait_for_song(page, song1, False, time='[0:01 / 0:05]')
+        song1_end_time = int(time.time() + 1.0)
         page.click(page.PLAY_PAUSE_BUTTON)
-        exported = server.export_songs()
-        if len(exported[song1.sha1].plays) != 0:
-            self.fail('Unexpected plays: ' + str(exported[song1.sha1].plays))
+        # TODO: This doesn't test that it won't be reported later.
+        self.wait_for_server_user_data({
+            song1.sha1: (None, None, []),
+            song2.sha1: (None, None, [(song2_start_time, song2_end_time)]),
+        })
 
         # After more than half of the first song has played, it should be
         # reported.
         page.click(page.PLAY_PAUSE_BUTTON)
-        self.wait_for_song(page, song1, False, time_str='[0:04 / 0:05]')
-        exported = server.export_songs()
-        if len(exported[song1.sha1].plays) != 1:
-            self.fail('Missing plays: ' + str(exported[song1.sha1].plays))
-        p = exported[song1.sha1].plays[0]
-        if p[0] < start_time or p[0] > end_time:
-            self.fail('Bad start time %d; expected [%d, %d]' %
-                      (p[0], start_time, end_time))
+        self.wait_for_song(page, song1, False, time='[0:04 / 0:05]')
+        self.wait_for_server_user_data({
+            song1.sha1: (None, None, [(song1_start_time, song1_end_time)]),
+            song2.sha1: (None, None, [(song2_start_time, song2_end_time)]),
+        })
+
+    def test_rate_and_tag(self):
+        song = Song('ar', 't1', 'al', rating=0.5, tags=['rock', 'guitar'])
+        server.import_songs([song])
+
+        page = Page(driver)
+        page.keywords = song.artist
+        page.click(page.LUCKY_BUTTON)
+        self.wait_for_song(page, song, rating=page.THREE_STARS,
+                           title=u'Rating: ★★★☆☆\nTags: guitar rock')
+
+        page.click(page.COVER_IMAGE)
+        page.click_rating(4)
+        page.click(page.UPDATE_CLOSE_IMAGE)
+        self.wait_for_song(page, song, rating=page.FOUR_STARS,
+                           title=u'Rating: ★★★★☆\nTags: guitar rock')
+        self.wait_for_server_user_data({
+            song.sha1: (0.75, ['guitar', 'rock'], None),
+        })
+
+        page.click(page.COVER_IMAGE)
+        page.get(page.TAG_TEXTAREA).send_keys(' +metal')
+        page.click(page.UPDATE_CLOSE_IMAGE)
+        self.wait_for_song(page, song, rating=page.FOUR_STARS,
+                           title=u'Rating: ★★★★☆\nTags: guitar metal rock')
+        self.wait_for_server_user_data({
+            song.sha1: (0.75, ['guitar', 'metal', 'rock'], None),
+        })
+
+    # TODO: Add tag autocompletion tests.
 
 if __name__ == '__main__':
     unittest.main()

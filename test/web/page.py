@@ -15,7 +15,10 @@ class InputElement(object):
         element.send_keys(value)
 
     def __get__(self, obj, owner):
-        return obj.get(self.locator).get_attribute("value")
+        return obj.get(self.locator).get_attribute('value')
+
+    def send_keys(self, value):
+        obj.get(self.locator).send_keys(value)
 
 class KeywordsInput(InputElement):
     locator = (By.ID, 'keywordsInput')
@@ -36,6 +39,7 @@ class Page(object):
     APPEND_BUTTON = (By.ID, 'appendButton')
     ARTIST_DIV = (By.ID, 'artistDiv')
     AUDIO = (By.ID, 'audio')
+    COVER_IMAGE = (By.ID, 'coverImage')
     FIRST_PLAYED_SELECT = (By.ID, 'firstPlayedSelect')
     FIRST_TRACK_CHECKBOX = (By.ID, 'firstTrackCheckbox')
     INSERT_BUTTON = (By.ID, 'insertButton')
@@ -46,14 +50,18 @@ class Page(object):
     PLAY_PAUSE_BUTTON = (By.ID, 'playPauseButton')
     PLAYLIST_TABLE = (By.ID, 'playlistTable')
     PREV_BUTTON = (By.ID, 'prevButton')
+    RATING_OVERLAY_DIV = (By.ID, 'ratingOverlayDiv')
+    RATING_SPAN = (By.ID, 'ratingSpan')
     REPLACE_BUTTON = (By.ID, 'replaceButton')
     RESET_BUTTON = (By.ID, 'resetButton')
     SEARCH_BUTTON = (By.ID, 'searchButton')
     SEARCH_RESULTS_CHECKBOX = (By.ID, 'searchResultsCheckbox')
     SEARCH_RESULTS_TABLE = (By.ID, 'searchResultsTable')
+    TAG_TEXTAREA = (By.ID, 'tagTextarea')
     TIME_DIV = (By.ID, 'timeDiv')
     TITLE_DIV = (By.ID, 'titleDiv')
     UNRATED_CHECKBOX = (By.ID, 'unratedCheckbox')
+    UPDATE_CLOSE_IMAGE = (By.ID, 'updateCloseImage')
 
     # Values for FIRST_PLAYED_SELECT and LAST_PLAYED_SELECT.
     UNSET_TIME = '...'
@@ -65,7 +73,7 @@ class Page(object):
     ONE_YEAR = 'one year'
     THREE_YEARS = 'three years'
 
-    # Values for MIN_RATING_SELECT.
+    # Values for MIN_RATING_SELECT and RATING_OVERLAY_DIV.
     ONE_STAR = u'★';
     TWO_STARS = u'★★';
     THREE_STARS = u'★★★';
@@ -111,19 +119,24 @@ class Page(object):
     def get_current_song(self):
         '''Gets information about the currently-playing song.
 
-           Returns a 4-tuple containing:
+           Returns a tuple containing:
                Song being displayed
-               <audio> src (string)
-               <audio> paused state (bool)
+               string <audio> src
+               bool <audio> paused state
                string displaying playback time (e.g. "[0:05 / 3:23]")
+               string from rating overlay (e.g. THREE_STARS)
+               string cover image title/tooltip text
         '''
         audio = self.get(Page.AUDIO)
         song = Song(self.get(Page.ARTIST_DIV).text,
                     self.get(Page.TITLE_DIV).text,
                     self.get(Page.ALBUM_DIV).text)
-        return (song, audio.get_attribute('src'),
+        return (song,
+                audio.get_attribute('src'),
                 audio.get_attribute('paused') is not None,
-                self.get(Page.TIME_DIV).text)
+                self.get(Page.TIME_DIV).text,
+                self.get(Page.RATING_OVERLAY_DIV).text,
+                self.get(Page.COVER_IMAGE).get_attribute('title'))
 
     def get(self, locator):
         utils.wait(lambda: self.driver.find_element(*locator))
@@ -145,3 +158,7 @@ class Page(object):
             find_elements_by_tag_name('tr')[row_index + 1].\
             find_elements_by_tag_name('td')[0].\
             find_elements_by_tag_name('input')[0].click()
+
+    def click_rating(self, num_stars):
+        stars = self.get(self.RATING_SPAN).find_elements_by_tag_name('a')
+        stars[num_stars-1].click()
