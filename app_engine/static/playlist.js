@@ -75,6 +75,7 @@ function Playlist(player) {
 Playlist.prototype.resetForTesting = function() {
   this.resetSearchForm(null, null, true);
   this.playlistTable.updateSongs([]);
+  this.player.hideUpdateDiv(false /* saveChanges */);
   this.player.setSongs([]);
 };
 

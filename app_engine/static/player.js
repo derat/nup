@@ -85,8 +85,21 @@ function Player() {
   document.body.addEventListener('keydown', this.handleBodyKeyDown.bind(this), false);
   window.addEventListener('beforeunload', this.handleBeforeUnload.bind(this), false);
 
+  this.updateTagsFromServer(true /* async */);
+};
+
+// Number of seconds that a seek operation should traverse.
+Player.SEEK_SECONDS = 10;
+
+// Number of times to retry playback after consecutive errors.
+Player.MAX_RETRIES = 2;
+
+// Number of seconds that a notification is shown when the song changes.
+Player.NOTIFICATION_SECONDS = 5;
+
+Player.prototype.updateTagsFromServer = function(async) {
   var req = new XMLHttpRequest();
-  req.open('GET', 'list_tags', true);
+  req.open('GET', 'list_tags', async);
   req.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
   req.onreadystatechange = function() {
     if (req.readyState == 4) {
@@ -100,15 +113,6 @@ function Player() {
   }.bind(this);
   req.send(null);
 };
-
-// Number of seconds that a seek operation should traverse.
-Player.SEEK_SECONDS = 10;
-
-// Number of times to retry playback after consecutive errors.
-Player.MAX_RETRIES = 2;
-
-// Number of seconds that a notification is shown when the song changes.
-Player.NOTIFICATION_SECONDS = 5;
 
 Player.prototype.getCurrentSong = function() {
   return (this.currentIndex >= 0 && this.currentIndex < this.songs.length) ? this.songs[this.currentIndex] : null;

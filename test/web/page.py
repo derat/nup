@@ -40,6 +40,7 @@ class Page(object):
     ARTIST_DIV = (By.ID, 'artistDiv')
     AUDIO = (By.ID, 'audio')
     COVER_IMAGE = (By.ID, 'coverImage')
+    EDIT_TAGS_SUGGESTIONS_DIV = (By.ID, 'editTagsSuggestionsDiv')
     EDIT_TAGS_TEXTAREA = (By.ID, 'editTagsTextarea')
     FIRST_PLAYED_SELECT = (By.ID, 'firstPlayedSelect')
     FIRST_TRACK_CHECKBOX = (By.ID, 'firstTrackCheckbox')
@@ -86,6 +87,10 @@ class Page(object):
 
     def reset(self):
         self.driver.execute_script('document.playlist.resetForTesting()')
+
+    def refresh_tags(self):
+        self.driver.execute_script(
+            'document.player.updateTagsFromServer(false)');
 
     def get_songs_from_table(self, table):
         songs = []
@@ -162,3 +167,7 @@ class Page(object):
     def click_rating(self, num_stars):
         stars = self.get(self.RATING_SPAN).find_elements_by_tag_name('a')
         stars[num_stars-1].click()
+
+    def get_tag_suggestions(self, locator):
+        spans = self.get(locator).find_elements_by_tag_name('span')
+        return [s.text for s in spans]

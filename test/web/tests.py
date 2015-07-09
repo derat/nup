@@ -479,6 +479,7 @@ class Test(unittest.TestCase):
         server.import_songs([song])
 
         page = Page(driver)
+        page.refresh_tags()
         page.keywords = song.artist
         page.click(page.LUCKY_BUTTON)
         self.wait_for_song(page, song, rating=page.THREE_STARS,
@@ -502,7 +503,44 @@ class Test(unittest.TestCase):
         self.wait_for_song(page, song, rating=page.FOUR_STARS,
                            title=u'Rating: ★★★★☆\nTags: guitar metal rock')
 
-    # TODO: Add tag autocompletion tests.
+    def test_edit_tags_autocomplete(self):
+        song1 = Song('ar', 't1', 'al', tags=['a0', 'a1', 'b'])
+        song2 = Song('ar', 't2', 'al', tags=['c0', 'c1', 'd'])
+        server.import_songs([song1, song2])
+
+        page = Page(driver)
+        page.refresh_tags()
+        page.keywords = song1.title
+        page.click(page.LUCKY_BUTTON)
+        self.wait_for_song(page, song1)
+
+        page.click(page.COVER_IMAGE)
+        textarea = page.get(page.EDIT_TAGS_TEXTAREA)
+
+        def check_textarea(expected):
+            actual = textarea.get_attribute('value')
+            if actual != expected:
+                self.fail('Tag text was "%s"; expected "%s"' %
+                          (actual, expected))
+
+        def check_suggestions(expected):
+            actual = page.get_tag_suggestions(page.EDIT_TAGS_SUGGESTIONS_DIV)
+            if actual != expected:
+                self.fail('Tag suggestions were %s; expected %s' %
+                          (str(actual), str(expected)))
+
+        check_textarea('a0 a1 b')
+
+        TAB = u'\ue004'
+        textarea.send_keys('d' + TAB)
+        check_textarea('a0 a1 b d ')
+
+        textarea.send_keys('c' + TAB)
+        check_textarea('a0 a1 b d c')
+        check_suggestions(['c0', 'c1'])
+
+        textarea.send_keys('1' + TAB)
+        check_textarea('a0 a1 b d c1 ')
 
 if __name__ == '__main__':
     unittest.main()
