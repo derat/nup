@@ -494,13 +494,13 @@ class Test(unittest.TestCase):
         })
 
         page.click(page.COVER_IMAGE)
-        page.get(page.TAG_TEXTAREA).send_keys(' +metal')
+        page.get(page.EDIT_TAGS_TEXTAREA).send_keys(' +metal')
         page.click(page.UPDATE_CLOSE_IMAGE)
-        self.wait_for_song(page, song, rating=page.FOUR_STARS,
-                           title=u'Rating: ★★★★☆\nTags: guitar metal rock')
         self.wait_for_server_user_data({
             song.sha1: (0.75, ['guitar', 'metal', 'rock'], None),
         })
+        self.wait_for_song(page, song, rating=page.FOUR_STARS,
+                           title=u'Rating: ★★★★☆\nTags: guitar metal rock')
 
     # TODO: Add tag autocompletion tests.
 

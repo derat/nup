@@ -65,7 +65,7 @@ function Player() {
   this.ratingSpan = $('ratingSpan');
   this.dumpSongLink = $('dumpSongLink');
   this.dumpSongCacheLink = $('dumpSongCacheLink');
-  this.tagTextarea = $('tagTextarea');
+  this.tagsTextarea = $('editTagsTextarea');
 
   this.audio.addEventListener('ended', this.onEnded.bind(this), false);
   this.audio.addEventListener('pause', this.onPause.bind(this), false);
@@ -80,7 +80,7 @@ function Player() {
   this.updateCloseImage.addEventListener('click', this.hideUpdateDiv.bind(this, true), false);
   this.ratingSpan.addEventListener('keydown', this.handleRatingSpanKeyDown.bind(this), false);
 
-  this.tagSuggester = new Suggester(this.tagTextarea, $('tagSuggestionsDiv'), [], false);
+  this.tagSuggester = new Suggester(this.tagsTextarea, $('editTagsSuggestionsDiv'), [], false);
 
   document.body.addEventListener('keydown', this.handleBodyKeyDown.bind(this), false);
   window.addEventListener('beforeunload', this.handleBeforeUnload.bind(this), false);
@@ -413,7 +413,7 @@ Player.prototype.showUpdateDiv = function() {
   this.setRating(song.rating);
   this.dumpSongLink.href = this.getDumpSongUrl(song, false);
   this.dumpSongCacheLink.href = this.getDumpSongUrl(song, true);
-  this.tagTextarea.value = song.tags.sort().join(' ');
+  this.tagsTextarea.value = song.tags.sort().join(' ');
   this.updateDiv.style.display = 'block';
   this.updateSong = song;
   return true;
@@ -422,7 +422,7 @@ Player.prototype.showUpdateDiv = function() {
 Player.prototype.hideUpdateDiv = function(saveChanges) {
   this.updateDiv.style.display = 'none';
   this.ratingSpan.blur();
-  this.tagTextarea.blur();
+  this.tagsTextarea.blur();
 
   var song = this.updateSong;
   this.updateSong = null;
@@ -432,7 +432,7 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
 
   var ratingChanged = this.updatedRating != song.rating;
 
-  var newRawTags = this.tagTextarea.value.trim().split(/\s+/);
+  var newRawTags = this.tagsTextarea.value.trim().split(/\s+/);
   var newTags = [];
   var createdTags = [];
   for (var i = 0; i < newRawTags.length; ++i) {
@@ -521,7 +521,7 @@ Player.prototype.processAccelerator = function(e) {
     return true;
   } else if (e.altKey && e.keyCode == KeyCodes.T) {
     if (this.showUpdateDiv())
-      this.tagTextarea.focus();
+      this.tagsTextarea.focus();
     return true;
   } else if (e.keyCode == KeyCodes.SPACE && !this.updateSong) {
     this.togglePause();

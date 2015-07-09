@@ -102,7 +102,7 @@ a.debugLink {
   margin-left: 40px;
 }
 
-#tagTextarea {
+#editTagsTextarea {
   border: solid 1px #ccc;
   width: 210px;
   height: 35px;
@@ -112,7 +112,7 @@ a.debugLink {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-#tagSuggestionsDiv {
+#editTagsSuggestionsDiv {
   position: absolute;
   left: 4px;
   bottom: 52px;
