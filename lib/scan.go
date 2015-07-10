@@ -1,4 +1,4 @@
-package main
+package lib
 
 import (
 	"bytes"
@@ -139,10 +139,10 @@ func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLeng
 	return (fi.Size() - headerLength - footerLength) / kbitRate * 8, nil
 }
 
-func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan SongOrErr) {
+func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan nup.SongOrErr) {
 	s := &nup.Song{Filename: relPath}
 	var err error
-	defer func() { updateChan <- SongOrErr{s, err} }()
+	defer func() { updateChan <- nup.SongOrErr{s, err} }()
 
 	f, err := os.Open(path)
 	if err != nil {
@@ -185,17 +185,17 @@ func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan SongO
 	s.Length = float64(lengthMs) / 1000
 }
 
-func getSongByPath(musicDir, relPath string, updateChan chan SongOrErr) {
+func GetSongByPath(musicDir, relPath string, updateChan chan nup.SongOrErr) {
 	p := filepath.Join(musicDir, relPath)
 	fi, err := os.Stat(p)
 	if err != nil {
-		updateChan <- SongOrErr{nil, err}
+		updateChan <- nup.SongOrErr{nil, err}
 		return
 	}
 	readFileDetails(p, relPath, fi, updateChan)
 }
 
-func scanForUpdatedSongs(musicDir, forceGlob string, lastUpdateTime time.Time, updateChan chan SongOrErr, logProgress bool) (numUpdates int, err error) {
+func ScanForUpdatedSongs(musicDir, forceGlob string, lastUpdateTime time.Time, updateChan chan nup.SongOrErr, logProgress bool) (numUpdates int, err error) {
 	numMp3s := 0
 	err = filepath.Walk(musicDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {

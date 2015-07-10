@@ -9,12 +9,12 @@ import (
 )
 
 func testLegacyQuery(expected []nup.Song, minId int64) error {
-	ch := make(chan SongOrErr)
+	ch := make(chan nup.SongOrErr)
 	num, err := getSongsFromLegacyDb(filepath.Join(test.GetDataDir(), "legacy.db"), minId, ch)
 	if err != nil {
 		return err
 	}
-	actual, err := getSongsFromChannel(ch, num)
+	actual, err := test.GetSongsFromChannel(ch, num)
 	if err != nil {
 		return err
 	}

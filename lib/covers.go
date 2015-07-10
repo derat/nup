@@ -1,4 +1,4 @@
-package main
+package lib
 
 import (
 	"io/ioutil"
@@ -6,20 +6,20 @@ import (
 	"strings"
 )
 
-type coverFinder struct {
+type CoverFinder struct {
 	// Artist-Album -> filename
 	artistAlbumMap map[string]string
 	// Album -> Artist
 	albumMap map[string][]string
 }
 
-func newCoverFinder(coverDir string) (*coverFinder, error) {
+func NewCoverFinder(coverDir string) (*CoverFinder, error) {
 	entries, err := ioutil.ReadDir(coverDir)
 	if err != nil {
 		return nil, err
 	}
 
-	cf := &coverFinder{
+	cf := &CoverFinder{
 		artistAlbumMap: make(map[string]string),
 		albumMap:       make(map[string][]string),
 	}
@@ -51,7 +51,7 @@ func newCoverFinder(coverDir string) (*coverFinder, error) {
 	return cf, nil
 }
 
-func (cf *coverFinder) findPath(artist, album string) string {
+func (cf *CoverFinder) FindPath(artist, album string) string {
 	escape := func(s string) string {
 		s = strings.Replace(s, "/", "%", -1)
 		return s

@@ -78,6 +78,11 @@ type Song struct {
 	LastModifiedTime time.Time `json:"-"`
 }
 
+type SongOrErr struct {
+	*Song
+	Err error
+}
+
 // PlayDump is used when dumping data.
 type PlayDump struct {
 	// Song entity's key ID from Datastore.

@@ -1,4 +1,4 @@
-package main
+package lib
 
 import (
 	"io/ioutil"
@@ -12,13 +12,13 @@ import (
 )
 
 func scanAndCompareSongs(t *testing.T, desc, dir, forceGlob string, lastUpdateTime time.Time, expected []nup.Song) {
-	ch := make(chan SongOrErr)
-	num, err := scanForUpdatedSongs(dir, forceGlob, lastUpdateTime, ch, false)
+	ch := make(chan nup.SongOrErr)
+	num, err := ScanForUpdatedSongs(dir, forceGlob, lastUpdateTime, ch, false)
 	if err != nil {
 		t.Errorf("%v: %v", desc, err)
 		return
 	}
-	actual, err := getSongsFromChannel(ch, num)
+	actual, err := test.GetSongsFromChannel(ch, num)
 	if err != nil {
 		t.Errorf("%v: %v", desc, err)
 		return

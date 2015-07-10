@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"erat.org/nup"
+	"erat.org/nup/lib"
 )
 
 const (
@@ -493,14 +494,14 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		if !parseFloatParam(c, w, r, "minFirstPlayed", &s) {
 			return
 		}
-		q.MinFirstStartTime = nup.SecondsToTime(s)
+		q.MinFirstStartTime = lib.SecondsToTime(s)
 	}
 	if len(r.FormValue("maxLastPlayed")) > 0 {
 		var s float64
 		if !parseFloatParam(c, w, r, "maxLastPlayed", &s) {
 			return
 		}
-		q.MaxLastStartTime = nup.SecondsToTime(s)
+		q.MaxLastStartTime = lib.SecondsToTime(s)
 	}
 
 	q.Tags = make([]string, 0)
@@ -580,7 +581,7 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 	if !parseIntParam(c, w, r, "songId", &id) || !parseFloatParam(c, w, r, "startTime", &startTimeFloat) {
 		return
 	}
-	startTime := nup.SecondsToTime(startTimeFloat)
+	startTime := lib.SecondsToTime(startTimeFloat)
 
 	if err := addPlay(c, id, startTime, r.RemoteAddr); err != nil {
 		c.Errorf("Got error while recording play: %v", err)

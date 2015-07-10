@@ -17,12 +17,12 @@ func TestJson(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	songs := []nup.Song{test.LegacySong1, test.LegacySong2}
-	ch := make(chan SongOrErr)
+	ch := make(chan nup.SongOrErr)
 	num, err := getSongsFromJsonFile(test.WriteSongsToJsonFile(dir, songs), ch)
 	if err != nil {
 		t.Error(err)
 	}
-	actual, err := getSongsFromChannel(ch, num)
+	actual, err := test.GetSongsFromChannel(ch, num)
 	if err != nil {
 		t.Error(err)
 	}

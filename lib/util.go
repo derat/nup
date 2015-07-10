@@ -1,4 +1,4 @@
-package nup
+package lib
 
 import (
 	"fmt"

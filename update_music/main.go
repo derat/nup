@@ -11,12 +11,8 @@ import (
 
 	"erat.org/cloud"
 	"erat.org/nup"
+	"erat.org/nup/lib"
 )
-
-type SongOrErr struct {
-	*nup.Song
-	Err error
-}
 
 type Config struct {
 	nup.ClientConfig
@@ -76,13 +72,13 @@ func main() {
 	}
 
 	log.Printf("Loading covers from %v", cfg.CoverDir)
-	cf, err := newCoverFinder(cfg.CoverDir)
+	cf, err := lib.NewCoverFinder(cfg.CoverDir)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	numSongs := 0
-	readChan := make(chan SongOrErr)
+	readChan := make(chan nup.SongOrErr)
 	startTime := time.Now()
 	replaceUserData := false
 	didFullScan := false
@@ -113,7 +109,7 @@ func main() {
 
 			scanner := bufio.NewScanner(f)
 			for scanner.Scan() {
-				go func(relPath string) { getSongByPath(cfg.MusicDir, relPath, readChan) }(scanner.Text())
+				go func(relPath string) { lib.GetSongByPath(cfg.MusicDir, relPath, readChan) }(scanner.Text())
 				numSongs++
 			}
 		} else {
@@ -122,7 +118,7 @@ func main() {
 				log.Fatalf("Unable to get last update time: ", err)
 			}
 			log.Printf("Scanning for songs in %v updated since %v", cfg.MusicDir, lastUpdateTime.Local())
-			if numSongs, err = scanForUpdatedSongs(cfg.MusicDir, *forceGlob, lastUpdateTime, readChan, true); err != nil {
+			if numSongs, err = lib.ScanForUpdatedSongs(cfg.MusicDir, *forceGlob, lastUpdateTime, readChan, true); err != nil {
 				log.Fatal(err)
 			}
 			didFullScan = true
@@ -143,7 +139,7 @@ func main() {
 			if s.Err != nil {
 				log.Fatalf("Got error for %v: %v\n", s.Filename, s.Err)
 			}
-			s.CoverFilename = cf.findPath(s.Artist, s.Album)
+			s.CoverFilename = cf.FindPath(s.Artist, s.Album)
 			if *requireCovers && len(s.CoverFilename) == 0 {
 				log.Fatalf("Failed to find cover for %v (%v-%v)", s.Filename, s.Artist, s.Album)
 			}

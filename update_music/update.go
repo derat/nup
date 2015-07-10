@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"erat.org/nup"
+	"erat.org/nup/lib"
 )
 
 const (
@@ -23,7 +24,7 @@ const (
 )
 
 func updateSongs(cfg Config, ch chan nup.Song, numSongs int, replaceUserData bool) error {
-	u, err := nup.GetServerUrl(cfg.ServerUrl, importPath)
+	u, err := lib.GetServerUrl(cfg.ServerUrl, importPath)
 	if err != nil {
 		return err
 	}
@@ -79,7 +80,7 @@ func updateSongs(cfg Config, ch chan nup.Song, numSongs int, replaceUserData boo
 }
 
 func deleteSong(cfg Config, songId int64) error {
-	u, err := nup.GetServerUrl(cfg.ServerUrl, deletePath)
+	u, err := lib.GetServerUrl(cfg.ServerUrl, deletePath)
 	if err != nil {
 		return err
 	}
