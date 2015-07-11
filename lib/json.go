@@ -1,4 +1,4 @@
-package main
+package lib
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	"erat.org/nup"
 )
 
-func getSongsFromJsonFile(path string, updateChan chan nup.SongOrErr) (numUpdates int, err error) {
+func GetSongsFromJsonFile(path string, updateChan chan nup.SongOrErr) (numUpdates int, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, err

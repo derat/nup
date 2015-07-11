@@ -72,8 +72,9 @@ func main() {
 	}
 
 	log.Printf("Loading covers from %v", cfg.CoverDir)
-	cf, err := lib.NewCoverFinder(cfg.CoverDir)
-	if err != nil {
+	var err error
+	cf := lib.NewCoverFinder()
+	if err = cf.AddDir(cfg.CoverDir); err != nil {
 		log.Fatal(err)
 	}
 
@@ -91,7 +92,7 @@ func main() {
 		replaceUserData = *importUserData
 	} else if len(*importJsonFile) > 0 {
 		log.Printf("Reading songs from %v", *importJsonFile)
-		if numSongs, err = getSongsFromJsonFile(*importJsonFile, readChan); err != nil {
+		if numSongs, err = lib.GetSongsFromJsonFile(*importJsonFile, readChan); err != nil {
 			log.Fatal(err)
 		}
 		replaceUserData = *importUserData
@@ -139,7 +140,7 @@ func main() {
 			if s.Err != nil {
 				log.Fatalf("Got error for %v: %v\n", s.Filename, s.Err)
 			}
-			s.CoverFilename = cf.FindPath(s.Artist, s.Album)
+			s.CoverFilename = cf.FindFilename(s.Artist, s.Album)
 			if *requireCovers && len(s.CoverFilename) == 0 {
 				log.Fatalf("Failed to find cover for %v (%v-%v)", s.Filename, s.Artist, s.Album)
 			}

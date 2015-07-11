@@ -13,25 +13,25 @@ type CoverFinder struct {
 	albumMap map[string][]string
 }
 
-func NewCoverFinder(coverDir string) (*CoverFinder, error) {
-	entries, err := ioutil.ReadDir(coverDir)
-	if err != nil {
-		return nil, err
-	}
-
-	cf := &CoverFinder{
+func NewCoverFinder() *CoverFinder {
+	return &CoverFinder{
 		artistAlbumMap: make(map[string]string),
 		albumMap:       make(map[string][]string),
 	}
-	for _, fi := range entries {
-		fn := fi.Name()
+}
 
-		ext := filepath.Ext(fn)
+func (cf *CoverFinder) AddDir(dir string) error {
+	entries, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, fi := range entries {
+		ext := filepath.Ext(fi.Name())
 		if ext != ".jpg" && ext != ".png" && ext != ".gif" {
 			continue
 		}
 
-		base := fn[0 : len(fn)-len(ext)]
+		base := fi.Name()[0 : len(fi.Name())-len(ext)]
 		parts := strings.Split(base, "-")
 		if len(parts) < 2 {
 			continue
@@ -39,7 +39,7 @@ func NewCoverFinder(coverDir string) (*CoverFinder, error) {
 
 		// Artist or album names may contain hyphens, so we'll just consider everything
 		// following a hyphen to be a potential album.
-		cf.artistAlbumMap[base] = fn
+		cf.artistAlbumMap[base] = fi.Name()
 		for i := 1; i < len(parts); i++ {
 			artist := strings.Join(parts[:i], "-")
 			album := strings.Join(parts[i:], "-")
@@ -48,10 +48,10 @@ func NewCoverFinder(coverDir string) (*CoverFinder, error) {
 			}
 		}
 	}
-	return cf, nil
+	return nil
 }
 
-func (cf *CoverFinder) FindPath(artist, album string) string {
+func (cf *CoverFinder) FindFilename(artist, album string) string {
 	escape := func(s string) string {
 		s = strings.Replace(s, "/", "%", -1)
 		return s

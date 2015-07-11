@@ -8,15 +8,15 @@ import (
 )
 
 func TestCoversBogusDir(t *testing.T) {
-	cf, err := NewCoverFinder("bogus")
-	if cf != nil || err == nil {
+	cf := NewCoverFinder()
+	if err := cf.AddDir("bogus"); err == nil {
 		t.Errorf("creation with bogus cover dir didn't fail")
 	}
 }
 
-func TestCoversFindPath(t *testing.T) {
-	cf, err := NewCoverFinder(filepath.Join(test.GetDataDir(), "covers"))
-	if err != nil {
+func TestCoversFindFilename(t *testing.T) {
+	cf := NewCoverFinder()
+	if err := cf.AddDir(filepath.Join(test.GetDataDir(), "covers")); err != nil {
 		t.Fatalf("creation failed")
 	}
 
@@ -42,7 +42,7 @@ func TestCoversFindPath(t *testing.T) {
 		{"Pearl Jam", "", ""},               // Artist matches but album doesn't.
 		{"", "", ""},                        // Missing artist/album.
 	} {
-		actual := cf.FindPath(tc.artist, tc.album)
+		actual := cf.FindFilename(tc.artist, tc.album)
 		if actual != tc.expected {
 			t.Errorf("%q, %q: expected %q but got %q", tc.artist, tc.album, tc.expected, actual)
 		}
