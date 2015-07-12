@@ -8,6 +8,13 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"erat.org/nup/lib"
+)
+
+const (
+	artistNameThreshold = 0.5
+	variousArtists      = "Various Artists"
 )
 
 // chooseArtistName returns the "best" artist name for an album, given a map
@@ -48,7 +55,7 @@ func downloadCover(info *albumInfo, dir string) (path string, err error) {
 	defer resp.Body.Close()
 
 	artist := chooseArtistName(info.ArtistCount)
-	path = filepath.Join(dir, fmt.Sprintf("%s-%s.jpg", artist, info.AlbumName))
+	path = filepath.Join(dir, lib.EscapeCoverString(fmt.Sprintf("%s-%s.jpg", artist, info.AlbumName)))
 	f, err := os.Create(path)
 	if err != nil {
 		return "", err

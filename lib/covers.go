@@ -52,12 +52,8 @@ func (cf *CoverFinder) AddDir(dir string) error {
 }
 
 func (cf *CoverFinder) FindFilename(artist, album string) string {
-	escape := func(s string) string {
-		s = strings.Replace(s, "/", "%", -1)
-		return s
-	}
-	artist = escape(artist)
-	album = escape(album)
+	artist = EscapeCoverString(artist)
+	album = EscapeCoverString(album)
 
 	if fn, ok := cf.artistAlbumMap[artist+"-"+album]; ok {
 		return fn

@@ -28,6 +28,11 @@ func GetServerUrl(baseUrl, path string) (*url.URL, error) {
 	return u, nil
 }
 
+// Escapes a string that will be used as part of a cover filename.
+func EscapeCoverString(s string) string {
+	return strings.Replace(s, "/", "%", -1)
+}
+
 // EncodePathForCloudStorage converts the passed-in original Unix filename to the appropriate path for accessing the file via Cloud Storage.
 // This includes:
 // - the initial escaping performed by the cloud_sync program (a subset of query escaping),

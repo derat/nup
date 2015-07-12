@@ -8,12 +8,6 @@ import (
 	"erat.org/nup/lib"
 )
 
-const (
-	logInterval         = 100
-	artistNameThreshold = 0.5
-	variousArtists      = "Various Artists"
-)
-
 type config struct {
 	OldCoverDir  string
 	NewCoverDir  string
@@ -28,7 +22,7 @@ type albumInfo struct {
 	AlbumId     string
 	AlbumName   string
 	ArtistCount map[string]int
-	OldFilename string
+	OldPath     string
 	OldSize     imageSize
 }
 

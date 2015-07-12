@@ -9,9 +9,14 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"erat.org/nup"
 	"erat.org/nup/lib"
+)
+
+const (
+	logInterval = 100
 )
 
 func getImageSize(path string) (imageSize, error) {
@@ -32,10 +37,6 @@ func getImageSize(path string) (imageSize, error) {
 func scanSongsForNeededCovers(cfg *config, cf *lib.CoverFinder, ch chan nup.SongOrErr, numSongs int) ([]*albumInfo, error) {
 	albums := make(map[string]*albumInfo)
 
-	// Sizes of existing cover images, keyed by cover basename. If the same file
-	// exists in both the old and new dir, the latter takes precedence.
-	sizes := make(map[string]imageSize)
-
 	for i := 0; i < numSongs; i++ {
 		s := <-ch
 		if s.Err != nil {
@@ -51,15 +52,13 @@ func scanSongsForNeededCovers(cfg *config, cf *lib.CoverFinder, ch chan nup.Song
 			continue
 		}
 
-		needCover := false
-		var size imageSize
-		fn := cf.FindFilename(s.Artist, s.Album)
-		if len(fn) == 0 {
-			needCover = true
-		} else {
-			var ok bool
-			if size, ok = sizes[fn]; !ok {
-				path := ""
+		ok := false
+		var info *albumInfo
+		if info, ok = albums[s.AlbumId]; !ok {
+			path := ""
+			size := imageSize{}
+
+			if fn := cf.FindFilename(s.Artist, s.Album); len(fn) > 0 {
 				if _, err := os.Stat(filepath.Join(cfg.NewCoverDir, fn)); err == nil {
 					path = filepath.Join(cfg.NewCoverDir, fn)
 				} else {
@@ -71,31 +70,22 @@ func scanSongsForNeededCovers(cfg *config, cf *lib.CoverFinder, ch chan nup.Song
 				if err != nil {
 					return nil, fmt.Errorf("Unable to get dimensions of %v: %v", path, err)
 				}
-				sizes[fn] = size
 			}
-			// TODO: Should only do this if the image came from the old, rather
-			// than new, directory.
-			if size.Width < cfg.MinDimension || size.Height < cfg.MinDimension {
-				needCover = true
+
+			info = &albumInfo{
+				AlbumId:     s.AlbumId,
+				AlbumName:   s.Album,
+				ArtistCount: make(map[string]int),
+				OldPath:     path,
+				OldSize:     size,
 			}
+			albums[s.AlbumId] = info
 		}
 
-		if needCover {
-			if _, ok := albums[s.AlbumId]; !ok {
-				albums[s.AlbumId] = &albumInfo{
-					AlbumId:     s.AlbumId,
-					AlbumName:   s.Album,
-					ArtistCount: make(map[string]int),
-					OldFilename: fn,
-					OldSize:     size,
-				}
-			}
-			oldName := albums[s.AlbumId].AlbumName
-			if oldName != s.Album {
-				return nil, fmt.Errorf("Album name mismatch for %v: had %q but saw %q for %v", s.AlbumId, oldName, s.Album, s.Filename)
-			}
-			albums[s.AlbumId].ArtistCount[s.Artist]++
+		if info.AlbumName != s.Album {
+			return nil, fmt.Errorf("Album name mismatch for %v: had %q but saw %q for %v", s.AlbumId, info.AlbumName, s.Album, s.Filename)
 		}
+		info.ArtistCount[s.Artist]++
 	}
 	if numSongs%logInterval != 0 {
 		log.Printf("Scanned %v songs", numSongs)
@@ -103,7 +93,10 @@ func scanSongsForNeededCovers(cfg *config, cf *lib.CoverFinder, ch chan nup.Song
 
 	ret := make([]*albumInfo, 0, len(albums))
 	for _, info := range albums {
-		ret = append(ret, info)
+		alreadyDownloaded := strings.HasPrefix(info.OldPath, cfg.NewCoverDir)
+		if len(info.OldPath) == 0 || ((info.OldSize.Width < cfg.MinDimension || info.OldSize.Height < cfg.MinDimension) && !alreadyDownloaded) {
+			ret = append(ret, info)
+		}
 	}
 	return ret, nil
 }
