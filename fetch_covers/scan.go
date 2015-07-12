@@ -29,8 +29,8 @@ func getImageSize(path string) (imageSize, error) {
 	return imageSize{img.Bounds().Max.X - img.Bounds().Min.X, img.Bounds().Max.Y - img.Bounds().Min.Y}, nil
 }
 
-func scanSongsForNeededCovers(cfg *config, cf *lib.CoverFinder, ch chan nup.SongOrErr, numSongs int) ([]albumInfo, error) {
-	albums := make(map[string]albumInfo)
+func scanSongsForNeededCovers(cfg *config, cf *lib.CoverFinder, ch chan nup.SongOrErr, numSongs int) ([]*albumInfo, error) {
+	albums := make(map[string]*albumInfo)
 
 	// Sizes of existing cover images, keyed by cover basename. If the same file
 	// exists in both the old and new dir, the latter takes precedence.
@@ -73,6 +73,8 @@ func scanSongsForNeededCovers(cfg *config, cf *lib.CoverFinder, ch chan nup.Song
 				}
 				sizes[fn] = size
 			}
+			// TODO: Should only do this if the image came from the old, rather
+			// than new, directory.
 			if size.Width < cfg.MinDimension || size.Height < cfg.MinDimension {
 				needCover = true
 			}
@@ -80,7 +82,7 @@ func scanSongsForNeededCovers(cfg *config, cf *lib.CoverFinder, ch chan nup.Song
 
 		if needCover {
 			if _, ok := albums[s.AlbumId]; !ok {
-				albums[s.AlbumId] = albumInfo{
+				albums[s.AlbumId] = &albumInfo{
 					AlbumId:     s.AlbumId,
 					AlbumName:   s.Album,
 					ArtistCount: make(map[string]int),
@@ -99,7 +101,7 @@ func scanSongsForNeededCovers(cfg *config, cf *lib.CoverFinder, ch chan nup.Song
 		log.Printf("Scanned %v songs", numSongs)
 	}
 
-	ret := make([]albumInfo, 0, len(albums))
+	ret := make([]*albumInfo, 0, len(albums))
 	for _, info := range albums {
 		ret = append(ret, info)
 	}

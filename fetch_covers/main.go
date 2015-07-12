@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"log"
-	"math"
 
 	"erat.org/nup"
 	"erat.org/nup/lib"
@@ -39,6 +38,7 @@ func main() {
 	newCoverDir := flag.String("new-cover-dir", "", "Path to directory where cover images should be written")
 	minDimension := flag.Int("min-dimension", 400, "Minimum image width or height")
 	maxSongs := flag.Int("max-songs", -1, "Maximum number of songs to inspect")
+	maxRequests := flag.Int("max-requests", 2, "Maximum number of parallel HTTP requests")
 	flag.Parse()
 
 	if len(*dumpFile) == 0 {
@@ -75,11 +75,15 @@ func main() {
 	}
 	log.Printf("Read %v song(s)", numSongs)
 
-	albums, err := scanSongsForNeededCovers(&cfg, cf, ch, int(math.Min(float64(numSongs), float64(*maxSongs))))
+	if *maxSongs >= 0 && *maxSongs < numSongs {
+		numSongs = *maxSongs
+	}
+
+	albums, err := scanSongsForNeededCovers(&cfg, cf, ch, numSongs)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("Need to fetch %v cover(s)", len(albums))
 
-	downloadCovers(albums, *newCoverDir)
+	downloadCovers(albums, *newCoverDir, *maxRequests, true)
 }

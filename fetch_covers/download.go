@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 // chooseArtistName returns the "best" artist name for an album, given a map
@@ -28,6 +29,9 @@ func chooseArtistName(artistCount map[string]int) string {
 	return variousArtists
 }
 
+// downloadCover downloads cover art for info into dir.
+// It returns the image file's path if successful, an empty path if the cover
+// was not found, or an error for a probably-transient error.
 func downloadCover(info *albumInfo, dir string) (path string, err error) {
 	url := fmt.Sprintf("https://coverartarchive.org/release/%s/front-500", info.AlbumId)
 	resp, err := http.Get(url)
@@ -63,23 +67,47 @@ type downloadResult struct {
 	Err       error
 }
 
-func downloadCovers(albums []albumInfo, dir string) {
+func downloadCovers(albums []*albumInfo, dir string, maxReq int, retryFailures bool) {
+	numReq := 0
+	canStartReq := func() bool { return numReq < maxReq }
+	cond := sync.NewCond(&sync.Mutex{})
 	ch := make(chan (downloadResult))
-	for i := range albums {
-		go func(info *albumInfo) {
-			path, err := downloadCover(info, dir)
-			ch <- downloadResult{info, path, err}
-		}(&(albums[i]))
-	}
+	go func() {
+		for i := range albums {
+			cond.L.Lock()
+			for !canStartReq() {
+				cond.Wait()
+			}
+			numReq++
+			cond.L.Unlock()
 
+			go func(info *albumInfo) {
+				path, err := downloadCover(info, dir)
+				ch <- downloadResult{info, path, err}
+				cond.L.Lock()
+				numReq--
+				cond.Signal()
+				cond.L.Unlock()
+			}(albums[i])
+		}
+	}()
+
+	retryableAlbums := make([]*albumInfo, 0)
 	for i := 0; i < len(albums); i++ {
 		res := <-ch
 		if res.Err != nil {
 			log.Printf("Failed to get %v (%v): %v", res.AlbumInfo.AlbumId, res.AlbumInfo.AlbumName, res.Err)
+			retryableAlbums = append(retryableAlbums, res.AlbumInfo)
 		} else if len(res.Path) == 0 {
 			log.Printf("Didn't find %v (%v)", res.AlbumInfo.AlbumId, res.AlbumInfo.AlbumName)
+			// TODO: Cache the negative result somewhere.
 		} else {
 			log.Printf("Wrote %v to %v", res.AlbumInfo.AlbumId, res.Path)
 		}
+	}
+
+	if len(retryableAlbums) > 0 && retryFailures {
+		log.Printf("Retrying %v album(s)", len(retryableAlbums))
+		downloadCovers(retryableAlbums, dir, 1, false)
 	}
 }
