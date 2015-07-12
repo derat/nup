@@ -14,7 +14,7 @@ import (
 
 const (
 	artistNameThreshold = 0.5
-	variousArtists      = "Various Artists"
+	variousArtists      = "Various"
 )
 
 // chooseArtistName returns the "best" artist name for an album, given a map
