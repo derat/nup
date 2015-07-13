@@ -17,70 +17,98 @@ const (
 	variousArtists      = "Various"
 )
 
-// chooseArtistName returns the "best" artist name for an album, given a map
-// from track artist names to counts.
-func chooseArtistName(artistCount map[string]int) string {
-	bestName := ""
+// chooseFilename returns the "best" filename for an album.
+func chooseFilename(info *albumInfo) string {
+	// If there was already an existing file, use its basename so that songs
+	// don't need to be updated.
+	if len(info.OldPath) > 0 {
+		return filepath.Base(info.OldPath)
+	}
+
+	// Find the most-commonly-occurring artist name.
+	bestArtist := ""
 	bestCount := 0
 	totalCount := 0
-	for name, count := range artistCount {
+	for name, count := range info.ArtistCount {
 		if count > bestCount {
-			bestName = name
+			bestArtist = name
 			bestCount = count
 		}
 		totalCount += count
 	}
-	if float32(bestCount)/float32(totalCount) >= artistNameThreshold {
-		return bestName
+	if float32(bestCount)/float32(totalCount) < artistNameThreshold {
+		bestArtist = variousArtists
 	}
-	return variousArtists
+	return lib.EscapeCoverString(fmt.Sprintf("%s-%s.jpg", bestArtist, info.AlbumName))
 }
 
 // downloadCover downloads cover art for info into dir.
 // It returns the image file's path if successful, an empty path if the cover
 // was not found, or an error for a probably-transient error.
-func downloadCover(info *albumInfo, dir string) (path string, err error) {
+func downloadCover(info *albumInfo, dir string) error {
 	url := fmt.Sprintf("https://coverartarchive.org/release/%s/front-500", info.AlbumId)
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("Fetching %v failed: %v", url, err)
+		return fmt.Errorf("Fetching %v failed: %v", url, err)
 	}
 	if resp.StatusCode != 200 {
 		resp.Body.Close()
 		if resp.StatusCode == 404 {
-			return "", nil
+			return nil
 		}
-		return "", fmt.Errorf("Got %v when fetching %v", resp.StatusCode, url)
+		return fmt.Errorf("Got %v when fetching %v", resp.StatusCode, url)
 	}
 	defer resp.Body.Close()
 
-	artist := chooseArtistName(info.ArtistCount)
-	path = filepath.Join(dir, lib.EscapeCoverString(fmt.Sprintf("%s-%s.jpg", artist, info.AlbumName)))
+	path := filepath.Join(dir, chooseFilename(info))
 	f, err := os.Create(path)
 	if err != nil {
-		return "", err
+		return err
 	}
-	defer f.Close()
 
 	if _, err = io.Copy(f, resp.Body); err != nil {
-		return "", fmt.Errorf("Failed to read from %v: %v", url, err)
+		f.Close()
+		return fmt.Errorf("Failed to read from %v: %v", url, err)
 	}
-	return path, nil
+	f.Close()
+
+	info.NewSize, err = getImageSize(path)
+	if err != nil {
+		return err
+	}
+	info.NewPath = path
+	return nil
+}
+
+func getAlbumsToDownload(albums []*albumInfo, minDimension int) []*albumInfo {
+	albumsToDownload := make([]*albumInfo, 0)
+	for _, info := range albums {
+		// If we've already downloaded it, downloading it again probably won't help.
+		if len(info.NewPath) != 0 {
+			continue
+		}
+
+		if len(info.OldPath) == 0 || info.OldSize.Width < minDimension || info.OldSize.Height < minDimension {
+			albumsToDownload = append(albumsToDownload, info)
+		}
+	}
+	return albumsToDownload
 }
 
 type downloadResult struct {
 	AlbumInfo *albumInfo
-	Path      string
 	Err       error
 }
 
-func downloadCovers(albums []*albumInfo, dir string, maxReq int, retryFailures bool) {
+func downloadCovers(cfg *config, albums []*albumInfo, retryFailures bool) {
+	albumsToDownload := getAlbumsToDownload(albums, cfg.MinDimension)
+
 	numReq := 0
-	canStartReq := func() bool { return numReq < maxReq }
+	canStartReq := func() bool { return numReq < cfg.MaxRequests }
 	cond := sync.NewCond(&sync.Mutex{})
-	ch := make(chan (downloadResult))
+	ch := make(chan downloadResult)
 	go func() {
-		for i := range albums {
+		for i := range albumsToDownload {
 			cond.L.Lock()
 			for !canStartReq() {
 				cond.Wait()
@@ -89,32 +117,33 @@ func downloadCovers(albums []*albumInfo, dir string, maxReq int, retryFailures b
 			cond.L.Unlock()
 
 			go func(info *albumInfo) {
-				path, err := downloadCover(info, dir)
-				ch <- downloadResult{info, path, err}
+				ch <- downloadResult{info, downloadCover(info, cfg.NewCoverDir)}
 				cond.L.Lock()
 				numReq--
 				cond.Signal()
 				cond.L.Unlock()
-			}(albums[i])
+			}(albumsToDownload[i])
 		}
 	}()
 
 	retryableAlbums := make([]*albumInfo, 0)
-	for i := 0; i < len(albums); i++ {
+	for i := 0; i < len(albumsToDownload); i++ {
 		res := <-ch
 		if res.Err != nil {
 			log.Printf("Failed to get %v (%v): %v", res.AlbumInfo.AlbumId, res.AlbumInfo.AlbumName, res.Err)
 			retryableAlbums = append(retryableAlbums, res.AlbumInfo)
-		} else if len(res.Path) == 0 {
+		} else if len(res.AlbumInfo.NewPath) == 0 {
 			log.Printf("Didn't find %v (%v)", res.AlbumInfo.AlbumId, res.AlbumInfo.AlbumName)
-			// TODO: Cache the negative result somewhere.
+			// Cache the negative result somewhere? Maybe not, since it seems
+			// like the archive sometimes returns transient 404s for covers it
+			// actualy has...
 		} else {
-			log.Printf("Wrote %v to %v", res.AlbumInfo.AlbumId, res.Path)
+			log.Printf("Wrote %v to %v", res.AlbumInfo.AlbumId, res.AlbumInfo.NewPath)
 		}
 	}
 
 	if len(retryableAlbums) > 0 && retryFailures {
 		log.Printf("Retrying %v album(s)", len(retryableAlbums))
-		downloadCovers(retryableAlbums, dir, 1, false)
+		downloadCovers(cfg, retryableAlbums, false)
 	}
 }

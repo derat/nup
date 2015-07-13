@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 
 	"erat.org/nup"
@@ -12,6 +13,7 @@ type config struct {
 	OldCoverDir  string
 	NewCoverDir  string
 	MinDimension int
+	MaxRequests  int
 }
 
 type imageSize struct {
@@ -19,11 +21,11 @@ type imageSize struct {
 }
 
 type albumInfo struct {
-	AlbumId     string
-	AlbumName   string
-	ArtistCount map[string]int
-	OldPath     string
-	OldSize     imageSize
+	AlbumId          string
+	AlbumName        string
+	ArtistCount      map[string]int
+	OldPath, NewPath string
+	OldSize, NewSize imageSize
 }
 
 func main() {
@@ -42,23 +44,11 @@ func main() {
 		log.Fatal("-new-cover-dir must be set")
 	}
 
-	cfg := config{
+	cfg := &config{
 		OldCoverDir:  *oldCoverDir,
 		NewCoverDir:  *newCoverDir,
 		MinDimension: *minDimension,
-	}
-
-	var err error
-	cf := lib.NewCoverFinder()
-	if len(*oldCoverDir) > 0 {
-		log.Printf("Loading old covers from %v", *oldCoverDir)
-		if err = cf.AddDir(*oldCoverDir); err != nil {
-			log.Fatal(err)
-		}
-	}
-	log.Printf("Loading new covers from %v", *newCoverDir)
-	if err = cf.AddDir(*newCoverDir); err != nil {
-		log.Fatal(err)
+		MaxRequests:  *maxRequests,
 	}
 
 	log.Printf("Reading songs from %v", *dumpFile)
@@ -72,12 +62,18 @@ func main() {
 	if *maxSongs >= 0 && *maxSongs < numSongs {
 		numSongs = *maxSongs
 	}
-
-	albums, err := scanSongsForNeededCovers(&cfg, cf, ch, numSongs)
+	albums, err := scanSongs(cfg, ch, numSongs)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("Need to fetch %v cover(s)", len(albums))
+	log.Printf("Got %v album(s)", len(albums))
 
-	downloadCovers(albums, *newCoverDir, *maxRequests, true)
+	downloadCovers(cfg, albums, true)
+	fmt.Println("The following old files can be moved away:")
+	fmt.Println("------------------------------------------")
+	for _, info := range albums {
+		if len(info.OldPath) > 0 && len(info.NewPath) > 0 {
+			fmt.Printf("%q\n", info.OldPath)
+		}
+	}
 }

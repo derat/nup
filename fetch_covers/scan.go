@@ -2,14 +2,8 @@ package main
 
 import (
 	"fmt"
-	"image"
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
 	"log"
-	"os"
 	"path/filepath"
-	"strings"
 
 	"erat.org/nup"
 	"erat.org/nup/lib"
@@ -19,22 +13,22 @@ const (
 	logInterval = 100
 )
 
-func getImageSize(path string) (imageSize, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return imageSize{}, err
-	}
-	defer f.Close()
-
-	img, _, err := image.Decode(f)
-	if err != nil {
-		return imageSize{}, err
+func scanSongs(cfg *config, ch chan nup.SongOrErr, numSongs int) ([]*albumInfo, error) {
+	var ocf *lib.CoverFinder
+	if len(cfg.OldCoverDir) > 0 {
+		log.Printf("Loading old covers from %v", cfg.OldCoverDir)
+		ocf = lib.NewCoverFinder()
+		if err := ocf.AddDir(cfg.OldCoverDir); err != nil {
+			return nil, err
+		}
 	}
 
-	return imageSize{img.Bounds().Max.X - img.Bounds().Min.X, img.Bounds().Max.Y - img.Bounds().Min.Y}, nil
-}
+	log.Printf("Loading new covers from %v", cfg.NewCoverDir)
+	ncf := lib.NewCoverFinder()
+	if err := ncf.AddDir(cfg.NewCoverDir); err != nil {
+		return nil, err
+	}
 
-func scanSongsForNeededCovers(cfg *config, cf *lib.CoverFinder, ch chan nup.SongOrErr, numSongs int) ([]*albumInfo, error) {
 	albums := make(map[string]*albumInfo)
 
 	for i := 0; i < numSongs; i++ {
@@ -52,33 +46,35 @@ func scanSongsForNeededCovers(cfg *config, cf *lib.CoverFinder, ch chan nup.Song
 			continue
 		}
 
-		ok := false
-		var info *albumInfo
-		if info, ok = albums[s.AlbumId]; !ok {
-			path := ""
-			size := imageSize{}
-
-			if fn := cf.FindFilename(s.Artist, s.Album); len(fn) > 0 {
-				if _, err := os.Stat(filepath.Join(cfg.NewCoverDir, fn)); err == nil {
-					path = filepath.Join(cfg.NewCoverDir, fn)
-				} else {
-					path = filepath.Join(cfg.OldCoverDir, fn)
-				}
-
-				var err error
-				size, err = getImageSize(path)
-				if err != nil {
-					return nil, fmt.Errorf("Unable to get dimensions of %v: %v", path, err)
-				}
-			}
-
+		info, ok := albums[s.AlbumId]
+		if !ok {
 			info = &albumInfo{
 				AlbumId:     s.AlbumId,
 				AlbumName:   s.Album,
 				ArtistCount: make(map[string]int),
-				OldPath:     path,
-				OldSize:     size,
 			}
+
+			if ocf != nil {
+				if fn := ocf.FindFilename(s.Artist, s.Album); len(fn) > 0 {
+					path := filepath.Join(cfg.OldCoverDir, fn)
+					size, err := getImageSize(path)
+					if err != nil {
+						return nil, fmt.Errorf("Unable to get dimensions of %v: %v", path, err)
+					}
+					info.OldPath = path
+					info.OldSize = size
+				}
+			}
+			if fn := ncf.FindFilename(s.Artist, s.Album); len(fn) > 0 {
+				path := filepath.Join(cfg.NewCoverDir, fn)
+				size, err := getImageSize(path)
+				if err != nil {
+					return nil, fmt.Errorf("Unable to get dimensions of %v: %v", path, err)
+				}
+				info.NewPath = path
+				info.NewSize = size
+			}
+
 			albums[s.AlbumId] = info
 		}
 
@@ -93,10 +89,7 @@ func scanSongsForNeededCovers(cfg *config, cf *lib.CoverFinder, ch chan nup.Song
 
 	ret := make([]*albumInfo, 0, len(albums))
 	for _, info := range albums {
-		alreadyDownloaded := strings.HasPrefix(info.OldPath, cfg.NewCoverDir)
-		if len(info.OldPath) == 0 || ((info.OldSize.Width < cfg.MinDimension || info.OldSize.Height < cfg.MinDimension) && !alreadyDownloaded) {
-			ret = append(ret, info)
-		}
+		ret = append(ret, info)
 	}
 	return ret, nil
 }
