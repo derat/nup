@@ -1,0 +1,8 @@
+#volumeRange {
+  vertical-align: middle;
+}
+
+#volumeSpan {
+  display: inline-block;
+  width: 3em;
+}

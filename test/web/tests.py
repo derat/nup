@@ -542,5 +542,30 @@ class Test(unittest.TestCase):
         textarea.send_keys('1' + TAB)
         check_textarea('a0 a1 b d c1 ')
 
+    def test_options(self):
+        page = Page(driver)
+        page.show_options()
+
+        def wait_for_volume(expected):
+            audio = page.get(page.AUDIO)
+            span = page.get(page.VOLUME_SPAN)
+            def is_expected():
+                return float(audio.get_attribute('volume')) == expected and \
+                       span.text == ('%d%%' % (expected * 100))
+            try:
+                utils.wait(is_expected, timeout_sec=3)
+            except utils.TimeoutError as e:
+                self.fail('Timed out waiting for volume.\nReceived ' +
+                          audio.get_attribute('volume') + ' / ' + span.text)
+
+        wait_for_volume(0.7)
+
+        ARROW_UP = u'\ue013'
+        volume_range = page.get(page.VOLUME_RANGE)
+        volume_range.send_keys(ARROW_UP)
+        wait_for_volume(0.8)
+
+        page.click(page.OPTIONS_OK_BUTTON)
+
 if __name__ == '__main__':
     unittest.main()

@@ -19,6 +19,16 @@ function updateTitleAttributeForTruncation(element, text) {
   element.title = (element.scrollWidth > element.offsetWidth) ? text : '';
 }
 
+function createElement(type, className, parentElement, text) {
+  var element = document.createElement(type);
+  if (className)
+    element.className = className;
+  parentElement.appendChild(element);
+  if (text != null)
+    element.appendChild(document.createTextNode(text));
+  return element;
+}
+
 function createClassNameRegExp(className) {
   return new RegExp('(^|\\s+)' + className + '($|\\s+)');
 }
@@ -46,6 +56,7 @@ var KeyCodes = {
 
   D:       68,
   N:       78,
+  O:       79,
   P:       80,
   R:       82,
   T:       84,

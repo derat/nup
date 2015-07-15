@@ -3,7 +3,7 @@
 
 function initPlayer() {
   document.player = new Player();
-};
+}
 
 function Player() {
   this.songs = [];
@@ -48,6 +48,9 @@ function Player() {
   // Timeout ID for calling closeNotification().
   this.closeNotificationTimeoutId = 0;
 
+  this.dialogManager = new DialogManager();
+  this.optionsDialog = null;
+
   this.audio = $('audio');
   this.favicon = $('favicon');
   this.coverImage = $('coverImage');
@@ -85,8 +88,12 @@ function Player() {
   document.body.addEventListener('keydown', this.handleBodyKeyDown.bind(this), false);
   window.addEventListener('beforeunload', this.handleBeforeUnload.bind(this), false);
 
+  this.config = document.config;
+  this.config.addListener(this);
+  this.onVolumeChange(this.config.getVolume());
+
   this.updateTagsFromServer(true /* async */);
-};
+}
 
 // Number of seconds that a seek operation should traverse.
 Player.SEEK_SECONDS = 10;
@@ -507,6 +514,19 @@ Player.prototype.setRating = function(rating) {
     this.ratingSpan.childNodes[i-1].innerText = (i <= numStars) ? "\u2605" : "\u2606";
 };
 
+Player.prototype.showOptions = function() {
+  if (this.optionsDialog)
+    return;
+
+  this.optionsDialog = new OptionsDialog(this.config, this.dialogManager.createDialog());
+  this.optionsDialog.setCloseCallback(this.closeOptions.bind(this));
+};
+
+Player.prototype.closeOptions = function() {
+  this.dialogManager.closeDialog(this.optionsDialog.getContainer());
+  this.optionsDialog = null;
+};
+
 Player.prototype.processAccelerator = function(e) {
   if (e.altKey && e.keyCode == KeyCodes.D) {
     var song = this.getCurrentSong();
@@ -515,6 +535,9 @@ Player.prototype.processAccelerator = function(e) {
     return true;
   } else if (e.altKey && e.keyCode == KeyCodes.N) {
     this.cycleTrack(1);
+    return true;
+  } else if (e.altKey && e.keyCode == KeyCodes.O) {
+    this.showOptions();
     return true;
   } else if (e.altKey && e.keyCode == KeyCodes.P) {
     this.cycleTrack(-1);
@@ -571,4 +594,8 @@ Player.prototype.handleRatingSpanKeyDown = function(e) {
     e.preventDefault();
     e.stopPropagation();
   }
+};
+
+Player.prototype.onVolumeChange = function(volume) {
+  this.audio.volume = volume;
 };

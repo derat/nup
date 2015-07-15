@@ -3,6 +3,7 @@
 
 import selenium
 import utils
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 
 from song import Song
@@ -49,6 +50,7 @@ class Page(object):
     LUCKY_BUTTON = (By.ID, 'luckyButton')
     MIN_RATING_SELECT = (By.ID, 'minRatingSelect')
     NEXT_BUTTON = (By.ID, 'nextButton')
+    OPTIONS_OK_BUTTON = (By.ID, 'optionsOkButton')
     PLAY_PAUSE_BUTTON = (By.ID, 'playPauseButton')
     PLAYLIST_TABLE = (By.ID, 'playlistTable')
     PREV_BUTTON = (By.ID, 'prevButton')
@@ -63,6 +65,8 @@ class Page(object):
     TITLE_DIV = (By.ID, 'titleDiv')
     UNRATED_CHECKBOX = (By.ID, 'unratedCheckbox')
     UPDATE_CLOSE_IMAGE = (By.ID, 'updateCloseImage')
+    VOLUME_RANGE = (By.ID, 'volumeRange')
+    VOLUME_SPAN = (By.ID, 'volumeSpan')
 
     # Values for FIRST_PLAYED_SELECT and LAST_PLAYED_SELECT.
     UNSET_TIME = '...'
@@ -158,6 +162,9 @@ class Page(object):
                 return
         raise RuntimeError('Failed to find option "%s"' % value)
 
+    def focus(self, locator):
+        self.driver.focus(locator)
+
     def click_search_result_checkbox(self, row_index):
         self.get(Page.SEARCH_RESULTS_TABLE).\
             find_elements_by_tag_name('tr')[row_index + 1].\
@@ -171,3 +178,8 @@ class Page(object):
     def get_tag_suggestions(self, locator):
         spans = self.get(locator).find_elements_by_tag_name('span')
         return [s.text for s in spans]
+
+    def show_options(self):
+        # This ought to be using Alt+O, but my version of selenium is broken and
+        # barfs when modifiers are sent.
+        self.driver.execute_script('document.player.showOptions()')
