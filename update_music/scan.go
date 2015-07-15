@@ -1,4 +1,4 @@
-package lib
+package main
 
 import (
 	"bytes"
@@ -185,7 +185,7 @@ func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan nup.S
 	s.Length = float64(lengthMs) / 1000
 }
 
-func GetSongByPath(musicDir, relPath string, updateChan chan nup.SongOrErr) {
+func getSongByPath(musicDir, relPath string, updateChan chan nup.SongOrErr) {
 	p := filepath.Join(musicDir, relPath)
 	fi, err := os.Stat(p)
 	if err != nil {
@@ -195,7 +195,7 @@ func GetSongByPath(musicDir, relPath string, updateChan chan nup.SongOrErr) {
 	readFileDetails(p, relPath, fi, updateChan)
 }
 
-func ScanForUpdatedSongs(musicDir, forceGlob string, lastUpdateTime time.Time, updateChan chan nup.SongOrErr, logProgress bool) (numUpdates int, err error) {
+func scanForUpdatedSongs(musicDir, forceGlob string, lastUpdateTime time.Time, updateChan chan nup.SongOrErr, logProgress bool) (numUpdates int, err error) {
 	numMp3s := 0
 	err = filepath.Walk(musicDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {

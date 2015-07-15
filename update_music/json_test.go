@@ -1,4 +1,4 @@
-package lib
+package main
 
 import (
 	"io/ioutil"
@@ -18,7 +18,7 @@ func TestJson(t *testing.T) {
 
 	songs := []nup.Song{test.LegacySong1, test.LegacySong2}
 	ch := make(chan nup.SongOrErr)
-	num, err := GetSongsFromJsonFile(test.WriteSongsToJsonFile(dir, songs), ch)
+	num, err := getSongsFromJsonFile(test.WriteSongsToJsonFile(dir, songs), ch)
 	if err != nil {
 		t.Error(err)
 	}

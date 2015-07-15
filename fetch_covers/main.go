@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -11,7 +12,6 @@ import (
 	"sync"
 
 	"erat.org/nup"
-	"erat.org/nup/lib"
 )
 
 const (
@@ -22,17 +22,32 @@ func getCoverFilename(albumId string) string {
 	return albumId + ".jpg"
 }
 
-func scanSongs(ch chan nup.SongOrErr, numSongs int, coverDir string) (albumIds []string, err error) {
+func readSongs(jsonPath string, coverDir string, maxSongs int) (albumIds []string, err error) {
 	missingAlbumIds := make(map[string]bool)
 
-	for i := 0; i < numSongs; i++ {
-		s := <-ch
-		if s.Err != nil {
-			return nil, fmt.Errorf("Got error for %v: %v", s.Filename, s.Err)
+	f, err := os.Open(jsonPath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	d := json.NewDecoder(f)
+	numSongs := 0
+	for true {
+		if maxSongs >= 0 && numSongs >= maxSongs {
+			break
 		}
 
-		if i > 0 && i%logInterval == 0 {
-			log.Printf("Scanned %v songs", i)
+		s := nup.Song{}
+		if err = d.Decode(&s); err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		numSongs++
+
+		if numSongs%logInterval == 0 {
+			log.Printf("Scanned %v songs", numSongs)
 		}
 
 		// Can't do anything if the song doesn't have an album ID.
@@ -145,20 +160,11 @@ func main() {
 	}
 
 	log.Printf("Reading songs from %v", *dumpFile)
-	ch := make(chan nup.SongOrErr)
-	numSongs, err := lib.GetSongsFromJsonFile(*dumpFile, ch)
+	albumIds, err := readSongs(*dumpFile, *coverDir, *maxSongs)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("Read %v song(s)", numSongs)
 
-	if *maxSongs >= 0 && *maxSongs < numSongs {
-		numSongs = *maxSongs
-	}
-	albumIds, err := scanSongs(ch, numSongs, *coverDir)
-	if err != nil {
-		log.Fatal(err)
-	}
 	log.Printf("Downloading cover(s) for %v album(s)", len(albumIds))
 	downloadCovers(albumIds, *coverDir, *maxRequests)
 }

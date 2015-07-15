@@ -1,4 +1,4 @@
-package lib
+package main
 
 import (
 	"path/filepath"
