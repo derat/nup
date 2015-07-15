@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"erat.org/nup"
-	"erat.org/nup/lib"
 )
 
 const (
@@ -372,7 +371,7 @@ func getSongsForQuery(c appengine.Context, query *songQuery, cacheOnly bool) ([]
 			songs[i] = storedSongs[storedIndex]
 			storedIndex++
 		}
-		prepareSongForClient(&songs[i], id, cfg, lib.WebClient)
+		prepareSongForClient(&songs[i], id, cfg, nup.WebClient)
 	}
 
 	if !query.Shuffle {

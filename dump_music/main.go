@@ -11,7 +11,6 @@ import (
 
 	"erat.org/cloud"
 	"erat.org/nup"
-	"erat.org/nup/lib"
 )
 
 const (
@@ -27,7 +26,7 @@ const (
 
 func getEntities(cfg *nup.ClientConfig, entityType string, batchSize int, f func([]byte)) {
 	client := http.Client{}
-	u, err := lib.GetServerUrl(cfg.ServerUrl, exportPath)
+	u, err := nup.GetServerUrl(cfg.ServerUrl, exportPath)
 	if err != nil {
 		log.Fatal("Failed to get server URL: ", err)
 	}

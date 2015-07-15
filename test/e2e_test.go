@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"erat.org/nup"
-	"erat.org/nup/lib"
 )
 
 const (
@@ -85,16 +84,16 @@ func extractFilePathFromUrl(s string) (string, error) {
 	}
 }
 
-func compareQueryResults(expected, actual []nup.Song, order OrderPolicy, client lib.ClientType) error {
+func compareQueryResults(expected, actual []nup.Song, order OrderPolicy, client nup.ClientType) error {
 	expectedCleaned := make([]nup.Song, len(expected))
 	for i := range expected {
 		s := expected[i]
 		s.Sha1 = ""
 		s.Plays = nil
-		s.Url = lib.GetCloudStorageUrl(songBucket, s.Filename, client)
+		s.Url = nup.GetCloudStorageUrl(songBucket, s.Filename, client)
 		s.Filename = ""
 		if len(s.CoverFilename) > 0 {
-			s.CoverUrl = lib.GetCloudStorageUrl(coverBucket, s.CoverFilename, client)
+			s.CoverUrl = nup.GetCloudStorageUrl(coverBucket, s.CoverFilename, client)
 			s.CoverFilename = ""
 		}
 		expectedCleaned[i] = s
@@ -127,27 +126,27 @@ func doPlayTimeQueries(tt *testing.T, t *Tester, s *nup.Song, queryPrefix string
 	plays := s.Plays
 	sort.Sort(nup.PlayArray(plays))
 
-	firstPlaySec := lib.TimeToSeconds(plays[0].StartTime)
+	firstPlaySec := nup.TimeToSeconds(plays[0].StartTime)
 	beforeFirstPlay := strconv.FormatFloat(firstPlaySec-10, 'f', -1, 64)
 	songs := t.QuerySongs(queryPrefix + "minFirstPlayed=" + beforeFirstPlay)
-	if err := compareQueryResults([]nup.Song{*s}, songs, IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{*s}, songs, IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 	afterFirstPlay := strconv.FormatFloat(firstPlaySec+10, 'f', -1, 64)
 	songs = t.QuerySongs(queryPrefix + "minFirstPlayed=" + afterFirstPlay)
-	if err := compareQueryResults([]nup.Song{}, songs, IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{}, songs, IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 
-	lastPlaySec := lib.TimeToSeconds(plays[len(plays)-1].StartTime)
+	lastPlaySec := nup.TimeToSeconds(plays[len(plays)-1].StartTime)
 	beforeLastPlay := strconv.FormatFloat(lastPlaySec-10, 'f', -1, 64)
 	songs = t.QuerySongs(queryPrefix + "maxLastPlayed=" + beforeLastPlay)
-	if err := compareQueryResults([]nup.Song{}, songs, IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{}, songs, IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 	afterLastPlay := strconv.FormatFloat(lastPlaySec+10, 'f', -1, 64)
 	songs = t.QuerySongs(queryPrefix + "maxLastPlayed=" + afterLastPlay)
-	if err := compareQueryResults([]nup.Song{*s}, songs, IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{*s}, songs, IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 }
@@ -164,13 +163,13 @@ func TestLegacy(tt *testing.T) {
 
 	log.Print("checking that play stats were generated correctly")
 	doPlayTimeQueries(tt, t, &LegacySong1, "tags=electronic&")
-	if err := compareQueryResults([]nup.Song{}, t.QuerySongs("maxPlays=0"), CompareOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.QuerySongs("maxPlays=0"), CompareOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{LegacySong2}, t.QuerySongs("maxPlays=1"), CompareOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong2}, t.QuerySongs("maxPlays=1"), CompareOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{LegacySong2, LegacySong1}, t.QuerySongs("maxPlays=2"), CompareOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong2, LegacySong1}, t.QuerySongs("maxPlays=2"), CompareOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 }
@@ -262,11 +261,11 @@ func TestUserData(tt *testing.T) {
 	log.Print("checking that play stats were updated")
 	doPlayTimeQueries(tt, t, &us, "")
 	for i := 0; i < 3; i++ {
-		if err := compareQueryResults([]nup.Song{}, t.QuerySongs("maxPlays="+strconv.Itoa(i)), IgnoreOrder, lib.WebClient); err != nil {
+		if err := compareQueryResults([]nup.Song{}, t.QuerySongs("maxPlays="+strconv.Itoa(i)), IgnoreOrder, nup.WebClient); err != nil {
 			tt.Error(err)
 		}
 	}
-	if err := compareQueryResults([]nup.Song{us}, t.QuerySongs("maxPlays=3"), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{us}, t.QuerySongs("maxPlays=3"), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 }
@@ -299,7 +298,7 @@ func TestQueries(tt *testing.T) {
 		{"tags=-electronic+instrumental", []nup.Song{LegacySong2}},
 		{"tags=instrumental&minRating=0.75", []nup.Song{LegacySong1}},
 	} {
-		if err := compareQueryResults(q.ExpectedSongs, t.QuerySongs(q.Query), CompareOrder, lib.WebClient); err != nil {
+		if err := compareQueryResults(q.ExpectedSongs, t.QuerySongs(q.Query), CompareOrder, nup.WebClient); err != nil {
 			tt.Errorf("%v: %v", q.Query, err)
 		}
 	}
@@ -312,7 +311,7 @@ func TestCaching(tt *testing.T) {
 	log.Print("posting and querying a song")
 	cacheParam := "cacheOnly=1"
 	t.PostSongs([]nup.Song{LegacySong1}, replaceUserData, 0)
-	if err := compareQueryResults([]nup.Song{LegacySong1}, t.QuerySongs(""), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong1}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 
@@ -322,38 +321,38 @@ func TestCaching(tt *testing.T) {
 	s := LegacySong1
 	s.Rating = 1.0
 	t.DoPost("rate_and_tag?songId="+id+"&rating=1.0", nil)
-	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(cacheParam), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(cacheParam), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("updating and re-querying")
 	s.Artist = "The Artist Formerly Known As " + s.Artist
 	t.PostSongs([]nup.Song{s}, keepUserData, 0)
-	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that time-based queries aren't cached")
 	timeParam := fmt.Sprintf("maxLastPlayed=%d", s.Plays[1].StartTime.Unix()+1)
-	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(timeParam), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(timeParam), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{}, t.QuerySongs(timeParam+"&"+cacheParam), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.QuerySongs(timeParam+"&"+cacheParam), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that play-count-based queries aren't cached")
 	playParam := "maxPlays=10"
-	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(playParam), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(playParam), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{}, t.QuerySongs(playParam+"&"+cacheParam), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.QuerySongs(playParam+"&"+cacheParam), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("posting another song and querying")
 	t.PostSongs([]nup.Song{LegacySong2}, replaceUserData, 0)
-	if err := compareQueryResults([]nup.Song{LegacySong2, s}, t.QuerySongs(""), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong2, s}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 }
@@ -385,7 +384,7 @@ func TestCacheRace(tt *testing.T) {
 	// the original song should be returned), and it should also result in the original song being re-cached.
 	log.Print("querying for pre-update song")
 	time.Sleep(time.Duration(500) * time.Millisecond)
-	if err := compareQueryResults([]nup.Song{LegacySong1}, t.QuerySongs(""), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong1}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 
@@ -393,7 +392,7 @@ func TestCacheRace(tt *testing.T) {
 	// and drop it from the cache to ensure that stale data won't be served.
 	log.Print("waiting for update to finish and querying for post-update song")
 	wg.Wait()
-	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 
@@ -409,13 +408,13 @@ func TestCacheRace(tt *testing.T) {
 
 	log.Print("querying for pre-import song")
 	time.Sleep(time.Duration(500) * time.Millisecond)
-	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{s}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("waiting for import to finish and querying for post-import song")
 	wg.Wait()
-	if err := compareQueryResults([]nup.Song{s2}, t.QuerySongs(""), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{s2}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 }
@@ -427,13 +426,13 @@ func TestAndroid(tt *testing.T) {
 	log.Print("posting songs")
 	now := t.GetNowFromServer()
 	t.PostSongs([]nup.Song{LegacySong1, LegacySong2}, replaceUserData, 0)
-	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(time.Time{}, getRegularSongs), IgnoreOrder, lib.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(time.Time{}, getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(now, getRegularSongs), IgnoreOrder, lib.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong1, LegacySong2}, t.GetSongsForAndroid(now, getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(t.GetNowFromServer(), getRegularSongs), IgnoreOrder, lib.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(t.GetNowFromServer(), getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
 
@@ -443,7 +442,7 @@ func TestAndroid(tt *testing.T) {
 	updatedLegacySong1.Rating = 1.0
 	now = t.GetNowFromServer()
 	t.DoPost("rate_and_tag?songId="+id+"&rating=1.0", nil)
-	if err := compareQueryResults([]nup.Song{updatedLegacySong1}, t.GetSongsForAndroid(now, getRegularSongs), IgnoreOrder, lib.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{updatedLegacySong1}, t.GetSongsForAndroid(now, getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
 
@@ -453,7 +452,7 @@ func TestAndroid(tt *testing.T) {
 	updatedLegacySong1.Plays = append(updatedLegacySong1.Plays, p)
 	now = t.GetNowFromServer()
 	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(p.StartTime.Unix(), 10), nil)
-	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(now, getRegularSongs), IgnoreOrder, lib.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(now, getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
 }
@@ -505,7 +504,7 @@ func TestCovers(tt *testing.T) {
 	s5.CoverFilename = fmt.Sprintf("Various Artists-%s.jpg", s5.Album)
 	createCover(s5.CoverFilename)
 	t.UpdateSongs()
-	if err := compareQueryResults([]nup.Song{Song0s, s5}, t.QuerySongs(""), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{Song0s, s5}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 
@@ -516,7 +515,7 @@ func TestCovers(tt *testing.T) {
 	s0.CoverFilename = fmt.Sprintf("%s-%s.jpg", s0.Artist, s0.Album)
 	createCover(s0.CoverFilename)
 	t.UpdateSongs()
-	if err := compareQueryResults([]nup.Song{s0, s5}, t.QuerySongs(""), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{s0, s5}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 }
@@ -605,7 +604,7 @@ func TestSorting(tt *testing.T) {
 
 	log.Print("importing songs and checking sort order")
 	t.ImportSongsFromJsonFile(WriteSongsToJsonFile(t.TempDir, songs), replaceUserData)
-	if err := compareQueryResults(songs, t.QuerySongs(""), CompareOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults(songs, t.QuerySongs(""), CompareOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
 }
@@ -621,13 +620,13 @@ func TestDeleteSong(tt *testing.T) {
 	t.DeleteSong(id1)
 
 	log.Print("checking non-deleted song")
-	if err := compareQueryResults([]nup.Song{LegacySong2}, t.QuerySongs(""), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong2}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{LegacySong2}, t.GetSongsForAndroid(time.Time{}, getRegularSongs), IgnoreOrder, lib.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong2}, t.GetSongsForAndroid(time.Time{}, getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{LegacySong2}, t.GetSongsForAndroid(postTime, getRegularSongs), IgnoreOrder, lib.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong2}, t.GetSongsForAndroid(postTime, getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
 	if err := CompareSongs([]nup.Song{LegacySong2}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
@@ -636,7 +635,7 @@ func TestDeleteSong(tt *testing.T) {
 
 	log.Print("checking that deleted song is in android query")
 	deletedSongs := t.GetSongsForAndroid(postTime, getDeletedSongs)
-	if err := compareQueryResults([]nup.Song{LegacySong1}, deletedSongs, IgnoreOrder, lib.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong1}, deletedSongs, IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
 	if deletedSongs[0].SongId != id1 {
@@ -649,10 +648,10 @@ func TestDeleteSong(tt *testing.T) {
 	t.DeleteSong(id2)
 
 	log.Print("checking no non-deleted songs")
-	if err := compareQueryResults([]nup.Song{}, t.QuerySongs(""), IgnoreOrder, lib.WebClient); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(time.Time{}, getRegularSongs), IgnoreOrder, lib.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{}, t.GetSongsForAndroid(time.Time{}, getRegularSongs), IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
 	if err := CompareSongs([]nup.Song{}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
@@ -661,7 +660,7 @@ func TestDeleteSong(tt *testing.T) {
 
 	log.Print("checking that both deleted songs are in android query")
 	deletedSongs = t.GetSongsForAndroid(laterTime, getDeletedSongs)
-	if err := compareQueryResults([]nup.Song{LegacySong2}, deletedSongs, IgnoreOrder, lib.AndroidClient); err != nil {
+	if err := compareQueryResults([]nup.Song{LegacySong2}, deletedSongs, IgnoreOrder, nup.AndroidClient); err != nil {
 		tt.Error(err)
 	}
 	if deletedSongs[0].SongId != id2 {

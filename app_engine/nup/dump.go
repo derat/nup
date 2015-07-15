@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"erat.org/nup"
-	"erat.org/nup/lib"
 )
 
 const (
@@ -129,7 +128,7 @@ func dumpSongsForAndroid(c appengine.Context, minLastModified time.Time, deleted
 	cfg := getConfig(c)
 	songs = songs[0:len(ids)]
 	for i, id := range ids {
-		prepareSongForClient(&songs[i], id, cfg, lib.AndroidClient)
+		prepareSongForClient(&songs[i], id, cfg, nup.AndroidClient)
 	}
 	return songs, nextCursor, nil
 }

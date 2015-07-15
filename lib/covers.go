@@ -4,6 +4,8 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"strings"
+
+	"erat.org/nup"
 )
 
 type CoverFinder struct {
@@ -52,8 +54,8 @@ func (cf *CoverFinder) AddDir(dir string) error {
 }
 
 func (cf *CoverFinder) FindFilename(artist, album string) string {
-	artist = EscapeCoverString(artist)
-	album = EscapeCoverString(album)
+	artist = nup.EscapeCoverString(artist)
+	album = nup.EscapeCoverString(album)
 
 	if fn, ok := cf.artistAlbumMap[artist+"-"+album]; ok {
 		return fn
