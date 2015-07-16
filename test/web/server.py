@@ -22,6 +22,9 @@ class Server:
             'CacheTags': False,
         }))
 
+    def reset_config(self):
+        self.send('POST', '/config')
+
     def send(self, method, path, body=None):
         self.conn.request(method, path, body, self.headers)
         resp = self.conn.getresponse()

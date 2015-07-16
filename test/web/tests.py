@@ -43,6 +43,7 @@ def setUpModule():
 def tearDownModule():
     file_thread.stop()
     driver.close()
+    server.reset_config()
 
 class Test(unittest.TestCase):
     def setUp(self):
