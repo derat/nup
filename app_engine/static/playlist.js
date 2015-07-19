@@ -64,6 +64,8 @@ function Playlist(player) {
   this.insertButton.addEventListener('click', this.enqueueSearchResults.bind(this, false, true), false);
   this.replaceButton.addEventListener('click', this.enqueueSearchResults.bind(this, true, false), false);
 
+  this.dialogManager = document.dialogManager;
+
   this.tagSuggester = new Suggester(tagsInput, $('tagsInputSuggestionsDiv'), [], true);
 
   document.body.addEventListener('keydown', this.handleBodyKeyDown_.bind(this), false);
@@ -154,7 +156,7 @@ Playlist.prototype.submitQuery = function(appendToQueue) {
     terms.push('maxLastPlayed=' + (getCurrentTimeSec() - parseInt(this.lastPlayedSelect.value)));
 
   if (!terms.length) {
-    alert('You must supply search terms.');
+    this.dialogManager.createMessageDialog('Invalid Search', 'You must supply search terms.');
     return;
   }
 
@@ -162,36 +164,34 @@ Playlist.prototype.submitQuery = function(appendToQueue) {
     this.request.abort();
 
   this.request = new XMLHttpRequest();
-  this.request.onreadystatechange = function() {
-    if (this.request.readyState == 4) {
-      var songs = [];
 
-      try {
-        var req = this.request;
-        if (req.status) {
-          if (req.status == 200) {
-            if (req.responseText) {
-              songs = eval('(' + req.responseText + ')');
-              console.log('Got response with ' + songs.length + ' song(s)');
-            } else {
-              console.log('No response text');
-            }
-          } else {
-            alert("Got " + req.status + ": " + req.responseText);
-          }
-        }
-      } catch (e) {
-        console.log('Caught exception while waiting for reply: ' + e);
+  this.request.onload = function() {
+    var req = this.request;
+    if (req.status == 200) {
+      if (req.responseText) {
+        var songs = eval('(' + req.responseText + ')');
+        console.log('Got response with ' + songs.length + ' song(s)');
+        this.searchResultsTable.updateSongs(songs);
+        this.searchResultsTable.setAllCheckboxes(true);
+        if (appendToQueue)
+          this.enqueueSearchResults(true, true);
+      } else {
+        this.dialogManager.createMessageDialog('Search Failed', 'Response from server was empty.');
       }
-
-      this.searchResultsTable.updateSongs(songs);
-      this.searchResultsTable.setAllCheckboxes(true);
-      if (appendToQueue)
-        this.enqueueSearchResults(true, true);
-
-      this.waitingDiv.style.display = 'none';
-      this.request = null;
+    } else {
+      if (req.status && req.responseText)
+        this.dialogManager.createMessageDialog('Search Failed', 'Got ' + req.status + ': ' + req.responseText);
+      else
+        this.dialogManager.createMessageDialog('Search Failed', 'Missing status in request.');
     }
+
+    this.waitingDiv.style.display = 'none';
+    this.request = null;
+  }.bind(this);
+
+  this.request.onerror = function(e) {
+    this.dialogManager.createMessageDialog('Search Failed', 'Request to server failed.');
+    console.log(e);
   }.bind(this);
 
   this.waitingDiv.style.display = 'block';

@@ -48,7 +48,7 @@ function Player() {
   // Timeout ID for calling closeNotification().
   this.closeNotificationTimeoutId = 0;
 
-  this.dialogManager = new DialogManager();
+  this.dialogManager = document.dialogManager;
   this.optionsDialog = null;
 
   this.audio = $('audio');

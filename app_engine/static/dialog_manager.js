@@ -1,6 +1,10 @@
 // Copyright 2011 Daniel Erat <dan@erat.org>
 // All rights reserved.
 
+function initDialogManager() {
+  document.dialogManager = new DialogManager();
+}
+
 function DialogManager() {
   this.listeners = [];
   var lightbox = document.createElement('div');
