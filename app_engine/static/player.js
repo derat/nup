@@ -528,6 +528,9 @@ Player.prototype.closeOptions = function() {
 };
 
 Player.prototype.processAccelerator = function(e) {
+  if (this.dialogManager.getNumDialogs())
+    return false;
+
   if (e.altKey && e.keyCode == KeyCodes.D) {
     var song = this.getCurrentSong();
     if (song)

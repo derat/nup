@@ -352,6 +352,9 @@ Playlist.prototype.handleBodyKeyDown_ = function(e) {
 };
 
 Playlist.prototype.processAccelerator_ = function(e) {
+  if (this.dialogManager.getNumDialogs())
+    return false;
+
   if (e.keyCode == KeyCodes.SLASH) {
     this.keywordsInput.focus();
     return true;
