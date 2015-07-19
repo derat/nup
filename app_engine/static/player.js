@@ -48,6 +48,8 @@ function Player() {
   // Timeout ID for calling closeNotification().
   this.closeNotificationTimeoutId = 0;
 
+  this.updater = new Updater();
+
   this.dialogManager = document.dialogManager;
   this.optionsDialog = null;
 
@@ -365,8 +367,10 @@ Player.prototype.onTimeUpdate = function(e) {
   this.lastUpdateTime = now;
 
   if (!this.reportedCurrentTrack) {
-    if (this.totalPlayedSec >= 240 || this.totalPlayedSec > duration / 2)
-      this.reportCurrentTrack();
+    if (this.totalPlayedSec >= 240 || this.totalPlayedSec > duration / 2) {
+      this.reportedCurrentTrack = true;
+      this.updater.reportPlay(song.songId, this.startTime);
+    }
   }
 };
 
@@ -397,19 +401,6 @@ Player.prototype.onError = function(e) {
 
 Player.prototype.notifyPlaylistAboutSongChange = function() {
   document.playlist.handleSongChange(this.currentIndex);
-};
-
-Player.prototype.reportCurrentTrack = function() {
-  if (this.reportedCurrentTrack)
-    return;
-  this.reportedCurrentTrack = true;
-
-  var song = this.getCurrentSong();
-  var url = 'report_played?songId=' + encodeURIComponent(song.songId) + '&startTime=' + encodeURIComponent(this.startTime);
-  console.log("Reporting track: " + url);
-  var req = new XMLHttpRequest();
-  req.open('POST', url, true);
-  req.send();
 };
 
 Player.prototype.showUpdateDiv = function() {
@@ -470,15 +461,7 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
   if (!ratingChanged && !tagsChanged)
     return;
 
-  var url = 'rate_and_tag?songId=' + encodeURIComponent(song.songId);
-  if (ratingChanged)
-    url += '&rating=' + encodeURIComponent(this.updatedRating);
-  if (tagsChanged)
-    url += '&tags=' + encodeURIComponent(newTags.join(' '));
-  console.log("Rating/tagging track: " + url);
-  var req = new XMLHttpRequest();
-  req.open('POST', url, true);
-  req.send();
+  this.updater.rateAndTag(song.songId, ratingChanged ? this.updatedRating : null, tagsChanged ? newTags : null);
 
   song.rating = this.updatedRating;
   song.tags = newTags;
