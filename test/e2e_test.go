@@ -244,6 +244,12 @@ func TestUserData(tt *testing.T) {
 		tt.Error(err)
 	}
 
+	log.Print("checking that duplicate plays are ignored")
+	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(s.Plays[len(us.Plays)-1].StartTime.Unix(), 10), nil)
+	if err := CompareSongs([]nup.Song{us}, t.DumpSongs(stripIds), IgnoreOrder); err != nil {
+		tt.Fatal(err)
+	}
+
 	log.Print("checking that duplicate tags are ignored")
 	us.Tags = []string{"electronic", "rock"}
 	t.DoPost("rate_and_tag?songId="+id+"&tags=electronic+electronic+rock+electronic", nil)

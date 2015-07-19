@@ -149,7 +149,8 @@ func addPlay(c appengine.Context, id int64, startTime time.Time, ip string) erro
 		if err != nil {
 			return fmt.Errorf("Querying for existing play failed: %v", err)
 		} else if len(existingKeys) > 0 {
-			return fmt.Errorf("Already have play for song %v starting at %v from %v", id, startTime, ip)
+			c.Debugf("Already have play for song %v starting at %v from %v", id, startTime, ip)
+			return ErrUnmodified
 		}
 
 		s.NumPlays++
