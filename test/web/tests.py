@@ -567,6 +567,13 @@ class Test(unittest.TestCase):
         wait_for_volume(0.8)
 
         page.click(page.OPTIONS_OK_BUTTON)
+        page.wait_until_gone(page.OPTIONS_DIV)
+
+        page.show_options()
+        wait_for_volume(0.8)
+        ESCAPE = u'\ue00c'
+        page.get(page.BODY).send_keys(ESCAPE)
+        page.wait_until_gone(page.OPTIONS_DIV)
 
 if __name__ == '__main__':
     unittest.main()

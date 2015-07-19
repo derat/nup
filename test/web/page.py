@@ -40,6 +40,7 @@ class Page(object):
     APPEND_BUTTON = (By.ID, 'appendButton')
     ARTIST_DIV = (By.ID, 'artistDiv')
     AUDIO = (By.ID, 'audio')
+    BODY = (By.TAG_NAME, 'body')
     COVER_IMAGE = (By.ID, 'coverImage')
     EDIT_TAGS_SUGGESTIONS_DIV = (By.ID, 'editTagsSuggestionsDiv')
     EDIT_TAGS_TEXTAREA = (By.ID, 'editTagsTextarea')
@@ -50,6 +51,7 @@ class Page(object):
     LUCKY_BUTTON = (By.ID, 'luckyButton')
     MIN_RATING_SELECT = (By.ID, 'minRatingSelect')
     NEXT_BUTTON = (By.ID, 'nextButton')
+    OPTIONS_DIV = (By.ID, 'optionsDiv')
     OPTIONS_OK_BUTTON = (By.ID, 'optionsOkButton')
     PLAY_PAUSE_BUTTON = (By.ID, 'playPauseButton')
     PLAYLIST_TABLE = (By.ID, 'playlistTable')
@@ -162,6 +164,15 @@ class Page(object):
                 return
         raise RuntimeError('Failed to find option "%s"' % value)
 
+    def wait_until_gone(self, locator):
+        def exists():
+            try:
+                self.driver.find_element(*locator)
+                return True
+            except selenium.common.exceptions.NoSuchElementException:
+                return False
+        utils.wait(lambda: not exists())
+
     def focus(self, locator):
         self.driver.focus(locator)
 
@@ -180,6 +191,6 @@ class Page(object):
         return [s.text for s in spans]
 
     def show_options(self):
-        # This ought to be using Alt+O, but my version of selenium is broken and
-        # barfs when modifiers are sent.
+        # TODO: This ought to be using Alt+O, but my version of selenium is
+        # broken and barfs when modifiers are sent.
         self.driver.execute_script('document.player.showOptions()')

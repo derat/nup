@@ -29,6 +29,8 @@ function OptionsDialog(config, container) {
 
   this.volumeRange.addEventListener('input', this.handleVolumeRangeInput.bind(this), false);
   $('optionsOkButton').addEventListener('click', this.handleOkButtonClick.bind(this), false);
+  this.keyListener = this.handleBodyKeyDown.bind(this);
+  document.body.addEventListener('keydown', this.keyListener, false);
 };
 
 OptionsDialog.prototype.getContainer = function() {
@@ -50,6 +52,27 @@ OptionsDialog.prototype.handleVolumeRangeInput = function(e) {
 };
 
 OptionsDialog.prototype.handleOkButtonClick = function(e) {
+  this.close();
+};
+
+OptionsDialog.prototype.handleBodyKeyDown = function(e) {
+  if (this.processAccelerator(e)) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+};
+
+OptionsDialog.prototype.processAccelerator = function(e) {
+  if (e.keyCode == KeyCodes.ESCAPE) {
+    this.close();
+    return true;
+  }
+
+  return false;
+};
+
+OptionsDialog.prototype.close = function() {
+  document.body.removeEventListener('keydown', this.keyListener, false);
   this.config.save();
   if (this.closeCallback)
     this.closeCallback();
