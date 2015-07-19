@@ -102,7 +102,7 @@ Player.SEEK_SECONDS = 10;
 Player.MAX_RETRIES = 2;
 
 // Number of seconds that a notification is shown when the song changes.
-Player.NOTIFICATION_SECONDS = 5;
+Player.NOTIFICATION_SECONDS = 3;
 
 Player.prototype.updateTagsFromServer = function(async) {
   var req = new XMLHttpRequest();
