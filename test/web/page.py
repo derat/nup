@@ -91,6 +91,9 @@ class Page(object):
         self.driver = driver
         self.reset()
 
+    def reload(self):
+        self.driver.refresh()
+
     def reset(self):
         self.driver.execute_script('document.playlist.resetForTesting()')
 

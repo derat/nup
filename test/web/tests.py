@@ -547,12 +547,12 @@ class Test(unittest.TestCase):
         page = Page(driver)
         page.show_options()
 
-        def wait_for_volume(expected):
+        def wait_for_volume(expected, check_span=True):
             audio = page.get(page.AUDIO)
-            span = page.get(page.VOLUME_SPAN)
+            span = page.get(page.VOLUME_SPAN) if check_span else None
             def is_expected():
                 return float(audio.get_attribute('volume')) == expected and \
-                       span.text == ('%d%%' % (expected * 100))
+                       (not span or span.text == ('%d%%' % (expected * 100)))
             try:
                 utils.wait(is_expected, timeout_sec=3)
             except utils.TimeoutError as e:
@@ -574,6 +574,9 @@ class Test(unittest.TestCase):
         ESCAPE = u'\ue00c'
         page.get(page.BODY).send_keys(ESCAPE)
         page.wait_until_gone(page.OPTIONS_DIV)
+
+        page.reload()
+        wait_for_volume(0.8, check_span=False)
 
 if __name__ == '__main__':
     unittest.main()
