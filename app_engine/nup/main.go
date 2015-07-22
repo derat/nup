@@ -560,6 +560,13 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "No rating or tags supplied", http.StatusBadRequest)
 		return
 	}
+
+	cfg := getConfig(c)
+	if cfg.ForceUpdateFailures && appengine.IsDevAppServer() {
+		http.Error(w, "Returning an error, as requested", http.StatusInternalServerError)
+		return
+	}
+
 	if err := updateRatingAndTags(c, id, hasRating, rating, tags, updateDelay); err != nil {
 		c.Errorf("Got error while rating/tagging song: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -581,6 +588,12 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	startTime := nup.SecondsToTime(startTimeFloat)
+
+	cfg := getConfig(c)
+	if cfg.ForceUpdateFailures && appengine.IsDevAppServer() {
+		http.Error(w, "Returning an error, as requested", http.StatusInternalServerError)
+		return
+	}
 
 	if err := addPlay(c, id, startTime, r.RemoteAddr); err != nil {
 		c.Errorf("Got error while recording play: %v", err)

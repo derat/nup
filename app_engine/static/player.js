@@ -269,7 +269,6 @@ Player.prototype.getRatingString = function(rating, withLabel, includeEmpty) {
 };
 
 Player.prototype.showNotification = function() {
-  console.log('showNotification');
   if (!('Notification' in window))
     return;
 
@@ -387,7 +386,8 @@ Player.prototype.onError = function(e) {
     case error.MEDIA_ERR_SRC_NOT_SUPPORTED:  // 4
       if (this.numErrors <= Player.MAX_RETRIES) {
         // TODO: Set a timeout?
-        var url = this.getCurrentSong().url;
+        var song = this.getCurrentSong();
+        var url = song ? song.url : '';
         console.log('Retrying ' + url + ' from position ' + this.lastPositionSec);
         this.audio.src = url;
         this.audio.currentTime = this.lastPositionSec;

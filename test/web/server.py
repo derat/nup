@@ -11,15 +11,20 @@ from song import Song
 class Server:
     def __init__(self, music_host_port):
         self.conn = httplib.HTTPConnection(constants.HOSTNAME, constants.PORT)
+        self.music_host_port = music_host_port
         self.headers = {
             'Cookie': '%s=1' % constants.AUTH_COOKIE,
         }
+        self.send_config()
+
+    def send_config(self, force_update_failures=False):
         self.send('POST', '/config', json.dumps({
-            'SongBaseUrl': 'http://%s:%d/' % music_host_port,
+            'SongBaseUrl': 'http://%s:%d/' % self.music_host_port,
             'CoverBaseUrl': '',
             'CacheSongs': False,
             'CacheQueries': False,
             'CacheTags': False,
+            'ForceUpdateFailures': force_update_failures,
         }))
 
     def reset_config(self):
@@ -40,27 +45,41 @@ class Server:
         self.send('POST', '/import?replaceUserData=1',
                   '\n'.join([json.dumps(s.to_dict()) for s in songs]))
 
+    def get_objects(self, path):
+        out = self.send('GET', path).strip()
+        # ''.split('\n') returns a list with a single empty string. :-/
+        return [json.loads(s) for s in out.split('\n')] if len(out) else []
+
     def export_songs(self):
-        def get_objects(path):
-            out = self.send('GET', path).strip()
-            # ''.split('\n') returns a list with a single empty string. :-/
-            return [json.loads(s) for s in out.split('\n')] if len(out) else []
+        def parse_time(s):
+            dt = datetime.datetime.strptime(s,
+                '%Y-%m-%dT%H:%M:%S.%fZ' if '.' in s else '%Y-%m-%dT%H:%M:%SZ')
+            # Why is there datetime.fromtimestamp() but not totimestamp()?
+            # Instead there's just this stupid timegm() function that doesn't
+            # know about microseconds.
+            t = calendar.timegm(dt.timetuple()) + float(dt.strftime('0.%f'))
+            return t
 
         songs_by_id = {}
-        for obj in get_objects('/export?type=song'):
+        for obj in self.get_objects('/export?type=song'):
             song = Song(obj['artist'], obj['title'], obj['album'],
                         obj['track'], obj['disc'], obj['rating'],
                         obj['filename'], obj['length'], obj['tags'] or [])
             song.sha1 = obj['sha1']
             song.album_id = obj['albumId']
             songs_by_id[obj['songId']] = song
-        for obj in get_objects('/export?type=play'):
+        for obj in self.get_objects('/export?type=play'):
             song = songs_by_id[obj['songId']]
             play_obj = obj['play']
-            dt = datetime.datetime.strptime(play_obj['t'].split('.')[0],
-                                            '%Y-%m-%dT%H:%M:%S')
-            # Why is there datetime.fromtimestamp() but not date.totimestamp()?
-            song.plays.append((calendar.timegm(dt.timetuple()),
-                               play_obj['ip']))
+            song.plays.append((parse_time(play_obj['t']), play_obj['ip']))
+
+        for s in songs_by_id.values():
+            s.plays.sort()
 
         return {s.sha1: s for s in songs_by_id.values()}
+
+    def get_song_id(self, sha1):
+        for obj in self.get_objects('/export?type=song'):
+            if obj['sha1'] == sha1:
+                return obj['songId']
+        raise RuntimeError('Didn\'t get song with SHA1 "%s"' % sha1)

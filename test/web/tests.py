@@ -112,9 +112,10 @@ class Test(unittest.TestCase):
 
         Takes a map from song SHA1s to 3-tuples, each of which consists of:
 
-            rating (float)
-            tags (list of strings)
-            plays (list of (start_timestamp, end_timestamp) tuples
+            rating: float
+            tags: list of strings
+            plays: list of float start_timestamp or
+                (start_timestamp, end_timestamp) tuples
 
         Values may be None to be ignored.
         '''
@@ -133,9 +134,13 @@ class Test(unittest.TestCase):
                         return False
                     for i, play in enumerate(sorted(actual.plays)):
                         actual_ts = play[0]
-                        exp_start, exp_end = exp_plays[i]
-                        if actual_ts < exp_start or actual_ts > exp_end:
-                            return False
+                        if isinstance(exp_plays[i], (list, tuple)):
+                            exp_start, exp_end = exp_plays[i]
+                            if actual_ts < exp_start or actual_ts > exp_end:
+                                return False
+                        else:
+                            if actual_ts != exp_plays[i]:
+                                return False
             return True
         try:
             utils.wait(is_expected, timeout_sec=5)
@@ -442,11 +447,11 @@ class Test(unittest.TestCase):
         page = Page(driver)
         page.keywords = song1.artist
         page.click(page.LUCKY_BUTTON)
-        self.wait_for_song(page, song1, False, time='[0:01 / 0:05]')
-        song2_start_time = int(time.time())
+        self.wait_for_song(page, song1, paused=False)
+        song2_start_time = time.time()
         page.click(page.NEXT_BUTTON)
-        self.wait_for_song(page, song2, True, time='[0:01 / 0:01]')
-        song2_end_time = int(time.time() + 1.0)  # Lawls.
+        self.wait_for_song(page, song2, paused=True)
+        song2_end_time = time.time()
 
         # Only the second song should've been reported.
         self.wait_for_server_user_data({
@@ -454,11 +459,11 @@ class Test(unittest.TestCase):
             song2.sha1: (None, None, [(song2_start_time, song2_end_time)]),
         })
 
-        # Go back to the first song but pause it after one second.
-        song1_start_time = int(time.time())
+        # Go back to the first song but pause it immediately.
+        song1_start_time = time.time()
         page.click(page.PREV_BUTTON)
-        self.wait_for_song(page, song1, False, time='[0:01 / 0:05]')
-        song1_end_time = int(time.time() + 1.0)
+        self.wait_for_song(page, song1, paused=False)
+        song1_end_time = time.time()
         page.click(page.PLAY_PAUSE_BUTTON)
         # TODO: This doesn't test that it won't be reported later.
         self.wait_for_server_user_data({
@@ -469,7 +474,7 @@ class Test(unittest.TestCase):
         # After more than half of the first song has played, it should be
         # reported.
         page.click(page.PLAY_PAUSE_BUTTON)
-        self.wait_for_song(page, song1, False, time='[0:04 / 0:05]')
+        self.wait_for_song(page, song1, paused=False)
         self.wait_for_server_user_data({
             song1.sha1: (None, None, [(song1_start_time, song1_end_time)]),
             song2.sha1: (None, None, [(song2_start_time, song2_end_time)]),
@@ -503,6 +508,54 @@ class Test(unittest.TestCase):
         })
         self.wait_for_song(page, song, rating=page.FOUR_STARS,
                            title=u'Rating: ★★★★☆\nTags: guitar metal rock')
+
+    def test_retry_updates(self):
+        song = Song('ar', 't1', 'al', rating=0.5, tags=['rock', 'guitar'])
+        server.import_songs([song])
+        song_id = server.get_song_id(song.sha1)
+
+        # Make the server always report failure.
+        page = Page(driver)
+        server.send_config(force_update_failures=True)
+        rating = 0.75
+        tags = ['jazz', 'mellow']
+        page.rate_and_tag_song(song_id, rating, tags)
+        first_start_time = 1437526417
+        page.report_play(song_id, first_start_time)
+        time.sleep(0.1)
+
+        # Let the updates succeed.
+        server.send_config(force_update_failures=False)
+        self.wait_for_server_user_data({
+            song.sha1: (rating, tags, [first_start_time]),
+        })
+
+        # Queue some more failed updates.
+        server.send_config(force_update_failures=True)
+        rating = 0.25
+        tags = ['lively', 'soul']
+        page.rate_and_tag_song(song_id, rating, tags)
+        second_start_time = 1437526778
+        page.report_play(song_id, second_start_time)
+        time.sleep(0.1)
+
+        # The queued updates should be sent if the page is reloaded.
+        page.reload()
+        server.send_config(force_update_failures=False)
+        self.wait_for_server_user_data({
+            song.sha1: (rating, tags, [first_start_time, second_start_time]),
+        })
+
+        # In the case of multiple queued updates, the last one should take
+        # precedence.
+        server.send_config(force_update_failures=True)
+        page.rate_and_tag_song(song_id, 0.5)
+        time.sleep(0.1)
+        page.rate_and_tag_song(song_id, 0.75)
+        time.sleep(0.1)
+        page.rate_and_tag_song(song_id, 1.0)
+        server.send_config(force_update_failures=False)
+        self.wait_for_server_user_data({ song.sha1: (1.0, None, None) })
 
     def test_edit_tags_autocomplete(self):
         song1 = Song('ar', 't1', 'al', tags=['a0', 'a1', 'b'])

@@ -197,3 +197,30 @@ class Page(object):
         # TODO: This ought to be using Alt+O, but my version of selenium is
         # broken and barfs when modifiers are sent.
         self.driver.execute_script('document.player.showOptions()')
+
+    def rate_and_tag_song(self, song_id, rating=None, tags=None):
+        '''Rates and/or tags a song, bypassing the UI.
+
+           Arguments:
+               song_id: string
+               rating: float in [0.0, 1.0], or None to avoid rating
+               tags: list of strings, or None to avoid tagging
+        '''
+        if rating is None:
+            rating = 'null'
+        if tags is None:
+            tags = 'null'
+        self.driver.execute_script(
+            'document.player.updater.rateAndTag(%s, %s, %s)' %
+            (song_id, rating, tags))
+
+    def report_play(self, song_id, start_time):
+        '''Reports a song having been played, bypassing the UI.
+
+           Arguments:
+               song_id: string
+               start_time: float timestamp
+        '''
+        self.driver.execute_script(
+            'document.player.updater.reportPlay(%s, %f)' %
+            (song_id, start_time))

@@ -134,4 +134,8 @@ type ServerConfig struct {
 
 	// Should datastore (rather than memcache) be used for caching query results and tags?
 	UseDatastoreForCache bool
+
+	// Should failure be reported for all user data updates (ratings, tags, plays)?
+	// Ignored for non-development servers.
+	ForceUpdateFailures bool
 }
