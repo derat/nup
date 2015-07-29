@@ -614,22 +614,24 @@ class Test(unittest.TestCase):
 
         wait_for_volume(0.7)
 
-        ARROW_UP = u'\ue013'
+        # Super-hacky, but clicking on the range (in its middle?) seems to bring
+        # it to 50%. Used to send the up arrow key but that looks like it
+        # stopped working.
         volume_range = page.get(page.VOLUME_RANGE)
-        volume_range.send_keys(ARROW_UP)
-        wait_for_volume(0.8)
+        volume_range.click()
+        wait_for_volume(0.5)
 
         page.click(page.OPTIONS_OK_BUTTON)
         page.wait_until_gone(page.OPTIONS_DIV)
 
         page.show_options()
-        wait_for_volume(0.8)
+        wait_for_volume(0.5)
         ESCAPE = u'\ue00c'
         page.get(page.BODY).send_keys(ESCAPE)
         page.wait_until_gone(page.OPTIONS_DIV)
 
         page.reload()
-        wait_for_volume(0.8, check_span=False)
+        wait_for_volume(0.5, check_span=False)
 
 if __name__ == '__main__':
     unittest.main()
