@@ -8,11 +8,20 @@ body {
   padding: 5px;
 }
 
-#coverImage {
+#coverDiv {
   float: left;
+  width: 65px;
   height: 65px;
   padding-left: 2px;
   padding-right: 5px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#coverImage {
+  max-width: 65px;
+  height: auto;
   cursor: pointer;
   -webkit-user-select: none;
 }
