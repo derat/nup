@@ -51,6 +51,7 @@ var Song5s nup.Song = nup.Song{
 	Artist:   "Third Artist",
 	Title:    "Five Seconds",
 	Album:    "Another Album",
+	AlbumId:  "a1d2405b-afe0-4e28-a935-b5b256f68131",
 	Track:    1,
 	Disc:     2,
 	Length:   5.041,

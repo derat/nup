@@ -507,7 +507,7 @@ func TestCovers(tt *testing.T) {
 	log.Print("writing cover and updating songs")
 	CopySongsToTempDir(t.MusicDir, Song0s.Filename, Song5s.Filename)
 	s5 := Song5s
-	s5.CoverFilename = fmt.Sprintf("Various Artists-%s.jpg", s5.Album)
+	s5.CoverFilename = fmt.Sprintf("%s.jpg", s5.AlbumId)
 	createCover(s5.CoverFilename)
 	t.UpdateSongs()
 	if err := compareQueryResults([]nup.Song{Song0s, s5}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
@@ -518,7 +518,7 @@ func TestCovers(tt *testing.T) {
 	RemoveFromTempDir(t.MusicDir, Song0s.Filename)
 	CopySongsToTempDir(t.MusicDir, Song0sUpdated.Filename)
 	s0 := Song0sUpdated
-	s0.CoverFilename = fmt.Sprintf("%s-%s.jpg", s0.Artist, s0.Album)
+	s0.CoverFilename = fmt.Sprintf("%s.jpg", s0.AlbumId)
 	createCover(s0.CoverFilename)
 	t.UpdateSongs()
 	if err := compareQueryResults([]nup.Song{s0, s5}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {

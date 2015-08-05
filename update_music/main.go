@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"path/filepath"
 	"time"
 
 	"erat.org/cloud"
@@ -45,6 +46,17 @@ func setLastUpdateTime(path string, t time.Time) error {
 	return json.NewEncoder(f).Encode(t)
 }
 
+func getCoverFilename(dir string, song *nup.Song) string {
+	if len(song.AlbumId) == 0 {
+		return ""
+	}
+	fn := song.AlbumId + ".jpg"
+	if _, err := os.Stat(filepath.Join(dir, fn)); err != nil {
+		return ""
+	}
+	return fn
+}
+
 func main() {
 	configFile := flag.String("config", "", "Path to config file")
 	deleteSongId := flag.Int64("delete-song-id", 0, "Delete song with given ID")
@@ -70,13 +82,7 @@ func main() {
 		return
 	}
 
-	log.Printf("Loading covers from %v", cfg.CoverDir)
 	var err error
-	cf := NewCoverFinder()
-	if err = cf.AddDir(cfg.CoverDir); err != nil {
-		log.Fatal(err)
-	}
-
 	numSongs := 0
 	readChan := make(chan nup.SongOrErr)
 	startTime := time.Now()
@@ -139,9 +145,9 @@ func main() {
 			if s.Err != nil {
 				log.Fatalf("Got error for %v: %v\n", s.Filename, s.Err)
 			}
-			s.CoverFilename = cf.FindFilename(s.Artist, s.Album)
+			s.CoverFilename = getCoverFilename(cfg.CoverDir, s.Song)
 			if *requireCovers && len(s.CoverFilename) == 0 {
-				log.Fatalf("Failed to find cover for %v (%v-%v)", s.Filename, s.Artist, s.Album)
+				log.Fatalf("Failed to find cover for %v (%v)", s.Filename, s.AlbumId)
 			}
 
 			log.Print("Sending ", s.Filename)
