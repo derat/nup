@@ -289,6 +289,11 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	includeCovers := false
+	if r.FormValue("covers") == "1" {
+		includeCovers = true
+	}
+
 	var max int64 = defaultDumpBatchSize
 	if len(r.FormValue("max")) > 0 && !parseIntParam(c, w, r, "max", &max) {
 		return
@@ -307,7 +312,7 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 	switch r.FormValue("type") {
 	case "song":
 		var songs []nup.Song
-		songs, nextCursor, err = dumpSongs(c, max, r.FormValue("cursor"))
+		songs, nextCursor, err = dumpSongs(c, max, r.FormValue("cursor"), includeCovers)
 		if err != nil {
 			c.Errorf("Dumping songs failed: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)

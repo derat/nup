@@ -68,7 +68,7 @@ func dumpEntities(c appengine.Context, q *datastore.Query, cursor string, entiti
 	return ids, parentIds, nextCursor, nil
 }
 
-func dumpSongs(c appengine.Context, max int64, cursor string) (songs []nup.Song, nextCursor string, err error) {
+func dumpSongs(c appengine.Context, max int64, cursor string, includeCovers bool) (songs []nup.Song, nextCursor string, err error) {
 	songs = make([]nup.Song, max)
 	songPtrs := make([]interface{}, max)
 	for i := range songs {
@@ -84,7 +84,9 @@ func dumpSongs(c appengine.Context, max int64, cursor string) (songs []nup.Song,
 	for i, id := range ids {
 		s := &songs[i]
 		s.SongId = strconv.FormatInt(id, 10)
-		s.CoverFilename = ""
+		if !includeCovers {
+			s.CoverFilename = ""
+		}
 	}
 	return songs, nextCursor, nil
 }

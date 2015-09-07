@@ -133,12 +133,25 @@ type stripPolicy int
 
 const (
 	stripIds stripPolicy = iota
-	retainIds
+	keepIds
 )
 
-func (t *Tester) DumpSongs(strip stripPolicy) []nup.Song {
+type coverPolicy int
+
+const (
+	skipCovers coverPolicy = iota
+	getCovers
+)
+
+func (t *Tester) DumpSongs(strip stripPolicy, covers coverPolicy) []nup.Song {
+	coversValue := "false"
+	if covers == getCovers {
+		coversValue = "true"
+	}
+
 	stdout, stderr, err := runCommand(filepath.Join(t.binDir, "dump_music"), "-config="+t.dumpConfigFile,
-		"-song-batch-size="+strconv.Itoa(dumpBatchSize), "-play-batch-size="+strconv.Itoa(dumpBatchSize))
+		"-song-batch-size="+strconv.Itoa(dumpBatchSize), "-play-batch-size="+strconv.Itoa(dumpBatchSize),
+		"-covers="+coversValue)
 	if err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
@@ -165,7 +178,7 @@ func (t *Tester) DumpSongs(strip stripPolicy) []nup.Song {
 }
 
 func (t *Tester) GetSongId(sha1 string) string {
-	for _, s := range t.DumpSongs(retainIds) {
+	for _, s := range t.DumpSongs(keepIds, skipCovers) {
 		if s.Sha1 == sha1 {
 			return s.SongId
 		}

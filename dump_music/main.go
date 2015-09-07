@@ -24,7 +24,7 @@ const (
 	chanSize             = 50
 )
 
-func getEntities(cfg *nup.ClientConfig, entityType string, batchSize int, f func([]byte)) {
+func getEntities(cfg *nup.ClientConfig, entityType string, extraArgs string, batchSize int, f func([]byte)) {
 	client := http.Client{}
 	u, err := nup.GetServerUrl(cfg.ServerUrl, exportPath)
 	if err != nil {
@@ -34,6 +34,9 @@ func getEntities(cfg *nup.ClientConfig, entityType string, batchSize int, f func
 	cursor := ""
 	for {
 		u.RawQuery = fmt.Sprintf("type=%s&max=%d", entityType, batchSize)
+		if len(extraArgs) > 0 {
+			u.RawQuery += "&" + extraArgs
+		}
 		if len(cursor) > 0 {
 			u.RawQuery += "&cursor=" + cursor
 		}
@@ -71,8 +74,15 @@ func getEntities(cfg *nup.ClientConfig, entityType string, batchSize int, f func
 	}
 }
 
-func getSongs(cfg *nup.ClientConfig, batchSize int, ch chan *nup.Song) {
-	getEntities(cfg, "song", batchSize, func(b []byte) {
+func getSongs(cfg *nup.ClientConfig, batchSize int, includeCovers bool, ch chan *nup.Song) {
+	extraArgs := "covers="
+	if includeCovers {
+		extraArgs += "1"
+	} else {
+		extraArgs += "0"
+	}
+
+	getEntities(cfg, "song", extraArgs, batchSize, func(b []byte) {
 		var s nup.Song
 		if err := json.Unmarshal(b, &s); err == nil {
 			ch <- &s
@@ -84,7 +94,7 @@ func getSongs(cfg *nup.ClientConfig, batchSize int, ch chan *nup.Song) {
 }
 
 func getPlays(cfg *nup.ClientConfig, batchSize int, ch chan *nup.PlayDump) {
-	getEntities(cfg, "play", batchSize, func(b []byte) {
+	getEntities(cfg, "play", "", batchSize, func(b []byte) {
 		var pd nup.PlayDump
 		if err := json.Unmarshal(b, &pd); err == nil {
 			ch <- &pd
@@ -99,6 +109,7 @@ func main() {
 	songBatchSize := flag.Int("song-batch-size", defaultSongBatchSize, "Size for each batch of entities")
 	playBatchSize := flag.Int("play-batch-size", defaultPlayBatchSize, "Size for each batch of entities")
 	configFile := flag.String("config", "", "Path to config file")
+	includeCovers := flag.Bool("covers", false, "Include cover filenames")
 	flag.Parse()
 
 	var cfg nup.ClientConfig
@@ -107,7 +118,7 @@ func main() {
 	}
 
 	songChan := make(chan *nup.Song, chanSize)
-	go getSongs(&cfg, *songBatchSize, songChan)
+	go getSongs(&cfg, *songBatchSize, *includeCovers, songChan)
 
 	playChan := make(chan *nup.PlayDump, chanSize)
 	go getPlays(&cfg, *playBatchSize, playChan)
