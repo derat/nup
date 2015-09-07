@@ -79,27 +79,27 @@ func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLeng
 		return (header << startBit) >> (32 - numBits)
 	}
 	if getBits(0, 11) != 0x7ff {
-		return 0, fmt.Errorf("Missing sync at %v", headerLength)
+		return 0, fmt.Errorf("Missing sync at %v (got 0x%x instead of 0x7ff)", headerLength, getBits(0, 11))
 	}
 	if getBits(11, 2) != 0x3 {
-		return 0, fmt.Errorf("Unsupported MPEG Audio version at %v", headerLength)
+		return 0, fmt.Errorf("Unsupported MPEG Audio version at %v (got 0x%x instead of 0x3)", headerLength, getBits(11, 2))
 	}
 	if getBits(13, 2) != 0x1 {
-		return 0, fmt.Errorf("Unsupported layer at %v", headerLength)
+		return 0, fmt.Errorf("Unsupported layer at %v (got 0x%x instead of 0x1)", headerLength, getBits(13, 2))
 	}
 
 	// This table is specific to MPEG 1, Layer 3.
 	var kbitRates = [...]int64{0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0}
 	kbitRate := kbitRates[getBits(16, 4)]
 	if kbitRate == 0 {
-		return 0, fmt.Errorf("Unsupported bitrate at %v", headerLength)
+		return 0, fmt.Errorf("Unsupported bitrate at %v (got index %d)", headerLength, getBits(16, 4))
 	}
 
 	// This table is specific to MPEG 1.
 	var sampleRates = [...]int64{44100, 48000, 32000, 0}
 	sampleRate := sampleRates[getBits(20, 2)]
 	if sampleRate == 0 {
-		return 0, fmt.Errorf("Unsupported sample rate at %v", headerLength)
+		return 0, fmt.Errorf("Unsupported sample rate at %v (got index %d)", headerLength, getBits(20, 2))
 	}
 
 	xingHeaderStart := headerLength + 4
