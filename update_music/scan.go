@@ -69,37 +69,37 @@ func computeAudioSha1(f *os.File, fi os.FileInfo, headerLength, footerLength int
 // Format details at http://www.codeproject.com/Articles/8295/MPEG-Audio-Frame-Header.
 func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLength int64) (int64, error) {
 	if _, err := f.Seek(headerLength, 0); err != nil {
-		return 0, fmt.Errorf("Unable to seek to %v: %v", headerLength, err)
+		return 0, fmt.Errorf("Unable to seek to 0x%x: %v", headerLength, err)
 	}
 	var header uint32
 	if err := binary.Read(f, binary.BigEndian, &header); err != nil {
-		return 0, fmt.Errorf("Unable to read frame header at %v: %v", headerLength, err)
+		return 0, fmt.Errorf("Unable to read frame header at 0x%x: %v", headerLength, err)
 	}
 	getBits := func(startBit, numBits uint) uint32 {
 		return (header << startBit) >> (32 - numBits)
 	}
 	if getBits(0, 11) != 0x7ff {
-		return 0, fmt.Errorf("Missing sync at %v (got 0x%x instead of 0x7ff)", headerLength, getBits(0, 11))
+		return 0, fmt.Errorf("Missing sync at 0x%x (got 0x%x instead of 0x7ff)", headerLength, getBits(0, 11))
 	}
 	if getBits(11, 2) != 0x3 {
-		return 0, fmt.Errorf("Unsupported MPEG Audio version at %v (got 0x%x instead of 0x3)", headerLength, getBits(11, 2))
+		return 0, fmt.Errorf("Unsupported MPEG Audio version at 0x%x (got 0x%x instead of 0x3)", headerLength, getBits(11, 2))
 	}
 	if getBits(13, 2) != 0x1 {
-		return 0, fmt.Errorf("Unsupported layer at %v (got 0x%x instead of 0x1)", headerLength, getBits(13, 2))
+		return 0, fmt.Errorf("Unsupported layer at 0%x (got 0x%x instead of 0x1)", headerLength, getBits(13, 2))
 	}
 
 	// This table is specific to MPEG 1, Layer 3.
 	var kbitRates = [...]int64{0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0}
 	kbitRate := kbitRates[getBits(16, 4)]
 	if kbitRate == 0 {
-		return 0, fmt.Errorf("Unsupported bitrate at %v (got index %d)", headerLength, getBits(16, 4))
+		return 0, fmt.Errorf("Unsupported bitrate at 0x%x (got index %d)", headerLength, getBits(16, 4))
 	}
 
 	// This table is specific to MPEG 1.
 	var sampleRates = [...]int64{44100, 48000, 32000, 0}
 	sampleRate := sampleRates[getBits(20, 2)]
 	if sampleRate == 0 {
-		return 0, fmt.Errorf("Unsupported sample rate at %v (got index %d)", headerLength, getBits(20, 2))
+		return 0, fmt.Errorf("Unsupported sample rate at 0x%x (got index %d)", headerLength, getBits(20, 2))
 	}
 
 	xingHeaderStart := headerLength + 4
@@ -116,7 +116,7 @@ func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLeng
 
 	b := make([]byte, 12, 12)
 	if _, err := f.ReadAt(b, xingHeaderStart); err != nil {
-		return 0, fmt.Errorf("Unable to read Xing header at %v: %v", xingHeaderStart, err)
+		return 0, fmt.Errorf("Unable to read Xing header at 0x%x: %v", xingHeaderStart, err)
 	}
 	xingHeaderName := string(b[0:4])
 	if xingHeaderName == "Xing" || xingHeaderName == "Info" {
@@ -124,7 +124,7 @@ func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLeng
 		var xingFlags uint32
 		binary.Read(r, binary.BigEndian, &xingFlags)
 		if xingFlags&0x1 == 0x0 {
-			return 0, fmt.Errorf("Xing header at %v lacks number of frames", xingHeaderStart)
+			return 0, fmt.Errorf("Xing header at 0x%x lacks number of frames", xingHeaderStart)
 		}
 		var numFrames uint32
 		binary.Read(r, binary.BigEndian, &numFrames)
