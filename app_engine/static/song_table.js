@@ -7,6 +7,9 @@ function SongTable(table, useCheckboxes, artistClickedCallback, albumClickedCall
   this.artistClickedCallback_ = artistClickedCallback;
   this.albumClickedCallback_ = albumClickedCallback;
 
+  // Index of the last-clicked checkbox (0 is header).
+  this.lastClickedCheckboxIndex_ = -1;
+
   if (useCheckboxes) {
     this.headingCheckbox_ = this.table_.rows[0].cells[0].childNodes[0];
     this.headingCheckbox_.addEventListener('click', this.handleCheckboxClicked_.bind(this, this.headingCheckbox_), false);
@@ -86,6 +89,8 @@ SongTable.prototype.updateSongs = function(newSongs) {
     if (this.checkedSongsChangedCallback_)
       this.checkedSongsChangedCallback_(this.numCheckedSongs_);
   }
+
+  this.lastClickedCheckboxIndex_ = -1;
 };
 
 // Initialize newly-created |row| to contain song data.
@@ -151,18 +156,47 @@ SongTable.prototype.handleAlbumClicked_ = function(row) {
 };
 
 // Handle one of the checkboxes being clicked.
-SongTable.prototype.handleCheckboxClicked_ = function(checkbox) {
-  var head = this.headingCheckbox_;
+SongTable.prototype.handleCheckboxClicked_ = function(checkbox, e) {
+  var table = this.table_;
+  var getCheckbox = function(index) {
+    return table.rows[index].cells[0].children[0];
+  }
+  var index = -1;
+  for (var i = 0; i < table.rows.length; i++) {
+    if (checkbox == getCheckbox(i)) {
+      index = i;
+      break;
+    }
+  }
   var checked = checkbox.checked;
 
-  if (checkbox == head) {
-    for (var i = 1; i < this.table_.rows.length; i++)
-      this.table_.rows[i].cells[0].children[0].checked = checked ? 'checked' : null;
+  if (index == 0) {
+    for (var i = 1; i < table.rows.length; i++)
+      getCheckbox(i).checked = checked ? 'checked' : null;
     this.numCheckedSongs_ = checked ? this.getNumSongs() : 0;
   } else {
     this.numCheckedSongs_ += checked ? 1 : -1;
+
+    if (e && e.shiftKey && checked) {
+      if (this.lastClickedCheckboxIndex_ > 0 &&
+          this.lastClickedCheckboxIndex_ < table.rows.length &&
+          this.lastClickedCheckboxIndex_ != index &&
+          getCheckbox(this.lastClickedCheckboxIndex_).checked) {
+        var start = Math.min(index, this.lastClickedCheckboxIndex_);
+        var end = Math.max(index, this.lastClickedCheckboxIndex_);
+        for (var i = start + 1; i < end; i++) {
+          var c = getCheckbox(i);
+          if (!c.checked) {
+            c.checked = 'checked';
+            this.numCheckedSongs_++;
+          }
+        }
+      }
+    }
   }
+
   this.updateHeadingCheckbox_();
+  this.lastClickedCheckboxIndex_ = index;
 
   if (this.checkedSongsChangedCallback_)
     this.checkedSongsChangedCallback_(this.numCheckedSongs_);
