@@ -62,7 +62,6 @@ func getEntities(cfg *nup.ClientConfig, entityType string, extraArgs string, bat
 			if err := json.Unmarshal(scanner.Bytes(), &cursor); err != nil {
 				f(scanner.Bytes())
 			}
-
 		}
 		if err = scanner.Err(); err != nil {
 			log.Fatal("Got error while reading from server: ", err)
