@@ -275,7 +275,7 @@ func deleteSong(c appengine.Context, id int64) error {
 		return fmt.Errorf("Not deleting song %v due to cache eviction error: %v", id, err)
 	}
 
-	return datastore.RunInTransaction(c, func(c appengine.Context) error {
+	err := datastore.RunInTransaction(c, func(c appengine.Context) error {
 		songKey := datastore.NewKey(c, songKind, "", id, nil)
 		song := nup.Song{}
 		if err := datastore.Get(c, songKey, &song); err != nil {
@@ -311,6 +311,11 @@ func deleteSong(c appengine.Context, id int64) error {
 
 		return nil
 	}, &datastore.TransactionOptions{XG: true})
+	if err != nil {
+		return err
+	}
+
+	return flushDataFromCacheForUpdate(c, metadataUpdate)
 }
 
 func clearData(c appengine.Context) error {
