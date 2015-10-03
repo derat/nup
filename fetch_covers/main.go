@@ -12,17 +12,37 @@ import (
 	"sync"
 
 	"erat.org/nup"
+	"github.com/hjfreyer/taglib-go/taglib"
 )
 
 const (
 	logInterval = 100
+	albumIdTag  = "MusicBrainz Album Id"
 )
 
 func getCoverFilename(albumId string) string {
 	return albumId + ".jpg"
 }
 
-func readSongs(jsonPath string, coverDir string, maxSongs int) (albumIds []string, err error) {
+func readSong(path string) (albumId string, err error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	tag, err := taglib.Decode(f, fi.Size())
+	if err != nil {
+		return "", err
+	}
+	return tag.CustomFrames()[albumIdTag], nil
+}
+
+func readDumpFile(jsonPath string, coverDir string, maxSongs int) (albumIds []string, err error) {
 	missingAlbumIds := make(map[string]bool)
 
 	f, err := os.Open(jsonPath)
@@ -152,17 +172,35 @@ func main() {
 	maxRequests := flag.Int("max-requests", 2, "Maximum number of parallel HTTP requests")
 	flag.Parse()
 
-	if len(*dumpFile) == 0 {
-		log.Fatal("-dump-file must be set")
-	}
 	if len(*coverDir) == 0 {
 		log.Fatal("-cover-dir must be set")
 	}
 
-	log.Printf("Reading songs from %v", *dumpFile)
-	albumIds, err := readSongs(*dumpFile, *coverDir, *maxSongs)
-	if err != nil {
-		log.Fatal(err)
+	albumIds := make([]string, 0)
+	if len(*dumpFile) > 0 {
+		if len(flag.Args()) > 0 {
+			log.Fatal("Cannot both set -dump-file and list music files")
+		}
+		log.Printf("Reading songs from %v", *dumpFile)
+		var err error
+		if albumIds, err = readDumpFile(*dumpFile, *coverDir, *maxSongs); err != nil {
+			log.Fatal(err)
+		}
+	} else if len(flag.Args()) > 0 {
+		ids := make(map[string]bool)
+		for _, p := range flag.Args() {
+			if id, err := readSong(p); err != nil {
+				log.Fatal("Failed to read %v: %v", p, err)
+			} else if len(id) > 0 {
+				log.Printf("%v has album ID %v", p, id)
+				ids[id] = true
+			}
+		}
+		for id, _ := range ids {
+			albumIds = append(albumIds, id)
+		}
+	} else {
+		log.Fatal("Either set -dump-file or list music files as arguments")
 	}
 
 	log.Printf("Downloading cover(s) for %v album(s)", len(albumIds))
