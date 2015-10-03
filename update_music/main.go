@@ -67,7 +67,7 @@ func main() {
 	importMinId := flag.Int64("import-min-id", 0, "Starting ID for --import-db (for resuming after failure)")
 	importUserData := flag.Bool("import-user-data", true, "When importing from DB or JSON, replace user data (ratings, tags, plays, etc.)")
 	limit := flag.Int("limit", 0, "If positive, limits the number of songs to update (for testing)")
-	requireCovers := flag.Bool("require-covers", false, "Die if cover images aren't found for any songs")
+	requireCovers := flag.Bool("require-covers", false, "Die if cover images aren't found for any songs that have album IDs")
 	songPathsFile := flag.String("song-paths-file", "", "Path to a file containing one relative path per line for songs to force updating")
 	flag.Parse()
 
@@ -146,7 +146,7 @@ func main() {
 				log.Fatalf("Got error for %v: %v\n", s.Filename, s.Err)
 			}
 			s.CoverFilename = getCoverFilename(cfg.CoverDir, s.Song)
-			if *requireCovers && len(s.CoverFilename) == 0 {
+			if *requireCovers && len(s.CoverFilename) == 0 && len(s.AlbumId) > 0 {
 				log.Fatalf("Failed to find cover for %v (%v)", s.Filename, s.AlbumId)
 			}
 
