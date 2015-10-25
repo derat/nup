@@ -389,8 +389,10 @@ Player.prototype.onError = function(e) {
         var song = this.getCurrentSong();
         var url = song ? song.url : '';
         console.log('Retrying ' + url + ' from position ' + this.lastPositionSec);
+        this.audio.pause();
         this.audio.src = url;
         this.audio.currentTime = this.lastPositionSec;
+        this.audio.play();
       } else {
         console.log('Giving up after ' + this.numErrors + ' error(s)');
         this.cycleTrack(1);
