@@ -13,7 +13,27 @@ indexes:
 - kind: Song
   properties:
   - name: AlbumLower
+  - name: LastStartTime
+
+- kind: Song
+  properties:
+  - name: AlbumLower
+  - name: NumPlays
+
+- kind: Song
+  properties:
+  - name: AlbumLower
   - name: Rating
+
+- kind: Song
+  properties:
+  - name: ArtistLower
+  - name: LastStartTime
+
+- kind: Song
+  properties:
+  - name: ArtistLower
+  - name: NumPlays
 
 - kind: Song
   properties:
@@ -25,6 +45,16 @@ indexes:
   - name: Disc
   - name: Track
   - name: FirstStartTime
+
+- kind: Song
+  properties:
+  - name: Keywords
+  - name: LastStartTime
+
+- kind: Song
+  properties:
+  - name: Keywords
+  - name: NumPlays
 
 - kind: Song
   properties:
