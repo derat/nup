@@ -5,6 +5,7 @@ import selenium
 import utils
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 
 from song import Song
 
@@ -179,11 +180,20 @@ class Page(object):
     def focus(self, locator):
         self.driver.focus(locator)
 
-    def click_search_result_checkbox(self, row_index):
-        self.get(Page.SEARCH_RESULTS_TABLE).\
+    def click_search_result_checkbox(self, row_index, shift=False):
+        action = ActionChains(self.driver)
+        if shift:
+            action.key_down(Keys.SHIFT)
+
+        checkbox = self.get(Page.SEARCH_RESULTS_TABLE).\
             find_elements_by_tag_name('tr')[row_index + 1].\
             find_elements_by_tag_name('td')[0].\
-            find_elements_by_tag_name('input')[0].click()
+            find_elements_by_tag_name('input')[0]
+        action.click(checkbox)
+
+        if shift:
+            action.key_up(Keys.SHIFT)
+        action.perform()
 
     def click_rating(self, num_stars):
         stars = self.get(self.RATING_SPAN).find_elements_by_tag_name('a')

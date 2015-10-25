@@ -324,6 +324,14 @@ class Test(unittest.TestCase):
         self.wait_for_search_results(page, songs, [True, True, True])
         check_selected(True, True)
 
+        # Shift-click downward.
+        page.click(page.SEARCH_RESULTS_CHECKBOX)
+        self.wait_for_search_results(page, songs, [False, False, False])
+        page.click_search_result_checkbox(0, True)
+        page.click_search_result_checkbox(2, True)
+        self.wait_for_search_results(page, songs, [True, True, True])
+        check_selected(True, True)
+
     def test_add_to_playlist(self):
         song1 = Song('a', 't1', 'al1', 1)
         song2 = Song('a', 't2', 'al1', 2)
