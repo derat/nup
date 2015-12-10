@@ -47,14 +47,19 @@ func setLastUpdateTime(path string, t time.Time) error {
 }
 
 func getCoverFilename(dir string, song *nup.Song) string {
-	if len(song.AlbumId) == 0 {
-		return ""
+	if len(song.AlbumId) != 0 {
+		fn := song.AlbumId + ".jpg"
+		if _, err := os.Stat(filepath.Join(dir, fn)); err == nil {
+			return fn
+		}
 	}
-	fn := song.AlbumId + ".jpg"
-	if _, err := os.Stat(filepath.Join(dir, fn)); err != nil {
-		return ""
+	if len(song.RecordingId) != 0 {
+		fn := song.RecordingId + ".jpg"
+		if _, err := os.Stat(filepath.Join(dir, fn)); err == nil {
+			return fn
+		}
 	}
-	return fn
+	return ""
 }
 
 func main() {
@@ -146,9 +151,10 @@ func main() {
 				log.Fatalf("Got error for %v: %v\n", s.Filename, s.Err)
 			}
 			s.CoverFilename = getCoverFilename(cfg.CoverDir, s.Song)
-			if *requireCovers && len(s.CoverFilename) == 0 && len(s.AlbumId) > 0 {
-				log.Fatalf("Failed to find cover for %v (%v)", s.Filename, s.AlbumId)
+			if *requireCovers && len(s.CoverFilename) == 0 && (len(s.AlbumId) > 0 || len(s.RecordingId) > 0) {
+				log.Fatalf("Failed to find cover for %v (album=%v, recording=%v)", s.Filename, s.AlbumId, s.RecordingId)
 			}
+			s.RecordingId = ""
 
 			log.Print("Sending ", s.Filename)
 			updateChan <- *s.Song

@@ -24,6 +24,10 @@ func scanAndCompareSongs(t *testing.T, desc, dir, forceGlob string, lastUpdateTi
 		return
 	}
 	for i := range expected {
+		if expected[i].RecordingId != actual[i].RecordingId {
+			t.Errorf("%v: song %v didn't have expected recording id: expected %q, actual %q", desc, i, expected[i].RecordingId, actual[i].RecordingId)
+			return
+		}
 		expected[i].Rating = 0
 	}
 	if err = test.CompareSongs(expected, actual, test.CompareOrder); err != nil {

@@ -536,13 +536,25 @@ func TestCovers(tt *testing.T) {
 		tt.Error(err)
 	}
 
+	log.Print("writing cover named after recording id")
+	CopySongsToTempDir(t.MusicDir, Song1s.Filename)
+	s1 := Song1s
+	s1.CoverFilename = fmt.Sprintf("%s.jpg", s1.RecordingId)
+	createCover(s1.CoverFilename)
+	RemoveFromTempDir(t.CoverDir, s0.CoverFilename)
+	t.UpdateSongs()
+	if err := compareQueryResults([]nup.Song{s0, s1, s5}, t.QuerySongs(""), IgnoreOrder, nup.WebClient); err != nil {
+		tt.Error(err)
+	}
+
 	log.Print("checking that covers are dumped (or not) as requested")
-	if err := CompareSongs([]nup.Song{s0, s5}, t.DumpSongs(stripIds, getCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]nup.Song{s0, s1, s5}, t.DumpSongs(stripIds, getCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 	s0.CoverFilename = ""
+	s1.CoverFilename = ""
 	s5.CoverFilename = ""
-	if err := CompareSongs([]nup.Song{s0, s5}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]nup.Song{s0, s1, s5}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 }

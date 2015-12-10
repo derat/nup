@@ -20,6 +20,7 @@ import (
 
 const (
 	albumIdTag          = "MusicBrainz Album Id"
+	recordingIdOwner    = "http://musicbrainz.org"
 	logProgressInterval = 100
 	mp3Extension        = ".mp3"
 )
@@ -169,6 +170,7 @@ func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan nup.S
 		s.Title = tag.Title()
 		s.Album = tag.Album()
 		s.AlbumId = tag.CustomFrames()[albumIdTag]
+		s.RecordingId = tag.UniqueFileIdentifiers()[recordingIdOwner]
 		s.Track = int(tag.Track())
 		s.Disc = int(tag.Disc())
 		headerLength = int64(tag.TagSize())
