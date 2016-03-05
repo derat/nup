@@ -177,18 +177,20 @@ SongTable.prototype.handleCheckboxClicked_ = function(checkbox, e) {
   } else {
     this.numCheckedSongs_ += checked ? 1 : -1;
 
-    if (e && e.shiftKey && checked) {
+    if (e && e.shiftKey) {
       if (this.lastClickedCheckboxIndex_ > 0 &&
           this.lastClickedCheckboxIndex_ < table.rows.length &&
-          this.lastClickedCheckboxIndex_ != index &&
-          getCheckbox(this.lastClickedCheckboxIndex_).checked) {
+          this.lastClickedCheckboxIndex_ != index) {
         var start = Math.min(index, this.lastClickedCheckboxIndex_);
         var end = Math.max(index, this.lastClickedCheckboxIndex_);
-        for (var i = start + 1; i < end; i++) {
+        for (var i = start; i <= end; i++) {
           var c = getCheckbox(i);
-          if (!c.checked) {
+          if (checked && !c.checked) {
             c.checked = 'checked';
             this.numCheckedSongs_++;
+          } else if (!checked && c.checked) {
+            c.checked = null;
+            this.numCheckedSongs_--;
           }
         }
       }
