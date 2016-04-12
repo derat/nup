@@ -20,6 +20,9 @@ function Player() {
   // Number of consecutive playback errors.
   this.numErrors = 0;
 
+  // ID of pending timeout to retry the current track after a playback error.
+  this.retryId = -1;
+
   // Time at which we started playing the current track as seconds since the epoch.
   this.startTime = -1;
 
@@ -101,7 +104,7 @@ function Player() {
 Player.SEEK_SECONDS = 10;
 
 // Number of times to retry playback after consecutive errors.
-Player.MAX_RETRIES = 2;
+Player.MAX_RETRIES = 15;
 
 // Number of seconds that a notification is shown when the song changes.
 Player.NOTIFICATION_SECONDS = 3;
@@ -158,6 +161,11 @@ Player.prototype.cycleTrack = function(offset) {
 };
 
 Player.prototype.selectTrack = function(index) {
+  if (this.retryId >= 0) {
+    window.clearTimeout(this.retryId);
+    this.retryId = -1;
+  }
+
   if (!this.songs.length) {
     this.currentIndex = -1;
     this.updateSongDisplay();
@@ -373,6 +381,18 @@ Player.prototype.onTimeUpdate = function(e) {
   }
 };
 
+Player.prototype.retry = function() {
+  var song = this.getCurrentSong();
+  var url = song ? song.url : '';
+  console.log('Retrying ' + url + ' from position ' + this.lastPositionSec);
+
+  this.retryId = -1;
+  this.audio.pause();
+  this.audio.src = url;
+  this.audio.currentTime = this.lastPositionSec;
+  this.audio.play();
+};
+
 Player.prototype.onError = function(e) {
   this.numErrors++;
 
@@ -385,14 +405,10 @@ Player.prototype.onError = function(e) {
     case error.MEDIA_ERR_DECODE:             // 3
     case error.MEDIA_ERR_SRC_NOT_SUPPORTED:  // 4
       if (this.numErrors <= Player.MAX_RETRIES) {
-        // TODO: Set a timeout?
-        var song = this.getCurrentSong();
-        var url = song ? song.url : '';
-        console.log('Retrying ' + url + ' from position ' + this.lastPositionSec);
-        this.audio.pause();
-        this.audio.src = url;
-        this.audio.currentTime = this.lastPositionSec;
-        this.audio.play();
+        this.audio.url = '';
+        var delayMs = Math.min(Math.pow(2, this.numErrors - 1), 1000);
+        console.log('Scheduling retry after ' + delayMs + ' ms');
+        this.retryId = window.setTimeout(this.retry.bind(this), delayMs);
       } else {
         console.log('Giving up after ' + this.numErrors + ' error(s)');
         this.cycleTrack(1);
