@@ -385,12 +385,8 @@ Player.prototype.onError = function(e) {
     case error.MEDIA_ERR_DECODE:             // 3
     case error.MEDIA_ERR_SRC_NOT_SUPPORTED:  // 4
       if (this.numErrors <= Player.MAX_RETRIES) {
-        // TODO: Set a timeout?
-        var song = this.getCurrentSong();
-        var url = song ? song.url : '';
-        console.log('Retrying ' + url + ' from position ' + this.lastPositionSec);
-        this.audio.pause();
-        this.audio.src = url;
+        console.log('Retrying from position ' + this.lastPositionSec);
+        this.audio.load();
         this.audio.currentTime = this.lastPositionSec;
         this.audio.play();
       } else {
