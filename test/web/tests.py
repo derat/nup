@@ -47,6 +47,7 @@ def tearDownModule():
 
 class Test(unittest.TestCase):
     def setUp(self):
+        server.reset_connection()
         server.clear_data()
         self.base_music_url = 'http://%s:%d/' % file_thread.host_port()
 
@@ -88,20 +89,21 @@ class Test(unittest.TestCase):
             self.fail('Timed out waiting for expected playlist' + msg +
                       '.\nReceived:\n' + pprint.pformat(page.get_playlist()))
 
-    def wait_for_song(self, page, song, paused=None, time=None,
-                      rating=None, title=None, msg=''):
+    def wait_for_song(self, page, song, paused=None, ended=None, time=None,
+                      rating=None, title=None, msg='', timeout_sec=5):
         '''Waits until the page is playing the expected song.'''
         def is_current():
-            current, current_src, current_paused, current_time, \
+            current, current_src, current_paused, current_ended, current_time, \
                 current_rating, current_title = page.get_current_song()
             return current == song and \
                    current_src == self.base_music_url + song.filename and \
                    (paused is None or current_paused == paused) and \
+                   (ended is None or current_ended == ended) and \
                    (time is None or current_time == time) and \
                    (rating is None or current_rating == rating) and \
                    (title is None or current_title == title)
         try:
-            utils.wait(is_current, timeout_sec=5)
+            utils.wait(is_current, timeout_sec=timeout_sec)
         except utils.TimeoutError as e:
             msg = ' (' + msg + ')' if msg else ''
             self.fail('Timed out waiting for song' + msg + '.\nReceived ' +
@@ -486,6 +488,28 @@ class Test(unittest.TestCase):
         self.wait_for_server_user_data({
             song1.sha1: (None, None, [(song1_start_time, song1_end_time)]),
             song2.sha1: (None, None, [(song2_start_time, song2_end_time)]),
+        })
+
+    def test_report_replay(self):
+        song = Song('ar', 't1', 'al', 1, filename=Song.FILE_1S, length=1.0)
+        server.import_songs([song])
+
+        # Play the song to completion.
+        page = Page(driver)
+        page.keywords = song.artist
+        first_start_time = time.time()
+        page.click(page.LUCKY_BUTTON)
+        self.wait_for_song(page, song, ended=True)
+
+        # Replay the song.
+        second_start_time = time.time()
+        page.click(page.PLAY_PAUSE_BUTTON)
+
+        # Both playbacks should be reported.
+        self.wait_for_server_user_data({
+            song.sha1: (None, None, [
+                (first_start_time, second_start_time),
+                (second_start_time, second_start_time + 2)]),
         })
 
     def test_rate_and_tag(self):

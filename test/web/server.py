@@ -10,12 +10,15 @@ from song import Song
 
 class Server:
     def __init__(self, music_host_port):
-        self.conn = httplib.HTTPConnection(constants.HOSTNAME, constants.PORT)
+        self.reset_connection()
         self.music_host_port = music_host_port
         self.headers = {
             'Cookie': '%s=1' % constants.AUTH_COOKIE,
         }
         self.send_config()
+
+    def reset_connection(self):
+        self.conn = httplib.HTTPConnection(constants.HOSTNAME, constants.PORT)
 
     def send_config(self, force_update_failures=False):
         self.send('POST', '/config', json.dumps({

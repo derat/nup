@@ -138,6 +138,7 @@ class Page(object):
                Song being displayed
                string <audio> src
                bool <audio> paused state
+               bool <audio> ended state
                string displaying playback time (e.g. "[0:05 / 3:23]")
                string from rating overlay (e.g. THREE_STARS)
                string cover image title/tooltip text
@@ -149,6 +150,7 @@ class Page(object):
         return (song,
                 audio.get_attribute('src'),
                 audio.get_attribute('paused') is not None,
+                audio.get_attribute('ended') is not None,
                 self.get(Page.TIME_DIV).text,
                 self.get(Page.RATING_OVERLAY_DIV).text,
                 self.get(Page.COVER_IMAGE).get_attribute('title'))

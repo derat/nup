@@ -174,24 +174,12 @@ Player.prototype.selectTrack = function(index) {
     return;
 
   this.currentIndex = index;
-  this.lastPositionSec = 0;
-  this.numErrors = 0;
-  this.startTime = getCurrentTimeSec();
-  this.totalPlayedSec = 0;
-  this.lastUpdateTime = -1;
-  this.reportedCurrentTrack = false;
-
   this.notifyPlaylistAboutSongChange();
   this.updateSongDisplay();
+  this.startCurrentTrack();
   this.updateButtonState();
   if (!document.hasFocus())
     this.showNotification();
-
-  var song = this.getCurrentSong();
-  console.log('Switching to ' + song.songId + ' (' + song.url + ')');
-  this.audio.src = song.url;
-  this.play();
-  this.reachedEndOfSongs = false;
 };
 
 Player.prototype.updateTags = function(tags) {
@@ -306,6 +294,22 @@ Player.prototype.closeNotification = function() {
   this.closeNotificationTimeoutId = 0;
 };
 
+Player.prototype.startCurrentTrack = function() {
+  this.lastPositionSec = 0;
+  this.numErrors = 0;
+  this.startTime = getCurrentTimeSec();
+  this.totalPlayedSec = 0;
+  this.lastUpdateTime = -1;
+  this.reportedCurrentTrack = false;
+  this.reachedEndOfSongs = false;
+
+  var song = this.getCurrentSong();
+  console.log('Starting ' + song.songId + ' (' + song.url + ')');
+  this.audio.src = song.url;
+  this.audio.currentTime = 0;
+  this.play();
+}
+
 Player.prototype.play = function() {
   console.log('Playing');
   this.audio.play();
@@ -317,10 +321,13 @@ Player.prototype.pause = function() {
 };
 
 Player.prototype.togglePause = function() {
-  if (this.audio.paused)
+  if (this.reachedEndOfSongs) {
+    this.startCurrentTrack();
+  } else if (this.audio.paused) {
     this.play();
-  else
+  } else {
     this.pause();
+  }
 };
 
 Player.prototype.seek = function(seconds) {
