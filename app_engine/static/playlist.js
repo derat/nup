@@ -324,6 +324,10 @@ Playlist.prototype.handlePresetSelectChanged = function(event) {
       console.log('Unknown preset setting ' + vals[i]);
   }
 
+  // Unfocus the element so that arrow keys or Page Up/Down won't select new
+  // presets.
+  this.presetSelect.blur();
+
   this.submitQuery(play);
 };
 

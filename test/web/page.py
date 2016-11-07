@@ -56,6 +56,7 @@ class Page(object):
     OPTIONS_OK_BUTTON = (By.ID, 'optionsOkButton')
     PLAY_PAUSE_BUTTON = (By.ID, 'playPauseButton')
     PLAYLIST_TABLE = (By.ID, 'playlistTable')
+    PRESET_SELECT = (By.ID, 'presetSelect')
     PREV_BUTTON = (By.ID, 'prevButton')
     RATING_OVERLAY_DIV = (By.ID, 'ratingOverlayDiv')
     RATING_SPAN = (By.ID, 'ratingSpan')
@@ -87,6 +88,13 @@ class Page(object):
     THREE_STARS = u'★★★';
     FOUR_STARS = u'★★★★';
     FIVE_STARS = u'★★★★★';
+
+    # Values for PRESET_SELECT.
+    PRESET_INSTRUMENTAL_OLD = 'instrumental old'
+    PRESET_MELLOW = 'mellow'
+    PRESET_NEW_ALBUMS = 'new albums'
+    PRESET_UNRATED = 'unrated'
+    PRESET_OLD = 'old'
 
     def __init__(self, driver):
         self.driver = driver
@@ -181,6 +189,9 @@ class Page(object):
 
     def focus(self, locator):
         self.driver.focus(locator)
+
+    def is_focused(self, locator):
+        return self.get(locator) == self.driver.switch_to.active_element
 
     def click_search_result_checkbox(self, row_index, shift=False):
         action = ActionChains(self.driver)

@@ -665,5 +665,33 @@ class Test(unittest.TestCase):
         page.reload()
         wait_for_volume(0.5, check_span=False)
 
+    def test_presets(self):
+        song1 = Song('a', 't1', 'unrated')
+        song2 = Song('a', 't1', 'new', rating=0.25, track=1, disc=1,
+                     plays=[(time.time(), '')])
+        song3 = Song('a', 't2', 'new', rating=1.0, track=2, disc=1,
+                     plays=[(time.time(), '')])
+        song4 = Song('a', 't1', 'old', rating=0.75, plays=[(1, '')])
+        song5 = Song('a', 't2', 'old', rating=0.75, tags=['instrumental'],
+                     plays=[(1, '')])
+        song6 = Song('a', 't1', 'mellow', rating=0.75, tags=['mellow'])
+        server.import_songs([song1, song2, song3, song4, song5, song6])
+
+        page = Page(driver)
+        page.select(page.PRESET_SELECT, page.PRESET_INSTRUMENTAL_OLD)
+        self.wait_for_song(page, song5)
+        page.select(page.PRESET_SELECT, page.PRESET_MELLOW)
+        self.wait_for_song(page, song6)
+        page.select(page.PRESET_SELECT, page.PRESET_NEW_ALBUMS)
+        self.wait_for_search_results(page, [song2])
+        page.select(page.PRESET_SELECT, page.PRESET_UNRATED)
+        self.wait_for_song(page, song1)
+        # TODO: Test PRESET_OLD? Not sure how to, since it shuffles and
+        # autoplays (i.e. either song4 or song5 will play)...
+
+        if page.is_focused(page.PRESET_SELECT):
+            self.fail('Preset select still focused after click')
+
+
 if __name__ == '__main__':
     unittest.main()
