@@ -115,7 +115,7 @@ type BasicAuthInfo struct {
 	Password string
 }
 
-// ClientConfig holds the App Engine server's configuration.
+// ServerConfig holds the App Engine server's configuration.
 type ServerConfig struct {
 	// Email addresses of Google users allowed to use the server.
 	GoogleUsers []string
