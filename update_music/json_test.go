@@ -26,7 +26,7 @@ func TestJson(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if err = test.CompareSongs(songs, actual, test.CompareOrder); err != nil {
+	if err = test.CompareSongs(songs, actual, test.IgnoreOrder); err != nil {
 		t.Error(err)
 	}
 }
