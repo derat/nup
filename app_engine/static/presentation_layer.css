@@ -1,0 +1,90 @@
+#presentationOverlay {
+  background-color: black;
+  display: none;
+  font-family: Arial, Helvetica, sans-serif;
+  height: 100%;
+  position: absolute;
+  width: 100%;
+  z-index: 5;
+}
+
+#presentationOverlay.shown {
+  display: flex;
+}
+
+#presentationLeft {
+  width: calc(60% - 40px);
+  height: calc(100% - 40px);
+  max-height: calc(100% - 40px);
+  margin: 20px;
+}
+
+#presentationCurrentCoverImg {
+  max-width: 100%;
+  max-height: 100%;
+  height: auto;
+}
+
+#presentationRight {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin: 60px 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#presentationRight .artist {
+  font-weight: bold;
+}
+
+#presentationRight .album {
+  font-style: italic;
+}
+
+#presentationCurrentText div {
+  color: white;
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+#presentationNextDiv {
+  display: none;
+}
+
+#presentationNextDiv.shown {
+  display: block;;
+}
+
+#presentationNextDiv div {
+  margin-top: 4px;
+}
+
+#presentationNextHeading {
+  color: #999;
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+#presentationNextDetails {
+  display: flex;
+}
+
+#presentationNextCoverDiv {
+  height: 80px;
+  width: 80px;
+  margin-right: 16px;
+}
+
+#presentationNextCoverImg {
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+#presentationNextText {
+  color: white;
+  font-size: 18px;
+}

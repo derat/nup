@@ -4,6 +4,7 @@
   <title>Player</title>
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
   <link id="favicon" href="images/missing_cover_icon.png" type="image/png" rel="icon"/>
+  <link href="presentation_layer.css" rel="stylesheet" type="text/css"/>
   <link href="song_table.css" rel="stylesheet" type="text/css"/>
   <link href="suggester.css" rel="stylesheet" type="text/css"/>
   <link href="dialog_manager.css" rel="stylesheet" type="text/css"/>
@@ -17,12 +18,39 @@
   <script src="suggester.js" type="text/javascript"></script>
   <script src="dialog_manager.js" type="text/javascript"></script>
   <script src="options_dialog.js" type="text/javascript"></script>
+  <script src="presentation_layer.js" type="text/javascript"></script>
   <script src="playlist.js" type="text/javascript"></script>
   <script src="updater.js" type="text/javascript"></script>
   <script src="player.js" type="text/javascript"></script>
 </head>
 
-<body onLoad="initConfig(); initDialogManager(); initPlayer(); initPlaylist()">
+<body onLoad="initConfig(); initDialogManager(); initPresentationLayer(); initPlayer(); initPlaylist();">
+
+<div id="presentationOverlay">
+  <div id="presentationLeft">
+    <img id="presentationCurrentCoverImg">
+  </div>
+  <div id="presentationRight">
+    <div id="presentationCurrentText">
+      <div id="presentationCurrentArtist" class="artist"></div>
+      <div id="presentationCurrentTitle" class="title"></div>
+      <div id="presentationCurrentAlbum" class="album"></div>
+    </div>
+    <div id="presentationNextDiv">
+      <div id="presentationNextHeading">Next</div>
+      <div id="presentationNextDetails">
+        <div id="presentationNextCoverDiv">
+          <img id="presentationNextCoverImg">
+        </div>
+        <div id="presentationNextText">
+          <div id="presentationNextArtist" class="artist"></div>
+          <div id="presentationNextTitle" class="title"></div>
+          <div id="presentationNextAlbum" class="album"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div id="playlistContainer">
   <div id="leftPane">

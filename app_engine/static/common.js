@@ -60,6 +60,7 @@ var KeyCodes = {
   P:       80,
   R:       82,
   T:       84,
+  V:       86,
 
   ZERO:    48,
   FIVE:    53

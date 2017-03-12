@@ -51,6 +51,7 @@ function Player() {
   this.updater = new Updater();
 
   this.dialogManager = document.dialogManager;
+  this.presentationLayer = document.presentationLayer;
   this.optionsDialog = null;
 
   this.audio = $('audio');
@@ -176,6 +177,7 @@ Player.prototype.selectTrack = function(index) {
   this.currentIndex = index;
   this.notifyPlaylistAboutSongChange();
   this.updateSongDisplay();
+  this.updatePresentationLayer();
   this.startCurrentTrack();
   this.updateButtonState();
   if (!document.hasFocus())
@@ -236,7 +238,16 @@ Player.prototype.updateCoverTitleAttribute = function() {
 
 Player.prototype.updateRatingOverlay = function() {
   var song = this.getCurrentSong();
-  this.ratingOverlayDiv.innerText = (song && song.rating >= 0.0) ? this.getRatingString(song.rating, false, false) : '';
+  this.ratingOverlayDiv.innerText = (song && song.rating >= 0.0) ?
+      this.getRatingString(song.rating, false, false) : '';
+};
+
+Player.prototype.updatePresentationLayer = function() {
+  var nextSong = null;
+  if (this.currentIndex >= 0 && this.currentIndex + 1 < this.songs.length)
+    nextSong = this.songs[this.currentIndex + 1];
+
+  this.presentationLayer.update(this.getCurrentSong(), nextSong);
 };
 
 Player.prototype.getRatingString = function(rating, withLabel, includeEmpty) {
@@ -541,11 +552,20 @@ Player.prototype.processAccelerator = function(e) {
     if (this.showUpdateDiv())
       this.tagsTextarea.focus();
     return true;
+  } else if (e.altKey && e.keyCode == KeyCodes.V) {
+    if (this.presentationLayer.isShown())
+      this.presentationLayer.hide();
+    else
+      this.presentationLayer.show();
+    return true;
   } else if (e.keyCode == KeyCodes.SPACE && !this.updateSong) {
     this.togglePause();
     return true;
   } else if (e.keyCode == KeyCodes.ENTER && this.updateSong) {
     this.hideUpdateDiv(true);
+    return true;
+  } else if (e.keyCode == KeyCodes.ESCAPE && this.presentationLayer.isShown()) {
+    this.presentationLayer.hide();
     return true;
   } else if (e.keyCode == KeyCodes.ESCAPE && this.updateSong) {
     this.hideUpdateDiv(false);
