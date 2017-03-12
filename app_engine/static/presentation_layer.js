@@ -42,11 +42,13 @@ PresentationLayer.prototype.isShown = function() {
 };
 
 PresentationLayer.prototype.show = function() {
+  addClassName(document.body, 'presenting');
   this.overlay.className = 'shown';
   this.shown = true;
 };
 
 PresentationLayer.prototype.hide = function() {
+  removeClassName(document.body, 'presenting');
   this.overlay.className = '';
   this.shown = false;
 };

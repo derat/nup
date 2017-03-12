@@ -1,3 +1,7 @@
+body .presenting {
+  overflow: hidden;
+}
+
 #presentationOverlay {
   background-color: black;
   display: none;
@@ -20,9 +24,9 @@
 }
 
 #presentationCurrentCoverImg {
-  max-width: 100%;
-  max-height: 100%;
-  height: auto;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 #presentationRight {
