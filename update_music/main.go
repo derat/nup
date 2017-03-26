@@ -118,7 +118,7 @@ func main() {
 		} else {
 			lastUpdateTime, err := getLastUpdateTime(cfg.LastUpdateTimeFile)
 			if err != nil {
-				log.Fatalf("Unable to get last update time: ", err)
+				log.Fatal("Unable to get last update time: ", err)
 			}
 			log.Printf("Scanning for songs in %v updated since %v", cfg.MusicDir, lastUpdateTime.Local())
 			if numSongs, err = scanForUpdatedSongs(cfg.MusicDir, *forceGlob, lastUpdateTime, readChan, true); err != nil {
