@@ -1,0 +1,8 @@
+{
+  "GoogleUsers": [ "test@example.com" ],
+  "SongBaseUrl": "http://localhost:8123/music/",
+  "CoverBaseUrl": "http://localhost:8123/covers/",
+  "CacheSongs": false,
+  "CacheQueries": false,
+  "CacheTags": false
+}

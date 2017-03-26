@@ -1,0 +1,75 @@
+{
+  "sha1":"5439c23b4eae55f9dcd145fc3284cd8fa05696ff",
+  "songId":"1",
+  "filename":"400x400.mp3",
+  "artist":"Artist",
+  "title":"400x400",
+  "album":"400x400",
+  "albumId":"400x400",
+  "track":1,
+  "disc":1,
+  "length":1,
+  "rating":1,
+  "plays":[],
+  "tags":[]
+}
+{
+  "sha1":"74057828e637cdaa60338c220ad3f59e4262c3f2",
+  "songId":"2",
+  "filename":"800x800.mp3",
+  "artist":"Artist",
+  "title":"800x800",
+  "album":"800x800",
+  "albumId":"800x800",
+  "track":1,
+  "disc":1,
+  "length":1,
+  "rating":1,
+  "plays":[],
+  "tags":[]
+}
+{
+  "sha1":"0358287496e475b2e812e882b7885be665b604d1",
+  "songId":"3",
+  "filename":"40x40.mp3",
+  "artist":"Artist",
+  "title":"40x40",
+  "album":"40x40",
+  "albumId":"40x40",
+  "track":1,
+  "disc":1,
+  "length":1,
+  "rating":1,
+  "plays":[],
+  "tags":[]
+}
+{
+  "sha1":"22aa5c0ad793e7a86852cfb7e0aa6b41aa98e99c",
+  "songId":"4",
+  "filename":"360x400.mp3",
+  "artist":"Artist",
+  "title":"360x400",
+  "album":"360x400",
+  "albumId":"360x400",
+  "track":1,
+  "disc":1,
+  "length":1,
+  "rating":1,
+  "plays":[],
+  "tags":[]
+}
+{
+  "sha1":"11551e3ebd919e5ef2329d9d3716c3e453d98c7d",
+  "songId":"5",
+  "filename":"400x360.mp3",
+  "artist":"Artist",
+  "title":"400x360",
+  "album":"400x360",
+  "albumId":"400x400",
+  "track":1,
+  "disc":1,
+  "length":1,
+  "rating":1,
+  "plays":[],
+  "tags":[]
+}
