@@ -17,7 +17,7 @@ function PresentationLayer() {
   this.nextArtist = $('presentationNextArtist');
   this.nextTitle = $('presentationNextTitle');
   this.nextAlbum = $('presentationNextAlbum');
-  this.nextCover = $('presentationNextCoverImg');
+  this.nextCover = $('presentationNextCover');
 
   this.shown = false;
 }
