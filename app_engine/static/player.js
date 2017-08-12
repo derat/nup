@@ -390,7 +390,7 @@ Player.prototype.onTimeUpdate = function(e) {
     }
   }
 
-  this.presentationLayer.updatePosition(this.audio.duration);
+  this.presentationLayer.updatePosition(this.audio.currentTime);
 };
 
 Player.prototype.onError = function(e) {
