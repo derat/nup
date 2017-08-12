@@ -55,7 +55,8 @@ PresentationLayer.prototype.updatePosition = function(sec) {
   if (isNaN(sec))
     return;
 
-  this.progressBar.style.width = parseInt(Math.min(100 * sec / this.duration, 100)) + '%';
+  var percent = Math.min(100 * sec / this.duration, 100);
+  this.progressBar.style.width = percent + '%';
   this.timeDiv.innerText = formatTime(sec);
 };
 

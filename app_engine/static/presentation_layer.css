@@ -57,7 +57,7 @@ body.presenting {
 #presentationProgressBorder {
   width: 80%;
   height: 6px;
-  margin-top: 10px;
+  margin-top: 16px;
   border: solid white 1px;
 }
 
