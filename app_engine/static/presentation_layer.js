@@ -19,10 +19,18 @@ function PresentationLayer() {
   this.nextAlbum = $('presentationNextAlbum');
   this.nextCover = $('presentationNextCover');
 
+  this.progressBorder = $('presentationProgressBorder');
+  this.progressBar = $('presentationProgressBar');
+  this.timeDiv = $('presentationTime');
+  this.durationDiv = $('presentationDuration');
+
+  // Duration of currently-playing song, in seconds.
+  this.duration = 0;
+
   this.shown = false;
 }
 
-PresentationLayer.prototype.update = function(currentSong, nextSong) {
+PresentationLayer.prototype.updateSongs = function(currentSong, nextSong) {
   this.currentArtist.innerText = currentSong ? currentSong.artist : '';
   this.currentTitle.innerText = currentSong ? currentSong.title : '';
   this.currentAlbum.innerText = currentSong ? currentSong.album : '';
@@ -35,6 +43,20 @@ PresentationLayer.prototype.update = function(currentSong, nextSong) {
   this.nextAlbum.innerText = nextSong ? nextSong.album : '';
   this.nextCover.src = nextSong && nextSong.coverUrl ?
       nextSong.coverUrl : 'images/missing_cover.png';
+
+  this.progressBorder.style.display = currentSong ? 'block' : 'none';
+  this.progressBar.style.width = '0px';
+  this.timeDiv.innerText = '';
+  this.durationDiv.innerText = currentSong ? formatTime(currentSong.length) : '';
+  this.duration = currentSong ? currentSong.length : 0;
+};
+
+PresentationLayer.prototype.updatePosition = function(sec) {
+  if (isNaN(sec))
+    return;
+
+  this.progressBar.style.width = parseInt(Math.min(100 * sec / this.duration, 100)) + '%';
+  this.timeDiv.innerText = formatTime(sec);
 };
 
 PresentationLayer.prototype.isShown = function() {

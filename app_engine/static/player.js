@@ -177,7 +177,7 @@ Player.prototype.selectTrack = function(index) {
   this.currentIndex = index;
   this.notifyPlaylistAboutSongChange();
   this.updateSongDisplay();
-  this.updatePresentationLayer();
+  this.updatePresentationLayerSongs();
   this.startCurrentTrack();
   this.updateButtonState();
   if (!document.hasFocus())
@@ -242,12 +242,12 @@ Player.prototype.updateRatingOverlay = function() {
       this.getRatingString(song.rating, false, false) : '';
 };
 
-Player.prototype.updatePresentationLayer = function() {
+Player.prototype.updatePresentationLayerSongs = function() {
   var nextSong = null;
   if (this.currentIndex >= 0 && this.currentIndex + 1 < this.songs.length)
     nextSong = this.songs[this.currentIndex + 1];
 
-  this.presentationLayer.update(this.getCurrentSong(), nextSong);
+  this.presentationLayer.updateSongs(this.getCurrentSong(), nextSong);
 };
 
 Player.prototype.getRatingString = function(rating, withLabel, includeEmpty) {
@@ -389,6 +389,8 @@ Player.prototype.onTimeUpdate = function(e) {
       this.updater.reportPlay(song.songId, this.startTime);
     }
   }
+
+  this.presentationLayer.updatePosition(this.audio.duration);
 };
 
 Player.prototype.onError = function(e) {

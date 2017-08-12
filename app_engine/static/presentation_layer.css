@@ -30,6 +30,7 @@ body.presenting {
 }
 
 #presentationRight {
+  width: calc(40% - 41px);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -51,6 +52,28 @@ body.presenting {
   color: white;
   font-size: 24px;
   margin-bottom: 8px;
+}
+
+#presentationProgressBorder {
+  width: 80%;
+  height: 6px;
+  margin-top: 10px;
+  border: solid white 1px;
+}
+
+#presentationProgressBar {
+  height: 6px;
+  background-color: white;
+}
+
+#presentationProgressTimes {
+  width: 80%;
+  display: flex;
+  justify-content: space-between;
+}
+
+#presentationProgressTimes div {
+  font-size: 16px;
 }
 
 #presentationNextDiv {
