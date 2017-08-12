@@ -1,8 +1,6 @@
 package appengine
 
 import (
-	"appengine"
-	"appengine/user"
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
@@ -15,12 +13,15 @@ import (
 	"strings"
 	"time"
 
+	"appengine"
+	"appengine/user"
+
 	"erat.org/nup"
 )
 
 const (
 	// Path to the index file.
-	indexPath = "nup/index.html"
+	indexPath = "index.html"
 
 	// Default and maximum size of a batch of dumped entities.
 	defaultDumpBatchSize = 100
