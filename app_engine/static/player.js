@@ -52,6 +52,7 @@ function Player() {
 
   this.dialogManager = document.dialogManager;
   this.presentationLayer = document.presentationLayer;
+  this.presentationLayer.setPlayNextTrackFunction(this.cycleTrack.bind(this, 1));
   this.optionsDialog = null;
 
   this.audio = $('audio');

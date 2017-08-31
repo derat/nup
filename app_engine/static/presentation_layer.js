@@ -5,7 +5,7 @@ function initPresentationLayer() {
   document.presentationLayer = new PresentationLayer();
 }
 
-function PresentationLayer() {
+function PresentationLayer(nextTrackFunc) {
   this.overlay = $('presentationOverlay');
 
   this.currentArtist = $('presentationCurrentArtist');
@@ -23,6 +23,8 @@ function PresentationLayer() {
   this.progressBar = $('presentationProgressBar');
   this.timeDiv = $('presentationTime');
   this.durationDiv = $('presentationDuration');
+
+  this.nextCover.addEventListener('click', this.playNextTrack.bind(this), false);
 
   // Duration of currently-playing song, in seconds.
   this.duration = 0;
@@ -74,4 +76,13 @@ PresentationLayer.prototype.hide = function() {
   removeClassName(document.body, 'presenting');
   this.overlay.className = '';
   this.shown = false;
+};
+
+PresentationLayer.prototype.setPlayNextTrackFunction = function(f) {
+  this.playNextTrackFunction = f;
+};
+
+PresentationLayer.prototype.playNextTrack = function() {
+  if (this.playNextTrackFunction)
+    this.playNextTrackFunction();
 };
