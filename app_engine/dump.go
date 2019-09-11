@@ -1,12 +1,13 @@
-package appengine
+package main
 
 import (
-	"appengine"
-	"appengine/datastore"
+	"context"
 	"fmt"
 	"sort"
 	"strconv"
 	"time"
+
+	"google.golang.org/appengine/datastore"
 
 	"erat.org/nup"
 )
@@ -17,7 +18,7 @@ const (
 	maxPlaysForSongDump = 256
 )
 
-func dumpEntities(c appengine.Context, q *datastore.Query, cursor string, entities []interface{}) (ids, parentIds []int64, nextCursor string, err error) {
+func dumpEntities(ctx context.Context, q *datastore.Query, cursor string, entities []interface{}) (ids, parentIds []int64, nextCursor string, err error) {
 	q = q.KeysOnly()
 	if len(cursor) > 0 {
 		dc, err := datastore.DecodeCursor(cursor)
@@ -26,7 +27,7 @@ func dumpEntities(c appengine.Context, q *datastore.Query, cursor string, entiti
 		}
 		q = q.Start(dc)
 	}
-	it := q.Run(c)
+	it := q.Run(ctx)
 
 	keys := make([]*datastore.Key, 0, len(entities))
 	ids = make([]int64, 0, len(entities))
@@ -61,21 +62,21 @@ func dumpEntities(c appengine.Context, q *datastore.Query, cursor string, entiti
 
 	entities = entities[0:len(keys)]
 	if len(keys) > 0 {
-		if err := datastore.GetMulti(c, keys, entities); err != nil {
+		if err := datastore.GetMulti(ctx, keys, entities); err != nil {
 			return nil, nil, "", fmt.Errorf("Failed to get %v entities: %v", len(keys), err)
 		}
 	}
 	return ids, parentIds, nextCursor, nil
 }
 
-func dumpSongs(c appengine.Context, max int64, cursor string, includeCovers bool) (songs []nup.Song, nextCursor string, err error) {
+func dumpSongs(ctx context.Context, max int64, cursor string, includeCovers bool) (songs []nup.Song, nextCursor string, err error) {
 	songs = make([]nup.Song, max)
 	songPtrs := make([]interface{}, max)
 	for i := range songs {
 		songPtrs[i] = &songs[i]
 	}
 
-	ids, _, nextCursor, err := dumpEntities(c, datastore.NewQuery(songKind).Order(keyProperty), cursor, songPtrs)
+	ids, _, nextCursor, err := dumpEntities(ctx, datastore.NewQuery(songKind).Order(keyProperty), cursor, songPtrs)
 	if err != nil {
 		return nil, "", err
 	}
@@ -91,14 +92,14 @@ func dumpSongs(c appengine.Context, max int64, cursor string, includeCovers bool
 	return songs, nextCursor, nil
 }
 
-func dumpPlays(c appengine.Context, max int64, cursor string) (plays []nup.PlayDump, nextCursor string, err error) {
+func dumpPlays(ctx context.Context, max int64, cursor string) (plays []nup.PlayDump, nextCursor string, err error) {
 	plays = make([]nup.PlayDump, max)
 	playPtrs := make([]interface{}, max)
 	for i := range plays {
 		playPtrs[i] = &plays[i].Play
 	}
 
-	_, pids, nextCursor, err := dumpEntities(c, datastore.NewQuery(playKind).Order(keyProperty), cursor, playPtrs)
+	_, pids, nextCursor, err := dumpEntities(ctx, datastore.NewQuery(playKind).Order(keyProperty), cursor, playPtrs)
 	if err != nil {
 		return nil, "", err
 	}
@@ -110,7 +111,7 @@ func dumpPlays(c appengine.Context, max int64, cursor string) (plays []nup.PlayD
 	return plays, nextCursor, nil
 }
 
-func dumpSongsForAndroid(c appengine.Context, minLastModified time.Time, deleted bool, max int64, cursor string) (songs []nup.Song, nextCursor string, err error) {
+func dumpSongsForAndroid(ctx context.Context, minLastModified time.Time, deleted bool, max int64, cursor string) (songs []nup.Song, nextCursor string, err error) {
 	songs = make([]nup.Song, max)
 	songPtrs := make([]interface{}, max)
 	for i := range songs {
@@ -122,12 +123,12 @@ func dumpSongsForAndroid(c appengine.Context, minLastModified time.Time, deleted
 		kind = deletedSongKind
 	}
 
-	ids, _, nextCursor, err := dumpEntities(c, datastore.NewQuery(kind).Filter("LastModifiedTime >= ", minLastModified), cursor, songPtrs)
+	ids, _, nextCursor, err := dumpEntities(ctx, datastore.NewQuery(kind).Filter("LastModifiedTime >= ", minLastModified), cursor, songPtrs)
 	if err != nil {
 		return nil, "", err
 	}
 
-	cfg := getConfig(c)
+	cfg := getConfig(ctx)
 	songs = songs[0:len(ids)]
 	for i, id := range ids {
 		prepareSongForClient(&songs[i], id, cfg, nup.AndroidClient)
@@ -135,10 +136,10 @@ func dumpSongsForAndroid(c appengine.Context, minLastModified time.Time, deleted
 	return songs, nextCursor, nil
 }
 
-func dumpSingleSong(c appengine.Context, id int64) (*nup.Song, error) {
-	sk := datastore.NewKey(c, songKind, "", id, nil)
+func dumpSingleSong(ctx context.Context, id int64) (*nup.Song, error) {
+	sk := datastore.NewKey(ctx, songKind, "", id, nil)
 	s := &nup.Song{}
-	if err := datastore.Get(c, sk, s); err != nil {
+	if err := datastore.Get(ctx, sk, s); err != nil {
 		return nil, err
 	}
 	s.SongId = strconv.FormatInt(id, 10)
@@ -148,7 +149,7 @@ func dumpSingleSong(c appengine.Context, id int64) (*nup.Song, error) {
 	for i := range plays {
 		playPtrs[i] = &plays[i].Play
 	}
-	pids, _, _, err := dumpEntities(c, datastore.NewQuery(playKind).Ancestor(sk), "", playPtrs)
+	pids, _, _, err := dumpEntities(ctx, datastore.NewQuery(playKind).Ancestor(sk), "", playPtrs)
 	if err != nil {
 		return nil, err
 	}

@@ -1,17 +1,23 @@
-runtime: go
-api_version: go1
+# TODO: Switch to go112, but doing so apparently requires migrating from
+# google.golang.org/appengine to cloud.google.com/go and also makes
+# dev_appserver.py unusable. Yay.
+# https://cloud.google.com/appengine/docs/standard/go112/go-differences
+runtime: go111
 
-builtins:
-- remote_api: on
+# TODO: This causes an error:
+# ERROR: (gcloud.app.deploy) INVALID_ARGUMENT: script field for handler
+# '/_ah/remote_api(/.*)?' must be set to 'auto' for runtime go112.
+#builtins:
+#- remote_api: on
 
 handlers:
 - url: /index\.html
-  script: _go_app
+  script: auto
   secure: always
 - url: /(.*\.(css|html|gif|jpe?g|js|png|txt))
   static_files: static/\1
   secure: always
   upload: static/.*
 - url: /.*
-  script: _go_app
+  script: auto
   secure: always

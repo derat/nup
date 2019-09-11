@@ -1,15 +1,18 @@
-package appengine
+package main
 
 import (
-	"appengine"
-	"appengine/datastore"
-	"appengine/memcache"
+	"context"
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
+
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/memcache"
 
 	"erat.org/nup"
 )
@@ -48,8 +51,8 @@ type cachedTags struct {
 	Tags []string
 }
 
-func getDatastoreCachedQueriesKey(c appengine.Context) *datastore.Key {
-	return datastore.NewKey(c, cachedQueriesKind, queriesCacheKey, 0, nil)
+func getDatastoreCachedQueriesKey(ctx context.Context) *datastore.Key {
+	return datastore.NewKey(ctx, cachedQueriesKind, queriesCacheKey, 0, nil)
 }
 
 func shouldCacheQuery(q *songQuery) bool {
@@ -65,11 +68,11 @@ func computeQueryHash(q *songQuery) (string, error) {
 	return hex.EncodeToString(s[:]), nil
 }
 
-func getAllCachedQueries(c appengine.Context) (cachedQueries, error) {
+func getAllCachedQueries(ctx context.Context) (cachedQueries, error) {
 	queries := make(cachedQueries)
-	if getConfig(c).UseDatastoreForCache {
+	if getConfig(ctx).UseDatastoreForCache {
 		eq := encodedCachedQueries{}
-		if err := datastore.Get(c, getDatastoreCachedQueriesKey(c), &eq); err == nil {
+		if err := datastore.Get(ctx, getDatastoreCachedQueriesKey(ctx), &eq); err == nil {
 			if err := json.Unmarshal(eq.Data, &queries); err != nil {
 				return nil, err
 			}
@@ -77,15 +80,15 @@ func getAllCachedQueries(c appengine.Context) (cachedQueries, error) {
 			return nil, err
 		}
 	} else {
-		if _, err := jsonCodec.Get(c, queriesCacheKey, &queries); err != nil && err != memcache.ErrCacheMiss {
+		if _, err := jsonCodec.Get(ctx, queriesCacheKey, &queries); err != nil && err != memcache.ErrCacheMiss {
 			return nil, err
 		}
 	}
 	return queries, nil
 }
 
-func getCachedQueryResults(c appengine.Context, query *songQuery) ([]int64, error) {
-	queries, err := getAllCachedQueries(c)
+func getCachedQueryResults(ctx context.Context, query *songQuery) ([]int64, error) {
+	queries, err := getAllCachedQueries(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -103,8 +106,8 @@ func getCachedQueryResults(c appengine.Context, query *songQuery) ([]int64, erro
 	return nil, nil
 }
 
-func updateCachedQueries(c appengine.Context, f func(cachedQueries) error) error {
-	queries, err := getAllCachedQueries(c)
+func updateCachedQueries(ctx context.Context, f func(cachedQueries) error) error {
+	queries, err := getAllCachedQueries(ctx)
 	if err != nil {
 		return err
 	}
@@ -115,20 +118,20 @@ func updateCachedQueries(c appengine.Context, f func(cachedQueries) error) error
 		return err
 	}
 
-	if getConfig(c).UseDatastoreForCache {
+	if getConfig(ctx).UseDatastoreForCache {
 		b, err := json.Marshal(queries)
 		if err != nil {
 			return err
 		}
-		_, err = datastore.Put(c, getDatastoreCachedQueriesKey(c), &encodedCachedQueries{b})
+		_, err = datastore.Put(ctx, getDatastoreCachedQueriesKey(ctx), &encodedCachedQueries{b})
 		return err
 	} else {
-		return jsonCodec.Set(c, &memcache.Item{Key: queriesCacheKey, Object: &queries})
+		return jsonCodec.Set(ctx, &memcache.Item{Key: queriesCacheKey, Object: &queries})
 	}
 }
 
-func writeQueryResultsToCache(c appengine.Context, query *songQuery, ids []int64) error {
-	return updateCachedQueries(c, func(queries cachedQueries) error {
+func writeQueryResultsToCache(ctx context.Context, query *songQuery, ids []int64) error {
+	return updateCachedQueries(ctx, func(queries cachedQueries) error {
 		queryHash, err := computeQueryHash(query)
 		if err != nil {
 			return err
@@ -138,9 +141,9 @@ func writeQueryResultsToCache(c appengine.Context, query *songQuery, ids []int64
 	})
 }
 
-func flushDataFromCacheForUpdate(c appengine.Context, updateType uint) error {
+func flushDataFromCacheForUpdate(ctx context.Context, updateType uint) error {
 	numFlushed := 0
-	if err := updateCachedQueries(c, func(queries cachedQueries) error {
+	if err := updateCachedQueries(ctx, func(queries cachedQueries) error {
 		for k, cq := range queries {
 			q := cq.Query
 			if (updateType&metadataUpdate) != 0 ||
@@ -159,56 +162,56 @@ func flushDataFromCacheForUpdate(c appengine.Context, updateType uint) error {
 		return err
 	}
 	if numFlushed > 0 {
-		c.Debugf("Flushed %v cached query(s) in response to update of type %v", numFlushed, updateType)
+		log.Debugf(ctx, "Flushed %v cached query(s) in response to update of type %v", numFlushed, updateType)
 	}
 
 	if updateType&tagsUpdate != 0 || updateType&metadataUpdate != 0 {
-		if err := flushTagsFromCache(c); err != nil {
+		if err := flushTagsFromCache(ctx); err != nil {
 			return err
 		}
-		c.Debugf("Flushed cached tags in response to update of type %v", updateType)
+		log.Debugf(ctx, "Flushed cached tags in response to update of type %v", updateType)
 	}
 
 	return nil
 }
 
-func getDatastoreCachedTagsKey(c appengine.Context) *datastore.Key {
-	return datastore.NewKey(c, cachedTagsKind, tagsCacheKey, 0, nil)
+func getDatastoreCachedTagsKey(ctx context.Context) *datastore.Key {
+	return datastore.NewKey(ctx, cachedTagsKind, tagsCacheKey, 0, nil)
 }
 
-func getTagsFromCache(c appengine.Context) ([]string, error) {
+func getTagsFromCache(ctx context.Context) ([]string, error) {
 	t := cachedTags{}
-	if getConfig(c).UseDatastoreForCache {
-		if err := datastore.Get(c, getDatastoreCachedTagsKey(c), &t); err == datastore.ErrNoSuchEntity {
+	if getConfig(ctx).UseDatastoreForCache {
+		if err := datastore.Get(ctx, getDatastoreCachedTagsKey(ctx), &t); err == datastore.ErrNoSuchEntity {
 			return nil, nil
 		} else if err != nil {
 			return nil, err
 		}
 	} else {
-		if _, err := jsonCodec.Get(c, tagsCacheKey, &t); err != nil && err != memcache.ErrCacheMiss {
+		if _, err := jsonCodec.Get(ctx, tagsCacheKey, &t); err != nil && err != memcache.ErrCacheMiss {
 			return nil, err
 		}
 	}
 	return t.Tags, nil
 }
 
-func writeTagsToCache(c appengine.Context, tags []string) error {
+func writeTagsToCache(ctx context.Context, tags []string) error {
 	t := cachedTags{tags}
-	if getConfig(c).UseDatastoreForCache {
-		_, err := datastore.Put(c, getDatastoreCachedTagsKey(c), &t)
+	if getConfig(ctx).UseDatastoreForCache {
+		_, err := datastore.Put(ctx, getDatastoreCachedTagsKey(ctx), &t)
 		return err
 	} else {
-		return jsonCodec.Set(c, &memcache.Item{Key: tagsCacheKey, Object: &t})
+		return jsonCodec.Set(ctx, &memcache.Item{Key: tagsCacheKey, Object: &t})
 	}
 }
 
-func flushTagsFromCache(c appengine.Context) error {
-	if getConfig(c).UseDatastoreForCache {
-		if err := datastore.Delete(c, getDatastoreCachedTagsKey(c)); err != nil && err != datastore.ErrNoSuchEntity {
+func flushTagsFromCache(ctx context.Context) error {
+	if getConfig(ctx).UseDatastoreForCache {
+		if err := datastore.Delete(ctx, getDatastoreCachedTagsKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
 			return err
 		}
 	} else {
-		if err := memcache.Delete(c, tagsCacheKey); err != nil && err != memcache.ErrCacheMiss {
+		if err := memcache.Delete(ctx, tagsCacheKey); err != nil && err != memcache.ErrCacheMiss {
 			return err
 		}
 	}
@@ -219,14 +222,14 @@ func getSongCacheKey(id int64) string {
 	return songCachePrefix + strconv.FormatInt(id, 10)
 }
 
-func flushSongFromCache(c appengine.Context, id int64) error {
-	if err := memcache.Delete(c, getSongCacheKey(id)); err != nil && err != memcache.ErrCacheMiss {
+func flushSongFromCache(ctx context.Context, id int64) error {
+	if err := memcache.Delete(ctx, getSongCacheKey(id)); err != nil && err != memcache.ErrCacheMiss {
 		return err
 	}
 	return nil
 }
 
-func getSongsFromCache(c appengine.Context, ids []int64) (songs map[int64]nup.Song, err error) {
+func getSongsFromCache(ctx context.Context, ids []int64) (songs map[int64]nup.Song, err error) {
 	keys := make([]string, len(ids))
 	for i, id := range ids {
 		keys[i] = getSongCacheKey(id)
@@ -234,7 +237,7 @@ func getSongsFromCache(c appengine.Context, ids []int64) (songs map[int64]nup.So
 
 	// Uh, no memcache.Codec.GetMulti()?
 	songs = make(map[int64]nup.Song)
-	items, err := memcache.GetMulti(c, keys)
+	items, err := memcache.GetMulti(ctx, keys)
 	if err != nil {
 		return nil, err
 	}
@@ -256,12 +259,12 @@ func getSongsFromCache(c appengine.Context, ids []int64) (songs map[int64]nup.So
 	return songs, nil
 }
 
-func flushSongsFromCacheAfterMultiError(c appengine.Context, ids []int64, me appengine.MultiError) error {
+func flushSongsFromCacheAfterMultiError(ctx context.Context, ids []int64, me appengine.MultiError) error {
 	for i, err := range me {
 		id := ids[i]
 		if err == memcache.ErrNotStored {
-			c.Debugf("Song %v already present in cache; flushing", id)
-			if err := flushSongFromCache(c, id); err != nil {
+			log.Debugf(ctx, "Song %v already present in cache; flushing", id)
+			if err := flushSongFromCache(ctx, id); err != nil {
 				return err
 			}
 		} else if err != nil {
@@ -271,7 +274,7 @@ func flushSongsFromCacheAfterMultiError(c appengine.Context, ids []int64, me app
 	return nil
 }
 
-func writeSongsToCache(c appengine.Context, ids []int64, songs []nup.Song, flushIfAlreadyPresent bool) error {
+func writeSongsToCache(ctx context.Context, ids []int64, songs []nup.Song, flushIfAlreadyPresent bool) error {
 	if len(ids) != len(songs) {
 		return fmt.Errorf("Got request to write %v ID(s) with %v song(s) to cache", len(ids), len(songs))
 	}
@@ -280,23 +283,23 @@ func writeSongsToCache(c appengine.Context, ids []int64, songs []nup.Song, flush
 	for i, id := range ids {
 		items[i] = &memcache.Item{Key: getSongCacheKey(id), Object: &songs[i]}
 	}
-	if err := jsonCodec.AddMulti(c, items); err != nil {
+	if err := jsonCodec.AddMulti(ctx, items); err != nil {
 		// Some of the songs might've been cached in response to a query in the meantime.
 		// memcache.Delete() is missing a lock duration (https://code.google.com/p/googleappengine/issues/detail?id=10983),
 		// so just do the best we can and try to delete the possibly-stale cached values.
 		if me, ok := err.(appengine.MultiError); ok && flushIfAlreadyPresent {
-			return flushSongsFromCacheAfterMultiError(c, ids, me)
+			return flushSongsFromCacheAfterMultiError(ctx, ids, me)
 		}
 		return err
 	}
 	return nil
 }
 
-func flushCache(c appengine.Context) error {
-	if err := memcache.Flush(c); err != nil {
+func flushCache(ctx context.Context) error {
+	if err := memcache.Flush(ctx); err != nil {
 		return err
 	}
-	if err := datastore.Delete(c, getDatastoreCachedQueriesKey(c)); err != nil && err != datastore.ErrNoSuchEntity {
+	if err := datastore.Delete(ctx, getDatastoreCachedQueriesKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
 		return err
 	}
 	return nil

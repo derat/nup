@@ -1,8 +1,10 @@
-package appengine
+package main
 
 import (
-	"appengine"
-	"appengine/datastore"
+	"context"
+
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
 
 	"erat.org/cloud"
 	"erat.org/nup"
@@ -57,14 +59,14 @@ func loadBaseConfig() {
 	}
 }
 
-func getTestConfigKey(c appengine.Context) *datastore.Key {
-	return datastore.NewKey(c, configKind, configKeyId, 0, nil)
+func getTestConfigKey(ctx context.Context) *datastore.Key {
+	return datastore.NewKey(ctx, configKind, configKeyId, 0, nil)
 }
 
-func getConfig(c appengine.Context) *nup.ServerConfig {
+func getConfig(ctx context.Context) *nup.ServerConfig {
 	if appengine.IsDevAppServer() {
 		testConfig := nup.ServerConfig{}
-		if err := datastore.Get(c, getTestConfigKey(c), &testConfig); err == nil {
+		if err := datastore.Get(ctx, getTestConfigKey(ctx), &testConfig); err == nil {
 			return &testConfig
 		} else if err != datastore.ErrNoSuchEntity {
 			panic(err)
@@ -77,14 +79,14 @@ func getConfig(c appengine.Context) *nup.ServerConfig {
 	return baseConfig
 }
 
-func saveTestConfig(c appengine.Context, cfg *nup.ServerConfig) {
-	if _, err := datastore.Put(c, getTestConfigKey(c), cfg); err != nil {
+func saveTestConfig(ctx context.Context, cfg *nup.ServerConfig) {
+	if _, err := datastore.Put(ctx, getTestConfigKey(ctx), cfg); err != nil {
 		panic(err)
 	}
 }
 
-func clearTestConfig(c appengine.Context) {
-	if err := datastore.Delete(c, getTestConfigKey(c)); err != nil && err != datastore.ErrNoSuchEntity {
+func clearTestConfig(ctx context.Context) {
+	if err := datastore.Delete(ctx, getTestConfigKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
 		panic(err)
 	}
 }

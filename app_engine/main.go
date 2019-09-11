@@ -1,7 +1,8 @@
-package appengine
+package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -13,8 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"appengine"
-	"appengine/user"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/user"
 
 	"erat.org/nup"
 )
@@ -71,8 +73,8 @@ func writeTextResponse(w http.ResponseWriter, s string) {
 	w.Write([]byte(s))
 }
 
-func hasAllowedGoogleAuth(c appengine.Context, r *http.Request, cfg *nup.ServerConfig) (email string, allowed bool) {
-	u := user.Current(c)
+func hasAllowedGoogleAuth(ctx context.Context, r *http.Request, cfg *nup.ServerConfig) (email string, allowed bool) {
+	u := user.Current(ctx)
 	if u == nil {
 		return "", false
 	}
@@ -106,9 +108,9 @@ func hasWebdriverCookie(r *http.Request) bool {
 	return true
 }
 
-func checkRequest(c appengine.Context, w http.ResponseWriter, r *http.Request, method string, redirectToLogin bool) bool {
-	cfg := getConfig(c)
-	username, allowed := hasAllowedGoogleAuth(c, r, cfg)
+func checkRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, method string, redirectToLogin bool) bool {
+	cfg := getConfig(ctx)
+	username, allowed := hasAllowedGoogleAuth(ctx, r, cfg)
 	if !allowed && len(username) == 0 {
 		username, allowed = hasAllowedBasicAuth(r, cfg)
 	}
@@ -118,18 +120,18 @@ func checkRequest(c appengine.Context, w http.ResponseWriter, r *http.Request, m
 	}
 	if !allowed {
 		if len(username) == 0 && redirectToLogin {
-			loginUrl, _ := user.LoginURL(c, "/")
-			c.Debugf("Unauthenticated request for %v from %v; redirecting to login", r.URL.String(), r.RemoteAddr)
+			loginUrl, _ := user.LoginURL(ctx, "/")
+			log.Debugf(ctx, "Unauthenticated request for %v from %v; redirecting to login", r.URL.String(), r.RemoteAddr)
 			http.Redirect(w, r, loginUrl, http.StatusFound)
 		} else {
-			c.Debugf("Unauthorized request for %v from %q at %v", r.URL.String(), username, r.RemoteAddr)
+			log.Debugf(ctx, "Unauthorized request for %v from %q at %v", r.URL.String(), username, r.RemoteAddr)
 			http.Error(w, "Request requires authorization", http.StatusUnauthorized)
 		}
 		return false
 	}
 
 	if r.Method != method {
-		c.Debugf("Invalid %v request for %v (expected %v)", r.Method, r.URL.String(), method)
+		log.Debugf(ctx, "Invalid %v request for %v (expected %v)", r.Method, r.URL.String(), method)
 		w.Header().Set("Allow", method)
 		http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
 		return false
@@ -138,10 +140,10 @@ func checkRequest(c appengine.Context, w http.ResponseWriter, r *http.Request, m
 	return true
 }
 
-func parseIntParam(c appengine.Context, w http.ResponseWriter, r *http.Request, name string, v *int64) bool {
+func parseIntParam(ctx context.Context, w http.ResponseWriter, r *http.Request, name string, v *int64) bool {
 	val, err := strconv.ParseInt(r.FormValue(name), 10, 64)
 	if err != nil {
-		c.Errorf("Unable to parse %v param %q", name, r.FormValue(name))
+		log.Errorf(ctx, "Unable to parse %v param %q", name, r.FormValue(name))
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return false
 	}
@@ -149,10 +151,10 @@ func parseIntParam(c appengine.Context, w http.ResponseWriter, r *http.Request, 
 	return true
 }
 
-func parseFloatParam(c appengine.Context, w http.ResponseWriter, r *http.Request, name string, v *float64) bool {
+func parseFloatParam(ctx context.Context, w http.ResponseWriter, r *http.Request, name string, v *float64) bool {
 	val, err := strconv.ParseFloat(r.FormValue(name), 64)
 	if err != nil {
-		c.Errorf("Unable to parse %v param %q", name, r.FormValue(name))
+		log.Errorf(ctx, "Unable to parse %v param %q", name, r.FormValue(name))
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return false
 	}
@@ -160,7 +162,7 @@ func parseFloatParam(c appengine.Context, w http.ResponseWriter, r *http.Request
 	return true
 }
 
-func init() {
+func main() {
 	loadBaseConfig()
 	rand.Seed(time.Now().UnixNano())
 
@@ -178,18 +180,20 @@ func init() {
 	http.HandleFunc("/rate_and_tag", handleRateAndTag)
 	http.HandleFunc("/report_played", handleReportPlayed)
 	http.HandleFunc("/songs", handleSongs)
+
+	appengine.Main()
 }
 
 func handleClear(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if !checkRequest(c, w, r, "POST", false) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "POST", false) {
 		return
 	}
 	if !appengine.IsDevAppServer() {
 		http.Error(w, "Only works on dev server", http.StatusBadRequest)
 		return
 	}
-	if err := clearData(c); err != nil {
+	if err := clearData(ctx); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -197,8 +201,8 @@ func handleClear(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleConfig(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if !checkRequest(c, w, r, "POST", false) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "POST", false) {
 		return
 	}
 	if !appengine.IsDevAppServer() {
@@ -209,11 +213,11 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 	cfg := nup.ServerConfig{}
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err == nil {
 		addTestUserToConfig(&cfg)
-		saveTestConfig(c, &cfg)
+		saveTestConfig(ctx, &cfg)
 	} else if err == io.EOF {
-		clearTestConfig(c)
+		clearTestConfig(ctx)
 	} else {
-		c.Errorf("Failed to decode config: %v", err)
+		log.Errorf(ctx, "Failed to decode config: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -222,31 +226,31 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleDeleteSong(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	c.Debugf("Got request: %v", r.URL.String())
-	if !checkRequest(c, w, r, "POST", false) {
+	ctx := appengine.NewContext(r)
+	log.Debugf(ctx, "Got request: %v", r.URL.String())
+	if !checkRequest(ctx, w, r, "POST", false) {
 		return
 	}
 
 	var id int64
-	if !parseIntParam(c, w, r, "songId", &id) {
+	if !parseIntParam(ctx, w, r, "songId", &id) {
 		return
 	}
-	if err := deleteSong(c, id); err != nil {
-		c.Errorf("Got error while deleting song: %v", err)
+	if err := deleteSong(ctx, id); err != nil {
+		log.Errorf(ctx, "Got error while deleting song: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	writeTextResponse(w, "ok")
 }
 
 func handleDumpSong(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if !checkRequest(c, w, r, "GET", false) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "GET", false) {
 		return
 	}
 
 	var id int64
-	if !parseIntParam(c, w, r, "id", &id) {
+	if !parseIntParam(ctx, w, r, "id", &id) {
 		return
 	}
 
@@ -254,7 +258,7 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 	var err error
 	if r.FormValue("cache") == "1" {
 		var songs map[int64]nup.Song
-		if songs, err = getSongsFromCache(c, []int64{id}); err == nil {
+		if songs, err = getSongsFromCache(ctx, []int64{id}); err == nil {
 			if song, ok := songs[id]; ok {
 				s = &song
 				s.SongId = strconv.FormatInt(id, 10)
@@ -263,18 +267,18 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		s, err = dumpSingleSong(c, id)
+		s, err = dumpSingleSong(ctx, id)
 	}
 
 	if err != nil {
-		c.Errorf("Dumping song %v failed: %v", id, err)
+		log.Errorf(ctx, "Dumping song %v failed: %v", id, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	b, err := json.Marshal(s)
 	if err != nil {
-		c.Errorf("Marshaling song %v failed: %v", id, err)
+		log.Errorf(ctx, "Marshaling song %v failed: %v", id, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -285,8 +289,8 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleExport(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if !checkRequest(c, w, r, "GET", false) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "GET", false) {
 		return
 	}
 
@@ -296,7 +300,7 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var max int64 = defaultDumpBatchSize
-	if len(r.FormValue("max")) > 0 && !parseIntParam(c, w, r, "max", &max) {
+	if len(r.FormValue("max")) > 0 && !parseIntParam(ctx, w, r, "max", &max) {
 		return
 	}
 	if max > maxDumpBatchSize {
@@ -313,9 +317,9 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 	switch r.FormValue("type") {
 	case "song":
 		var songs []nup.Song
-		songs, nextCursor, err = dumpSongs(c, max, r.FormValue("cursor"), includeCovers)
+		songs, nextCursor, err = dumpSongs(ctx, max, r.FormValue("cursor"), includeCovers)
 		if err != nil {
-			c.Errorf("Dumping songs failed: %v", err)
+			log.Errorf(ctx, "Dumping songs failed: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -325,9 +329,9 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 		}
 	case "play":
 		var plays []nup.PlayDump
-		plays, nextCursor, err = dumpPlays(c, max, r.FormValue("cursor"))
+		plays, nextCursor, err = dumpPlays(ctx, max, r.FormValue("cursor"))
 		if err != nil {
-			c.Errorf("Dumping plays failed: %v", err)
+			log.Errorf(ctx, "Dumping plays failed: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -342,14 +346,14 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 
 	for i := 0; i < len(objectPtrs); i++ {
 		if err = e.Encode(objectPtrs[i]); err != nil {
-			c.Errorf("Encoding object failed: %v", err)
+			log.Errorf(ctx, "Encoding object failed: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
 	if len(nextCursor) > 0 {
 		if err = e.Encode(nextCursor); err != nil {
-			c.Errorf("Encoding cursor failed: %v", err)
+			log.Errorf(ctx, "Encoding cursor failed: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -357,15 +361,15 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleFlushCache(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if !checkRequest(c, w, r, "POST", false) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "POST", false) {
 		return
 	}
 	if !appengine.IsDevAppServer() {
 		http.Error(w, "Only works on dev server", http.StatusBadRequest)
 		return
 	}
-	if err := flushCache(c); err != nil {
+	if err := flushCache(ctx); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -373,8 +377,8 @@ func handleFlushCache(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if !checkRequest(c, w, r, "GET", true) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "GET", true) {
 		return
 	}
 
@@ -385,7 +389,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 	f, err := os.Open(indexPath)
 	if err != nil {
-		c.Errorf("Failed to open %v: %v", indexPath, err)
+		log.Errorf(ctx, "Failed to open %v: %v", indexPath, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -393,18 +397,18 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html")
 	if _, err = io.Copy(w, f); err != nil {
-		c.Errorf("Failed to copy %v to response: %v", indexPath, err)
+		log.Errorf(ctx, "Failed to copy %v to response: %v", indexPath, err)
 	}
 }
 
 func handleImport(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if !checkRequest(c, w, r, "POST", false) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "POST", false) {
 		return
 	}
 
 	var updateDelayNsec int64 = 0
-	if len(r.FormValue("updateDelayNsec")) > 0 && !parseIntParam(c, w, r, "updateDelayNsec", &updateDelayNsec) {
+	if len(r.FormValue("updateDelayNsec")) > 0 && !parseIntParam(ctx, w, r, "updateDelayNsec", &updateDelayNsec) {
 		return
 	}
 	updateDelay := time.Nanosecond * time.Duration(updateDelayNsec)
@@ -417,33 +421,33 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 		if err := d.Decode(s); err == io.EOF {
 			break
 		} else if err != nil {
-			c.Errorf("Failed to decode song: %v", err)
+			log.Errorf(ctx, "Failed to decode song: %v", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := updateOrInsertSong(c, s, replaceUserData, updateDelay); err != nil {
-			c.Errorf("Failed to update song with SHA1 %v: %v", s.Sha1, err)
+		if err := updateOrInsertSong(ctx, s, replaceUserData, updateDelay); err != nil {
+			log.Errorf(ctx, "Failed to update song with SHA1 %v: %v", s.Sha1, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		numSongs++
 	}
-	if err := flushDataFromCacheForUpdate(c, metadataUpdate); err != nil {
-		c.Errorf("Failed to flush cached queries: %v", err)
+	if err := flushDataFromCacheForUpdate(ctx, metadataUpdate); err != nil {
+		log.Errorf(ctx, "Failed to flush cached queries: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	c.Debugf("Updated %v song(s)", numSongs)
+	log.Debugf(ctx, "Updated %v song(s)", numSongs)
 	writeTextResponse(w, "ok")
 }
 
 func handleListTags(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if !checkRequest(c, w, r, "GET", false) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "GET", false) {
 		return
 	}
-	tags, err := getTags(c)
+	tags, err := getTags(ctx)
 	if err != nil {
-		c.Errorf("Unable to query tags: %v", err)
+		log.Errorf(ctx, "Unable to query tags: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -451,16 +455,16 @@ func handleListTags(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleNowNsec(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if !checkRequest(c, w, r, "GET", false) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "GET", false) {
 		return
 	}
 	writeTextResponse(w, strconv.FormatInt(time.Now().UnixNano(), 10))
 }
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if !checkRequest(c, w, r, "GET", false) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "GET", false) {
 		return
 	}
 
@@ -479,7 +483,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(r.FormValue("minRating")) > 0 {
-		if !parseFloatParam(c, w, r, "minRating", &q.MinRating) {
+		if !parseFloatParam(ctx, w, r, "minRating", &q.MinRating) {
 			return
 		}
 		q.HasMinRating = true
@@ -488,7 +492,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(r.FormValue("maxPlays")) > 0 {
-		if !parseIntParam(c, w, r, "maxPlays", &q.MaxPlays) {
+		if !parseIntParam(ctx, w, r, "maxPlays", &q.MaxPlays) {
 			return
 		}
 		q.HasMaxPlays = true
@@ -496,14 +500,14 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 
 	if len(r.FormValue("minFirstPlayed")) > 0 {
 		var s float64
-		if !parseFloatParam(c, w, r, "minFirstPlayed", &s) {
+		if !parseFloatParam(ctx, w, r, "minFirstPlayed", &s) {
 			return
 		}
 		q.MinFirstStartTime = nup.SecondsToTime(s)
 	}
 	if len(r.FormValue("maxLastPlayed")) > 0 {
 		var s float64
-		if !parseFloatParam(c, w, r, "maxLastPlayed", &s) {
+		if !parseFloatParam(ctx, w, r, "maxLastPlayed", &s) {
 			return
 		}
 		q.MaxLastStartTime = nup.SecondsToTime(s)
@@ -519,9 +523,9 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	songs, err := getSongsForQuery(c, q, cacheOnly)
+	songs, err := getSongsForQuery(ctx, q, cacheOnly)
 	if err != nil {
-		c.Errorf("Unable to query songs: %v", err)
+		log.Errorf(ctx, "Unable to query songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -529,17 +533,17 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if !checkRequest(c, w, r, "POST", false) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "POST", false) {
 		return
 	}
 	var id int64
-	if !parseIntParam(c, w, r, "songId", &id) {
+	if !parseIntParam(ctx, w, r, "songId", &id) {
 		return
 	}
 
 	var updateDelayNsec int64 = 0
-	if len(r.FormValue("updateDelayNsec")) > 0 && !parseIntParam(c, w, r, "updateDelayNsec", &updateDelayNsec) {
+	if len(r.FormValue("updateDelayNsec")) > 0 && !parseIntParam(ctx, w, r, "updateDelayNsec", &updateDelayNsec) {
 		return
 	}
 	updateDelay := time.Nanosecond * time.Duration(updateDelayNsec)
@@ -549,7 +553,7 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 	var tags []string
 
 	if _, ok := r.Form["rating"]; ok {
-		if !parseFloatParam(c, w, r, "rating", &rating) {
+		if !parseFloatParam(ctx, w, r, "rating", &rating) {
 			return
 		}
 		hasRating = true
@@ -567,14 +571,14 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := getConfig(c)
+	cfg := getConfig(ctx)
 	if cfg.ForceUpdateFailures && appengine.IsDevAppServer() {
 		http.Error(w, "Returning an error, as requested", http.StatusInternalServerError)
 		return
 	}
 
-	if err := updateRatingAndTags(c, id, hasRating, rating, tags, updateDelay); err != nil {
-		c.Errorf("Got error while rating/tagging song: %v", err)
+	if err := updateRatingAndTags(ctx, id, hasRating, rating, tags, updateDelay); err != nil {
+		log.Errorf(ctx, "Got error while rating/tagging song: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -582,40 +586,40 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	c.Debugf("Got request: %v", r.URL.String())
-	if !checkRequest(c, w, r, "POST", false) {
+	ctx := appengine.NewContext(r)
+	log.Debugf(ctx, "Got request: %v", r.URL.String())
+	if !checkRequest(ctx, w, r, "POST", false) {
 		return
 	}
 
 	var id int64
 	var startTimeFloat float64
-	if !parseIntParam(c, w, r, "songId", &id) || !parseFloatParam(c, w, r, "startTime", &startTimeFloat) {
+	if !parseIntParam(ctx, w, r, "songId", &id) || !parseFloatParam(ctx, w, r, "startTime", &startTimeFloat) {
 		return
 	}
 	startTime := nup.SecondsToTime(startTimeFloat)
 
-	cfg := getConfig(c)
+	cfg := getConfig(ctx)
 	if cfg.ForceUpdateFailures && appengine.IsDevAppServer() {
 		http.Error(w, "Returning an error, as requested", http.StatusInternalServerError)
 		return
 	}
 
-	if err := addPlay(c, id, startTime, r.RemoteAddr); err != nil {
-		c.Errorf("Got error while recording play: %v", err)
+	if err := addPlay(ctx, id, startTime, r.RemoteAddr); err != nil {
+		log.Errorf(ctx, "Got error while recording play: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	writeTextResponse(w, "ok")
 }
 
 func handleSongs(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if !checkRequest(c, w, r, "GET", false) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "GET", false) {
 		return
 	}
 
 	var max int64 = defaultDumpBatchSize
-	if len(r.FormValue("max")) > 0 && !parseIntParam(c, w, r, "max", &max) {
+	if len(r.FormValue("max")) > 0 && !parseIntParam(ctx, w, r, "max", &max) {
 		return
 	}
 	if max > maxDumpBatchSize {
@@ -625,7 +629,7 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 	var minLastModified time.Time
 	if len(r.FormValue("minLastModifiedNsec")) > 0 {
 		var ns int64
-		if !parseIntParam(c, w, r, "minLastModifiedNsec", &ns) {
+		if !parseIntParam(ctx, w, r, "minLastModifiedNsec", &ns) {
 			return
 		}
 		if ns > 0 {
@@ -634,13 +638,13 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var deleted int64
-	if len(r.FormValue("deleted")) > 0 && !parseIntParam(c, w, r, "deleted", &deleted) {
+	if len(r.FormValue("deleted")) > 0 && !parseIntParam(ctx, w, r, "deleted", &deleted) {
 		return
 	}
 
-	songs, cursor, err := dumpSongsForAndroid(c, minLastModified, deleted != 0, max, r.FormValue("cursor"))
+	songs, cursor, err := dumpSongsForAndroid(ctx, minLastModified, deleted != 0, max, r.FormValue("cursor"))
 	if err != nil {
-		c.Errorf("Unable to get songs: %v", err)
+		log.Errorf(ctx, "Unable to get songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
