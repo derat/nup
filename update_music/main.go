@@ -66,7 +66,7 @@ func main() {
 	deleteSongId := flag.Int64("delete-song-id", 0, "Delete song with given ID")
 	dryRun := flag.Bool("dry-run", false, "Only print what would be updated")
 	forceGlob := flag.String("force-glob", "", "Glob pattern relative to music dir for files to scan and update even if they haven't changed")
-	importJsonFile := flag.String("import-json-file", "", "If non-empty, path to JSON file containing a stream of Song objects to import")
+	importJSONFile := flag.String("import-json-file", "", "If non-empty, path to JSON file containing a stream of Song objects to import")
 	importUserData := flag.Bool("import-user-data", true, "When importing from JSON, replace user data (ratings, tags, plays, etc.)")
 	limit := flag.Int("limit", 0, "If positive, limits the number of songs to update (for testing)")
 	requireCovers := flag.Bool("require-covers", false, "Die if cover images aren't found for any songs that have album IDs")
@@ -91,9 +91,9 @@ func main() {
 	replaceUserData := false
 	didFullScan := false
 
-	if len(*importJsonFile) > 0 {
-		log.Printf("Reading songs from %v", *importJsonFile)
-		if numSongs, err = getSongsFromJsonFile(*importJsonFile, readChan); err != nil {
+	if len(*importJSONFile) > 0 {
+		log.Printf("Reading songs from %v", *importJSONFile)
+		if numSongs, err = getSongsFromJSONFile(*importJSONFile, readChan); err != nil {
 			log.Fatal(err)
 		}
 		replaceUserData = *importUserData

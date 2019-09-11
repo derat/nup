@@ -58,7 +58,7 @@ func basicAuth(r *http.Request) (username, password string, ok bool) {
 	return cs[:s], cs[s+1:], true
 }
 
-func writeJsonResponse(w http.ResponseWriter, v interface{}) {
+func writeJSONResponse(w http.ResponseWriter, v interface{}) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -451,7 +451,7 @@ func handleListTags(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJsonResponse(w, tags)
+	writeJSONResponse(w, tags)
 }
 
 func handleNowNsec(w http.ResponseWriter, r *http.Request) {
@@ -529,7 +529,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJsonResponse(w, songs)
+	writeJSONResponse(w, songs)
 }
 
 func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
@@ -605,7 +605,8 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := addPlay(ctx, id, startTime, r.RemoteAddr); err != nil {
+	ip := strings.Split(r.RemoteAddr, ":")[0]
+	if err := addPlay(ctx, id, startTime, ip); err != nil {
 		log.Errorf(ctx, "Got error while recording play: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -656,5 +657,5 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 	if len(cursor) > 0 {
 		rows = append(rows, cursor)
 	}
-	writeJsonResponse(w, rows)
+	writeJSONResponse(w, rows)
 }

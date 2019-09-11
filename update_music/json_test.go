@@ -9,7 +9,7 @@ import (
 	"erat.org/nup/test"
 )
 
-func TestJson(t *testing.T) {
+func TestJSON(t *testing.T) {
 	dir, err := ioutil.TempDir("", "update_music.")
 	if err != nil {
 		panic(err)
@@ -18,7 +18,7 @@ func TestJson(t *testing.T) {
 
 	songs := []nup.Song{test.LegacySong1, test.LegacySong2}
 	ch := make(chan nup.SongOrErr)
-	num, err := getSongsFromJsonFile(test.WriteSongsToJsonFile(dir, songs), ch)
+	num, err := getSongsFromJSONFile(test.WriteSongsToJSONFile(dir, songs), ch)
 	if err != nil {
 		t.Error(err)
 	}

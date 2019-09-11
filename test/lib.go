@@ -72,7 +72,7 @@ func RemoveFromTempDir(dir string, filenames ...string) {
 	}
 }
 
-func WriteSongsToJsonFile(dir string, songs []nup.Song) (path string) {
+func WriteSongsToJSONFile(dir string, songs []nup.Song) (path string) {
 	f, err := ioutil.TempFile(dir, "songs-json.")
 	if err != nil {
 		panic(err)

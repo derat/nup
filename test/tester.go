@@ -192,7 +192,7 @@ func (t *Tester) ImportSongsFromLegacyDb(path string) {
 	}
 }
 
-func (t *Tester) ImportSongsFromJsonFile(path string, policy userDataPolicy) {
+func (t *Tester) ImportSongsFromJSONFile(path string, policy userDataPolicy) {
 	userDataValue := "false"
 	if policy == replaceUserData {
 		userDataValue = "true"

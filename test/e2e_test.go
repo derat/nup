@@ -151,29 +151,6 @@ func doPlayTimeQueries(tt *testing.T, t *Tester, s *nup.Song, queryPrefix string
 	}
 }
 
-func TestLegacy(tt *testing.T) {
-	t := setUpTest(noCaching)
-	defer cleanUpTest(t)
-
-	log.Print("importing songs from legacy db")
-	t.ImportSongsFromLegacyDb(filepath.Join(GetDataDir(), "legacy.db"))
-	if err := CompareSongs([]nup.Song{LegacySong1, LegacySong2}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
-		tt.Error(err)
-	}
-
-	log.Print("checking that play stats were generated correctly")
-	doPlayTimeQueries(tt, t, &LegacySong1, "tags=electronic&")
-	if err := compareQueryResults([]nup.Song{}, t.QuerySongs("maxPlays=0"), CompareOrder, nup.WebClient); err != nil {
-		tt.Error(err)
-	}
-	if err := compareQueryResults([]nup.Song{LegacySong2}, t.QuerySongs("maxPlays=1"), CompareOrder, nup.WebClient); err != nil {
-		tt.Error(err)
-	}
-	if err := compareQueryResults([]nup.Song{LegacySong2, LegacySong1}, t.QuerySongs("maxPlays=2"), CompareOrder, nup.WebClient); err != nil {
-		tt.Error(err)
-	}
-}
-
 func TestUpdate(tt *testing.T) {
 	t := setUpTest(noCaching)
 	defer cleanUpTest(t)
@@ -559,12 +536,12 @@ func TestCovers(tt *testing.T) {
 	}
 }
 
-func TestJsonImport(tt *testing.T) {
+func TestJSONImport(tt *testing.T) {
 	t := setUpTest(noCaching)
 	defer cleanUpTest(t)
 
 	log.Print("importing songs from json file")
-	t.ImportSongsFromJsonFile(WriteSongsToJsonFile(t.TempDir, []nup.Song{LegacySong1, LegacySong2}), replaceUserData)
+	t.ImportSongsFromJSONFile(WriteSongsToJSONFile(t.TempDir, []nup.Song{LegacySong1, LegacySong2}), replaceUserData)
 	if err := CompareSongs([]nup.Song{LegacySong1, LegacySong2}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
@@ -580,7 +557,7 @@ func TestJsonImport(tt *testing.T) {
 	us.Rating /= 2.0
 	us.Plays = us.Plays[0:1]
 	us.Tags = []string{"bogus"}
-	t.ImportSongsFromJsonFile(WriteSongsToJsonFile(t.TempDir, []nup.Song{us, LegacySong2}), replaceUserData)
+	t.ImportSongsFromJSONFile(WriteSongsToJSONFile(t.TempDir, []nup.Song{us, LegacySong2}), replaceUserData)
 	if err := CompareSongs([]nup.Song{us, LegacySong2}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
@@ -595,7 +572,7 @@ func TestJsonImport(tt *testing.T) {
 	}
 
 	log.Print("updating song from json file but preserving user data")
-	t.ImportSongsFromJsonFile(WriteSongsToJsonFile(t.TempDir, []nup.Song{LegacySong1, LegacySong2}), keepUserData)
+	t.ImportSongsFromJSONFile(WriteSongsToJSONFile(t.TempDir, []nup.Song{LegacySong1, LegacySong2}), keepUserData)
 	us2 := LegacySong1
 	us2.Rating = us.Rating
 	us2.Tags = us.Tags
@@ -642,7 +619,7 @@ func TestSorting(tt *testing.T) {
 	}
 
 	log.Print("importing songs and checking sort order")
-	t.ImportSongsFromJsonFile(WriteSongsToJsonFile(t.TempDir, songs), replaceUserData)
+	t.ImportSongsFromJSONFile(WriteSongsToJSONFile(t.TempDir, songs), replaceUserData)
 	if err := compareQueryResults(songs, t.QuerySongs(""), CompareOrder, nup.WebClient); err != nil {
 		tt.Error(err)
 	}
