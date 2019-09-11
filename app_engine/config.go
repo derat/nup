@@ -6,7 +6,6 @@ import (
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 
-	"erat.org/cloud"
 	"erat.org/nup"
 	"erat.org/nup/test"
 )
@@ -36,7 +35,7 @@ func cleanBaseUrl(u *string) {
 
 func loadBaseConfig() {
 	baseConfig = &nup.ServerConfig{}
-	if err := cloud.ReadJson(configPath, baseConfig); err != nil {
+	if err := nup.ReadJSON(configPath, baseConfig); err != nil {
 		panic(err)
 	}
 

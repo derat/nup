@@ -1,12 +1,12 @@
 package nup
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"time"
-
-	"erat.org/cloud"
 )
 
 type ClientType int
@@ -39,7 +39,7 @@ func EscapeCoverString(s string) string {
 // - regular query escaping, and
 // - replacing "+" with "%20" because Cloud Storage seems unhappy otherwise.
 func EncodePathForCloudStorage(p string) string {
-	return strings.Replace(url.QueryEscape(cloud.EscapeObjectName(p)), "+", "%20", -1)
+	return strings.Replace(url.QueryEscape(EscapeObjectName(p)), "+", "%20", -1)
 }
 
 func GetCloudStorageUrl(bucketName, filePath string, client ClientType) string {
@@ -59,4 +59,33 @@ func SecondsToTime(s float64) time.Time {
 
 func TimeToSeconds(t time.Time) float64 {
 	return float64(t.UnixNano()) / float64(time.Second/time.Nanosecond)
+}
+
+func ReadJSON(path string, out interface{}) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	d := json.NewDecoder(f)
+	if err = d.Decode(out); err != nil {
+		return err
+	}
+	return nil
+}
+
+func EscapeObjectName(s string) string {
+	// Per https://developers.google.com/storage/docs/bucketnaming#objectnames.
+	for _, r := range []struct{ from, to string }{
+		{"%", "%25"}, // Escape pre-existing percents.
+		{"#", "%23"}, // Used to denote version numbers.
+		{"[", "%5B"}, // Used for wildcards.
+		{"]", "%5D"}, // Used for wildcards.
+		{"*", "%2A"}, // Used for wildcards.
+		{"?", "%3F"}, // Used for wildcards.
+	} {
+		s = strings.Replace(s, r.from, r.to, -1)
+	}
+	return s
 }

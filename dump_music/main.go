@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 
-	"erat.org/cloud"
 	"erat.org/nup"
 )
 
@@ -112,7 +111,7 @@ func main() {
 	flag.Parse()
 
 	var cfg nup.ClientConfig
-	if err := cloud.ReadJson(*configFile, &cfg); err != nil {
+	if err := nup.ReadJSON(*configFile, &cfg); err != nil {
 		log.Fatal("Unable to read config file: ", err)
 	}
 
