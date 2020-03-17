@@ -28,18 +28,15 @@ func GetServerUrl(baseUrl, path string) (*url.URL, error) {
 	return u, nil
 }
 
-// Escapes a string that will be used as part of a cover filename.
-func EscapeCoverString(s string) string {
-	return strings.Replace(s, "/", "%", -1)
-}
-
-// EncodePathForCloudStorage converts the passed-in original Unix filename to the appropriate path for accessing the file via Cloud Storage.
-// This includes:
-// - the initial escaping performed by the cloud_sync program (a subset of query escaping),
-// - regular query escaping, and
-// - replacing "+" with "%20" because Cloud Storage seems unhappy otherwise.
+// EncodePathForCloudStorage converts the passed-in original Unix filename to
+// the appropriate path for accessing the file via Cloud Storage. This includes
+// both regular query escaping and replacing "+" with "%20" because Cloud
+// Storage seems unhappy otherwise.
+//
+// See https://developers.google.com/storage/docs/bucketnaming#objectnames for
+// additional object naming suggestions.
 func EncodePathForCloudStorage(p string) string {
-	return strings.Replace(url.QueryEscape(EscapeObjectName(p)), "+", "%20", -1)
+	return strings.Replace(url.QueryEscape(p), "+", "%20", -1)
 }
 
 func GetCloudStorageUrl(bucketName, filePath string, client ClientType) string {
@@ -73,19 +70,4 @@ func ReadJSON(path string, out interface{}) error {
 		return err
 	}
 	return nil
-}
-
-func EscapeObjectName(s string) string {
-	// Per https://developers.google.com/storage/docs/bucketnaming#objectnames.
-	for _, r := range []struct{ from, to string }{
-		{"%", "%25"}, // Escape pre-existing percents.
-		{"#", "%23"}, // Used to denote version numbers.
-		{"[", "%5B"}, // Used for wildcards.
-		{"]", "%5D"}, // Used for wildcards.
-		{"*", "%2A"}, // Used for wildcards.
-		{"?", "%3F"}, // Used for wildcards.
-	} {
-		s = strings.Replace(s, r.from, r.to, -1)
-	}
-	return s
 }
