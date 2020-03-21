@@ -80,7 +80,18 @@ function Player() {
   this.audio.addEventListener('timeupdate', this.onTimeUpdate.bind(this), false);
   this.audio.addEventListener('error', this.onError.bind(this), false);
 
+  if ('mediaSession' in navigator) {
+    const ms = navigator.mediaSession;
+    ms.setActionHandler('play', () => this.play());
+    ms.setActionHandler('pause', () => this.pause());
+    ms.setActionHandler('seekbackward', () => this.seek(-Player.SEEK_SECONDS));
+    ms.setActionHandler('seekforward', () => this.seek(Player.SEEK_SECONDS));
+    ms.setActionHandler('previoustrack', () => this.cycleTrack(-1));
+    ms.setActionHandler('nexttrack', () => this.cycleTrack(1));
+  }
+
   this.coverImage.addEventListener('click', this.showUpdateDiv.bind(this), false);
+  this.coverImage.addEventListener('load', () => this.updateMediaSessionMetadata(true /* imageLoaded */), false);
   this.prevButton.addEventListener('click', this.cycleTrack.bind(this, -1), false);
   this.nextButton.addEventListener('click', this.cycleTrack.bind(this, 1), false);
   this.playPauseButton.addEventListener('click', this.togglePause.bind(this), false);
@@ -222,6 +233,8 @@ Player.prototype.updateSongDisplay = function() {
 
   this.updateCoverTitleAttribute();
   this.updateRatingOverlay();
+  // Metadata will be updated again after |coverImage| is loaded.
+  this.updateMediaSessionMetadata(false /* imageLoaded */);
 };
 
 Player.prototype.updateCoverTitleAttribute = function() {
@@ -241,6 +254,33 @@ Player.prototype.updateRatingOverlay = function() {
   var song = this.getCurrentSong();
   this.ratingOverlayDiv.innerText = (song && song.rating >= 0.0) ?
       this.getRatingString(song.rating, false, false) : '';
+};
+
+Player.prototype.updateMediaSessionMetadata = function(imageLoaded) {
+  if (!('mediaSession' in navigator)) return;
+
+  const song = this.getCurrentSong();
+  if (!song) {
+    navigator.mediaSession.metadata = null;
+    return;
+  }
+
+  const data = {
+    title: song.title,
+    artist: song.artist,
+    album: song.album,
+  };
+  if (imageLoaded) {
+    const img = this.coverImage;
+    data.artwork = [
+      {
+        src: img.src,
+        sizes: `${img.naturalWidth}x${img.naturalHeight}`,
+        type: 'image/jpeg',
+      }
+    ];
+  }
+  navigator.mediaSession.metadata = new MediaMetadata(data);
 };
 
 Player.prototype.updatePresentationLayerSongs = function() {
