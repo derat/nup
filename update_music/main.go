@@ -79,6 +79,9 @@ func main() {
 	}
 
 	if *deleteSongId > 0 {
+		if *dryRun {
+			log.Fatal("-dry-run is incompatible with -delete-song-id")
+		}
 		log.Printf("Deleting song %v", *deleteSongId)
 		deleteSong(cfg, *deleteSongId)
 		return
