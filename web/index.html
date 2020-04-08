@@ -1,249 +1,307 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html>
-<head>
-  <title>Player</title>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
-  <link id="favicon" href="images/missing_cover_icon.png" type="image/png" rel="icon"/>
-  <link href="presentation_layer.css" rel="stylesheet" type="text/css"/>
-  <link href="song_table.css" rel="stylesheet" type="text/css"/>
-  <link href="suggester.css" rel="stylesheet" type="text/css"/>
-  <link href="dialog_manager.css" rel="stylesheet" type="text/css"/>
-  <link href="playlist.css" rel="stylesheet" type="text/css"/>
-  <link href="options_dialog.css" rel="stylesheet" type="text/css"/>
-  <link href="player.css" rel="stylesheet" type="text/css"/>
-  <link href="index.css" rel="stylesheet" type="text/css"/>
-  <script src="common.js" type="text/javascript"></script>
-  <script src="config.js" type="text/javascript"></script>
-  <script src="song_table.js" type="text/javascript"></script>
-  <script src="suggester.js" type="text/javascript"></script>
-  <script src="dialog_manager.js" type="text/javascript"></script>
-  <script src="options_dialog.js" type="text/javascript"></script>
-  <script src="presentation_layer.js" type="text/javascript"></script>
-  <script src="playlist.js" type="text/javascript"></script>
-  <script src="updater.js" type="text/javascript"></script>
-  <script src="player.js" type="text/javascript"></script>
-</head>
+  <head>
+    <title>Player</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <link
+      id="favicon"
+      href="images/missing_cover_icon.png"
+      type="image/png"
+      rel="icon"
+    />
+    <link href="presentation_layer.css" rel="stylesheet" type="text/css" />
+    <link href="song_table.css" rel="stylesheet" type="text/css" />
+    <link href="suggester.css" rel="stylesheet" type="text/css" />
+    <link href="dialog_manager.css" rel="stylesheet" type="text/css" />
+    <link href="playlist.css" rel="stylesheet" type="text/css" />
+    <link href="options_dialog.css" rel="stylesheet" type="text/css" />
+    <link href="player.css" rel="stylesheet" type="text/css" />
+    <link href="index.css" rel="stylesheet" type="text/css" />
+    <script src="common.js" type="text/javascript"></script>
+    <script src="config.js" type="text/javascript"></script>
+    <script src="song_table.js" type="text/javascript"></script>
+    <script src="suggester.js" type="text/javascript"></script>
+    <script src="dialog_manager.js" type="text/javascript"></script>
+    <script src="options_dialog.js" type="text/javascript"></script>
+    <script src="presentation_layer.js" type="text/javascript"></script>
+    <script src="playlist.js" type="text/javascript"></script>
+    <script src="updater.js" type="text/javascript"></script>
+    <script src="player.js" type="text/javascript"></script>
+  </head>
 
-<body onLoad="initConfig(); initDialogManager(); initPresentationLayer(); initPlayer(); initPlaylist();">
-
-<div id="presentationOverlay">
-  <div id="presentationLeft">
-    <img id="presentationCurrentCoverImg">
-  </div>
-  <div id="presentationRight">
-    <div id="presentationCurrentText">
-      <div id="presentationCurrentArtist" class="artist"></div>
-      <div id="presentationCurrentTitle" class="title"></div>
-      <div id="presentationCurrentAlbum" class="album"></div>
-      <div id="presentationProgressBorder">
-        <div id="presentationProgressBar"></div>
+  <body
+    onLoad="initConfig(); initDialogManager(); initPresentationLayer(); initPlayer(); initPlaylist();"
+  >
+    <div id="presentationOverlay">
+      <div id="presentationLeft">
+        <img id="presentationCurrentCoverImg" />
       </div>
-      <div id="presentationProgressTimes">
-        <div id="presentationTime"></div>
-        <div id="presentationDuration"></div>
-      </div>
-    </div>
-    <div id="presentationNextDiv">
-      <div id="presentationNextHeading">Next</div>
-      <div id="presentationNextDetails">
-        <img id="presentationNextCover">
-        <div id="presentationNextText">
-          <div id="presentationNextArtist" class="artist"></div>
-          <div id="presentationNextTitle" class="title"></div>
-          <div id="presentationNextAlbum" class="album"></div>
+      <div id="presentationRight">
+        <div id="presentationCurrentText">
+          <div id="presentationCurrentArtist" class="artist"></div>
+          <div id="presentationCurrentTitle" class="title"></div>
+          <div id="presentationCurrentAlbum" class="album"></div>
+          <div id="presentationProgressBorder">
+            <div id="presentationProgressBar"></div>
+          </div>
+          <div id="presentationProgressTimes">
+            <div id="presentationTime"></div>
+            <div id="presentationDuration"></div>
+          </div>
+        </div>
+        <div id="presentationNextDiv">
+          <div id="presentationNextHeading">Next</div>
+          <div id="presentationNextDetails">
+            <img id="presentationNextCover" />
+            <div id="presentationNextText">
+              <div id="presentationNextArtist" class="artist"></div>
+              <div id="presentationNextTitle" class="title"></div>
+              <div id="presentationNextAlbum" class="album"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-</div>
 
-<div id="playlistContainer">
-  <div id="leftPane">
-    <audio id="audio" type="audio/mpeg">
-      Your browser doesn't support the audio element.
-    </audio>
+    <div id="playlistContainer">
+      <div id="leftPane">
+        <audio id="audio" type="audio/mpeg">
+          Your browser doesn't support the audio element.
+        </audio>
 
-    <div id="songInfoDiv">
-      <div id="coverDiv">
-        <img id="coverImage" alt=""/>
+        <div id="songInfoDiv">
+          <div id="coverDiv">
+            <img id="coverImage" alt="" />
+          </div>
+          <div id="ratingOverlayDiv"></div>
+          <div id="artistDiv"></div>
+          <div id="titleDiv"></div>
+          <div id="albumDiv"></div>
+          <div id="timeDiv"></div>
+        </div>
+
+        <div id="controlsDiv">
+          <input
+            id="prevButton"
+            type="button"
+            value="Prev"
+            disabled="disabled"
+          />
+          <input
+            id="nextButton"
+            type="button"
+            value="Next"
+            disabled="disabled"
+          />
+          <input
+            id="playPauseButton"
+            type="button"
+            value="Pause"
+            disabled="disabled"
+          />
+        </div>
+
+        <div id="updateDiv">
+          <img id="updateCloseImage" src="images/update_close.png" />
+          <div id="ratingDiv">
+            Rating: <span id="ratingSpan" tabindex="0"></span>
+            <a id="dumpSongLink" class="debugLink" target="_blank">[d]</a>
+            <a id="dumpSongCacheLink" class="debugLink" target="_blank">[c]</a>
+          </div>
+          <textarea id="editTagsTextarea"></textarea>
+          <div id="editTagsSuggestionsDiv"></div>
+        </div>
+
+        <table class="songTable" id="playlistTable">
+          <tr>
+            <th class="artist">Artist</th>
+            <th class="title">Title</th>
+            <th class="album">Album</th>
+            <th class="time">Time</th>
+          </tr>
+        </table>
       </div>
-      <div id="ratingOverlayDiv"></div>
-      <div id="artistDiv"></div>
-      <div id="titleDiv"></div>
-      <div id="albumDiv"></div>
-      <div id="timeDiv"></div>
-    </div>
 
-    <div id="controlsDiv">
-      <input id="prevButton" type="button" value="Prev" disabled="disabled"/>
-      <input id="nextButton" type="button" value="Next" disabled="disabled"/>
-      <input id="playPauseButton" type="button" value="Pause" disabled="disabled"/>
-    </div>
+      <div id="centerDivider"></div>
 
-    <div id="updateDiv">
-      <img id="updateCloseImage" src="images/update_close.png">
-      <div id="ratingDiv">
-        Rating: <span id="ratingSpan" tabindex="0"></span>
-        <a id="dumpSongLink" class="debugLink" target="_blank">[d]</a>
-        <a id="dumpSongCacheLink" class="debugLink" target="_blank">[c]</a>
+      <div id="rightPane">
+        <div id="searchTitle">Search</div>
+
+        <form style="display:block">
+          <table id="searchTable">
+            <colgroup>
+              <col id="searchLeftColumn" />
+              <col id="searchRightColumn" />
+            </colgroup>
+            <tr>
+              <td><label for="keywordsInput">Keywords</label></td>
+              <td>
+                <input id="keywordsInput" type="text" size="32" />
+                <img
+                  id="keywordsClearButton"
+                  src="images/playlist_clear_text.png"
+                />
+              </td>
+            </tr>
+            <tr>
+              <td><label for="tagsInput">Tags</label></td>
+              <td>
+                <div id="tagsInputDiv">
+                  <input id="tagsInput" type="text" size="32" />
+                  <img
+                    id="tagsClearButton"
+                    src="images/playlist_clear_text.png"
+                  />
+                  <div id="tagsInputSuggestionsDiv"></div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <label for="shuffleCheckbox">Shuffle</label>
+                <input id="shuffleCheckbox" type="checkbox" value="shuffle" />
+              </td>
+              <td>
+                <label for="firstTrackCheckbox">First track</label>
+                <input
+                  id="firstTrackCheckbox"
+                  type="checkbox"
+                  value="firstTrack"
+                />
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <label for="unratedCheckbox">Unrated</label>
+                <input id="unratedCheckbox" type="checkbox" value="unrated" />
+              </td>
+              <td>
+                <label for="minRatingSelect">Min rating</label>
+                <select id="minRatingSelect">
+                  <option value="0.00">★</option>
+                  <option value="0.25">★★</option>
+                  <option value="0.50">★★★</option>
+                  <option value="0.75">★★★★</option>
+                  <option value="1.00">★★★★★</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2">
+                <label for="maxPlaysInput">Played</label>
+                <input id="maxPlaysInput" type="text" />
+                <label for="maxPlaysInput">or fewer times</label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <label id="firstPlayedLabel" for="firstPlayedSelect"
+                  >First played</label
+                >
+              </td>
+              <td>
+                <select id="firstPlayedSelect">
+                  <option value="0">...</option>
+                  <option value="86400">one day</option>
+                  <option value="604800">one week</option>
+                  <option value="2592000">one month</option>
+                  <option value="7776000">three months</option>
+                  <option value="15552000">six months</option>
+                  <option value="31536000">one year</option>
+                  <option value="94608000">three years</option>
+                </select>
+                <label for="firstPlayedSelect">or less ago</label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <label id="lastPlayedLabel" for="lastPlayedSelect"
+                  >Last played</label
+                >
+              </td>
+              <td>
+                <select id="lastPlayedSelect">
+                  <option value="0">...</option>
+                  <option value="86400">one day</option>
+                  <option value="604800">one week</option>
+                  <option value="2592000">one month</option>
+                  <option value="7776000">three months</option>
+                  <option value="15552000">six months</option>
+                  <option value="31536000">one year</option>
+                  <option value="94608000">three years</option>
+                </select>
+                <label for="lastPlayedSelect">or longer ago</label>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <label id="presetLabel" for="presetSelect">Preset</label>
+              </td>
+              <td>
+                <select id="presetSelect">
+                  <option value="">...</option>
+                  <option value="mr=3;t=instrumental;lp=6;s=1;play=1"
+                    >instrumental old</option
+                  >
+                  <option value="mr=3;t=mellow;s=1;play=1">mellow</option>
+                  <option value="ft=1;fp=3">new albums</option>
+                  <option value="u=1;play=1">unrated</option>
+                  <option value="mr=3;lp=6;s=1;play=1">old</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2">
+                <div id="searchButtons">
+                  <input id="searchButton" type="button" value="Search" />
+                  <input id="resetButton" type="button" value="Reset" />
+                  <input
+                    id="luckyButton"
+                    type="button"
+                    value="I'm Feeling Lucky"
+                  />
+                </div>
+              </td>
+            </tr>
+          </table>
+        </form>
+
+        <div id="searchResultsControls">
+          <span id="searchResultsTitle">Results</span>
+          <input
+            id="appendButton"
+            type="button"
+            value="Append"
+            disabled="true"
+          />
+          <input
+            id="insertButton"
+            type="button"
+            value="Insert"
+            disabled="true"
+          />
+          <input
+            id="replaceButton"
+            type="button"
+            value="Replace"
+            disabled="true"
+          />
+        </div>
+
+        <table class="songTable" id="searchResultsTable">
+          <tr>
+            <th class="checkbox">
+              <input id="searchResultsCheckbox" type="checkbox" />
+            </th>
+            <th class="artist">Artist</th>
+            <th class="title">Title</th>
+            <th class="album">Album</th>
+            <th class="time">Time</th>
+          </tr>
+        </table>
       </div>
-      <textarea id="editTagsTextarea"></textarea>
-      <div id="editTagsSuggestionsDiv"></div>
     </div>
 
-    <table class="songTable" id="playlistTable">
-      <tr>
-        <th class="artist">Artist</th>
-        <th class="title">Title</th>
-        <th class="album">Album</th>
-        <th class="time">Time</th>
-      </tr>
-    </table>
-  </div>
-
-  <div id="centerDivider"></div>
-
-  <div id="rightPane">
-    <div id="searchTitle">Search</div>
-
-    <form style="display:block">
-      <table id="searchTable">
-        <col id="searchLeftColumn"/>
-        <col id="searchRightColumn"/>
-        <tr>
-          <td><label for="keywordsInput">Keywords</label></td>
-          <td>
-            <input id="keywordsInput" type="text" size="32"></input>
-            <img id="keywordsClearButton" src="images/playlist_clear_text.png">
-          </td>
-        </tr>
-        <tr>
-          <td><label for="tagsInput">Tags</label></td>
-          <td>
-            <div id="tagsInputDiv">
-              <input id="tagsInput" type="text" size="32"></input>
-              <img id="tagsClearButton" src="images/playlist_clear_text.png">
-              <div id="tagsInputSuggestionsDiv"></div>
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td>
-            <label for="shuffleCheckbox">Shuffle</label>
-            <input id="shuffleCheckbox" type="checkbox" value="shuffle"></input>
-          </td>
-          <td>
-            <label for="firstTrackCheckbox">First track</label>
-            <input id="firstTrackCheckbox" type="checkbox" value="firstTrack"></input>
-          </td>
-        </tr>
-        <tr>
-          <td>
-            <label for="unratedCheckbox">Unrated</label>
-            <input id="unratedCheckbox" type="checkbox" value="unrated"></input>
-          </td>
-          <td>
-            <label for="minRatingSelect">Min rating</label>
-            <select id="minRatingSelect">
-              <option value="0.00">★</option>
-              <option value="0.25">★★</option>
-              <option value="0.50">★★★</option>
-              <option value="0.75">★★★★</option>
-              <option value="1.00">★★★★★</option>
-            </select>
-          </td>
-        </tr>
-        <tr>
-          <td colspan="2">
-            <label for="maxPlaysInput">Played</label>
-            <input id="maxPlaysInput" type="text"></input>
-            <label for="maxPlaysInput">or fewer times</label>
-          </td>
-        </tr>
-        <tr>
-          <td>
-            <label id="firstPlayedLabel" for="firstPlayedSelect">First played</label>
-          </td>
-          <td>
-            <select id="firstPlayedSelect">
-              <option value="0">...</option>
-              <option value="86400">one day</option>
-              <option value="604800">one week</option>
-              <option value="2592000">one month</option>
-              <option value="7776000">three months</option>
-              <option value="15552000">six months</option>
-              <option value="31536000">one year</option>
-              <option value="94608000">three years</option>
-            </select>
-            <label for="firstPlayedSelect">or less ago</label>
-          </td>
-        </tr>
-        <tr>
-          <td>
-            <label id="lastPlayedLabel" for="lastPlayedSelect">Last played</label>
-          </td>
-          <td>
-            <select id="lastPlayedSelect">
-              <option value="0">...</option>
-              <option value="86400">one day</option>
-              <option value="604800">one week</option>
-              <option value="2592000">one month</option>
-              <option value="7776000">three months</option>
-              <option value="15552000">six months</option>
-              <option value="31536000">one year</option>
-              <option value="94608000">three years</option>
-            </select>
-            <label for="lastPlayedSelect">or longer ago</label>
-          </td>
-        </tr>
-        <tr>
-          <td>
-            <label id="presetLabel" for="presetSelect">Preset</label>
-          </td>
-          <td>
-            <select id="presetSelect">
-              <option value="">...</option>
-              <option value="mr=3;t=instrumental;lp=6;s=1;play=1">instrumental old</option>
-              <option value="mr=3;t=mellow;s=1;play=1">mellow</option>
-              <option value="ft=1;fp=3">new albums</option>
-              <option value="u=1;play=1">unrated</option>
-              <option value="mr=3;lp=6;s=1;play=1">old</option>
-            </select>
-          </td>
-        </tr>
-        <tr>
-          <td colspan="2">
-            <div id="searchButtons">
-              <input id="searchButton" type="button" value="Search"></input>
-              <input id="resetButton" type="button" value="Reset"></input>
-              <input id="luckyButton" type="button" value="I'm Feeling Lucky"></input>
-            </div>
-          </td>
-        </tr>
-      </table>
-    </form>
-
-    <div id="searchResultsControls">
-      <span id="searchResultsTitle">Results</span>
-      <input id="appendButton" type="button" value="Append" disabled="true"></input>
-      <input id="insertButton" type="button" value="Insert" disabled="true"></input>
-      <input id="replaceButton" type="button" value="Replace" disabled="true"></input>
-    </div>
-
-    <table class="songTable" id="searchResultsTable">
-      <tr>
-        <th class="checkbox"><input id="searchResultsCheckbox" type="checkbox"></th>
-        <th class="artist">Artist</th>
-        <th class="title">Title</th>
-        <th class="album">Album</th>
-        <th class="time">Time</th>
-      </tr>
-    </table>
-  </div>
-
-</div>
-
-<div id="waitingDiv">Waiting for server...</div>
-
-</body>
+    <div id="waitingDiv">Waiting for server...</div>
+  </body>
 </html>

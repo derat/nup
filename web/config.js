@@ -5,41 +5,41 @@ function initConfig() {
   document.config = new Config();
 }
 
-function Config() {
-  this.listeners = [];
+class Config {
+  VOLUME_KEY = 'volume';
 
-  // Initialize defaults.
-  this.volume = 0.7;
+  constructor() {
+    this.listeners = [];
 
-  this.load();
-}
+    // Initialize defaults.
+    this.volume = 0.7;
 
-Config.VOLUME_KEY = 'volume';
-
-Config.prototype.addListener = function(listener) {
-  this.listeners.push(listener);
-};
-
-Config.prototype.getVolume = function() {
-  return this.volume;
-};
-
-Config.prototype.setVolume = function(volume) {
-  this.volume = volume;
-  for (var i = 0; i < this.listeners.length; i++) {
-    this.listeners[i].onVolumeChange(this.volume);
+    this.load();
   }
-};
 
-Config.prototype.load = function() {
-  if (!window.localStorage) return;
+  addListener(listener) {
+    this.listeners.push(listener);
+  }
 
-  var volume = localStorage[Config.VOLUME_KEY];
-  if (volume != null) this.volume = volume;
-};
+  getVolume() {
+    return this.volume;
+  }
 
-Config.prototype.save = function() {
-  if (!window.localStorage) return;
+  setVolume(volume) {
+    this.volume = volume;
+    for (let i = 0; i < this.listeners.length; i++) {
+      this.listeners[i].onVolumeChange(this.volume);
+    }
+  }
 
-  localStorage[Config.VOLUME_KEY] = this.volume;
-};
+  load() {
+    if (!window.localStorage) return;
+    const volume = localStorage[Config.VOLUME_KEY];
+    if (volume != null) this.volume = volume;
+  }
+
+  save() {
+    if (!window.localStorage) return;
+    localStorage[Config.VOLUME_KEY] = this.volume;
+  }
+}

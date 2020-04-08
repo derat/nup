@@ -3,9 +3,12 @@
 
 import distutils.spawn
 import pprint
+import tempfile
 import time
 import unittest
+
 from selenium import webdriver
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 # Local imports.
 import constants
@@ -27,6 +30,11 @@ def setUpModule():
     global server
     server = Server(file_thread.host_port())
 
+    global driver
+    # Collect browser logs:
+    # https://intellipaat.com/community/5478/getting-console-log-output-from-chrome-with-selenium-python-api-bindings
+    caps = DesiredCapabilities.CHROME
+    caps['goog:loggingPrefs'] = { 'browser':'ALL' }
     # For some reason, even when the chromedriver executable is in $PATH, I get
     # an error like the following here:
     #
@@ -35,8 +43,8 @@ def setUpModule():
     #
     # Passing the path manually seems to work:
     # https://stackoverflow.com/a/12611523
-    global driver
-    driver = webdriver.Chrome(distutils.spawn.find_executable('chromedriver'))
+    driver = webdriver.Chrome(distutils.spawn.find_executable('chromedriver'),
+                              desired_capabilities=caps)
 
     # Makes no sense: Chrome starts at a data: URL, so I get a "Cookies are
     # disabled inside 'data:' URLs" exception if I try to add the cookie before
@@ -49,16 +57,33 @@ def setUpModule():
     })
     driver.get(base_url)
 
+    global log_file
+    log_file = tempfile.NamedTemporaryFile(prefix='nup_chrome.',
+                                           suffix='.txt',
+                                           delete=False)
+    print('Writing Chrome logs to %s' % log_file.name)
+
 def tearDownModule():
     file_thread.stop()
     driver.close()
     server.reset_config()
+    log_file.close()
 
 class Test(unittest.TestCase):
     def setUp(self):
+        # https://stackoverflow.com/a/4506296
+        log_file.write(self._testMethodName + '\n')
+        log_file.write('-' * 80 + '\n')
+
         server.reset_connection()
         server.clear_data()
         self.base_music_url = 'http://%s:%d/' % file_thread.host_port()
+
+    def tearDown(self):
+        for entry in driver.get_log('browser'):
+            log_file.write(entry['message'] + '\n')
+        log_file.write('\n')
+        log_file.flush()
 
     def wait_for_search_results(self, page, songs, checked=None, msg=''):
         '''Waits until the page is displaying the expected search results.'''

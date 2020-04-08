@@ -3,7 +3,7 @@ function $(id) {
 }
 
 function pad(num, width) {
-  var str = num + '';
+  let str = num + '';
   while (str.length < width) str = '0' + str;
   return str;
 }
@@ -21,7 +21,7 @@ function updateTitleAttributeForTruncation(element, text) {
 }
 
 function createElement(type, className, parentElement, text) {
-  var element = document.createElement(type);
+  const element = document.createElement(type);
   if (className) element.className = className;
   parentElement.appendChild(element);
   if (text != null) element.appendChild(document.createTextNode(text));
@@ -33,18 +33,18 @@ function createClassNameRegExp(className) {
 }
 
 function addClassName(element, className) {
-  var re = createClassNameRegExp(className);
+  const re = createClassNameRegExp(className);
   if (!element.className.match(re)) {
     element.className += ' ' + className;
   }
 }
 
 function removeClassName(element, className) {
-  var re = createClassNameRegExp(className);
+  const re = createClassNameRegExp(className);
   element.className = element.className.replace(re, ' ');
 }
 
-var KeyCodes = {
+const KeyCodes = {
   ENTER: 13,
   ESCAPE: 27,
   LEFT: 37,
