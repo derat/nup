@@ -9,6 +9,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -22,6 +23,9 @@ import (
 )
 
 const (
+	// Path to the index file relative to the base directory.
+	indexPath = "web/index.html"
+
 	// Default and maximum size of a batch of dumped entities.
 	defaultDumpBatchSize = 100
 	maxDumpBatchSize     = 5000
@@ -167,6 +171,7 @@ func main() {
 	loadBaseConfig()
 	rand.Seed(time.Now().UnixNano())
 
+	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/clear", handleClear)
 	http.HandleFunc("/config", handleConfig)
 	http.HandleFunc("/delete_song", handleDeleteSong)
@@ -376,6 +381,31 @@ func handleFlushCache(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeTextResponse(w, "ok")
+}
+
+func handleIndex(w http.ResponseWriter, r *http.Request) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "GET", true) {
+		return
+	}
+
+	if r.URL.Path != "/" {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	f, err := os.Open(indexPath)
+	if err != nil {
+		log.Errorf(ctx, "Failed to open %v: %v", indexPath, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
+
+	w.Header().Set("Content-Type", "text/html")
+	if _, err = io.Copy(w, f); err != nil {
+		log.Errorf(ctx, "Failed to copy %v to response: %v", indexPath, err)
+	}
 }
 
 func handleImport(w http.ResponseWriter, r *http.Request) {

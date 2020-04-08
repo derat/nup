@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	// Config file path relative to base app directory.
+	// Config file path relative to base directory.
 	configPath = "config.json"
 
 	// Datastore kind and ID for storing the server config for testing.
