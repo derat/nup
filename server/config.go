@@ -7,7 +7,6 @@ import (
 	"google.golang.org/appengine/datastore"
 
 	"github.com/derat/nup/cloudutil"
-	"github.com/derat/nup/test"
 	"github.com/derat/nup/types"
 )
 
@@ -23,7 +22,7 @@ const (
 var baseConfig *types.ServerConfig
 
 func addTestUserToConfig(cfg *types.ServerConfig) {
-	cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, types.BasicAuthInfo{test.TestUsername, test.TestPassword})
+	cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, types.BasicAuthInfo{cloudutil.TestUsername, cloudutil.TestPassword})
 }
 
 // cleanBaseURL appends a trailing slash to u if not already present.

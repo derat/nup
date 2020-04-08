@@ -9,6 +9,13 @@ import (
 	"strings"
 )
 
+const (
+	// TestUsername and TestPassword are accepted for basic HTTP authentication
+	// by development servers.
+	TestUsername = "testuser"
+	TestPassword = "testpass"
+)
+
 type ClientType int
 
 const (

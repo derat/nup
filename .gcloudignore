@@ -23,3 +23,8 @@
 *.test
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+
+# Stuff not needed by the App Engine server.
+README.md
+cmd/
+test/

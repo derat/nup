@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/derat/nup/cloudutil"
 	"github.com/derat/nup/types"
 )
 
@@ -107,16 +108,16 @@ func newTester(serverURL, binDir string) *Tester {
 	}{
 		filepath.Join(t.TempDir, "last_update_time"),
 		t.serverURL,
-		TestUsername,
-		TestPassword,
+		cloudutil.TestUsername,
+		cloudutil.TestPassword,
 		t.CoverDir,
 		t.MusicDir,
 	})
 
 	t.dumpConfigFile = writeConfig("dump_config.json", types.ClientConfig{
 		ServerURL: t.serverURL,
-		Username:  TestUsername,
-		Password:  TestPassword,
+		Username:  cloudutil.TestUsername,
+		Password:  cloudutil.TestPassword,
 	})
 
 	return t
@@ -210,7 +211,7 @@ func (t *Tester) NewRequest(method, path string, body io.Reader) *http.Request {
 	if err != nil {
 		panic(err)
 	}
-	req.SetBasicAuth(TestUsername, TestPassword)
+	req.SetBasicAuth(cloudutil.TestUsername, cloudutil.TestPassword)
 	return req
 }
 

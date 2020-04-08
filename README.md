@@ -1,6 +1,30 @@
 # nup
 
-AppEngine app for streaming a music collection.
+App Engine app for streaming a music collection.
+
+## Deploying the app
+
+From the base directory, run:
+
+```sh
+gcloud app deploy --project=<PROJECT_ID>
+```
+
+## Development and testing
+
+First, from the base directory, run:
+
+```sh
+dev_appserver.py --datastore_consistency_policy=consistent .
+```
+
+This starts a local development App Engine instance listening at
+`http://localhost:8080`.
+
+*   End-to-end Go tests that exercise the App Engine server can be run from the
+    `test/` directory via `go test`.
+*   Selenium tests that exercise both the web client and the server can be run
+    from the `test/web/` directory via `./tests.py`.
 
 ## Merging songs
 
