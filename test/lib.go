@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"erat.org/nup"
+	"github.com/derat/nup/types"
 )
 
 const (
@@ -72,7 +72,7 @@ func RemoveFromTempDir(dir string, filenames ...string) {
 	}
 }
 
-func WriteSongsToJSONFile(dir string, songs []nup.Song) (path string) {
+func WriteSongsToJSONFile(dir string, songs []types.Song) (path string) {
 	f, err := ioutil.TempFile(dir, "songs-json.")
 	if err != nil {
 		panic(err)
@@ -88,7 +88,7 @@ func WriteSongsToJSONFile(dir string, songs []nup.Song) (path string) {
 	return f.Name()
 }
 
-type SongArray []nup.Song
+type SongArray []types.Song
 
 func (a SongArray) Len() int      { return len(a) }
 func (a SongArray) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
@@ -106,7 +106,7 @@ const (
 	IgnoreOrder
 )
 
-func CompareSongs(expected, actual []nup.Song, order OrderPolicy) error {
+func CompareSongs(expected, actual []types.Song, order OrderPolicy) error {
 	if order == IgnoreOrder {
 		sort.Sort(SongArray(expected))
 		sort.Sort(SongArray(actual))
@@ -114,12 +114,16 @@ func CompareSongs(expected, actual []nup.Song, order OrderPolicy) error {
 
 	m := make([]string, 0)
 
-	stringify := func(s nup.Song) string {
+	stringify := func(s types.Song) string {
 		if s.Plays != nil {
 			for j := range s.Plays {
 				s.Plays[j].StartTime = s.Plays[j].StartTime.UTC()
+				// Ugly hack to handle IPv6 addresses.
+				if s.Plays[j].IpAddress == "[::1]" {
+					s.Plays[j].IpAddress = "127.0.0.1"
+				}
 			}
-			sort.Sort(nup.PlayArray(s.Plays))
+			sort.Sort(types.PlayArray(s.Plays))
 		}
 		b, err := json.Marshal(s)
 		if err != nil {
@@ -149,8 +153,8 @@ func CompareSongs(expected, actual []nup.Song, order OrderPolicy) error {
 	return nil
 }
 
-func GetSongsFromChannel(ch chan nup.SongOrErr, num int) ([]nup.Song, error) {
-	songs := make([]nup.Song, 0)
+func GetSongsFromChannel(ch chan types.SongOrErr, num int) ([]types.Song, error) {
+	songs := make([]types.Song, 0)
 	for i := 0; i < num; i++ {
 		s := <-ch
 		if s.Err != nil {

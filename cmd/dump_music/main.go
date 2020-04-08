@@ -9,7 +9,8 @@ import (
 	"net/http"
 	"os"
 
-	"erat.org/nup"
+	"github.com/derat/nup/cloudutil"
+	"github.com/derat/nup/types"
 )
 
 const (
@@ -23,9 +24,9 @@ const (
 	chanSize             = 50
 )
 
-func getEntities(cfg *nup.ClientConfig, entityType string, extraArgs string, batchSize int, f func([]byte)) {
+func getEntities(cfg *types.ClientConfig, entityType string, extraArgs string, batchSize int, f func([]byte)) {
 	client := http.Client{}
-	u, err := nup.GetServerUrl(cfg.ServerUrl, exportPath)
+	u, err := cloudutil.ServerURL(cfg.ServerUrl, exportPath)
 	if err != nil {
 		log.Fatal("Failed to get server URL: ", err)
 	}
@@ -72,7 +73,7 @@ func getEntities(cfg *nup.ClientConfig, entityType string, extraArgs string, bat
 	}
 }
 
-func getSongs(cfg *nup.ClientConfig, batchSize int, includeCovers bool, ch chan *nup.Song) {
+func getSongs(cfg *types.ClientConfig, batchSize int, includeCovers bool, ch chan *types.Song) {
 	extraArgs := "covers="
 	if includeCovers {
 		extraArgs += "1"
@@ -81,7 +82,7 @@ func getSongs(cfg *nup.ClientConfig, batchSize int, includeCovers bool, ch chan 
 	}
 
 	getEntities(cfg, "song", extraArgs, batchSize, func(b []byte) {
-		var s nup.Song
+		var s types.Song
 		if err := json.Unmarshal(b, &s); err == nil {
 			ch <- &s
 		} else {
@@ -91,9 +92,9 @@ func getSongs(cfg *nup.ClientConfig, batchSize int, includeCovers bool, ch chan 
 	ch <- nil
 }
 
-func getPlays(cfg *nup.ClientConfig, batchSize int, ch chan *nup.PlayDump) {
+func getPlays(cfg *types.ClientConfig, batchSize int, ch chan *types.PlayDump) {
 	getEntities(cfg, "play", "", batchSize, func(b []byte) {
-		var pd nup.PlayDump
+		var pd types.PlayDump
 		if err := json.Unmarshal(b, &pd); err == nil {
 			ch <- &pd
 		} else {
@@ -110,15 +111,15 @@ func main() {
 	includeCovers := flag.Bool("covers", false, "Include cover filenames")
 	flag.Parse()
 
-	var cfg nup.ClientConfig
-	if err := nup.ReadJSON(*configFile, &cfg); err != nil {
+	var cfg types.ClientConfig
+	if err := cloudutil.ReadJSON(*configFile, &cfg); err != nil {
 		log.Fatal("Unable to read config file: ", err)
 	}
 
-	songChan := make(chan *nup.Song, chanSize)
+	songChan := make(chan *types.Song, chanSize)
 	go getSongs(&cfg, *songBatchSize, *includeCovers, songChan)
 
-	playChan := make(chan *nup.PlayDump, chanSize)
+	playChan := make(chan *types.PlayDump, chanSize)
 	go getPlays(&cfg, *playBatchSize, playChan)
 
 	e := json.NewEncoder(os.Stdout)
@@ -137,7 +138,7 @@ func main() {
 		}
 
 		if err := e.Encode(s); err != nil {
-			log.Fatal("Failed to encode song: %v", err)
+			log.Fatal("Failed to encode song: ", err)
 		}
 
 		numSongs++
@@ -148,6 +149,6 @@ func main() {
 	log.Printf("Wrote %d songs", numSongs)
 
 	if pd != nil {
-		log.Fatal("Got orphaned play for song %v: %v", pd.SongId, pd.Play)
+		log.Fatalf("Got orphaned play for song %v: %v", pd.SongId, pd.Play)
 	}
 }

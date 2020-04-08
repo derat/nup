@@ -8,7 +8,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"erat.org/nup"
+	"github.com/derat/nup/cloudutil"
+	"github.com/derat/nup/types"
 )
 
 const (
@@ -22,8 +23,8 @@ const (
 	importReplaceParam = "replaceUserData=1"
 )
 
-func updateSongs(cfg Config, ch chan nup.Song, numSongs int, replaceUserData bool) error {
-	u, err := nup.GetServerUrl(cfg.ServerUrl, importPath)
+func updateSongs(cfg Config, ch chan types.Song, numSongs int, replaceUserData bool) error {
+	u, err := cloudutil.ServerURL(cfg.ServerUrl, importPath)
 	if err != nil {
 		return err
 	}
@@ -79,7 +80,7 @@ func updateSongs(cfg Config, ch chan nup.Song, numSongs int, replaceUserData boo
 }
 
 func deleteSong(cfg Config, songId int64) error {
-	u, err := nup.GetServerUrl(cfg.ServerUrl, deletePath)
+	u, err := cloudutil.ServerURL(cfg.ServerUrl, deletePath)
 	if err != nil {
 		return err
 	}

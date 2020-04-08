@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"erat.org/nup"
-	"erat.org/nup/test"
+	"github.com/derat/nup/test"
+	"github.com/derat/nup/types"
 )
 
 func TestUpdate(t *testing.T) {
-	receivedSongs := make([]nup.Song, 0)
+	receivedSongs := make([]types.Song, 0)
 	replace := ""
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -23,7 +23,7 @@ func TestUpdate(t *testing.T) {
 		defer r.Body.Close()
 		d := json.NewDecoder(r.Body)
 		for true {
-			s := nup.Song{}
+			s := types.Song{}
 			if err := d.Decode(&s); err == io.EOF {
 				break
 			} else if err != nil {
@@ -37,10 +37,10 @@ func TestUpdate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := Config{ClientConfig: nup.ClientConfig{ServerUrl: server.URL}}
-	ch := make(chan nup.Song)
+	cfg := Config{ClientConfig: types.ClientConfig{ServerUrl: server.URL}}
+	ch := make(chan types.Song)
 
-	s0 := nup.Song{
+	s0 := types.Song{
 		Sha1:     "1977c91fea860245695dcceea0805c14cede7559",
 		Filename: "arovane/atol_scrap/thaem_nue.mp3",
 		Artist:   "Arovane",
@@ -50,10 +50,10 @@ func TestUpdate(t *testing.T) {
 		Disc:     1,
 		Length:   449,
 		Rating:   0.75,
-		Plays:    []nup.Play{{time.Unix(1276057170, 0), "127.0.0.1"}, {time.Unix(1297316913, 0), "1.2.3.4"}},
+		Plays:    []types.Play{{time.Unix(1276057170, 0), "127.0.0.1"}, {time.Unix(1297316913, 0), "1.2.3.4"}},
 		Tags:     []string{"electronic", "instrumental"},
 	}
-	s1 := nup.Song{
+	s1 := types.Song{
 		Sha1:     "b70984a4ac5084999b70478cdf163218b90cefdb",
 		Filename: "gary_hoey/animal_instinct/motown_fever.mp3",
 		Artist:   "Gary Hoey",
@@ -63,7 +63,7 @@ func TestUpdate(t *testing.T) {
 		Disc:     1,
 		Length:   182,
 		Rating:   0.5,
-		Plays:    []nup.Play{{time.Unix(1394773930, 0), "8.8.8.8"}},
+		Plays:    []types.Play{{time.Unix(1394773930, 0), "8.8.8.8"}},
 		Tags:     []string{"instrumental", "rock"},
 	}
 	go func() {
@@ -73,7 +73,7 @@ func TestUpdate(t *testing.T) {
 	if err := updateSongs(cfg, ch, 2, true); err != nil {
 		t.Fatalf("failed to send songs: %v", err)
 	}
-	if err := test.CompareSongs([]nup.Song{s0, s1}, receivedSongs, test.CompareOrder); err != nil {
+	if err := test.CompareSongs([]types.Song{s0, s1}, receivedSongs, test.CompareOrder); err != nil {
 		t.Error(err)
 	}
 	if replace != "1" {
@@ -81,7 +81,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	receivedSongs = receivedSongs[:0]
-	sentSongs := make([]nup.Song, 250, 250)
+	sentSongs := make([]types.Song, 250, 250)
 	go func() {
 		for i := 0; i < len(sentSongs); i++ {
 			sentSongs[i].Sha1 = strconv.Itoa(i)

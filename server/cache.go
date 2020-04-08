@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/derat/nup/types"
+
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/memcache"
-
-	"erat.org/nup"
 )
 
 const (
@@ -229,14 +229,14 @@ func flushSongFromCache(ctx context.Context, id int64) error {
 	return nil
 }
 
-func getSongsFromCache(ctx context.Context, ids []int64) (songs map[int64]nup.Song, err error) {
+func getSongsFromCache(ctx context.Context, ids []int64) (songs map[int64]types.Song, err error) {
 	keys := make([]string, len(ids))
 	for i, id := range ids {
 		keys[i] = getSongCacheKey(id)
 	}
 
 	// Uh, no memcache.Codec.GetMulti()?
-	songs = make(map[int64]nup.Song)
+	songs = make(map[int64]types.Song)
 	items, err := memcache.GetMulti(ctx, keys)
 	if err != nil {
 		return nil, err
@@ -250,7 +250,7 @@ func getSongsFromCache(ctx context.Context, ids []int64) (songs map[int64]nup.So
 		if err != nil {
 			return nil, fmt.Errorf("Failed to parse key %q: %v", idStr, err)
 		}
-		s := nup.Song{}
+		s := types.Song{}
 		if err = json.Unmarshal(item.Value, &s); err != nil {
 			return nil, fmt.Errorf("Failed to unmarshal cached song %v: %v", id, err)
 		}
@@ -274,7 +274,7 @@ func flushSongsFromCacheAfterMultiError(ctx context.Context, ids []int64, me app
 	return nil
 }
 
-func writeSongsToCache(ctx context.Context, ids []int64, songs []nup.Song, flushIfAlreadyPresent bool) error {
+func writeSongsToCache(ctx context.Context, ids []int64, songs []types.Song, flushIfAlreadyPresent bool) error {
 	if len(ids) != len(songs) {
 		return fmt.Errorf("Got request to write %v ID(s) with %v song(s) to cache", len(ids), len(songs))
 	}

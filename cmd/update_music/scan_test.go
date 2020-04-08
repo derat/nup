@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"erat.org/nup"
-	"erat.org/nup/test"
+	"github.com/derat/nup/test"
+	"github.com/derat/nup/types"
 )
 
-func scanAndCompareSongs(t *testing.T, desc, dir, forceGlob string, lastUpdateTime time.Time, expected []nup.Song) {
-	ch := make(chan nup.SongOrErr)
+func scanAndCompareSongs(t *testing.T, desc, dir, forceGlob string, lastUpdateTime time.Time, expected []types.Song) {
+	ch := make(chan types.SongOrErr)
 	num, err := scanForUpdatedSongs(dir, forceGlob, lastUpdateTime, ch, false)
 	if err != nil {
 		t.Errorf("%v: %v", desc, err)
@@ -55,19 +55,19 @@ func TestScan(t *testing.T) {
 
 	test.CopySongsToTempDir(dir, test.Song0s.Filename, test.Song1s.Filename)
 	startTime := time.Now()
-	scanAndCompareSongs(t, "initial", dir, "", time.Time{}, []nup.Song{test.Song0s, test.Song1s})
-	scanAndCompareSongs(t, "unchanged", dir, "", startTime, []nup.Song{})
+	scanAndCompareSongs(t, "initial", dir, "", time.Time{}, []types.Song{test.Song0s, test.Song1s})
+	scanAndCompareSongs(t, "unchanged", dir, "", startTime, []types.Song{})
 
 	test.CopySongsToTempDir(dir, test.Song5s.Filename)
 	addTime := time.Now()
-	scanAndCompareSongs(t, "add", dir, "", startTime, []nup.Song{test.Song5s})
+	scanAndCompareSongs(t, "add", dir, "", startTime, []types.Song{test.Song5s})
 
 	if err = os.Remove(filepath.Join(dir, test.Song0s.Filename)); err != nil {
 		panic(err)
 	}
 	test.CopySongsToTempDir(dir, test.Song0sUpdated.Filename)
 	updateTime := time.Now()
-	scanAndCompareSongs(t, "update", dir, "", addTime, []nup.Song{test.Song0sUpdated})
+	scanAndCompareSongs(t, "update", dir, "", addTime, []types.Song{test.Song0sUpdated})
 
 	subdir := filepath.Join(dir, "foo")
 	if err = os.Mkdir(subdir, 0700); err != nil {
@@ -83,14 +83,14 @@ func TestScan(t *testing.T) {
 	}
 	renamedSong1s := test.Song1s
 	renamedSong1s.Filename = filepath.Join(filepath.Base(subdir), test.Song1s.Filename)
-	scanAndCompareSongs(t, "rename", dir, "", updateTime, []nup.Song{renamedSong1s})
+	scanAndCompareSongs(t, "rename", dir, "", updateTime, []types.Song{renamedSong1s})
 
-	scanAndCompareSongs(t, "force exact", dir, test.Song0sUpdated.Filename, updateTime, []nup.Song{test.Song0sUpdated})
-	scanAndCompareSongs(t, "force wildcard", dir, "foo/*", updateTime, []nup.Song{renamedSong1s})
+	scanAndCompareSongs(t, "force exact", dir, test.Song0sUpdated.Filename, updateTime, []types.Song{test.Song0sUpdated})
+	scanAndCompareSongs(t, "force wildcard", dir, "foo/*", updateTime, []types.Song{renamedSong1s})
 
 	updateTime = time.Now()
 	test.CopySongsToTempDir(dir, test.Id3v1Song.Filename)
-	scanAndCompareSongs(t, "id3v1", dir, "", updateTime, []nup.Song{test.Id3v1Song})
+	scanAndCompareSongs(t, "id3v1", dir, "", updateTime, []types.Song{test.Id3v1Song})
 }
 
 // TODO: Test errors, skipping bogus files, etc.

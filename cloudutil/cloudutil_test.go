@@ -1,11 +1,11 @@
-package nup
+package cloudutil
 
 import (
 	"fmt"
 	"testing"
 )
 
-func TestGetCloudStorageUrl(t *testing.T) {
+func TestCloudStorageURL(t *testing.T) {
 	const bucket = "test-bucket"
 	for _, tc := range []struct {
 		path string // original file path
@@ -21,12 +21,12 @@ func TestGetCloudStorageUrl(t *testing.T) {
 		{"huh?.mp3", "huh%3F.mp3"},
 	} {
 		webExp := fmt.Sprintf("https://storage.cloud.google.com/%s/%s", bucket, tc.obj)
-		if url := GetCloudStorageUrl(bucket, tc.path, WebClient); url != webExp {
-			t.Errorf("GetCloudStorageUrl(%q, %q, WebClient) = %q; want %q", bucket, tc.path, url, webExp)
+		if url := CloudStorageURL(bucket, tc.path, WebClient); url != webExp {
+			t.Errorf("CloudStorageURL(%q, %q, WebClient) = %q; want %q", bucket, tc.path, url, webExp)
 		}
 		androidExp := fmt.Sprintf("https://%s.storage.googleapis.com/%s", bucket, tc.obj)
-		if url := GetCloudStorageUrl(bucket, tc.path, AndroidClient); url != androidExp {
-			t.Errorf("GetCloudStorageUrl(%q, %q, AndroidClient) = %q; want %q", bucket, tc.path, url, androidExp)
+		if url := CloudStorageURL(bucket, tc.path, AndroidClient); url != androidExp {
+			t.Errorf("CloudStorageURL(%q, %q, AndroidClient) = %q; want %q", bucket, tc.path, url, androidExp)
 		}
 	}
 }

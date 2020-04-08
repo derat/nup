@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/derat/nup/cloudutil"
+	"github.com/derat/nup/types"
+
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
-
-	"erat.org/nup"
 )
 
 const (
@@ -48,7 +49,7 @@ func (a int64Array) Len() int           { return len(a) }
 func (a int64Array) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a int64Array) Less(i, j int) bool { return a[i] < a[j] }
 
-type songArray []nup.Song
+type songArray []types.Song
 
 func (a songArray) Len() int      { return len(a) }
 func (a songArray) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
@@ -87,7 +88,7 @@ func getTags(ctx context.Context) (tags []string, err error) {
 	tagMap := make(map[string]bool)
 	it := datastore.NewQuery(songKind).Project("Tags").Distinct().Run(ctx)
 	for {
-		song := &nup.Song{}
+		song := &types.Song{}
 		if _, err := it.Next(song); err == nil {
 			for _, t := range song.Tags {
 				tagMap[t] = true
@@ -273,7 +274,7 @@ func performQueryAgainstDatastore(ctx context.Context, query *songQuery) ([]int6
 	return mergedIds, nil
 }
 
-func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]nup.Song, error) {
+func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]types.Song, error) {
 	var ids []int64
 	var err error
 
@@ -317,14 +318,14 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 	}
 
 	ids = ids[:numResults]
-	songs := make([]nup.Song, numResults)
+	songs := make([]types.Song, numResults)
 
 	if numResults == 0 {
 		return songs, nil
 	}
 
-	cachedSongs := make(map[int64]nup.Song)
-	storedSongs := make([]nup.Song, 0)
+	cachedSongs := make(map[int64]types.Song)
+	storedSongs := make([]types.Song, 0)
 
 	// Get whatever we can from memcache.
 	if cfg.CacheSongs {
@@ -349,7 +350,7 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 				keys = append(keys, datastore.NewKey(ctx, songKind, "", id, nil))
 			}
 		}
-		storedSongs = make([]nup.Song, len(keys))
+		storedSongs = make([]types.Song, len(keys))
 		if err = datastore.GetMulti(ctx, keys, storedSongs); err != nil {
 			return nil, err
 		}
@@ -373,7 +374,7 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 			songs[i] = storedSongs[storedIndex]
 			storedIndex++
 		}
-		prepareSongForClient(&songs[i], id, cfg, nup.WebClient)
+		prepareSongForClient(&songs[i], id, cfg, cloudutil.WebClient)
 	}
 
 	if !query.Shuffle {

@@ -4,20 +4,18 @@
 # https://cloud.google.com/appengine/docs/standard/go112/go-differences
 runtime: go111
 
-# TODO: This causes an error:
-# ERROR: (gcloud.app.deploy) INVALID_ARGUMENT: script field for handler
-# '/_ah/remote_api(/.*)?' must be set to 'auto' for runtime go112.
-#builtins:
-#- remote_api: on
+# app.yaml is supposed to be in the same directory as go.mod.
+main: server
 
 handlers:
-- url: /index\.html
-  script: auto
+- url: /
+  static_files: web/index.html
   secure: always
+  upload: web/index.html
 - url: /(.*\.(css|html|gif|jpe?g|js|png|txt))
-  static_files: static/\1
+  static_files: web/\1
   secure: always
-  upload: static/.*
+  upload: web/.*
 - url: /.*
   script: auto
   secure: always

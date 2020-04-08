@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"erat.org/nup"
-	"github.com/hjfreyer/taglib-go/taglib"
+	"github.com/derat/nup/types"
+	"github.com/derat/taglib-go/taglib"
 )
 
 const (
@@ -58,7 +58,7 @@ func readDumpFile(jsonPath string, coverDir string, maxSongs int) (albumIds []st
 			break
 		}
 
-		s := nup.Song{}
+		s := types.Song{}
 		if err = d.Decode(&s); err == io.EOF {
 			break
 		} else if err != nil {
@@ -190,7 +190,7 @@ func main() {
 		ids := make(map[string]bool)
 		for _, p := range flag.Args() {
 			if id, err := readSong(p); err != nil {
-				log.Fatal("Failed to read %v: %v", p, err)
+				log.Fatalf("Failed to read %v: %v", p, err)
 			} else if len(id) > 0 {
 				log.Printf("%v has album ID %v", p, id)
 				ids[id] = true

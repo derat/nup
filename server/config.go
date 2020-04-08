@@ -6,8 +6,9 @@ import (
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 
-	"erat.org/nup"
-	"erat.org/nup/test"
+	"github.com/derat/nup/cloudutil"
+	"github.com/derat/nup/test"
+	"github.com/derat/nup/types"
 )
 
 const (
@@ -19,10 +20,10 @@ const (
 	configKeyId = "config"
 )
 
-var baseConfig *nup.ServerConfig
+var baseConfig *types.ServerConfig
 
-func addTestUserToConfig(cfg *nup.ServerConfig) {
-	cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, nup.BasicAuthInfo{test.TestUsername, test.TestPassword})
+func addTestUserToConfig(cfg *types.ServerConfig) {
+	cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, types.BasicAuthInfo{test.TestUsername, test.TestPassword})
 }
 
 // cleanBaseUrl appends a trailing slash to u if not already present.
@@ -34,8 +35,8 @@ func cleanBaseUrl(u *string) {
 }
 
 func loadBaseConfig() {
-	baseConfig = &nup.ServerConfig{}
-	if err := nup.ReadJSON(configPath, baseConfig); err != nil {
+	baseConfig = &types.ServerConfig{}
+	if err := cloudutil.ReadJSON(configPath, baseConfig); err != nil {
 		panic(err)
 	}
 
@@ -62,9 +63,9 @@ func getTestConfigKey(ctx context.Context) *datastore.Key {
 	return datastore.NewKey(ctx, configKind, configKeyId, 0, nil)
 }
 
-func getConfig(ctx context.Context) *nup.ServerConfig {
+func getConfig(ctx context.Context) *types.ServerConfig {
 	if appengine.IsDevAppServer() {
-		testConfig := nup.ServerConfig{}
+		testConfig := types.ServerConfig{}
 		if err := datastore.Get(ctx, getTestConfigKey(ctx), &testConfig); err == nil {
 			return &testConfig
 		} else if err != datastore.ErrNoSuchEntity {
@@ -78,7 +79,7 @@ func getConfig(ctx context.Context) *nup.ServerConfig {
 	return baseConfig
 }
 
-func saveTestConfig(ctx context.Context, cfg *nup.ServerConfig) {
+func saveTestConfig(ctx context.Context, cfg *types.ServerConfig) {
 	if _, err := datastore.Put(ctx, getTestConfigKey(ctx), cfg); err != nil {
 		panic(err)
 	}

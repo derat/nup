@@ -10,11 +10,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"erat.org/nup"
+	"github.com/derat/nup/cloudutil"
+	"github.com/derat/nup/types"
 )
 
 type Config struct {
-	nup.ClientConfig
+	types.ClientConfig
 	CoverDir           string
 	MusicDir           string
 	LastUpdateTimeFile string
@@ -45,7 +46,7 @@ func setLastUpdateTime(path string, t time.Time) error {
 	return json.NewEncoder(f).Encode(t)
 }
 
-func getCoverFilename(dir string, song *nup.Song) string {
+func getCoverFilename(dir string, song *types.Song) string {
 	if len(song.AlbumId) != 0 {
 		fn := song.AlbumId + ".jpg"
 		if _, err := os.Stat(filepath.Join(dir, fn)); err == nil {
@@ -74,7 +75,7 @@ func main() {
 	flag.Parse()
 
 	var cfg Config
-	if err := nup.ReadJSON(*configFile, &cfg); err != nil {
+	if err := cloudutil.ReadJSON(*configFile, &cfg); err != nil {
 		log.Fatal("Unable to read config file: ", err)
 	}
 
@@ -89,7 +90,7 @@ func main() {
 
 	var err error
 	numSongs := 0
-	readChan := make(chan nup.SongOrErr)
+	readChan := make(chan types.SongOrErr)
 	startTime := time.Now()
 	replaceUserData := false
 	didFullScan := false
@@ -137,7 +138,7 @@ func main() {
 	log.Printf("Sending %v song(s)\n", numSongs)
 
 	// Look up covers and feed songs to the updater.
-	updateChan := make(chan nup.Song)
+	updateChan := make(chan types.Song)
 	go func() {
 		for i := 0; i < numSongs; i++ {
 			s := <-readChan

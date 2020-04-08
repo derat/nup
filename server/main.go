@@ -9,22 +9,19 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
-	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/derat/nup/types"
+
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/user"
-
-	"erat.org/nup"
 )
 
 const (
-	// Path to the index file.
-	indexPath = "index.html"
-
 	// Default and maximum size of a batch of dumped entities.
 	defaultDumpBatchSize = 100
 	maxDumpBatchSize     = 5000
@@ -73,7 +70,7 @@ func writeTextResponse(w http.ResponseWriter, s string) {
 	w.Write([]byte(s))
 }
 
-func hasAllowedGoogleAuth(ctx context.Context, r *http.Request, cfg *nup.ServerConfig) (email string, allowed bool) {
+func hasAllowedGoogleAuth(ctx context.Context, r *http.Request, cfg *types.ServerConfig) (email string, allowed bool) {
 	u := user.Current(ctx)
 	if u == nil {
 		return "", false
@@ -87,7 +84,7 @@ func hasAllowedGoogleAuth(ctx context.Context, r *http.Request, cfg *nup.ServerC
 	return u.Email, false
 }
 
-func hasAllowedBasicAuth(r *http.Request, cfg *nup.ServerConfig) (username string, allowed bool) {
+func hasAllowedBasicAuth(r *http.Request, cfg *types.ServerConfig) (username string, allowed bool) {
 	username, password, ok := basicAuth(r)
 	if !ok {
 		return "", false
@@ -162,11 +159,14 @@ func parseFloatParam(ctx context.Context, w http.ResponseWriter, r *http.Request
 	return true
 }
 
+func secondsToTime(s float64) time.Time {
+	return time.Unix(0, int64(s*float64(time.Second/time.Nanosecond)))
+}
+
 func main() {
 	loadBaseConfig()
 	rand.Seed(time.Now().UnixNano())
 
-	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/clear", handleClear)
 	http.HandleFunc("/config", handleConfig)
 	http.HandleFunc("/delete_song", handleDeleteSong)
@@ -181,6 +181,8 @@ func main() {
 	http.HandleFunc("/report_played", handleReportPlayed)
 	http.HandleFunc("/songs", handleSongs)
 
+	// TODO: Update to use http.ListenAndServe():
+	// https://cloud.google.com/appengine/docs/standard/go111/go-differences#writing_a_main_package
 	appengine.Main()
 }
 
@@ -210,7 +212,7 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := nup.ServerConfig{}
+	cfg := types.ServerConfig{}
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err == nil {
 		addTestUserToConfig(&cfg)
 		saveTestConfig(ctx, &cfg)
@@ -254,10 +256,10 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var s *nup.Song
+	var s *types.Song
 	var err error
 	if r.FormValue("cache") == "1" {
-		var songs map[int64]nup.Song
+		var songs map[int64]types.Song
 		if songs, err = getSongsFromCache(ctx, []int64{id}); err == nil {
 			if song, ok := songs[id]; ok {
 				s = &song
@@ -316,7 +318,7 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 
 	switch r.FormValue("type") {
 	case "song":
-		var songs []nup.Song
+		var songs []types.Song
 		songs, nextCursor, err = dumpSongs(ctx, max, r.FormValue("cursor"), includeCovers)
 		if err != nil {
 			log.Errorf(ctx, "Dumping songs failed: %v", err)
@@ -328,7 +330,7 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 			objectPtrs[i] = &songs[i]
 		}
 	case "play":
-		var plays []nup.PlayDump
+		var plays []types.PlayDump
 		plays, nextCursor, err = dumpPlays(ctx, max, r.FormValue("cursor"))
 		if err != nil {
 			log.Errorf(ctx, "Dumping plays failed: %v", err)
@@ -376,31 +378,6 @@ func handleFlushCache(w http.ResponseWriter, r *http.Request) {
 	writeTextResponse(w, "ok")
 }
 
-func handleIndex(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "GET", true) {
-		return
-	}
-
-	if r.URL.Path != "/" {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-
-	f, err := os.Open(indexPath)
-	if err != nil {
-		log.Errorf(ctx, "Failed to open %v: %v", indexPath, err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer f.Close()
-
-	w.Header().Set("Content-Type", "text/html")
-	if _, err = io.Copy(w, f); err != nil {
-		log.Errorf(ctx, "Failed to copy %v to response: %v", indexPath, err)
-	}
-}
-
 func handleImport(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
 	if !checkRequest(ctx, w, r, "POST", false) {
@@ -417,7 +394,7 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 	replaceUserData := r.FormValue("replaceUserData") == "1"
 	d := json.NewDecoder(r.Body)
 	for true {
-		s := &nup.Song{}
+		s := &types.Song{}
 		if err := d.Decode(s); err == io.EOF {
 			break
 		} else if err != nil {
@@ -503,14 +480,14 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		if !parseFloatParam(ctx, w, r, "minFirstPlayed", &s) {
 			return
 		}
-		q.MinFirstStartTime = nup.SecondsToTime(s)
+		q.MinFirstStartTime = secondsToTime(s)
 	}
 	if len(r.FormValue("maxLastPlayed")) > 0 {
 		var s float64
 		if !parseFloatParam(ctx, w, r, "maxLastPlayed", &s) {
 			return
 		}
-		q.MaxLastStartTime = nup.SecondsToTime(s)
+		q.MaxLastStartTime = secondsToTime(s)
 	}
 
 	q.Tags = make([]string, 0)
@@ -597,7 +574,7 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 	if !parseIntParam(ctx, w, r, "songId", &id) || !parseFloatParam(ctx, w, r, "startTime", &startTimeFloat) {
 		return
 	}
-	startTime := nup.SecondsToTime(startTimeFloat)
+	startTime := secondsToTime(startTimeFloat)
 
 	cfg := getConfig(ctx)
 	if cfg.ForceUpdateFailures && appengine.IsDevAppServer() {
@@ -605,7 +582,9 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := strings.Split(r.RemoteAddr, ":")[0]
+	// Drop the trailing colon and port number. We can't just split on ':' and
+	// take the first item since we may get an IPv6 address like "[::1]:12345".
+	ip := regexp.MustCompile(":\\d+$").ReplaceAllString(r.RemoteAddr, "")
 	if err := addPlay(ctx, id, startTime, ip); err != nil {
 		log.Errorf(ctx, "Got error while recording play: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -7,9 +7,10 @@ import (
 	"strconv"
 	"time"
 
-	"google.golang.org/appengine/datastore"
+	"github.com/derat/nup/cloudutil"
+	"github.com/derat/nup/types"
 
-	"erat.org/nup"
+	"google.golang.org/appengine/datastore"
 )
 
 const (
@@ -69,8 +70,8 @@ func dumpEntities(ctx context.Context, q *datastore.Query, cursor string, entiti
 	return ids, parentIds, nextCursor, nil
 }
 
-func dumpSongs(ctx context.Context, max int64, cursor string, includeCovers bool) (songs []nup.Song, nextCursor string, err error) {
-	songs = make([]nup.Song, max)
+func dumpSongs(ctx context.Context, max int64, cursor string, includeCovers bool) (songs []types.Song, nextCursor string, err error) {
+	songs = make([]types.Song, max)
 	songPtrs := make([]interface{}, max)
 	for i := range songs {
 		songPtrs[i] = &songs[i]
@@ -92,8 +93,8 @@ func dumpSongs(ctx context.Context, max int64, cursor string, includeCovers bool
 	return songs, nextCursor, nil
 }
 
-func dumpPlays(ctx context.Context, max int64, cursor string) (plays []nup.PlayDump, nextCursor string, err error) {
-	plays = make([]nup.PlayDump, max)
+func dumpPlays(ctx context.Context, max int64, cursor string) (plays []types.PlayDump, nextCursor string, err error) {
+	plays = make([]types.PlayDump, max)
 	playPtrs := make([]interface{}, max)
 	for i := range plays {
 		playPtrs[i] = &plays[i].Play
@@ -111,8 +112,8 @@ func dumpPlays(ctx context.Context, max int64, cursor string) (plays []nup.PlayD
 	return plays, nextCursor, nil
 }
 
-func dumpSongsForAndroid(ctx context.Context, minLastModified time.Time, deleted bool, max int64, cursor string) (songs []nup.Song, nextCursor string, err error) {
-	songs = make([]nup.Song, max)
+func dumpSongsForAndroid(ctx context.Context, minLastModified time.Time, deleted bool, max int64, cursor string) (songs []types.Song, nextCursor string, err error) {
+	songs = make([]types.Song, max)
 	songPtrs := make([]interface{}, max)
 	for i := range songs {
 		songPtrs[i] = &songs[i]
@@ -131,20 +132,20 @@ func dumpSongsForAndroid(ctx context.Context, minLastModified time.Time, deleted
 	cfg := getConfig(ctx)
 	songs = songs[0:len(ids)]
 	for i, id := range ids {
-		prepareSongForClient(&songs[i], id, cfg, nup.AndroidClient)
+		prepareSongForClient(&songs[i], id, cfg, cloudutil.AndroidClient)
 	}
 	return songs, nextCursor, nil
 }
 
-func dumpSingleSong(ctx context.Context, id int64) (*nup.Song, error) {
+func dumpSingleSong(ctx context.Context, id int64) (*types.Song, error) {
 	sk := datastore.NewKey(ctx, songKind, "", id, nil)
-	s := &nup.Song{}
+	s := &types.Song{}
 	if err := datastore.Get(ctx, sk, s); err != nil {
 		return nil, err
 	}
 	s.SongId = strconv.FormatInt(id, 10)
 
-	plays := make([]nup.PlayDump, maxPlaysForSongDump)
+	plays := make([]types.PlayDump, maxPlaysForSongDump)
 	playPtrs := make([]interface{}, maxPlaysForSongDump)
 	for i := range plays {
 		playPtrs[i] = &plays[i].Play
@@ -156,7 +157,7 @@ func dumpSingleSong(ctx context.Context, id int64) (*nup.Song, error) {
 	for i := range pids {
 		s.Plays = append(s.Plays, plays[i].Play)
 	}
-	sort.Sort(nup.PlayArray(s.Plays))
+	sort.Sort(types.PlayArray(s.Plays))
 
 	return s, nil
 }

@@ -1,4 +1,5 @@
-package nup
+// Package types defines shared types.
+package types
 
 import (
 	"time"

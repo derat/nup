@@ -5,10 +5,10 @@ import (
 	"io"
 	"os"
 
-	"erat.org/nup"
+	"github.com/derat/nup/types"
 )
 
-func getSongsFromJSONFile(path string, updateChan chan nup.SongOrErr) (numUpdates int, err error) {
+func getSongsFromJSONFile(path string, updateChan chan types.SongOrErr) (numUpdates int, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, err
@@ -17,13 +17,13 @@ func getSongsFromJSONFile(path string, updateChan chan nup.SongOrErr) (numUpdate
 
 	d := json.NewDecoder(f)
 	for true {
-		s := nup.Song{}
+		s := types.Song{}
 		if err = d.Decode(&s); err == io.EOF {
 			break
 		} else if err != nil {
 			return 0, err
 		}
-		go func() { updateChan <- nup.SongOrErr{&s, nil} }()
+		go func() { updateChan <- types.SongOrErr{&s, nil} }()
 		numUpdates += 1
 	}
 

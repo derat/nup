@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"erat.org/nup"
+	"github.com/derat/nup/types"
 )
 
 const (
@@ -143,7 +143,7 @@ const (
 	getCovers
 )
 
-func (t *Tester) DumpSongs(strip stripPolicy, covers coverPolicy) []nup.Song {
+func (t *Tester) DumpSongs(strip stripPolicy, covers coverPolicy) []types.Song {
 	coversValue := "false"
 	if covers == getCovers {
 		coversValue = "true"
@@ -155,14 +155,14 @@ func (t *Tester) DumpSongs(strip stripPolicy, covers coverPolicy) []nup.Song {
 	if err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
-	songs := make([]nup.Song, 0)
+	songs := make([]types.Song, 0)
 
 	if len(stdout) == 0 {
 		return songs
 	}
 
 	for _, l := range strings.Split(strings.TrimSpace(stdout), "\n") {
-		s := nup.Song{}
+		s := types.Song{}
 		if err = json.Unmarshal([]byte(l), &s); err != nil {
 			if err == io.EOF {
 				break
@@ -253,7 +253,7 @@ func (t *Tester) DoPost(pathAndQueryParams string, body io.Reader) {
 	}
 }
 
-func (t *Tester) PostSongs(songs []nup.Song, userData userDataPolicy, updateDelay time.Duration) {
+func (t *Tester) PostSongs(songs []types.Song, userData userDataPolicy, updateDelay time.Duration) {
 	var buf bytes.Buffer
 	e := json.NewEncoder(&buf)
 	for _, s := range songs {
@@ -268,11 +268,11 @@ func (t *Tester) PostSongs(songs []nup.Song, userData userDataPolicy, updateDela
 	t.DoPost(path, &buf)
 }
 
-func (t *Tester) QuerySongs(params string) []nup.Song {
+func (t *Tester) QuerySongs(params string) []types.Song {
 	resp := t.SendRequest(t.NewRequest("GET", "query?"+params, nil))
 	defer resp.Body.Close()
 
-	songs := make([]nup.Song, 0)
+	songs := make([]types.Song, 0)
 	d := json.NewDecoder(resp.Body)
 	if err := d.Decode(&songs); err != nil {
 		panic(err)
@@ -316,7 +316,7 @@ const (
 	getDeletedSongs
 )
 
-func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted deletionPolicy) []nup.Song {
+func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted deletionPolicy) []types.Song {
 	var nsec int64
 	if !minLastModified.IsZero() {
 		nsec = minLastModified.UnixNano()
@@ -326,7 +326,7 @@ func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted deletionP
 		deletedVal = 1
 	}
 
-	songs := make([]nup.Song, 0)
+	songs := make([]types.Song, 0)
 	var cursor string
 
 	for {
@@ -349,7 +349,7 @@ func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted deletionP
 
 		cursor = ""
 		for _, item := range items {
-			s := nup.Song{}
+			s := types.Song{}
 			if err = json.Unmarshal(item, &s); err == nil {
 				songs = append(songs, s)
 			} else if err := json.Unmarshal(item, &cursor); err != nil {

@@ -14,8 +14,8 @@ import (
 	"syscall"
 	"time"
 
-	"erat.org/nup"
-	"github.com/hjfreyer/taglib-go/taglib"
+	"github.com/derat/nup/types"
+	"github.com/derat/taglib-go/taglib"
 )
 
 const (
@@ -140,10 +140,10 @@ func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLeng
 	return (fi.Size() - headerLength - footerLength) / kbitRate * 8, nil
 }
 
-func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan nup.SongOrErr) {
-	s := &nup.Song{Filename: relPath}
+func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan types.SongOrErr) {
+	s := &types.Song{Filename: relPath}
 	var err error
-	defer func() { updateChan <- nup.SongOrErr{s, err} }()
+	defer func() { updateChan <- types.SongOrErr{s, err} }()
 
 	f, err := os.Open(path)
 	if err != nil {
@@ -187,17 +187,17 @@ func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan nup.S
 	s.Length = float64(lengthMs) / 1000
 }
 
-func getSongByPath(musicDir, relPath string, updateChan chan nup.SongOrErr) {
+func getSongByPath(musicDir, relPath string, updateChan chan types.SongOrErr) {
 	p := filepath.Join(musicDir, relPath)
 	fi, err := os.Stat(p)
 	if err != nil {
-		updateChan <- nup.SongOrErr{nil, err}
+		updateChan <- types.SongOrErr{nil, err}
 		return
 	}
 	readFileDetails(p, relPath, fi, updateChan)
 }
 
-func scanForUpdatedSongs(musicDir, forceGlob string, lastUpdateTime time.Time, updateChan chan nup.SongOrErr, logProgress bool) (numUpdates int, err error) {
+func scanForUpdatedSongs(musicDir, forceGlob string, lastUpdateTime time.Time, updateChan chan types.SongOrErr, logProgress bool) (numUpdates int, err error) {
 	numMp3s := 0
 	err = filepath.Walk(musicDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {

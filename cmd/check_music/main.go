@@ -10,20 +10,20 @@ import (
 	"path/filepath"
 	"sort"
 
-	"erat.org/nup"
+	"github.com/derat/nup/types"
 )
 
-type songCheckFunction func(s *nup.Song) error
+type songCheckFunction func(s *types.Song) error
 type coverCheckFunction func(coverFilename string) error
 
-type songArray []*nup.Song
+type songArray []*types.Song
 
 func (a songArray) Len() int           { return len(a) }
 func (a songArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a songArray) Less(i, j int) bool { return a[i].Filename < a[j].Filename }
 
-func checkSongs(songs []*nup.Song, musicDir, coverDir string, strict bool) {
-	checkFile := func(s *nup.Song) error {
+func checkSongs(songs []*types.Song, musicDir, coverDir string, strict bool) {
+	checkFile := func(s *types.Song) error {
 		if len(s.Filename) == 0 {
 			return fmt.Errorf("no filename")
 		} else if _, err := os.Stat(filepath.Join(musicDir, s.Filename)); err != nil {
@@ -31,13 +31,13 @@ func checkSongs(songs []*nup.Song, musicDir, coverDir string, strict bool) {
 		}
 		return nil
 	}
-	checkAlbumInfo := func(s *nup.Song) error {
+	checkAlbumInfo := func(s *types.Song) error {
 		if strict && len(s.AlbumId) == 0 && s.Album != "[non-album tracks]" {
 			return fmt.Errorf("missing MusicBrainz album")
 		}
 		return nil
 	}
-	checkCover := func(s *nup.Song) error {
+	checkCover := func(s *types.Song) error {
 		if len(s.CoverFilename) == 0 {
 			if strict {
 				return fmt.Errorf("no cover file")
@@ -62,16 +62,16 @@ func checkSongs(songs []*nup.Song, musicDir, coverDir string, strict bool) {
 	}
 }
 
-func checkCovers(songs []*nup.Song, coverDir string) {
+func checkCovers(songs []*types.Song, coverDir string) {
 	dir, err := os.Open(coverDir)
 	if err != nil {
-		log.Fatal("Failed to open cover dir: %v", err)
+		log.Fatal("Failed to open cover dir: ", err)
 	}
 	defer dir.Close()
 
 	coverFilenames, err := dir.Readdirnames(0)
 	if err != nil {
-		log.Fatal("Failed to read cover dir: %v", err)
+		log.Fatal("Failed to read cover dir: ", err)
 	}
 
 	songCoverFilenames := make(map[string]bool)
@@ -109,13 +109,13 @@ func main() {
 	}
 
 	d := json.NewDecoder(os.Stdin)
-	songs := make([]*nup.Song, 0)
+	songs := make([]*types.Song, 0)
 	for {
-		var s nup.Song
+		var s types.Song
 		if err := d.Decode(&s); err == io.EOF {
 			break
 		} else if err != nil {
-			log.Fatal("Failed to read song: %v", err)
+			log.Fatal("Failed to read song: ", err)
 		}
 		songs = append(songs, &s)
 	}

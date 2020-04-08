@@ -1,4 +1,5 @@
-package nup
+// Package cloudutil provides common server-related functionality.
+package cloudutil
 
 import (
 	"encoding/json"
@@ -6,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"time"
 )
 
 type ClientType int
@@ -16,8 +16,8 @@ const (
 	AndroidClient
 )
 
-func GetServerUrl(baseUrl, path string) (*url.URL, error) {
-	u, err := url.Parse(baseUrl)
+func ServerURL(baseURL, path string) (*url.URL, error) {
+	u, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -28,34 +28,26 @@ func GetServerUrl(baseUrl, path string) (*url.URL, error) {
 	return u, nil
 }
 
-// EncodePathForCloudStorage converts the passed-in original Unix filename to
+// encodePathForCloudStorage converts the passed-in original Unix filename to
 // the appropriate path for accessing the file via Cloud Storage. This includes
 // both regular query escaping and replacing "+" with "%20" because Cloud
 // Storage seems unhappy otherwise.
 //
 // See https://developers.google.com/storage/docs/bucketnaming#objectnames for
 // additional object naming suggestions.
-func EncodePathForCloudStorage(p string) string {
+func encodePathForCloudStorage(p string) string {
 	return strings.Replace(url.QueryEscape(p), "+", "%20", -1)
 }
 
-func GetCloudStorageUrl(bucketName, filePath string, client ClientType) string {
+func CloudStorageURL(bucketName, filePath string, client ClientType) string {
 	switch client {
 	case WebClient:
-		return fmt.Sprintf("https://storage.cloud.google.com/%s/%s", bucketName, EncodePathForCloudStorage(filePath))
+		return fmt.Sprintf("https://storage.cloud.google.com/%s/%s", bucketName, encodePathForCloudStorage(filePath))
 	case AndroidClient:
-		return fmt.Sprintf("https://%s.storage.googleapis.com/%s", bucketName, EncodePathForCloudStorage(filePath))
+		return fmt.Sprintf("https://%s.storage.googleapis.com/%s", bucketName, encodePathForCloudStorage(filePath))
 	default:
 		panic(fmt.Sprintf("Invalid client type %v", client))
 	}
-}
-
-func SecondsToTime(s float64) time.Time {
-	return time.Unix(0, int64(s*float64(time.Second/time.Nanosecond)))
-}
-
-func TimeToSeconds(t time.Time) float64 {
-	return float64(t.UnixNano()) / float64(time.Second/time.Nanosecond)
 }
 
 func ReadJSON(path string, out interface{}) error {

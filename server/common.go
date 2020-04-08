@@ -5,7 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"erat.org/nup"
+	"github.com/derat/nup/cloudutil"
+	"github.com/derat/nup/types"
 )
 
 const (
@@ -20,7 +21,7 @@ var (
 	ErrUnmodified = errors.New("Object wasn't modified")
 )
 
-func prepareSongForClient(s *nup.Song, id int64, cfg *nup.ServerConfig, client nup.ClientType) {
+func prepareSongForClient(s *types.Song, id int64, cfg *types.ServerConfig, client cloudutil.ClientType) {
 	// Set fields that are only present in search results (i.e. not in Datastore).
 	s.SongId = strconv.FormatInt(id, 10)
 
@@ -30,7 +31,7 @@ func prepareSongForClient(s *nup.Song, id int64, cfg *nup.ServerConfig, client n
 			return ""
 		}
 		if len(bucket) > 0 {
-			return nup.GetCloudStorageUrl(bucket, filename, client)
+			return cloudutil.CloudStorageURL(bucket, filename, client)
 		}
 		return baseUrl + filename
 	}
