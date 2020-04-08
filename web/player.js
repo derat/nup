@@ -52,7 +52,9 @@ function Player() {
 
   this.dialogManager = document.dialogManager;
   this.presentationLayer = document.presentationLayer;
-  this.presentationLayer.setPlayNextTrackFunction(this.cycleTrack.bind(this, 1));
+  this.presentationLayer.setPlayNextTrackFunction(
+    this.cycleTrack.bind(this, 1),
+  );
   this.optionsDialog = null;
 
   this.audio = $('audio');
@@ -77,7 +79,11 @@ function Player() {
   this.audio.addEventListener('ended', this.onEnded.bind(this), false);
   this.audio.addEventListener('pause', this.onPause.bind(this), false);
   this.audio.addEventListener('play', this.onPlay.bind(this), false);
-  this.audio.addEventListener('timeupdate', this.onTimeUpdate.bind(this), false);
+  this.audio.addEventListener(
+    'timeupdate',
+    this.onTimeUpdate.bind(this),
+    false,
+  );
   this.audio.addEventListener('error', this.onError.bind(this), false);
 
   if ('mediaSession' in navigator) {
@@ -90,18 +96,59 @@ function Player() {
     ms.setActionHandler('nexttrack', () => this.cycleTrack(1));
   }
 
-  this.coverImage.addEventListener('click', this.showUpdateDiv.bind(this), false);
-  this.coverImage.addEventListener('load', () => this.updateMediaSessionMetadata(true /* imageLoaded */), false);
-  this.prevButton.addEventListener('click', this.cycleTrack.bind(this, -1), false);
-  this.nextButton.addEventListener('click', this.cycleTrack.bind(this, 1), false);
-  this.playPauseButton.addEventListener('click', this.togglePause.bind(this), false);
-  this.updateCloseImage.addEventListener('click', this.hideUpdateDiv.bind(this, true), false);
-  this.ratingSpan.addEventListener('keydown', this.handleRatingSpanKeyDown.bind(this), false);
+  this.coverImage.addEventListener(
+    'click',
+    this.showUpdateDiv.bind(this),
+    false,
+  );
+  this.coverImage.addEventListener(
+    'load',
+    () => this.updateMediaSessionMetadata(true /* imageLoaded */),
+    false,
+  );
+  this.prevButton.addEventListener(
+    'click',
+    this.cycleTrack.bind(this, -1),
+    false,
+  );
+  this.nextButton.addEventListener(
+    'click',
+    this.cycleTrack.bind(this, 1),
+    false,
+  );
+  this.playPauseButton.addEventListener(
+    'click',
+    this.togglePause.bind(this),
+    false,
+  );
+  this.updateCloseImage.addEventListener(
+    'click',
+    this.hideUpdateDiv.bind(this, true),
+    false,
+  );
+  this.ratingSpan.addEventListener(
+    'keydown',
+    this.handleRatingSpanKeyDown.bind(this),
+    false,
+  );
 
-  this.tagSuggester = new Suggester(this.tagsTextarea, $('editTagsSuggestionsDiv'), [], false);
+  this.tagSuggester = new Suggester(
+    this.tagsTextarea,
+    $('editTagsSuggestionsDiv'),
+    [],
+    false,
+  );
 
-  document.body.addEventListener('keydown', this.handleBodyKeyDown.bind(this), false);
-  window.addEventListener('beforeunload', this.handleBeforeUnload.bind(this), false);
+  document.body.addEventListener(
+    'keydown',
+    this.handleBodyKeyDown.bind(this),
+    false,
+  );
+  window.addEventListener(
+    'beforeunload',
+    this.handleBeforeUnload.bind(this),
+    false,
+  );
 
   this.config = document.config;
   this.config.addListener(this);
@@ -137,7 +184,9 @@ Player.prototype.updateTagsFromServer = function(async) {
 };
 
 Player.prototype.getCurrentSong = function() {
-  return (this.currentIndex >= 0 && this.currentIndex < this.songs.length) ? this.songs[this.currentIndex] : null;
+  return this.currentIndex >= 0 && this.currentIndex < this.songs.length
+    ? this.songs[this.currentIndex]
+    : null;
 };
 
 Player.prototype.getDumpSongUrl = function(song, cache) {
@@ -178,13 +227,10 @@ Player.prototype.selectTrack = function(index) {
     return;
   }
 
-  if (index < 0)
-    index = 0;
-  else if (index >= this.songs.length)
-    index = this.songs.length - 1;
+  if (index < 0) index = 0;
+  else if (index >= this.songs.length) index = this.songs.length - 1;
 
-  if (index == this.currentIndex)
-    return;
+  if (index == this.currentIndex) return;
 
   this.currentIndex = index;
   this.notifyPlaylistAboutSongChange();
@@ -192,8 +238,7 @@ Player.prototype.selectTrack = function(index) {
   this.updatePresentationLayerSongs();
   this.startCurrentTrack();
   this.updateButtonState();
-  if (!document.hasFocus())
-    this.showNotification();
+  if (!document.hasFocus()) this.showNotification();
 };
 
 Player.prototype.updateTags = function(tags) {
@@ -204,7 +249,8 @@ Player.prototype.updateTags = function(tags) {
 
 Player.prototype.updateButtonState = function() {
   this.prevButton.disabled = this.currentIndex <= 0;
-  this.nextButton.disabled = this.currentIndex < 0 || this.currentIndex >= this.songs.length - 1;
+  this.nextButton.disabled =
+    this.currentIndex < 0 || this.currentIndex >= this.songs.length - 1;
   this.playPauseButton.disabled = this.currentIndex < 0;
 };
 
@@ -245,15 +291,16 @@ Player.prototype.updateCoverTitleAttribute = function() {
   }
 
   var text = this.getRatingString(song.rating, true, true);
-  if (song.tags.length > 0)
-    text += "\nTags: " + song.tags.sort().join(' ');
+  if (song.tags.length > 0) text += '\nTags: ' + song.tags.sort().join(' ');
   this.coverImage.title = text;
 };
 
 Player.prototype.updateRatingOverlay = function() {
   var song = this.getCurrentSong();
-  this.ratingOverlayDiv.innerText = (song && song.rating >= 0.0) ?
-      this.getRatingString(song.rating, false, false) : '';
+  this.ratingOverlayDiv.innerText =
+    song && song.rating >= 0.0
+      ? this.getRatingString(song.rating, false, false)
+      : '';
 };
 
 Player.prototype.updateMediaSessionMetadata = function(imageLoaded) {
@@ -277,7 +324,7 @@ Player.prototype.updateMediaSessionMetadata = function(imageLoaded) {
         src: img.src,
         sizes: `${img.naturalWidth}x${img.naturalHeight}`,
         type: 'image/jpeg',
-      }
+      },
     ];
   }
   navigator.mediaSession.metadata = new MediaMetadata(data);
@@ -292,29 +339,23 @@ Player.prototype.updatePresentationLayerSongs = function() {
 };
 
 Player.prototype.getRatingString = function(rating, withLabel, includeEmpty) {
-  if (rating < 0.0)
-    return "Unrated";
+  if (rating < 0.0) return 'Unrated';
 
   ratingString = withLabel ? 'Rating: ' : '';
   var numStars = this.ratingToNumStars(rating);
   for (var i = 1; i <= 5; ++i) {
-    if (i <= numStars)
-      ratingString += "\u2605";
-    else if (includeEmpty)
-      ratingString += "\u2606";
-    else
-      break;
+    if (i <= numStars) ratingString += '\u2605';
+    else if (includeEmpty) ratingString += '\u2606';
+    else break;
   }
   return ratingString;
 };
 
 Player.prototype.showNotification = function() {
-  if (!('Notification' in window))
-    return;
+  if (!('Notification' in window)) return;
 
   if (Notification.permission !== 'granted') {
-    if (Notification.permission !== 'denied')
-      Notification.requestPermission();
+    if (Notification.permission !== 'denied') Notification.requestPermission();
     return;
   }
 
@@ -324,22 +365,20 @@ Player.prototype.showNotification = function() {
   }
 
   var song = this.getCurrentSong();
-  if (!song)
-    return;
+  if (!song) return;
 
-  this.notification = new Notification(
-      song.artist + "\n" + song.title,
-      {
-        body: song.album + "\n" + formatTime(song.length),
-        icon: song.coverUrl
-      });
+  this.notification = new Notification(song.artist + '\n' + song.title, {
+    body: song.album + '\n' + formatTime(song.length),
+    icon: song.coverUrl,
+  });
   this.closeNotificationTimeoutId = window.setTimeout(
-      this.closeNotification.bind(this), Player.NOTIFICATION_SECONDS * 1000);
+    this.closeNotification.bind(this),
+    Player.NOTIFICATION_SECONDS * 1000,
+  );
 };
 
 Player.prototype.closeNotification = function() {
-  if (!this.notification)
-    return;
+  if (!this.notification) return;
 
   this.notification.close();
   this.notification = null;
@@ -360,7 +399,7 @@ Player.prototype.startCurrentTrack = function() {
   this.audio.src = song.url;
   this.audio.currentTime = 0;
   this.play();
-}
+};
 
 Player.prototype.play = function() {
   console.log('Playing');
@@ -383,19 +422,15 @@ Player.prototype.togglePause = function() {
 };
 
 Player.prototype.seek = function(seconds) {
-  if (!this.audio.seekable)
-    return;
+  if (!this.audio.seekable) return;
 
   var newTime = Math.max(this.audio.currentTime + seconds, 0);
-  if (newTime < this.audio.duration)
-    this.audio.currentTime = newTime;
+  if (newTime < this.audio.duration) this.audio.currentTime = newTime;
 };
 
 Player.prototype.onEnded = function(e) {
-  if (this.currentIndex >= this.songs.length - 1)
-    this.reachedEndOfSongs = true;
-  else
-    this.cycleTrack(1);
+  if (this.currentIndex >= this.songs.length - 1) this.reachedEndOfSongs = true;
+  else this.cycleTrack(1);
 };
 
 Player.prototype.onPause = function(e) {
@@ -413,15 +448,18 @@ Player.prototype.onTimeUpdate = function(e) {
   var duration = song ? song.length : this.audio.duration;
 
   this.timeDiv.innerText =
-      this.audio.duration > 0 ?
-      '[' + formatTime(this.audio.currentTime) + ' / ' + formatTime(duration) + ']' :
-      '';
+    this.audio.duration > 0
+      ? '[' +
+        formatTime(this.audio.currentTime) +
+        ' / ' +
+        formatTime(duration) +
+        ']'
+      : '';
   this.lastPositionSec = this.audio.currentTime;
   this.numErrors = 0;
 
   var now = getCurrentTimeSec();
-  if (this.lastUpdateTime > 0)
-    this.totalPlayedSec += (now - this.lastUpdateTime);
+  if (this.lastUpdateTime > 0) this.totalPlayedSec += now - this.lastUpdateTime;
   this.lastUpdateTime = now;
 
   if (!this.reportedCurrentTrack) {
@@ -440,11 +478,11 @@ Player.prototype.onError = function(e) {
   var error = e.target.error;
   console.log('Got playback error: ' + error.code);
   switch (error.code) {
-    case error.MEDIA_ERR_ABORTED:  // 1
+    case error.MEDIA_ERR_ABORTED: // 1
       break;
-    case error.MEDIA_ERR_NETWORK:            // 2
-    case error.MEDIA_ERR_DECODE:             // 3
-    case error.MEDIA_ERR_SRC_NOT_SUPPORTED:  // 4
+    case error.MEDIA_ERR_NETWORK: // 2
+    case error.MEDIA_ERR_DECODE: // 3
+    case error.MEDIA_ERR_SRC_NOT_SUPPORTED: // 4
       if (this.numErrors <= Player.MAX_RETRIES) {
         console.log('Retrying from position ' + this.lastPositionSec);
         this.audio.load();
@@ -464,12 +502,10 @@ Player.prototype.notifyPlaylistAboutSongChange = function() {
 
 Player.prototype.showUpdateDiv = function() {
   var song = this.getCurrentSong();
-  if (!song)
-    return false;
+  if (!song) return false;
 
   // Already shown.
-  if (this.updateSong)
-    return true;
+  if (this.updateSong) return true;
 
   this.setRating(song.rating);
   this.dumpSongLink.href = this.getDumpSongUrl(song, false);
@@ -488,8 +524,7 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
   var song = this.updateSong;
   this.updateSong = null;
 
-  if (!song || !saveChanges)
-    return;
+  if (!song || !saveChanges) return;
 
   var ratingChanged = this.updatedRating != song.rating;
 
@@ -498,13 +533,16 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
   var createdTags = [];
   for (var i = 0; i < newRawTags.length; ++i) {
     var tag = newRawTags[i].toLowerCase();
-    if (!this.tags.length || this.tags.indexOf(tag) != -1 || song.tags.indexOf(tag) != -1) {
+    if (
+      !this.tags.length ||
+      this.tags.indexOf(tag) != -1 ||
+      song.tags.indexOf(tag) != -1
+    ) {
       newTags.push(tag);
     } else if (tag[0] == '+' && tag.length > 1) {
       tag = tag.substring(1);
       newTags.push(tag);
-      if (this.tags.indexOf(tag) == -1)
-        createdTags.push(tag);
+      if (this.tags.indexOf(tag) == -1) createdTags.push(tag);
     } else {
       console.log('Skipping unknown tag "' + tag + '"');
     }
@@ -514,28 +552,29 @@ Player.prototype.hideUpdateDiv = function(saveChanges) {
   });
   var tagsChanged = newTags.join(' ') != song.tags.sort().join(' ');
 
-  if (createdTags.length > 0)
-    this.updateTags(this.tags.concat(createdTags));
+  if (createdTags.length > 0) this.updateTags(this.tags.concat(createdTags));
 
-  if (!ratingChanged && !tagsChanged)
-    return;
+  if (!ratingChanged && !tagsChanged) return;
 
-  this.updater.rateAndTag(song.songId, ratingChanged ? this.updatedRating : null, tagsChanged ? newTags : null);
+  this.updater.rateAndTag(
+    song.songId,
+    ratingChanged ? this.updatedRating : null,
+    tagsChanged ? newTags : null,
+  );
 
   song.rating = this.updatedRating;
   song.tags = newTags;
 
   this.updateCoverTitleAttribute();
-  if (ratingChanged)
-    this.updateRatingOverlay();
+  if (ratingChanged) this.updateRatingOverlay();
 };
 
 Player.prototype.numStarsToRating = function(numStars) {
-  return (numStars <= 0) ? -1.0 : (Math.min(numStars, 5) - 1) / 4.0;
+  return numStars <= 0 ? -1.0 : (Math.min(numStars, 5) - 1) / 4.0;
 };
 
 Player.prototype.ratingToNumStars = function(rating) {
-  return (rating < 0.0) ? 0 : 1 + Math.round(Math.min(rating, 1.0) * 4.0);
+  return rating < 0.0 ? 0 : 1 + Math.round(Math.min(rating, 1.0) * 4.0);
 };
 
 Player.prototype.setRating = function(rating) {
@@ -545,7 +584,11 @@ Player.prototype.setRating = function(rating) {
   if (!this.ratingSpan.hasChildNodes()) {
     for (var i = 1; i <= 5; ++i) {
       var anchor = document.createElement('a');
-      anchor.addEventListener('click', this.setRating.bind(this, this.numStarsToRating(i)), false);
+      anchor.addEventListener(
+        'click',
+        this.setRating.bind(this, this.numStarsToRating(i)),
+        false,
+      );
       anchor.className = 'star';
       this.ratingSpan.appendChild(anchor);
     }
@@ -553,14 +596,17 @@ Player.prototype.setRating = function(rating) {
 
   var numStars = this.ratingToNumStars(rating);
   for (var i = 1; i <= 5; ++i)
-    this.ratingSpan.childNodes[i-1].innerText = (i <= numStars) ? "\u2605" : "\u2606";
+    this.ratingSpan.childNodes[i - 1].innerText =
+      i <= numStars ? '\u2605' : '\u2606';
 };
 
 Player.prototype.showOptions = function() {
-  if (this.optionsDialog)
-    return;
+  if (this.optionsDialog) return;
 
-  this.optionsDialog = new OptionsDialog(this.config, this.dialogManager.createDialog());
+  this.optionsDialog = new OptionsDialog(
+    this.config,
+    this.dialogManager.createDialog(),
+  );
   this.optionsDialog.setCloseCallback(this.closeOptions.bind(this));
 };
 
@@ -570,13 +616,11 @@ Player.prototype.closeOptions = function() {
 };
 
 Player.prototype.processAccelerator = function(e) {
-  if (this.dialogManager.getNumDialogs())
-    return false;
+  if (this.dialogManager.getNumDialogs()) return false;
 
   if (e.altKey && e.keyCode == KeyCodes.D) {
     var song = this.getCurrentSong();
-    if (song)
-      window.open(this.getDumpSongUrl(song, false), '_blank');
+    if (song) window.open(this.getDumpSongUrl(song, false), '_blank');
     return true;
   } else if (e.altKey && e.keyCode == KeyCodes.N) {
     this.cycleTrack(1);
@@ -588,18 +632,14 @@ Player.prototype.processAccelerator = function(e) {
     this.cycleTrack(-1);
     return true;
   } else if (e.altKey && e.keyCode == KeyCodes.R) {
-    if (this.showUpdateDiv())
-      this.ratingSpan.focus();
+    if (this.showUpdateDiv()) this.ratingSpan.focus();
     return true;
   } else if (e.altKey && e.keyCode == KeyCodes.T) {
-    if (this.showUpdateDiv())
-      this.tagsTextarea.focus();
+    if (this.showUpdateDiv()) this.tagsTextarea.focus();
     return true;
   } else if (e.altKey && e.keyCode == KeyCodes.V) {
-    if (this.presentationLayer.isShown())
-      this.presentationLayer.hide();
-    else
-      this.presentationLayer.show();
+    if (this.presentationLayer.isShown()) this.presentationLayer.hide();
+    else this.presentationLayer.show();
     return true;
   } else if (e.keyCode == KeyCodes.SPACE && !this.updateSong) {
     this.togglePause();

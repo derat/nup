@@ -4,8 +4,9 @@
 function OptionsDialog(config, container) {
   this.config = config;
   this.container = container;
-  this.container.insertAdjacentHTML('afterbegin',
-      '<div id="optionsDiv">' +
+  this.container.insertAdjacentHTML(
+    'afterbegin',
+    '<div id="optionsDiv">' +
       '  <div class="title">Options</div>' +
       '  <hr class="title">' +
       '  <p id="volumeRow">' +
@@ -16,7 +17,8 @@ function OptionsDialog(config, container) {
       '  <div class="buttonContainer">' +
       '   <input id="optionsOkButton" type="button" value="OK">' +
       '  </div>' +
-      '</div>');
+      '</div>',
+  );
 
   this.closeCallback = null;
 
@@ -27,11 +29,19 @@ function OptionsDialog(config, container) {
   this.volumeRange.value = volume;
   this.updateVolumeSpan(volume);
 
-  this.volumeRange.addEventListener('input', this.handleVolumeRangeInput.bind(this), false);
-  $('optionsOkButton').addEventListener('click', this.handleOkButtonClick.bind(this), false);
+  this.volumeRange.addEventListener(
+    'input',
+    this.handleVolumeRangeInput.bind(this),
+    false,
+  );
+  $('optionsOkButton').addEventListener(
+    'click',
+    this.handleOkButtonClick.bind(this),
+    false,
+  );
   this.keyListener = this.handleBodyKeyDown.bind(this);
   document.body.addEventListener('keydown', this.keyListener, false);
-};
+}
 
 OptionsDialog.prototype.getContainer = function() {
   return this.container;
@@ -74,6 +84,5 @@ OptionsDialog.prototype.processAccelerator = function(e) {
 OptionsDialog.prototype.close = function() {
   document.body.removeEventListener('keydown', this.keyListener, false);
   this.config.save();
-  if (this.closeCallback)
-    this.closeCallback();
+  if (this.closeCallback) this.closeCallback();
 };

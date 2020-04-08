@@ -10,14 +10,22 @@ function DialogManager() {
   var lightbox = document.createElement('div');
   this.lightbox = lightbox;
   lightbox.className = 'dialogLightbox';
-  lightbox.addEventListener('click', this.handleLightboxClick_.bind(this), false);
+  lightbox.addEventListener(
+    'click',
+    this.handleLightboxClick_.bind(this),
+    false,
+  );
   document.body.insertBefore(lightbox, document.body.firstChild);
 
   var outerContainer = document.createElement('div');
   outerContainer.className = 'dialogOuterContainer';
   document.body.insertBefore(outerContainer, lightbox.nextSibling);
 
-  this.innerContainer = createElement('div', 'dialogInnerContainer', outerContainer);
+  this.innerContainer = createElement(
+    'div',
+    'dialogInnerContainer',
+    outerContainer,
+  );
 }
 
 DialogManager.prototype.getNumDialogs = function() {
@@ -34,7 +42,9 @@ DialogManager.prototype.createDialog = function() {
   var dialog = createElement('span', 'dialog', this.innerContainer);
   if (this.getNumDialogs() == 1) {
     this.lightbox.style.display = 'block';
-    this.listeners.forEach(function(v) { v(true); }, this);
+    this.listeners.forEach(function(v) {
+      v(true);
+    }, this);
   }
   return dialog;
 };
@@ -43,13 +53,19 @@ DialogManager.prototype.closeDialog = function(dialog) {
   this.innerContainer.removeChild(dialog);
   if (this.getNumDialogs() == 0) {
     this.lightbox.style.display = 'none';
-    this.listeners.forEach(function(v) { v(false); }, this);
+    this.listeners.forEach(function(v) {
+      v(false);
+    }, this);
   }
 };
 
 DialogManager.prototype.createMessageDialog = function(titleText, messageText) {
   var dialog = this.createDialog();
-  dialog.addEventListener('keydown', this.handleMessageDialogKeyDown_.bind(this, dialog), false);
+  dialog.addEventListener(
+    'keydown',
+    this.handleMessageDialogKeyDown_.bind(this, dialog),
+    false,
+  );
 
   addClassName(dialog, 'messageDialog');
   createElement('div', 'title', dialog, titleText);
@@ -59,7 +75,11 @@ DialogManager.prototype.createMessageDialog = function(titleText, messageText) {
   var button = createElement('input', '', container);
   button.type = 'button';
   button.value = 'OK';
-  button.addEventListener('click', this.handleMessageDialogButtonClick_.bind(this, dialog), false);
+  button.addEventListener(
+    'click',
+    this.handleMessageDialogButtonClick_.bind(this, dialog),
+    false,
+  );
   button.focus();
 };
 
@@ -68,7 +88,8 @@ DialogManager.prototype.handleMessageDialogButtonClick_ = function(dialog, e) {
 };
 
 DialogManager.prototype.handleMessageDialogKeyDown_ = function(dialog, e) {
-  if (e.keyCode == 27) {  // escape
+  if (e.keyCode == 27) {
+    // escape
     e.preventDefault();
     this.closeDialog(dialog);
   }

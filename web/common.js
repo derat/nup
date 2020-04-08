@@ -1,9 +1,10 @@
-function $(id) { return document.getElementById(id); }
+function $(id) {
+  return document.getElementById(id);
+}
 
 function pad(num, width) {
   var str = num + '';
-  while (str.length < width)
-    str = '0' + str;
+  while (str.length < width) str = '0' + str;
   return str;
 }
 
@@ -16,16 +17,14 @@ function getCurrentTimeSec() {
 }
 
 function updateTitleAttributeForTruncation(element, text) {
-  element.title = (element.scrollWidth > element.offsetWidth) ? text : '';
+  element.title = element.scrollWidth > element.offsetWidth ? text : '';
 }
 
 function createElement(type, className, parentElement, text) {
   var element = document.createElement(type);
-  if (className)
-    element.className = className;
+  if (className) element.className = className;
   parentElement.appendChild(element);
-  if (text != null)
-    element.appendChild(document.createTextNode(text));
+  if (text != null) element.appendChild(document.createTextNode(text));
   return element;
 }
 
@@ -46,22 +45,22 @@ function removeClassName(element, className) {
 }
 
 var KeyCodes = {
-  ENTER:   13,
-  ESCAPE:  27,
-  LEFT:    37,
-  RIGHT:   39,
-  SPACE:   32,
-  TAB:      9,
-  SLASH:  191,
+  ENTER: 13,
+  ESCAPE: 27,
+  LEFT: 37,
+  RIGHT: 39,
+  SPACE: 32,
+  TAB: 9,
+  SLASH: 191,
 
-  D:       68,
-  N:       78,
-  O:       79,
-  P:       80,
-  R:       82,
-  T:       84,
-  V:       86,
+  D: 68,
+  N: 78,
+  O: 79,
+  P: 80,
+  R: 82,
+  T: 84,
+  V: 86,
 
-  ZERO:    48,
-  FIVE:    53
+  ZERO: 48,
+  FIVE: 53,
 };

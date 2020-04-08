@@ -32,17 +32,14 @@ Config.prototype.setVolume = function(volume) {
 };
 
 Config.prototype.load = function() {
-  if (!window.localStorage)
-    return;
+  if (!window.localStorage) return;
 
   var volume = localStorage[Config.VOLUME_KEY];
-  if (volume != null)
-    this.volume = volume;
+  if (volume != null) this.volume = volume;
 };
 
 Config.prototype.save = function() {
-  if (!window.localStorage)
-    return;
+  if (!window.localStorage) return;
 
   localStorage[Config.VOLUME_KEY] = this.volume;
 };
