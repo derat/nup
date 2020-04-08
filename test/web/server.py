@@ -22,12 +22,12 @@ class Server:
 
     def send_config(self, force_update_failures=False):
         self.send('POST', '/config', json.dumps({
-            'SongBaseUrl': 'http://%s:%d/' % self.music_host_port,
-            'CoverBaseUrl': '',
-            'CacheSongs': False,
-            'CacheQueries': False,
-            'CacheTags': False,
-            'ForceUpdateFailures': force_update_failures,
+            'songBaseUrl': 'http://%s:%d/' % self.music_host_port,
+            'coverBaseUrl': '',
+            'cacheSongs': False,
+            'cacheQueries': False,
+            'cacheTags': False,
+            'forceUpdateFailures': force_update_failures,
         }))
 
     def reset_config(self):

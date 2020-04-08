@@ -26,9 +26,9 @@ func addTestUserToConfig(cfg *types.ServerConfig) {
 	cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, types.BasicAuthInfo{test.TestUsername, test.TestPassword})
 }
 
-// cleanBaseUrl appends a trailing slash to u if not already present.
+// cleanBaseURL appends a trailing slash to u if not already present.
 // Does nothing if u is empty.
-func cleanBaseUrl(u *string) {
+func cleanBaseURL(u *string) {
 	if len(*u) > 0 && (*u)[len(*u)-1] != '/' {
 		*u += "/"
 	}
@@ -40,18 +40,18 @@ func loadBaseConfig() {
 		panic(err)
 	}
 
-	cleanBaseUrl(&baseConfig.SongBaseUrl)
+	cleanBaseURL(&baseConfig.SongBaseURL)
 	haveSongBucket := len(baseConfig.SongBucket) > 0
-	haveSongUrl := len(baseConfig.SongBaseUrl) > 0
-	if (haveSongBucket && haveSongUrl) || !(haveSongBucket || haveSongUrl) {
-		panic("Exactly one of SongBucket and SongBaseUrl must be set")
+	haveSongURL := len(baseConfig.SongBaseURL) > 0
+	if (haveSongBucket && haveSongURL) || !(haveSongBucket || haveSongURL) {
+		panic("Exactly one of SongBucket and SongBaseURL must be set")
 	}
 
-	cleanBaseUrl(&baseConfig.CoverBaseUrl)
+	cleanBaseURL(&baseConfig.CoverBaseURL)
 	haveCoverBucket := len(baseConfig.CoverBucket) > 0
-	haveCoverUrl := len(baseConfig.CoverBaseUrl) > 0
-	if (haveCoverBucket && haveCoverUrl) || !(haveCoverBucket || haveCoverUrl) {
-		panic("Exactly one of CoverBucket and CoverBaseUrl must be set")
+	haveCoverURL := len(baseConfig.CoverBaseURL) > 0
+	if (haveCoverBucket && haveCoverURL) || !(haveCoverBucket || haveCoverURL) {
+		panic("Exactly one of CoverBucket and CoverBaseURL must be set")
 	}
 
 	if appengine.IsDevAppServer() {

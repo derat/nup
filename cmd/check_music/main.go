@@ -32,7 +32,7 @@ func checkSongs(songs []*types.Song, musicDir, coverDir string, strict bool) {
 		return nil
 	}
 	checkAlbumInfo := func(s *types.Song) error {
-		if strict && len(s.AlbumId) == 0 && s.Album != "[non-album tracks]" {
+		if strict && len(s.AlbumID) == 0 && s.Album != "[non-album tracks]" {
 			return fmt.Errorf("missing MusicBrainz album")
 		}
 		return nil
@@ -56,7 +56,7 @@ func checkSongs(songs []*types.Song, musicDir, coverDir string, strict bool) {
 	} {
 		for _, s := range songs {
 			if err := c(s); err != nil {
-				log.Printf("%s (%s-%s): %v", s.SongId, s.Artist, s.Title, err)
+				log.Printf("%s (%s-%s): %v", s.SongID, s.Artist, s.Title, err)
 			}
 		}
 	}

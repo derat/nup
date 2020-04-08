@@ -16,9 +16,9 @@ import (
 
 type Config struct {
 	types.ClientConfig
-	CoverDir           string
-	MusicDir           string
-	LastUpdateTimeFile string
+	CoverDir           string `json:"coverDir"`
+	MusicDir           string `json:"musicDir"`
+	LastUpdateTimeFile string `json:"lastUpdateTimeFile"`
 }
 
 func getLastUpdateTime(path string) (t time.Time, err error) {
@@ -47,14 +47,14 @@ func setLastUpdateTime(path string, t time.Time) error {
 }
 
 func getCoverFilename(dir string, song *types.Song) string {
-	if len(song.AlbumId) != 0 {
-		fn := song.AlbumId + ".jpg"
+	if len(song.AlbumID) != 0 {
+		fn := song.AlbumID + ".jpg"
 		if _, err := os.Stat(filepath.Join(dir, fn)); err == nil {
 			return fn
 		}
 	}
-	if len(song.RecordingId) != 0 {
-		fn := song.RecordingId + ".jpg"
+	if len(song.RecordingID) != 0 {
+		fn := song.RecordingID + ".jpg"
 		if _, err := os.Stat(filepath.Join(dir, fn)); err == nil {
 			return fn
 		}
@@ -64,7 +64,7 @@ func getCoverFilename(dir string, song *types.Song) string {
 
 func main() {
 	configFile := flag.String("config", "", "Path to config file")
-	deleteSongId := flag.Int64("delete-song-id", 0, "Delete song with given ID")
+	deleteSongID := flag.Int64("delete-song-id", 0, "Delete song with given ID")
 	dryRun := flag.Bool("dry-run", false, "Only print what would be updated")
 	forceGlob := flag.String("force-glob", "", "Glob pattern relative to music dir for files to scan and update even if they haven't changed")
 	importJSONFile := flag.String("import-json-file", "", "If non-empty, path to JSON file containing a stream of Song objects to import")
@@ -79,12 +79,12 @@ func main() {
 		log.Fatal("Unable to read config file: ", err)
 	}
 
-	if *deleteSongId > 0 {
+	if *deleteSongID > 0 {
 		if *dryRun {
 			log.Fatal("-dry-run is incompatible with -delete-song-id")
 		}
-		log.Printf("Deleting song %v", *deleteSongId)
-		deleteSong(cfg, *deleteSongId)
+		log.Printf("Deleting song %v", *deleteSongID)
+		deleteSong(cfg, *deleteSongID)
 		return
 	}
 
@@ -146,10 +146,10 @@ func main() {
 				log.Fatalf("Got error for %v: %v\n", s.Filename, s.Err)
 			}
 			s.CoverFilename = getCoverFilename(cfg.CoverDir, s.Song)
-			if *requireCovers && len(s.CoverFilename) == 0 && (len(s.AlbumId) > 0 || len(s.RecordingId) > 0) {
-				log.Fatalf("Failed to find cover for %v (album=%v, recording=%v)", s.Filename, s.AlbumId, s.RecordingId)
+			if *requireCovers && len(s.CoverFilename) == 0 && (len(s.AlbumID) > 0 || len(s.RecordingID) > 0) {
+				log.Fatalf("Failed to find cover for %v (album=%v, recording=%v)", s.Filename, s.AlbumID, s.RecordingID)
 			}
-			s.RecordingId = ""
+			s.RecordingID = ""
 
 			log.Print("Sending ", s.Filename)
 			updateChan <- *s.Song

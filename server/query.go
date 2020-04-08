@@ -59,9 +59,9 @@ func (a songArray) Less(i, j int) bool {
 	} else if a[i].AlbumLower > a[j].AlbumLower {
 		return false
 	}
-	if a[i].AlbumId < a[j].AlbumId {
+	if a[i].AlbumID < a[j].AlbumID {
 		return true
-	} else if a[i].AlbumId > a[j].AlbumId {
+	} else if a[i].AlbumID > a[j].AlbumID {
 		return false
 	}
 	if a[i].Disc < a[j].Disc {

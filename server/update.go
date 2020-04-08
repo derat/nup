@@ -35,13 +35,13 @@ func sortedStringSlicesMatch(a, b []string) bool {
 }
 
 func copySongFileFields(dest, src *types.Song) {
-	dest.Sha1 = src.Sha1
+	dest.SHA1 = src.SHA1
 	dest.Filename = src.Filename
 	dest.CoverFilename = src.CoverFilename
 	dest.Artist = src.Artist
 	dest.Title = src.Title
 	dest.Album = src.Album
-	dest.AlbumId = src.AlbumId
+	dest.AlbumID = src.AlbumID
 	dest.Track = src.Track
 	dest.Disc = src.Disc
 	dest.Length = src.Length
@@ -217,7 +217,7 @@ func updateRatingAndTags(ctx context.Context, id int64, hasRating bool, rating f
 }
 
 func updateOrInsertSong(ctx context.Context, updatedSong *types.Song, replaceUserData bool, updateDelay time.Duration) error {
-	sha1 := updatedSong.Sha1
+	sha1 := updatedSong.SHA1
 	queryKeys, err := datastore.NewQuery(songKind).KeysOnly().Filter("Sha1 =", sha1).GetAll(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("Querying for SHA1 %v failed: %v", sha1, err)

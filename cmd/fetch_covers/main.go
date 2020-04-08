@@ -43,7 +43,7 @@ func readSong(path string) (albumId string, err error) {
 }
 
 func readDumpFile(jsonPath string, coverDir string, maxSongs int) (albumIds []string, err error) {
-	missingAlbumIds := make(map[string]bool)
+	missingAlbumIDs := make(map[string]bool)
 
 	f, err := os.Open(jsonPath)
 	if err != nil {
@@ -71,24 +71,24 @@ func readDumpFile(jsonPath string, coverDir string, maxSongs int) (albumIds []st
 		}
 
 		// Can't do anything if the song doesn't have an album ID.
-		if len(s.AlbumId) == 0 {
+		if len(s.AlbumID) == 0 {
 			continue
 		}
 
 		// Check if we already have the cover.
-		if _, err := os.Stat(filepath.Join(coverDir, getCoverFilename(s.AlbumId))); err == nil {
+		if _, err := os.Stat(filepath.Join(coverDir, getCoverFilename(s.AlbumID))); err == nil {
 			continue
 		}
 
-		missingAlbumIds[s.AlbumId] = true
+		missingAlbumIDs[s.AlbumID] = true
 	}
 	if numSongs%logInterval != 0 {
 		log.Printf("Scanned %v songs", numSongs)
 	}
 
-	ret := make([]string, len(missingAlbumIds))
+	ret := make([]string, len(missingAlbumIDs))
 	i := 0
-	for id := range missingAlbumIds {
+	for id := range missingAlbumIDs {
 		ret[i] = id
 		i++
 	}

@@ -16,7 +16,7 @@ const (
 	batchSize = 100
 
 	deletePath        = "delete_song"
-	deleteSongIdParam = "songId"
+	deleteSongIDParam = "songId"
 
 	// Server path to import songs and query params.
 	importPath         = "import"
@@ -24,7 +24,7 @@ const (
 )
 
 func updateSongs(cfg Config, ch chan types.Song, numSongs int, replaceUserData bool) error {
-	u, err := cloudutil.ServerURL(cfg.ServerUrl, importPath)
+	u, err := cloudutil.ServerURL(cfg.ServerURL, importPath)
 	if err != nil {
 		return err
 	}
@@ -80,11 +80,11 @@ func updateSongs(cfg Config, ch chan types.Song, numSongs int, replaceUserData b
 }
 
 func deleteSong(cfg Config, songId int64) error {
-	u, err := cloudutil.ServerURL(cfg.ServerUrl, deletePath)
+	u, err := cloudutil.ServerURL(cfg.ServerURL, deletePath)
 	if err != nil {
 		return err
 	}
-	u.RawQuery = deleteSongIdParam + "=" + strconv.FormatInt(songId, 10)
+	u.RawQuery = deleteSongIDParam + "=" + strconv.FormatInt(songId, 10)
 	req, err := http.NewRequest("POST", u.String(), nil)
 	if err != nil {
 		return err

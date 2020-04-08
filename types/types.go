@@ -11,28 +11,28 @@ type Play struct {
 	StartTime time.Time `json:"t"`
 
 	// Client playing the song.
-	IpAddress string `json:"ip"`
+	IPAddress string `datastore:"IpAddress" json:"ip"`
 }
 
 // Song represents an audio file.
 type Song struct {
 	// SHA1 hash of the audio portion of the file.
-	Sha1 string `json:"sha1,omitempty"`
+	SHA1 string `datastore:"Sha1" json:"sha1,omitempty"`
 
 	// Song entity's key ID from Datastore. Only set in search results.
-	SongId string `datastore:"-" json:"songId,omitempty"`
+	SongID string `datastore:"-" json:"songId,omitempty"`
 
 	// Relative path from the base of the music directory.
-	// Must be escaped for Cloud Storage when constructing Url.
+	// Must be escaped for Cloud Storage when constructing URL.
 	Filename string `json:"filename,omitempty"`
 
 	// Relative path from the base of the covers directory.
-	// Must be escaped for Cloud Storage when constructing CoverUrl.
+	// Must be escaped for Cloud Storage when constructing CoverURL.
 	CoverFilename string `datastore:",noindex" json:"coverFilename,omitempty"`
 
 	// URL of the song and cover art. Only set in search results.
-	Url      string `datastore:"-" json:"url,omitempty"`
-	CoverUrl string `datastore:"-" json:"coverUrl,omitempty"`
+	URL      string `datastore:"-" json:"url,omitempty"`
+	CoverURL string `datastore:"-" json:"coverUrl,omitempty"`
 
 	// Canonical versions used for display.
 	Artist string `datastore:",noindex" json:"artist"`
@@ -49,12 +49,12 @@ type Song struct {
 
 	// Opaque ID uniquely identifying the album (generally, a MusicBrainz
 	// release ID taken from a "MusicBrainz Album Id" ID3v2 tag).
-	AlbumId string `json:"albumId,omitempty"`
+	AlbumID string `datastore:"AlbumId" json:"albumId,omitempty"`
 
 	// Opaque ID uniquely identifying the recording (generally, the MusicBrainz
 	// ID corresponding to the MusicBrainz recording entity, taken from a UFID
 	// ID3v2 tag). Only used to find cover art for non-album tracks.
-	RecordingId string `datastore:"-" json:"-"`
+	RecordingID string `datastore:"-" json:"-"`
 
 	// Track and disc number or 0 if unset.
 	Track int `json:"track"`
@@ -92,7 +92,7 @@ type SongOrErr struct {
 // PlayDump is used when dumping data.
 type PlayDump struct {
 	// Song entity's key ID from Datastore.
-	SongId string `json:"songId"`
+	SongID string `json:"songId"`
 
 	// Play information.
 	Play Play `json:"play"`
@@ -106,42 +106,42 @@ func (a PlayArray) Less(i, j int) bool { return a[i].StartTime.Before(a[j].Start
 
 // ClientConfig holds configuration details shared across client binaries.
 type ClientConfig struct {
-	ServerUrl string
-	Username  string
-	Password  string
+	ServerURL string `json:"serverUrl"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
 }
 
 type BasicAuthInfo struct {
-	Username string
-	Password string
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 // ServerConfig holds the App Engine server's configuration.
 type ServerConfig struct {
 	// Email addresses of Google users allowed to use the server.
-	GoogleUsers []string
+	GoogleUsers []string `json:"googleUsers"`
 
 	// Credentials of accounts using HTTP basic authentication.
-	BasicAuthUsers []BasicAuthInfo
+	BasicAuthUsers []BasicAuthInfo `json:"basicAuthUsers"`
 
 	// Names of the Cloud Storage buckets where song and cover files are stored.
-	SongBucket  string
-	CoverBucket string
+	SongBucket  string `json:"songBucket"`
+	CoverBucket string `json:"coverBucket"`
 
 	// Base URLs where song and cover files are stored.
-	// Exactly one of *Bucket and *BaseUrl must be set.
-	SongBaseUrl  string
-	CoverBaseUrl string
+	// Exactly one of *Bucket and *BaseURL must be set.
+	SongBaseURL  string `json:"songBaseUrl"`
+	CoverBaseURL string `json:"coverBaseUrl"`
 
 	// Should songs, query results, and tags be cached?
-	CacheSongs   bool
-	CacheQueries bool
-	CacheTags    bool
+	CacheSongs   bool `json:"cacheSongs"`
+	CacheQueries bool `json:"cacheQueries"`
+	CacheTags    bool `json:"cacheTags"`
 
 	// Should datastore (rather than memcache) be used for caching query results and tags?
-	UseDatastoreForCache bool
+	UseDatastoreForCache bool `json:"useDatastoreForCache"`
 
 	// Should failure be reported for all user data updates (ratings, tags, plays)?
 	// Ignored for non-development servers.
-	ForceUpdateFailures bool
+	ForceUpdateFailures bool `json:"forceUpdateFailures"`
 }

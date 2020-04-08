@@ -37,11 +37,11 @@ func TestUpdate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := Config{ClientConfig: types.ClientConfig{ServerUrl: server.URL}}
+	cfg := Config{ClientConfig: types.ClientConfig{ServerURL: server.URL}}
 	ch := make(chan types.Song)
 
 	s0 := types.Song{
-		Sha1:     "1977c91fea860245695dcceea0805c14cede7559",
+		SHA1:     "1977c91fea860245695dcceea0805c14cede7559",
 		Filename: "arovane/atol_scrap/thaem_nue.mp3",
 		Artist:   "Arovane",
 		Title:    "Thaem Nue",
@@ -54,7 +54,7 @@ func TestUpdate(t *testing.T) {
 		Tags:     []string{"electronic", "instrumental"},
 	}
 	s1 := types.Song{
-		Sha1:     "b70984a4ac5084999b70478cdf163218b90cefdb",
+		SHA1:     "b70984a4ac5084999b70478cdf163218b90cefdb",
 		Filename: "gary_hoey/animal_instinct/motown_fever.mp3",
 		Artist:   "Gary Hoey",
 		Title:    "Motown Fever",
@@ -84,7 +84,7 @@ func TestUpdate(t *testing.T) {
 	sentSongs := make([]types.Song, 250, 250)
 	go func() {
 		for i := 0; i < len(sentSongs); i++ {
-			sentSongs[i].Sha1 = strconv.Itoa(i)
+			sentSongs[i].SHA1 = strconv.Itoa(i)
 			ch <- sentSongs[i]
 		}
 	}()

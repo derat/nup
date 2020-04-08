@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # coding=UTF-8
 
+import distutils.spawn
 import pprint
 import time
 import unittest
@@ -26,8 +27,16 @@ def setUpModule():
     global server
     server = Server(file_thread.host_port())
 
+    # For some reason, even when the chromedriver executable is in $PATH, I get
+    # an error like the following here:
+    #
+    # WebDriverException: Message: 'chromedriver' executable needs to be in
+    # PATH. Please see https://sites.google.com/a/chromium.org/chromedriver/home
+    #
+    # Passing the path manually seems to work:
+    # https://stackoverflow.com/a/12611523
     global driver
-    driver = webdriver.Chrome()
+    driver = webdriver.Chrome(distutils.spawn.find_executable('chromedriver'))
 
     # Makes no sense: Chrome starts at a data: URL, so I get a "Cookies are
     # disabled inside 'data:' URLs" exception if I try to add the cookie before
@@ -36,7 +45,7 @@ def setUpModule():
     driver.get(base_url)
     driver.add_cookie({
         'name': constants.AUTH_COOKIE,
-        'value': 1,
+        'value': '1',
     })
     driver.get(base_url)
 

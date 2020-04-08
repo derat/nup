@@ -96,7 +96,7 @@ func (a SongArray) Less(i, j int) bool {
 	if a[i].Filename != a[j].Filename {
 		return a[i].Filename < a[j].Filename
 	}
-	return a[i].Url < a[j].Url
+	return a[i].URL < a[j].URL
 }
 
 type OrderPolicy int
@@ -119,8 +119,8 @@ func CompareSongs(expected, actual []types.Song, order OrderPolicy) error {
 			for j := range s.Plays {
 				s.Plays[j].StartTime = s.Plays[j].StartTime.UTC()
 				// Ugly hack to handle IPv6 addresses.
-				if s.Plays[j].IpAddress == "[::1]" {
-					s.Plays[j].IpAddress = "127.0.0.1"
+				if s.Plays[j].IPAddress == "[::1]" {
+					s.Plays[j].IPAddress = "127.0.0.1"
 				}
 			}
 			sort.Sort(types.PlayArray(s.Plays))

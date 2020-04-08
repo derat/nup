@@ -53,8 +53,8 @@ func readId3Footer(f *os.File, fi os.FileInfo) (length int64, artist, title, alb
 	return footerLength, artist, title, album, nil
 }
 
-// computeAudioSha1 returns a SHA1 hash of the audio (i.e. non-metadata) portion of f.
-func computeAudioSha1(f *os.File, fi os.FileInfo, headerLength, footerLength int64) (string, error) {
+// computeAudioSHA1 returns a SHA1 hash of the audio (i.e. non-metadata) portion of f.
+func computeAudioSHA1(f *os.File, fi os.FileInfo, headerLength, footerLength int64) (string, error) {
 	if _, err := f.Seek(headerLength, 0); err != nil {
 		return "", err
 	}
@@ -169,14 +169,14 @@ func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan types
 		s.Artist = tag.Artist()
 		s.Title = tag.Title()
 		s.Album = tag.Album()
-		s.AlbumId = tag.CustomFrames()[albumIdTag]
-		s.RecordingId = tag.UniqueFileIdentifiers()[recordingIdOwner]
+		s.AlbumID = tag.CustomFrames()[albumIdTag]
+		s.RecordingID = tag.UniqueFileIdentifiers()[recordingIdOwner]
 		s.Track = int(tag.Track())
 		s.Disc = int(tag.Disc())
 		headerLength = int64(tag.TagSize())
 	}
 
-	s.Sha1, err = computeAudioSha1(f, fi, headerLength, footerLength)
+	s.SHA1, err = computeAudioSHA1(f, fi, headerLength, footerLength)
 	if err != nil {
 		return
 	}

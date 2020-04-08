@@ -26,7 +26,7 @@ const (
 
 func getEntities(cfg *types.ClientConfig, entityType string, extraArgs string, batchSize int, f func([]byte)) {
 	client := http.Client{}
-	u, err := cloudutil.ServerURL(cfg.ServerUrl, exportPath)
+	u, err := cloudutil.ServerURL(cfg.ServerURL, exportPath)
 	if err != nil {
 		log.Fatal("Failed to get server URL: ", err)
 	}
@@ -132,7 +132,7 @@ func main() {
 			break
 		}
 
-		for pd != nil && pd.SongId == s.SongId {
+		for pd != nil && pd.SongID == s.SongID {
 			s.Plays = append(s.Plays, pd.Play)
 			pd = <-playChan
 		}
@@ -149,6 +149,6 @@ func main() {
 	log.Printf("Wrote %d songs", numSongs)
 
 	if pd != nil {
-		log.Fatalf("Got orphaned play for song %v: %v", pd.SongId, pd.Play)
+		log.Fatalf("Got orphaned play for song %v: %v", pd.SongID, pd.Play)
 	}
 }

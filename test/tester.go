@@ -64,15 +64,15 @@ type Tester struct {
 
 	updateConfigFile string
 	dumpConfigFile   string
-	serverUrl        string
+	serverURL        string
 	binDir           string
 	client           http.Client
 }
 
-func newTester(serverUrl, binDir string) *Tester {
+func newTester(serverURL, binDir string) *Tester {
 	t := &Tester{
 		TempDir:   CreateTempDir(),
-		serverUrl: serverUrl,
+		serverURL: serverURL,
 		binDir:    binDir,
 	}
 
@@ -96,30 +96,27 @@ func newTester(serverUrl, binDir string) *Tester {
 		return path
 	}
 
+	// Corresponds to Config in cmd/update_music/main.go.
 	t.updateConfigFile = writeConfig("update_config.json", struct {
-		LastUpdateTimeFile string
-		ServerUrl          string
-		Username           string
-		Password           string
-		CoverDir           string
-		MusicDir           string
+		LastUpdateTimeFile string `json:"lastUpdateTimeFile"`
+		ServerURL          string `json:"serverUrl"`
+		Username           string `json:"username"`
+		Password           string `json:"password"`
+		CoverDir           string `json:"coverDir"`
+		MusicDir           string `json:"musicDir"`
 	}{
 		filepath.Join(t.TempDir, "last_update_time"),
-		t.serverUrl,
+		t.serverURL,
 		TestUsername,
 		TestPassword,
 		t.CoverDir,
 		t.MusicDir,
 	})
 
-	t.dumpConfigFile = writeConfig("dump_config.json", struct {
-		ServerUrl string
-		Username  string
-		Password  string
-	}{
-		t.serverUrl,
-		TestUsername,
-		TestPassword,
+	t.dumpConfigFile = writeConfig("dump_config.json", types.ClientConfig{
+		ServerURL: t.serverURL,
+		Username:  TestUsername,
+		Password:  TestPassword,
 	})
 
 	return t
@@ -170,26 +167,20 @@ func (t *Tester) DumpSongs(strip stripPolicy, covers coverPolicy) []types.Song {
 			panic(fmt.Sprintf("unable to unmarshal song %q: %v", l, err))
 		}
 		if strip == stripIds {
-			s.SongId = ""
+			s.SongID = ""
 		}
 		songs = append(songs, s)
 	}
 	return songs
 }
 
-func (t *Tester) GetSongId(sha1 string) string {
+func (t *Tester) SongID(sha1 string) string {
 	for _, s := range t.DumpSongs(keepIds, skipCovers) {
-		if s.Sha1 == sha1 {
-			return s.SongId
+		if s.SHA1 == sha1 {
+			return s.SongID
 		}
 	}
 	panic(fmt.Sprintf("failed to find ID for %v", sha1))
-}
-
-func (t *Tester) ImportSongsFromLegacyDb(path string) {
-	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile, "-import-db="+path); err != nil {
-		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
-	}
 }
 
 func (t *Tester) ImportSongsFromJSONFile(path string, policy userDataPolicy) {
@@ -215,7 +206,7 @@ func (t *Tester) DeleteSong(songId string) {
 }
 
 func (t *Tester) NewRequest(method, path string, body io.Reader) *http.Request {
-	req, err := http.NewRequest(method, t.serverUrl+path, body)
+	req, err := http.NewRequest(method, t.serverURL+path, body)
 	if err != nil {
 		panic(err)
 	}

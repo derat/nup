@@ -7,13 +7,13 @@ import (
 )
 
 var Song0s = types.Song{
-	Sha1:        "fefac74a1d5928316d7131747107c8a61b71ffe4",
+	SHA1:        "fefac74a1d5928316d7131747107c8a61b71ffe4",
 	Filename:    "0s.mp3",
 	Artist:      "First Artist",
 	Title:       "Zero Seconds",
 	Album:       "First Album",
-	AlbumId:     "1e477f68-c407-4eae-ad01-518528cedc2c",
-	RecordingId: "392cea06-94c2-416b-80aa-f5b1e7d0fb1c",
+	AlbumID:     "1e477f68-c407-4eae-ad01-518528cedc2c",
+	RecordingID: "392cea06-94c2-416b-80aa-f5b1e7d0fb1c",
 	Track:       1,
 	Disc:        0,
 	Length:      0.026,
@@ -21,13 +21,13 @@ var Song0s = types.Song{
 }
 
 var Song0sUpdated = types.Song{
-	Sha1:        "fefac74a1d5928316d7131747107c8a61b71ffe4",
+	SHA1:        "fefac74a1d5928316d7131747107c8a61b71ffe4",
 	Filename:    "0s-updated.mp3",
 	Artist:      "First Artist",
 	Title:       "Zero Seconds (Remix)",
 	Album:       "First Album",
-	AlbumId:     "1e477f68-c407-4eae-ad01-518528cedc2c",
-	RecordingId: "271a81af-6c2d-44cf-a0b8-a25ad74c82f9",
+	AlbumID:     "1e477f68-c407-4eae-ad01-518528cedc2c",
+	RecordingID: "271a81af-6c2d-44cf-a0b8-a25ad74c82f9",
 	Track:       1,
 	Disc:        0,
 	Length:      0.026,
@@ -35,13 +35,13 @@ var Song0sUpdated = types.Song{
 }
 
 var Song1s = types.Song{
-	Sha1:        "c6e3230b4ed5e1f25d92dd6b80bfc98736bbee62",
+	SHA1:        "c6e3230b4ed5e1f25d92dd6b80bfc98736bbee62",
 	Filename:    "1s.mp3",
 	Artist:      "Second Artist",
 	Title:       "One Second",
 	Album:       "First Album",
-	AlbumId:     "1e477f68-c407-4eae-ad01-518528cedc2c",
-	RecordingId: "5d7e41b2-ec4b-44dd-b25a-a576d7a08adb",
+	AlbumID:     "1e477f68-c407-4eae-ad01-518528cedc2c",
+	RecordingID: "5d7e41b2-ec4b-44dd-b25a-a576d7a08adb",
 	Track:       2,
 	Disc:        0,
 	Length:      1.071,
@@ -49,12 +49,12 @@ var Song1s = types.Song{
 }
 
 var Song5s = types.Song{
-	Sha1:     "63afdde2b390804562d54788865fff1bfd11cf94",
+	SHA1:     "63afdde2b390804562d54788865fff1bfd11cf94",
 	Filename: "5s.mp3",
 	Artist:   "Third Artist",
 	Title:    "Five Seconds",
 	Album:    "Another Album",
-	AlbumId:  "a1d2405b-afe0-4e28-a935-b5b256f68131",
+	AlbumID:  "a1d2405b-afe0-4e28-a935-b5b256f68131",
 	Track:    1,
 	Disc:     2,
 	Length:   5.041,
@@ -62,7 +62,7 @@ var Song5s = types.Song{
 }
 
 var Id3v1Song = types.Song{
-	Sha1:     "fefac74a1d5928316d7131747107c8a61b71ffe4",
+	SHA1:     "fefac74a1d5928316d7131747107c8a61b71ffe4",
 	Filename: "id3v1.mp3",
 	Artist:   "The Legacy Formats",
 	Title:    "Give It Up For ID3v1",
@@ -74,7 +74,7 @@ var Id3v1Song = types.Song{
 }
 
 var LegacySong1 = types.Song{
-	Sha1:     "1977c91fea860245695dcceea0805c14cede7559",
+	SHA1:     "1977c91fea860245695dcceea0805c14cede7559",
 	Filename: "arovane/atol_scrap/thaem_nue.mp3",
 	Artist:   "Arovane",
 	Title:    "Thaem Nue",
@@ -88,7 +88,7 @@ var LegacySong1 = types.Song{
 }
 
 var LegacySong2 = types.Song{
-	Sha1:     "b70984a4ac5084999b70478cdf163218b90cefdb",
+	SHA1:     "b70984a4ac5084999b70478cdf163218b90cefdb",
 	Filename: "gary_hoey/animal_instinct/motown_fever.mp3",
 	Artist:   "Gary Hoey",
 	Title:    "Motown Fever",

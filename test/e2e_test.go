@@ -67,8 +67,8 @@ func cleanUpTest(t *Tester) {
 	t.CleanUp()
 }
 
-// extractFilePathFromUrl extracts the (escaped for Cloud Storage but un-query-escaped) original file path from a URL.
-func extractFilePathFromUrl(s string) (string, error) {
+// extractFilePathFromURL extracts the (escaped for Cloud Storage but un-query-escaped) original file path from a URL.
+func extractFilePathFromURL(s string) (string, error) {
 	u, err := url.Parse(s)
 	if err != nil {
 		return "", fmt.Errorf("unable to parse URL")
@@ -89,12 +89,12 @@ func compareQueryResults(expected, actual []types.Song, order OrderPolicy, clien
 	expectedCleaned := make([]types.Song, len(expected))
 	for i := range expected {
 		s := expected[i]
-		s.Sha1 = ""
+		s.SHA1 = ""
 		s.Plays = nil
-		s.Url = cloudutil.CloudStorageURL(songBucket, s.Filename, client)
+		s.URL = cloudutil.CloudStorageURL(songBucket, s.Filename, client)
 		s.Filename = ""
 		if len(s.CoverFilename) > 0 {
-			s.CoverUrl = cloudutil.CloudStorageURL(coverBucket, s.CoverFilename, client)
+			s.CoverURL = cloudutil.CloudStorageURL(coverBucket, s.CoverFilename, client)
 			s.CoverFilename = ""
 		}
 		expectedCleaned[i] = s
@@ -104,10 +104,10 @@ func compareQueryResults(expected, actual []types.Song, order OrderPolicy, clien
 	for i := range actual {
 		s := actual[i]
 
-		if len(s.SongId) == 0 {
-			return fmt.Errorf("song %v (%v) has no ID", i, s.Url)
+		if len(s.SongID) == 0 {
+			return fmt.Errorf("song %v (%v) has no ID", i, s.URL)
 		}
-		s.SongId = ""
+		s.SongID = ""
 
 		if len(s.Tags) == 0 {
 			s.Tags = nil
@@ -190,7 +190,7 @@ func TestUserData(tt *testing.T) {
 	log.Print("importing a song")
 	CopySongsToTempDir(t.MusicDir, Song0s.Filename)
 	t.UpdateSongs()
-	id := t.GetSongId(Song0s.Sha1)
+	id := t.SongID(Song0s.SHA1)
 
 	log.Print("rating and tagging")
 	s := Song0s
@@ -306,7 +306,7 @@ func TestCaching(tt *testing.T) {
 
 	// After rating the song, the query results should still be served from the cache.
 	log.Print("rating and re-querying")
-	id1 := t.GetSongId(s1.Sha1)
+	id1 := t.SongID(s1.SHA1)
 	s1.Rating = 1.0
 	t.DoPost("rate_and_tag?songId="+id1+"&rating=1.0", nil)
 	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(cacheParam), IgnoreOrder, cloudutil.WebClient); err != nil {
@@ -349,7 +349,7 @@ func TestCaching(tt *testing.T) {
 	if err := compareQueryResults([]types.Song{s2}, t.QuerySongs("album="+url.QueryEscape(s2.Album)), IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
-	id2 := t.GetSongId(s2.Sha1)
+	id2 := t.SongID(s2.SHA1)
 	t.DeleteSong(id2)
 	if err := compareQueryResults([]types.Song{}, t.QuerySongs("album="+url.QueryEscape(s2.Album)), IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
@@ -369,7 +369,7 @@ func TestCacheRace(tt *testing.T) {
 	// c) Update the song.
 	// d) See that the song has been re-added to the cache by the subsequent query and drop it again.
 	log.Print("starting slow background update")
-	id := t.GetSongId(LegacySong1.Sha1)
+	id := t.SongID(LegacySong1.SHA1)
 	s := LegacySong1
 	s.Rating = 1.0
 	wg := sync.WaitGroup{}
@@ -436,7 +436,7 @@ func TestAndroid(tt *testing.T) {
 	}
 
 	log.Print("rating a song")
-	id := t.GetSongId(LegacySong1.Sha1)
+	id := t.SongID(LegacySong1.SHA1)
 	updatedLegacySong1 := LegacySong1
 	updatedLegacySong1.Rating = 1.0
 	now = t.GetNowFromServer()
@@ -478,7 +478,7 @@ func TestTags(tt *testing.T) {
 	}
 
 	log.Print("adding tags and checking that they're returned")
-	id := t.GetSongId(LegacySong1.Sha1)
+	id := t.SongID(LegacySong1.SHA1)
 	t.DoPost("rate_and_tag?songId="+id+"&tags=electronic+instrumental+drums+idm", nil)
 	if tags := t.GetTags(); tags != "drums,electronic,idm,instrumental,rock" {
 		tt.Errorf("got tags %q", tags)
@@ -500,7 +500,7 @@ func TestCovers(tt *testing.T) {
 	log.Print("writing cover and updating songs")
 	CopySongsToTempDir(t.MusicDir, Song0s.Filename, Song5s.Filename)
 	s5 := Song5s
-	s5.CoverFilename = fmt.Sprintf("%s.jpg", s5.AlbumId)
+	s5.CoverFilename = fmt.Sprintf("%s.jpg", s5.AlbumID)
 	createCover(s5.CoverFilename)
 	t.UpdateSongs()
 	if err := compareQueryResults([]types.Song{Song0s, s5}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
@@ -511,7 +511,7 @@ func TestCovers(tt *testing.T) {
 	RemoveFromTempDir(t.MusicDir, Song0s.Filename)
 	CopySongsToTempDir(t.MusicDir, Song0sUpdated.Filename)
 	s0 := Song0sUpdated
-	s0.CoverFilename = fmt.Sprintf("%s.jpg", s0.AlbumId)
+	s0.CoverFilename = fmt.Sprintf("%s.jpg", s0.AlbumID)
 	createCover(s0.CoverFilename)
 	t.UpdateSongs()
 	if err := compareQueryResults([]types.Song{s0, s5}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
@@ -521,7 +521,7 @@ func TestCovers(tt *testing.T) {
 	log.Print("writing cover named after recording id")
 	CopySongsToTempDir(t.MusicDir, Song1s.Filename)
 	s1 := Song1s
-	s1.CoverFilename = fmt.Sprintf("%s.jpg", s1.RecordingId)
+	s1.CoverFilename = fmt.Sprintf("%s.jpg", s1.RecordingID)
 	createCover(s1.CoverFilename)
 	RemoveFromTempDir(t.CoverDir, s0.CoverFilename)
 	t.UpdateSongs()
@@ -568,7 +568,7 @@ func TestJSONImport(tt *testing.T) {
 	}
 
 	log.Print("reporting play")
-	id := t.GetSongId(us.Sha1)
+	id := t.SongID(us.SHA1)
 	st := time.Unix(1410746718, 0)
 	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(st.Unix(), 10), nil)
 	us.Plays = append(us.Plays, types.Play{st, "127.0.0.1"})
@@ -595,11 +595,11 @@ func TestSorting(tt *testing.T) {
 	for _, s := range []struct {
 		Artist  string
 		Album   string
-		AlbumId string
+		AlbumID string
 		Disc    int
 		Track   int
 	}{
-		// Sorting should be [Album, AlbumId, Disc, Track].
+		// Sorting should be [Album, AlbumID, Disc, Track].
 		{"b", "album1", "23", 1, 1},
 		{"b", "album1", "23", 1, 2},
 		{"b", "album1", "23", 2, 1},
@@ -612,12 +612,12 @@ func TestSorting(tt *testing.T) {
 	} {
 		id := fmt.Sprintf("%s-%s-%d-%d", s.Artist, s.Album, s.Disc, s.Track)
 		songs = append(songs, types.Song{
-			Sha1:     id,
+			SHA1:     id,
 			Filename: id + ".mp3",
 			Artist:   s.Artist,
 			Title:    fmt.Sprintf("Track %d", s.Track),
 			Album:    s.Album,
-			AlbumId:  s.AlbumId,
+			AlbumID:  s.AlbumID,
 			Track:    s.Track,
 			Disc:     s.Disc,
 		})
@@ -637,7 +637,7 @@ func TestDeleteSong(tt *testing.T) {
 	log.Print("posting songs and deleting first song")
 	postTime := t.GetNowFromServer()
 	t.PostSongs([]types.Song{LegacySong1, LegacySong2}, replaceUserData, 0)
-	id1 := t.GetSongId(LegacySong1.Sha1)
+	id1 := t.SongID(LegacySong1.SHA1)
 	t.DeleteSong(id1)
 
 	log.Print("checking non-deleted song")
@@ -659,13 +659,13 @@ func TestDeleteSong(tt *testing.T) {
 	if err := compareQueryResults([]types.Song{LegacySong1}, deletedSongs, IgnoreOrder, cloudutil.AndroidClient); err != nil {
 		tt.Error(err)
 	}
-	if deletedSongs[0].SongId != id1 {
-		tt.Errorf("deleted song's id (%v) didn't match original id (%v)", deletedSongs[0].SongId, id1)
+	if deletedSongs[0].SongID != id1 {
+		tt.Errorf("deleted song's id (%v) didn't match original id (%v)", deletedSongs[0].SongID, id1)
 	}
 
 	log.Print("deleting second song")
 	laterTime := t.GetNowFromServer()
-	id2 := t.GetSongId(LegacySong2.Sha1)
+	id2 := t.SongID(LegacySong2.SHA1)
 	t.DeleteSong(id2)
 
 	log.Print("checking no non-deleted songs")
@@ -684,7 +684,7 @@ func TestDeleteSong(tt *testing.T) {
 	if err := compareQueryResults([]types.Song{LegacySong2}, deletedSongs, IgnoreOrder, cloudutil.AndroidClient); err != nil {
 		tt.Error(err)
 	}
-	if deletedSongs[0].SongId != id2 {
-		tt.Errorf("deleted song's id (%v) didn't match original id (%v)", deletedSongs[0].SongId, id2)
+	if deletedSongs[0].SongID != id2 {
+		tt.Errorf("deleted song's id (%v) didn't match original id (%v)", deletedSongs[0].SongID, id2)
 	}
 }

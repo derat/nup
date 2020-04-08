@@ -85,7 +85,7 @@ func dumpSongs(ctx context.Context, max int64, cursor string, includeCovers bool
 	songs = songs[0:len(ids)]
 	for i, id := range ids {
 		s := &songs[i]
-		s.SongId = strconv.FormatInt(id, 10)
+		s.SongID = strconv.FormatInt(id, 10)
 		if !includeCovers {
 			s.CoverFilename = ""
 		}
@@ -107,7 +107,7 @@ func dumpPlays(ctx context.Context, max int64, cursor string) (plays []types.Pla
 
 	plays = plays[0:len(pids)]
 	for i, pid := range pids {
-		plays[i].SongId = strconv.FormatInt(pid, 10)
+		plays[i].SongID = strconv.FormatInt(pid, 10)
 	}
 	return plays, nextCursor, nil
 }
@@ -143,7 +143,7 @@ func dumpSingleSong(ctx context.Context, id int64) (*types.Song, error) {
 	if err := datastore.Get(ctx, sk, s); err != nil {
 		return nil, err
 	}
-	s.SongId = strconv.FormatInt(id, 10)
+	s.SongID = strconv.FormatInt(id, 10)
 
 	plays := make([]types.PlayDump, maxPlaysForSongDump)
 	playPtrs := make([]interface{}, maxPlaysForSongDump)

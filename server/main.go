@@ -117,9 +117,9 @@ func checkRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, m
 	}
 	if !allowed {
 		if len(username) == 0 && redirectToLogin {
-			loginUrl, _ := user.LoginURL(ctx, "/")
+			loginURL, _ := user.LoginURL(ctx, "/")
 			log.Debugf(ctx, "Unauthenticated request for %v from %v; redirecting to login", r.URL.String(), r.RemoteAddr)
-			http.Redirect(w, r, loginUrl, http.StatusFound)
+			http.Redirect(w, r, loginURL, http.StatusFound)
 		} else {
 			log.Debugf(ctx, "Unauthorized request for %v from %q at %v", r.URL.String(), username, r.RemoteAddr)
 			http.Error(w, "Request requires authorization", http.StatusUnauthorized)
@@ -263,7 +263,7 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 		if songs, err = getSongsFromCache(ctx, []int64{id}); err == nil {
 			if song, ok := songs[id]; ok {
 				s = &song
-				s.SongId = strconv.FormatInt(id, 10)
+				s.SongID = strconv.FormatInt(id, 10)
 			} else {
 				err = fmt.Errorf("Song %v not cached", id)
 			}
@@ -403,7 +403,7 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := updateOrInsertSong(ctx, s, replaceUserData, updateDelay); err != nil {
-			log.Errorf(ctx, "Failed to update song with SHA1 %v: %v", s.Sha1, err)
+			log.Errorf(ctx, "Failed to update song with SHA1 %v: %v", s.SHA1, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
