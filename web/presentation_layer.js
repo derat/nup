@@ -1,10 +1,6 @@
 // Copyright 2017 Daniel Erat <dan@erat.org>
 // All rights reserved.
 
-function initPresentationLayer() {
-  document.presentationLayer = new PresentationLayer();
-}
-
 class PresentationLayer {
   constructor(nextTrackFunc) {
     this.overlay = $('presentationOverlay');

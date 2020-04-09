@@ -1,10 +1,6 @@
 // Copyright 2011 Daniel Erat <dan@erat.org>
 // All rights reserved.
 
-function initDialogManager() {
-  document.dialogManager = new DialogManager();
-}
-
 class DialogManager {
   constructor() {
     this.listeners = [];

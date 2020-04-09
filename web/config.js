@@ -1,10 +1,6 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
-function initConfig() {
-  document.config = new Config();
-}
-
 class Config {
   VOLUME_KEY = 'volume';
 

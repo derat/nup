@@ -1,10 +1,6 @@
 // Copyright 2010 Daniel Erat.
 // All rights reserved.
 
-function initPlaylist() {
-  document.playlist = new Playlist(document.player);
-}
-
 class Playlist {
   constructor(player) {
     this.player = player;

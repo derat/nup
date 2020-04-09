@@ -1,10 +1,6 @@
 // Copyright 2010 Daniel Erat.
 // All rights reserved.
 
-function initPlayer() {
-  document.player = new Player();
-}
-
 class Player {
   // Number of seconds that a seek operation should traverse.
   SEEK_SECONDS = 10;
