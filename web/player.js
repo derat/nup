@@ -62,9 +62,7 @@ class Player {
 
     this.dialogManager = document.dialogManager;
     this.presentationLayer = document.presentationLayer;
-    this.presentationLayer.setPlayNextTrackFunction(
-      this.cycleTrack.bind(this, 1),
-    );
+    this.presentationLayer.setPlayNextTrackFunction(() => this.cycleTrack(1));
     this.optionsDialog = null;
 
     this.audio = $('audio');
@@ -86,15 +84,11 @@ class Player {
     this.dumpSongCacheLink = $('dumpSongCacheLink');
     this.tagsTextarea = $('editTagsTextarea');
 
-    this.audio.addEventListener('ended', this.onEnded.bind(this), false);
-    this.audio.addEventListener('pause', this.onPause.bind(this), false);
-    this.audio.addEventListener('play', this.onPlay.bind(this), false);
-    this.audio.addEventListener(
-      'timeupdate',
-      this.onTimeUpdate.bind(this),
-      false,
-    );
-    this.audio.addEventListener('error', this.onError.bind(this), false);
+    this.audio.addEventListener('ended', () => this.onEnded(), false);
+    this.audio.addEventListener('pause', () => this.onPause(), false);
+    this.audio.addEventListener('play', () => this.onPlay(), false);
+    this.audio.addEventListener('timeupdate', () => this.onTimeUpdate(), false);
+    this.audio.addEventListener('error', e => this.onError(e), false);
 
     if ('mediaSession' in navigator) {
       const ms = navigator.mediaSession;
@@ -110,7 +104,7 @@ class Player {
 
     this.coverImage.addEventListener(
       'click',
-      this.showUpdateDiv.bind(this),
+      () => this.showUpdateDiv(),
       false,
     );
     this.coverImage.addEventListener(
@@ -118,29 +112,21 @@ class Player {
       () => this.updateMediaSessionMetadata(true /* imageLoaded */),
       false,
     );
-    this.prevButton.addEventListener(
-      'click',
-      this.cycleTrack.bind(this, -1),
-      false,
-    );
-    this.nextButton.addEventListener(
-      'click',
-      this.cycleTrack.bind(this, 1),
-      false,
-    );
+    this.prevButton.addEventListener('click', () => this.cycleTrack(-1), false);
+    this.nextButton.addEventListener('click', () => this.cycleTrack(1), false);
     this.playPauseButton.addEventListener(
       'click',
-      this.togglePause.bind(this),
+      () => this.togglePause(),
       false,
     );
     this.updateCloseImage.addEventListener(
       'click',
-      this.hideUpdateDiv.bind(this, true),
+      () => this.hideUpdateDiv(true),
       false,
     );
     this.ratingSpan.addEventListener(
       'keydown',
-      this.handleRatingSpanKeyDown.bind(this),
+      e => this.handleRatingSpanKeyDown(e),
       false,
     );
 
@@ -153,12 +139,12 @@ class Player {
 
     document.body.addEventListener(
       'keydown',
-      this.handleBodyKeyDown.bind(this),
+      e => this.handleBodyKeyDown(e),
       false,
     );
     window.addEventListener(
       'beforeunload',
-      this.handleBeforeUnload.bind(this),
+      e => this.handleBeforeUnload(e),
       false,
     );
 
@@ -173,7 +159,7 @@ class Player {
     const req = new XMLHttpRequest();
     req.open('GET', 'list_tags', async);
     req.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-    req.onreadystatechange = function() {
+    req.onreadystatechange = () => {
       if (req.readyState == 4) {
         if (req.status == 200) {
           this.updateTags(JSON.parse(req.responseText));
@@ -182,7 +168,7 @@ class Player {
           console.log('Got ' + req.status + ' while loading tags');
         }
       }
-    }.bind(this);
+    };
     req.send(null);
   }
 
@@ -378,7 +364,7 @@ class Player {
       icon: song.coverUrl,
     });
     this.closeNotificationTimeoutId = window.setTimeout(
-      this.closeNotification.bind(this),
+      () => this.closeNotification(),
       Player.NOTIFICATION_SECONDS * 1000,
     );
   }
@@ -434,23 +420,23 @@ class Player {
     if (newTime < this.audio.duration) this.audio.currentTime = newTime;
   }
 
-  onEnded(e) {
+  onEnded() {
     if (this.currentIndex >= this.songs.length - 1) {
       this.reachedEndOfSongs = true;
     } else this.cycleTrack(1);
   }
 
-  onPause(e) {
+  onPause() {
     this.playPauseButton.value = 'Play';
     this.lastUpdateTime = -1;
   }
 
-  onPlay(e) {
+  onPlay() {
     this.playPauseButton.value = 'Pause';
     this.lastUpdateTime = getCurrentTimeSec();
   }
 
-  onTimeUpdate(e) {
+  onTimeUpdate() {
     const song = this.getCurrentSong();
     const duration = song ? song.length : this.audio.duration;
 
@@ -556,9 +542,9 @@ class Player {
         console.log('Skipping unknown tag "' + tag + '"');
       }
     }
-    newTags = newTags.sort().filter(function(item, pos, self) {
-      return self.indexOf(item) == pos;
-    });
+    newTags = newTags
+      .sort()
+      .filter((item, pos, self) => self.indexOf(item) == pos);
     const tagsChanged = newTags.join(' ') != song.tags.sort().join(' ');
 
     if (createdTags.length > 0) this.updateTags(this.tags.concat(createdTags));
@@ -593,11 +579,8 @@ class Player {
     if (!this.ratingSpan.hasChildNodes()) {
       for (let i = 1; i <= 5; ++i) {
         const anchor = document.createElement('a');
-        anchor.addEventListener(
-          'click',
-          this.setRating.bind(this, this.numStarsToRating(i)),
-          false,
-        );
+        const rating = this.numStarsToRating(i);
+        anchor.addEventListener('click', () => this.setRating(rating), false);
         anchor.className = 'star';
         this.ratingSpan.appendChild(anchor);
       }
@@ -617,7 +600,7 @@ class Player {
       this.config,
       this.dialogManager.createDialog(),
     );
-    this.optionsDialog.setCloseCallback(this.closeOptions.bind(this));
+    this.optionsDialog.setCloseCallback(() => this.closeOptions());
   }
 
   closeOptions() {

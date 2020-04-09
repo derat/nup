@@ -14,12 +14,8 @@ class Playlist {
     this.playlistTable = new SongTable(
       $('playlistTable'),
       false /* useCheckboxes */,
-      function(playlist, artist) {
-        playlist.resetSearchForm(artist, null, false);
-      }.bind(this, this),
-      function(playlist, album) {
-        playlist.resetSearchForm(null, album, false);
-      }.bind(this, this),
+      artist => this.resetSearchForm(artist, null, false),
+      album => this.resetSearchForm(null, album, false),
     );
 
     this.rightPane = $('rightPane');
@@ -47,103 +43,95 @@ class Playlist {
     this.searchResultsTable = new SongTable(
       $('searchResultsTable'),
       true /* useCheckboxes */,
-      function(playlist, artist) {
-        playlist.resetSearchForm(artist, null, false);
-      }.bind(this, this),
-      function(playlist, album) {
-        playlist.resetSearchForm(null, album, false);
-      }.bind(this, this),
-      this.handleCheckedSongsChanged_.bind(this),
+      artist => this.resetSearchForm(artist, null, false),
+      album => this.resetSearchForm(null, album, false),
+      () => this.handleCheckedSongsChanged_(),
     );
 
     this.waitingDiv = $('waitingDiv');
 
     this.keywordsInput.addEventListener(
       'keydown',
-      this.handleFormKeyDown.bind(this),
+      e => this.handleFormKeyDown(e),
       false,
     );
     this.keywordsClearButton.addEventListener(
       'click',
-      function(e) {
-        this.keywordsInput.value = null;
-      }.bind(this),
+      () => (this.keywordsInput.value = null),
       false,
     );
     this.tagsInput.addEventListener(
       'keydown',
-      this.handleFormKeyDown.bind(this),
+      e => this.handleFormKeyDown(e),
       false,
     );
     this.tagsClearButton.addEventListener(
       'click',
-      function(e) {
-        this.tagsInput.value = null;
-      }.bind(this),
+      () => (this.tagsInput.value = null),
       false,
     );
     this.shuffleCheckbox.addEventListener(
       'keydown',
-      this.handleFormKeyDown.bind(this),
+      e => this.handleFormKeyDown(e),
       false,
     );
     this.firstTrackCheckbox.addEventListener(
       'keydown',
-      this.handleFormKeyDown.bind(this),
+      e => this.handleFormKeyDown(e),
       false,
     );
     this.unratedCheckbox.addEventListener(
       'keydown',
-      this.handleFormKeyDown.bind(this),
+      e => this.handleFormKeyDown(e),
       false,
     );
     this.unratedCheckbox.addEventListener(
       'change',
-      this.handleUnratedCheckboxChanged.bind(this),
+      e => this.handleUnratedCheckboxChanged(e),
       false,
     );
     this.maxPlaysInput.addEventListener(
       'keydown',
-      this.handleFormKeyDown.bind(this),
+      e => this.handleFormKeyDown(e),
       false,
     );
     this.presetSelect.addEventListener(
       'change',
-      this.handlePresetSelectChanged.bind(this),
+      e => this.handlePresetSelectChanged(e),
       false,
     );
     this.searchButton.addEventListener(
       'click',
-      this.submitQuery.bind(this, false),
+      () => this.submitQuery(false),
       false,
     );
     this.resetButton.addEventListener(
       'click',
-      this.resetSearchForm.bind(this, null, null, true),
+      () => this.resetSearchForm(null, null, true),
       false,
     );
     this.luckyButton.addEventListener(
       'click',
-      this.doLuckySearch.bind(this),
+      () => this.doLuckySearch(),
       false,
     );
     this.appendButton.addEventListener(
       'click',
-      this.enqueueSearchResults.bind(
-        this,
-        false /* clearFirst */,
-        false /* afterCurrent */,
-      ),
+      () =>
+        this.enqueueSearchResults(
+          false /* clearFirst */,
+          false /* afterCurrent */,
+        ),
       false,
     );
     this.insertButton.addEventListener(
       'click',
-      this.enqueueSearchResults.bind(this, false, true),
+      () => this.enqueueSearchResults(false, true),
       false,
     );
     this.replaceButton.addEventListener(
       'click',
-      this.enqueueSearchResults.bind(this, true, false),
+      () => this.enqueueSearchResults(true, false),
       false,
     );
 
@@ -158,7 +146,7 @@ class Playlist {
 
     document.body.addEventListener(
       'keydown',
-      this.handleBodyKeyDown_.bind(this),
+      e => this.handleBodyKeyDown_(e),
       false,
     );
 
@@ -218,9 +206,7 @@ class Playlist {
         // The server splits on non-alphanumeric characters to make keywords.
         // Split on miscellaneous punctuation here to at least handle some of this.
         keywords = keywords.concat(
-          match[1].split(/[-_+=~!?@#$%^&*()'".,:;]+/).filter(function(s) {
-            return s.length;
-          }),
+          match[1].split(/[-_+=~!?@#$%^&*()'".,:;]+/).filter(s => s.length),
         );
         text = match[2];
       }
@@ -276,7 +262,7 @@ class Playlist {
 
     this.request = new XMLHttpRequest();
 
-    this.request.onload = function() {
+    this.request.onload = () => {
       const req = this.request;
       if (req.status == 200) {
         if (req.responseText) {
@@ -307,15 +293,15 @@ class Playlist {
 
       this.waitingDiv.style.display = 'none';
       this.request = null;
-    }.bind(this);
+    };
 
-    this.request.onerror = function(e) {
+    this.request.onerror = e => {
       this.dialogManager.createMessageDialog(
         'Search Failed',
         'Request to server failed.',
       );
       console.log(e);
-    }.bind(this);
+    };
 
     this.waitingDiv.style.display = 'block';
     const url = 'query?' + terms.join('&');
@@ -355,7 +341,7 @@ class Playlist {
   // page so the form is visible.
   resetSearchForm(artist, album, clearResults) {
     const keywords = [];
-    const clean = function(s) {
+    const clean = s => {
       s = s.replace(/"/g, '\\"');
       if (s.indexOf(' ') != -1) s = '"' + s + '"';
       return s;

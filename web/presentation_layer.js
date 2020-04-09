@@ -25,11 +25,7 @@ class PresentationLayer {
     this.timeDiv = $('presentationTime');
     this.durationDiv = $('presentationDuration');
 
-    this.nextCover.addEventListener(
-      'click',
-      this.playNextTrack.bind(this),
-      false,
-    );
+    this.nextCover.addEventListener('click', () => this.playNextTrack(), false);
 
     // Duration of currently-playing song, in seconds.
     this.duration = 0;

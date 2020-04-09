@@ -58,7 +58,7 @@ class Updater {
     console.log('Reporting track: ' + url);
     const req = new XMLHttpRequest();
 
-    const handleError = function() {
+    const handleError = () => {
       console.log('Reporting to ' + url + ' failed; queuing to retry later');
       this.removePlayReportFromArray(
         songId,
@@ -70,7 +70,7 @@ class Updater {
       this.scheduleRetry(false);
     };
 
-    req.onload = function() {
+    req.onload = () => {
       if (req.status == 200) {
         this.removePlayReportFromArray(
           songId,
@@ -81,10 +81,10 @@ class Updater {
         this.scheduleRetry(true);
       } else {
         console.log('Got ' + req.status + ': ' + req.responseText);
-        handleError.bind(this)();
+        handleError();
       }
-    }.bind(this);
-    req.onerror = handleError.bind(this);
+    };
+    req.onerror = () => handleError();
 
     req.open('POST', url, true);
     req.send();
@@ -119,7 +119,7 @@ class Updater {
     console.log('Rating/tagging track: ' + url);
     const req = new XMLHttpRequest();
 
-    const handleError = function() {
+    const handleError = () => {
       console.log(
         'Rating/tagging to ' + url + ' failed; queuing to retry later',
       );
@@ -134,17 +134,17 @@ class Updater {
       this.scheduleRetry(false);
     };
 
-    req.onload = function() {
+    req.onload = () => {
       if (req.status == 200) {
         delete this.inProgressRatingsAndTags[songId];
         this.writeState();
         this.scheduleRetry(true);
       } else {
         console.log('Got ' + req.status + ': ' + req.responseText);
-        handleError.bind(this)();
+        handleError();
       }
-    }.bind(this);
-    req.onerror = handleError.bind(this);
+    };
+    req.onerror = () => handleError();
 
     req.open('POST', url, true);
     req.send();
@@ -189,7 +189,7 @@ class Updater {
       : this.MIN_RETRY_DELAY_MS;
     delayMs = Math.min(delayMs, this.MAX_RETRY_DELAY_MS);
     console.log('Scheduling retry in ' + delayMs + ' ms');
-    this.retryTimeoutId = window.setTimeout(this.doRetry.bind(this), delayMs);
+    this.retryTimeoutId = window.setTimeout(() => this.doRetry(), delayMs);
     this.lastRetryDelayMs = delayMs;
   }
 
@@ -202,7 +202,7 @@ class Updater {
       Object.keys(this.inProgressRatingsAndTags).length
     ) {
       this.retryTimeoutId = window.setTimeout(
-        this.doRetry.bind(this),
+        () => this.doRetry(),
         this.MIN_RETRY_DELAY_MS,
       );
       return;

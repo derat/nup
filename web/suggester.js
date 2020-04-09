@@ -12,21 +12,13 @@ class Suggester {
 
     textarea.addEventListener(
       'keydown',
-      this.handleTextareaKeyDown.bind(this),
+      e => this.handleTextareaKeyDown(e),
       false,
     );
-    textarea.addEventListener(
-      'focus',
-      this.handleTextareaFocus.bind(this),
-      false,
-    );
+    textarea.addEventListener('focus', e => this.handleTextareaFocus(e), false);
     textarea.spellcheck = false;
 
-    document.addEventListener(
-      'click',
-      this.handleDocumentClick.bind(this),
-      false,
-    );
+    document.addEventListener('click', e => this.handleDocumentClick(e), false);
   }
 
   setWords(words) {
@@ -138,7 +130,7 @@ class Suggester {
       span.innerText = words[i];
       span.addEventListener(
         'click',
-        this.handleSuggestionClick.bind(this, words[i]),
+        e => this.handleSuggestionClick(words[i], e),
         false,
       );
       div.appendChild(span);

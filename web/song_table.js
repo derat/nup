@@ -21,7 +21,7 @@ class SongTable {
       this.headingCheckbox_ = this.table_.rows[0].cells[0].children[0];
       this.headingCheckbox_.addEventListener(
         'click',
-        this.handleCheckboxClicked_.bind(this, this.headingCheckbox_),
+        e => this.handleCheckboxClicked_(this.headingCheckbox_, e),
         false,
       );
       this.checkedSongsChangedCallback_ = checkedSongsChangedCallback;
@@ -137,7 +137,7 @@ class SongTable {
       checkbox.checked = 'checked';
       checkbox.addEventListener(
         'click',
-        this.handleCheckboxClicked_.bind(this, checkbox),
+        e => this.handleCheckboxClicked_(checkbox, e),
         false,
       );
       cell.appendChild(checkbox);
@@ -147,7 +147,7 @@ class SongTable {
     const artistLink = document.createElement('a');
     artistLink.addEventListener(
       'click',
-      this.handleArtistClicked_.bind(this, row),
+      () => this.handleArtistClicked_(row),
       false,
     );
     row.insertCell(-1).appendChild(artistLink);
@@ -159,7 +159,7 @@ class SongTable {
     const albumLink = document.createElement('a');
     albumLink.addEventListener(
       'click',
-      this.handleAlbumClicked_.bind(this, row),
+      () => this.handleAlbumClicked_(row),
       false,
     );
     row.insertCell(-1).appendChild(albumLink);
@@ -172,7 +172,7 @@ class SongTable {
   updateRow_(row, song) {
     row.song = song;
 
-    const updateCell = function(cell, text, updateChild) {
+    const updateCell = (cell, text, updateChild) => {
       (updateChild ? cell.children[0] : cell).innerText = text;
       updateTitleAttributeForTruncation(cell, text);
     };
@@ -207,9 +207,7 @@ class SongTable {
   // Handle one of the checkboxes being clicked.
   handleCheckboxClicked_(checkbox, e) {
     const table = this.table_;
-    const getCheckbox = function(index) {
-      return table.rows[index].cells[0].children[0];
-    };
+    const getCheckbox = index => table.rows[index].cells[0].children[0];
     let index = -1;
     for (let i = 0; i < table.rows.length; i++) {
       if (checkbox == getCheckbox(i)) {

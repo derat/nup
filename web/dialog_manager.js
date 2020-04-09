@@ -11,11 +11,7 @@ class DialogManager {
     const lightbox = document.createElement('div');
     this.lightbox = lightbox;
     lightbox.className = 'dialogLightbox';
-    lightbox.addEventListener(
-      'click',
-      this.handleLightboxClick_.bind(this),
-      false,
-    );
+    lightbox.addEventListener('click', e => e.stopPropagation(), false);
     document.body.insertBefore(lightbox, document.body.firstChild);
 
     const outerContainer = document.createElement('div');
@@ -43,9 +39,7 @@ class DialogManager {
     const dialog = createElement('span', 'dialog', this.innerContainer);
     if (this.getNumDialogs() == 1) {
       this.lightbox.style.display = 'block';
-      this.listeners.forEach(function(v) {
-        v(true);
-      }, this);
+      this.listeners.forEach(v => v(true), this);
     }
     return dialog;
   }
@@ -54,9 +48,7 @@ class DialogManager {
     this.innerContainer.removeChild(dialog);
     if (this.getNumDialogs() == 0) {
       this.lightbox.style.display = 'none';
-      this.listeners.forEach(function(v) {
-        v(false);
-      }, this);
+      this.listeners.forEach(v => v(false), this);
     }
   }
 
@@ -64,7 +56,13 @@ class DialogManager {
     const dialog = this.createDialog();
     dialog.addEventListener(
       'keydown',
-      this.handleMessageDialogKeyDown_.bind(this, dialog),
+      e => {
+        if (e.keyCode == 27) {
+          // escape
+          e.preventDefault();
+          this.closeDialog(dialog);
+        }
+      },
       false,
     );
 
@@ -76,27 +74,7 @@ class DialogManager {
     const button = createElement('input', '', container);
     button.type = 'button';
     button.value = 'OK';
-    button.addEventListener(
-      'click',
-      this.handleMessageDialogButtonClick_.bind(this, dialog),
-      false,
-    );
+    button.addEventListener('click', () => this.closeDialog(dialog), false);
     button.focus();
-  }
-
-  handleMessageDialogButtonClick_(dialog, e) {
-    this.closeDialog(dialog);
-  }
-
-  handleMessageDialogKeyDown_(dialog, e) {
-    if (e.keyCode == 27) {
-      // escape
-      e.preventDefault();
-      this.closeDialog(dialog);
-    }
-  }
-
-  handleLightboxClick_(e) {
-    e.stopPropagation();
   }
 }

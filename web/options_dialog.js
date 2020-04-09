@@ -32,15 +32,17 @@ class OptionsDialog {
 
     this.volumeRange.addEventListener(
       'input',
-      this.handleVolumeRangeInput.bind(this),
+      () => {
+        const volume = this.volumeRange.value;
+        this.config.setVolume(volume);
+        this.updateVolumeSpan(volume);
+      },
       false,
     );
-    $('optionsOkButton').addEventListener(
-      'click',
-      this.handleOkButtonClick.bind(this),
-      false,
-    );
-    this.keyListener = this.handleBodyKeyDown.bind(this);
+
+    $('optionsOkButton').addEventListener('click', () => this.close(), false);
+
+    this.keyListener = e => this.handleBodyKeyDown(e);
     document.body.addEventListener('keydown', this.keyListener, false);
   }
 
@@ -54,16 +56,6 @@ class OptionsDialog {
 
   updateVolumeSpan(volume) {
     this.volumeSpan.innerText = parseInt(volume * 100) + '%';
-  }
-
-  handleVolumeRangeInput(e) {
-    const volume = this.volumeRange.value;
-    this.config.setVolume(volume);
-    this.updateVolumeSpan(volume);
-  }
-
-  handleOkButtonClick(e) {
-    this.close();
   }
 
   handleBodyKeyDown(e) {
