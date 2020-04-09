@@ -1,4 +1,4 @@
-// Copyright 2011 Daniel Erat <dan@erat.org>
+// Copyright 2011 Daniel Erat.
 // All rights reserved.
 
 class DialogManager {
@@ -62,7 +62,7 @@ class DialogManager {
       false,
     );
 
-    addClassName(dialog, 'messageDialog');
+    dialog.classList.add('messageDialog');
     createElement('div', 'title', dialog, titleText);
     createElement('hr', 'title', dialog);
     createElement('div', 'message', dialog, messageText);

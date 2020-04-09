@@ -8,7 +8,7 @@ class Suggester {
     this.words = words;
     this.tabAdvancesFocus = tabAdvancesFocus;
 
-    addClassName(this.suggestionsDiv, 'suggestions');
+    this.suggestionsDiv.classList.add('suggestions');
 
     textarea.addEventListener(
       'keydown',
@@ -136,10 +136,10 @@ class Suggester {
       div.appendChild(span);
     }
 
-    addClassName(this.suggestionsDiv, 'shown');
+    this.suggestionsDiv.classList.add('shown');
   }
 
   hideSuggestions() {
-    removeClassName(this.suggestionsDiv, 'shown');
+    this.suggestionsDiv.classList.remove('shown');
   }
 }

@@ -1,3 +1,6 @@
+// Copyright 2020 Daniel Erat.
+// All rights reserved.
+
 function $(id) {
   return document.getElementById(id);
 }
@@ -26,22 +29,6 @@ function createElement(type, className, parentElement, text) {
   parentElement.appendChild(element);
   if (text != null) element.appendChild(document.createTextNode(text));
   return element;
-}
-
-function createClassNameRegExp(className) {
-  return new RegExp('(^|\\s+)' + className + '($|\\s+)');
-}
-
-function addClassName(element, className) {
-  const re = createClassNameRegExp(className);
-  if (!element.className.match(re)) {
-    element.className += ' ' + className;
-  }
-}
-
-function removeClassName(element, className) {
-  const re = createClassNameRegExp(className);
-  element.className = element.className.replace(re, ' ');
 }
 
 const KeyCodes = {

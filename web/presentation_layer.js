@@ -1,4 +1,4 @@
-// Copyright 2017 Daniel Erat <dan@erat.org>
+// Copyright 2017 Daniel Erat.
 // All rights reserved.
 
 class PresentationLayer {
@@ -69,13 +69,13 @@ class PresentationLayer {
   }
 
   show() {
-    addClassName(document.body, 'presenting');
+    document.body.classList.add('presenting');
     this.overlay.className = 'shown';
     this.shown = true;
   }
 
   hide() {
-    removeClassName(document.body, 'presenting');
+    document.body.classList.remove('presenting');
     this.overlay.className = '';
     this.shown = false;
   }
