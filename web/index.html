@@ -10,14 +10,14 @@
       rel="icon"
     />
     <link href="presentation_layer.css" rel="stylesheet" type="text/css" />
-    <link href="song_table.css" rel="stylesheet" type="text/css" />
     <link href="suggester.css" rel="stylesheet" type="text/css" />
     <link href="dialog_manager.css" rel="stylesheet" type="text/css" />
     <link href="playlist.css" rel="stylesheet" type="text/css" />
     <link href="options_dialog.css" rel="stylesheet" type="text/css" />
     <link href="player.css" rel="stylesheet" type="text/css" />
     <link href="index.css" rel="stylesheet" type="text/css" />
-    <script src="index.js" type="module"></script>
+    <script src="song_table.js" type="module"></script>
+    <script src="index.js" type="module" defer></script>
   </head>
 
   <body>
@@ -101,14 +101,7 @@
           <div id="editTagsSuggestionsDiv"></div>
         </div>
 
-        <table class="songTable" id="playlistTable">
-          <tr>
-            <th class="artist">Artist</th>
-            <th class="title">Title</th>
-            <th class="album">Album</th>
-            <th class="time">Time</th>
-          </tr>
-        </table>
+        <song-table id="playlistTable" />
       </div>
 
       <div id="centerDivider"></div>
@@ -277,17 +270,7 @@
           />
         </div>
 
-        <table class="songTable" id="searchResultsTable">
-          <tr>
-            <th class="checkbox">
-              <input id="searchResultsCheckbox" type="checkbox" />
-            </th>
-            <th class="artist">Artist</th>
-            <th class="title">Title</th>
-            <th class="album">Album</th>
-            <th class="time">Time</th>
-          </tr>
-        </table>
+        <song-table id="searchResultsTable" use-checkboxes />
       </div>
     </div>
 

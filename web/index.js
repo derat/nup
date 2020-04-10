@@ -7,10 +7,8 @@ import Player from './player.js';
 import Playlist from './playlist.js';
 import PresentationLayer from './presentation_layer.js';
 
-window.addEventListener('DOMContentLoaded', () => {
-  document.config = new Config();
-  document.dialogManager = new DialogManager();
-  document.presentationLayer = new PresentationLayer();
-  document.player = new Player();
-  document.playlist = new Playlist(document.player);
-});
+document.config = new Config();
+document.dialogManager = new DialogManager();
+document.presentationLayer = new PresentationLayer();
+document.player = new Player();
+document.playlist = new Playlist(document.player);

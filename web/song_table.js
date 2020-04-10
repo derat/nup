@@ -1,34 +1,58 @@
 // Copyright 2014 Daniel Erat.
 // All rights reserved.
 
-import {formatTime, updateTitleAttributeForTruncation} from './common.js';
+import {
+  createElement,
+  formatTime,
+  updateTitleAttributeForTruncation,
+} from './common.js';
 
-export default class SongTable {
-  constructor(
-    table,
-    useCheckboxes,
-    artistClickedCallback,
-    albumClickedCallback,
-    checkedSongsChangedCallback,
-  ) {
-    this.table_ = table;
-    this.useCheckboxes_ = useCheckboxes;
-    this.artistClickedCallback_ = artistClickedCallback;
-    this.albumClickedCallback_ = albumClickedCallback;
+class SongTable extends HTMLElement {
+  constructor() {
+    super();
 
-    // Index of the last-clicked checkbox (0 is header).
-    this.lastClickedCheckboxIndex_ = -1;
+    this.useCheckboxes_ = this.hasAttribute('use-checkboxes');
+    this.lastClickedCheckboxIndex_ = -1; // 0 is header
 
-    if (useCheckboxes) {
-      this.headingCheckbox_ = this.table_.rows[0].cells[0].children[0];
+    // Needed to e.g. let a margin be set on the custom element.
+    this.style.display = 'block';
+
+    this.shadow_ = this.attachShadow({mode: 'open'});
+
+    const link = document.createElement('link');
+    link.setAttribute('rel', 'stylesheet');
+    link.setAttribute('href', 'song_table.css');
+    this.shadow_.appendChild(link);
+
+    this.table_ = document.createElement('table');
+    const row = createElement('tr', undefined, this.table_.createTHead());
+    if (this.useCheckboxes_) {
+      const th = createElement('th', 'checkbox', row);
+      this.headingCheckbox_ = createElement('input', undefined, th);
+      this.headingCheckbox_.type = 'checkbox';
       this.headingCheckbox_.addEventListener(
         'click',
         e => this.handleCheckboxClicked_(this.headingCheckbox_, e),
         false,
       );
-      this.checkedSongsChangedCallback_ = checkedSongsChangedCallback;
       this.numCheckedSongs_ = 0;
     }
+    createElement('th', 'artist', row, 'Artist');
+    createElement('th', 'title', row, 'Title');
+    createElement('th', 'album', row, 'Album');
+    createElement('th', 'time', row, 'Time');
+
+    this.shadow_.appendChild(this.table_);
+  }
+
+  setArtistClickedCallback(cb) {
+    this.artistClickedCallback_ = cb;
+  }
+  setAlbumClickedCallback(cb) {
+    this.albumClickedCallback_ = cb;
+  }
+  setCheckedSongsChangedCallback(cb) {
+    this.checkedSongsChangedCallback_ = cb;
   }
 
   getNumSongs() {
@@ -132,9 +156,9 @@ export default class SongTable {
   initRow_(row) {
     // Checkbox.
     if (this.useCheckboxes_) {
-      const cell = row.insertCell(-1);
+      const cell = row.insertCell();
       cell.className = 'checkbox';
-      const checkbox = document.createElement('input');
+      const checkbox = createElement('input', undefined, cell);
       checkbox.type = 'checkbox';
       checkbox.checked = 'checked';
       checkbox.addEventListener(
@@ -142,32 +166,20 @@ export default class SongTable {
         e => this.handleCheckboxClicked_(checkbox, e),
         false,
       );
-      cell.appendChild(checkbox);
     }
 
-    // Artist.
-    const artistLink = document.createElement('a');
-    artistLink.addEventListener(
+    createElement('a', undefined, row.insertCell()).addEventListener(
       'click',
       () => this.handleArtistClicked_(row),
       false,
-    );
-    row.insertCell(-1).appendChild(artistLink);
-
-    // Title.
-    row.insertCell(-1);
-
-    // Album.
-    const albumLink = document.createElement('a');
-    albumLink.addEventListener(
+    ); // artist
+    row.insertCell(); // title
+    createElement('a', undefined, row.insertCell()).addEventListener(
       'click',
       () => this.handleAlbumClicked_(row),
       false,
-    );
-    row.insertCell(-1).appendChild(albumLink);
-
-    // Time.
-    row.insertCell(-1).className = 'time';
+    ); // album
+    row.insertCell().className = 'time'; // time
   }
 
   // Update |row| to display data about |song|.
@@ -260,13 +272,12 @@ export default class SongTable {
   // Update the |headingCheckbox_|'s visual state for the current number of checked songs.
   updateHeadingCheckbox_() {
     const head = this.headingCheckbox_;
-    if (this.numCheckedSongs_ == 0) {
-      head.checked = null;
-      head.className = 'opaque';
-    } else {
-      head.checked = 'checked';
-      head.className =
-        this.numCheckedSongs_ == this.getNumSongs() ? 'opaque' : 'transparent';
-    }
+    head.checked = !this.numCheckedSongs_ ? null : 'checked';
+    head.className =
+      !this.numCheckedSongs_ || this.numCheckedSongs_ == this.getNumSongs()
+        ? ''
+        : 'transparent';
   }
 }
+
+customElements.define('song-table', SongTable);

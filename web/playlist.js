@@ -2,7 +2,6 @@
 // All rights reserved.
 
 import {$, getCurrentTimeSec, KeyCodes} from './common.js';
-import SongTable from './song_table.js';
 import Suggester from './suggester.js';
 
 export default class Playlist {
@@ -11,11 +10,12 @@ export default class Playlist {
     this.currentIndex = -1;
     this.request = null;
 
-    this.playlistTable = new SongTable(
-      $('playlistTable'),
-      false /* useCheckboxes */,
-      artist => this.resetSearchForm(artist, null, false),
-      album => this.resetSearchForm(null, album, false),
+    this.playlistTable = $('playlistTable');
+    this.playlistTable.setArtistClickedCallback(artist =>
+      this.resetSearchForm(artist, null, false),
+    );
+    this.playlistTable.setAlbumClickedCallback(album =>
+      this.resetSearchForm(null, album, false),
     );
 
     this.rightPane = $('rightPane');
@@ -40,12 +40,15 @@ export default class Playlist {
     this.insertButton = $('insertButton');
     this.replaceButton = $('replaceButton');
 
-    this.searchResultsTable = new SongTable(
-      $('searchResultsTable'),
-      true /* useCheckboxes */,
-      artist => this.resetSearchForm(artist, null, false),
-      album => this.resetSearchForm(null, album, false),
-      () => this.handleCheckedSongsChanged_(),
+    this.searchResultsTable = $('searchResultsTable');
+    this.searchResultsTable.setArtistClickedCallback(artist =>
+      this.resetSearchForm(artist, null, false),
+    );
+    this.searchResultsTable.setAlbumClickedCallback(album =>
+      this.resetSearchForm(null, album, false),
+    );
+    this.searchResultsTable.setCheckedSongsChangedCallback(() =>
+      this.handleCheckedSongsChanged_(),
     );
 
     this.waitingDiv = $('waitingDiv');
