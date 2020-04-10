@@ -21,10 +21,14 @@ export default class Player {
   // Number of seconds that a notification is shown when the song changes.
   NOTIFICATION_SECONDS = 3;
 
-  constructor() {
+  constructor(config) {
+    this.config_ = config;
+    this.config_.addListener(this);
+    this.playlist_ = undefined;
+
     this.songs = [];
 
-    // Available tags.  Loaded from the server.
+    // Available tags. Loaded from the server.
     this.tags = [];
 
     // Index into |songs| of the track currently being played.
@@ -147,11 +151,13 @@ export default class Player {
       false,
     );
 
-    this.config = document.config;
-    this.config.addListener(this);
-    this.onVolumeChange(this.config.getVolume());
+    this.onVolumeChange(this.config_.getVolume());
 
     this.updateTagsFromServer(true /* async */);
+  }
+
+  setPlaylist(playlist) {
+    this.playlist_ = playlist;
   }
 
   updateTagsFromServer(async) {
@@ -232,7 +238,7 @@ export default class Player {
   updateTags(tags) {
     this.tags = tags.slice(0);
     this.tagSuggester.setWords(this.tags);
-    document.playlist.handleTagsUpdated(this.tags);
+    if (this.playlist_) this.playlist_.handleTagsUpdated(this.tags);
   }
 
   updateButtonState() {
@@ -491,7 +497,7 @@ export default class Player {
   }
 
   notifyPlaylistAboutSongChange() {
-    document.playlist.handleSongChange(this.currentIndex);
+    if (this.playlist_) this.playlist_.handleSongChange(this.currentIndex);
   }
 
   showUpdateDiv() {
@@ -596,7 +602,7 @@ export default class Player {
     if (this.optionsDialog) return;
 
     this.optionsDialog = new OptionsDialog(
-      this.config,
+      this.config_,
       this.dialogManager,
       () => {
         this.optionsDialog = null;

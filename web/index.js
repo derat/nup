@@ -5,6 +5,7 @@ import Config from './config.js';
 import Player from './player.js';
 import Playlist from './playlist.js';
 
-document.config = new Config();
-document.player = new Player();
-document.playlist = new Playlist(document.player);
+const config = new Config();
+const player = new Player(config);
+const playlist = new Playlist(player);
+player.setPlaylist(playlist);
