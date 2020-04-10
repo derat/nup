@@ -1,28 +1,82 @@
 // Copyright 2011 Daniel Erat.
 // All rights reserved.
 
-import {createElement, createShadow} from './common.js';
+import {$, createElement, createShadow, createTemplate} from './common.js';
+
+const template = createTemplate(`
+<style>
+.lightbox {
+  background-color: black;
+  display: none;
+  height: 100%;
+  opacity: 0.1;
+  pointer-events: auto;
+  position: fixed;
+  width: 100%;
+  z-index: 10;
+}
+.lightbox.shown {
+  display: block;
+}
+.outer-container {
+  display: table;
+  height: 100%;
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+  z-index: 11;
+}
+.inner-container {
+  display: table-cell;
+  text-align: center;
+  vertical-align: middle;
+}
+.dialog {
+  background-color: white;
+  border: solid 1px #aaa;
+  box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
+  -moz-box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
+  -webkit-box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
+  display: inline-block;
+  padding: 10px;
+  pointer-events: auto;
+  text-align: left;
+}
+.message-dialog {
+  width: 400px;
+}
+</style>
+<div id="lightbox" class="lightbox"></div>
+<div class="outer-container">
+  <div id="container" class="inner-container"></div>
+</div>
+`);
+
+const messageDialogTemplate = createTemplate(`
+<style>
+  @import 'dialog.css';
+  #message {
+    line-height: 18px;
+    margin-top: 10px;
+  }
+</style>
+<div id="title" class="title"></div>
+<hr class="title" />
+<div id="message"></div>
+<div class="button-container">
+  <button id="ok-button">OK</button>
+</div>
+`);
 
 class DialogManager extends HTMLElement {
   constructor() {
     super();
 
-    // TODO: Is there a better way to do this?
-    this.style.cssText = `
-      left: 0;
-      height: 100%;
-      pointer-events: none;
-      position: fixed;
-      top: 0;
-      width: 100%;
-      z-index: 10;
-    `;
-
-    this.shadow_ = createShadow(this, 'dialog-manager.css');
-    this.lightbox_ = createElement('div', 'lightbox', this.shadow_);
+    this.shadow_ = this.attachShadow({mode: 'open'});
+    this.shadow_.appendChild(template.content.cloneNode(true));
+    this.lightbox_ = $('lightbox', this.shadow_);
     this.lightbox_.addEventListener('click', e => e.stopPropagation(), false);
-    const outer = createElement('div', 'outer-container', this.shadow_);
-    this.container_ = createElement('div', 'inner-container', outer);
+    this.container_ = $('container', this.shadow_);
   }
 
   getNumDialogs() {
@@ -55,12 +109,11 @@ class DialogManager extends HTMLElement {
     );
 
     dialog.classList.add('message-dialog');
-    const shadow = createShadow(dialog, 'message-dialog.css');
-    createElement('div', 'title', shadow, titleText);
-    createElement('hr', 'title', shadow);
-    createElement('div', 'message', shadow, messageText);
-    const cont = createElement('div', 'button-container', shadow);
-    const button = createElement('button', undefined, cont, 'OK');
+    const shadow = dialog.attachShadow({mode: 'open'});
+    shadow.appendChild(messageDialogTemplate.content.cloneNode(true));
+    $('title', shadow).innerText = titleText;
+    $('message', shadow).innerText = messageText;
+    const button = $('ok-button', shadow);
     button.addEventListener('click', () => this.closeDialog(dialog), false);
     button.focus();
   }

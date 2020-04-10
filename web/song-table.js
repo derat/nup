@@ -2,11 +2,32 @@
 // All rights reserved.
 
 import {
+  $,
   createElement,
   createShadow,
+  createTemplate,
   formatTime,
   updateTitleAttributeForTruncation,
 } from './common.js';
+
+const tableTemplate = createTemplate(`
+<table id="table">
+  <thead>
+    <tr id="head-row">
+      <th class="artist">Artist</th>
+      <th class="title">Title</th>
+      <th class="album">Album</th>
+      <th class="time">Time</th>
+    </tr>
+  </thead>
+</table>
+`);
+
+const checkboxTemplate = createTemplate(`
+<th class="checkbox">
+  <input type="checkbox" id="head-checkbox" />
+</th>
+`);
 
 class SongTable extends HTMLElement {
   constructor() {
@@ -17,12 +38,13 @@ class SongTable extends HTMLElement {
 
     this.style.display = 'block';
     this.shadow_ = createShadow(this, 'song-table.css');
-    this.table_ = createElement('table', undefined, this.shadow_);
-    const row = createElement('tr', undefined, this.table_.createTHead());
+    this.shadow_.appendChild(tableTemplate.content.cloneNode(true));
+    this.table_ = $('table', this.shadow_);
+
     if (this.useCheckboxes_) {
-      const th = createElement('th', 'checkbox', row);
-      this.headingCheckbox_ = createElement('input', undefined, th);
-      this.headingCheckbox_.type = 'checkbox';
+      const tr = $('head-row', this.shadow_);
+      tr.insertBefore(checkboxTemplate.content.cloneNode(true), tr.firstChild);
+      this.headingCheckbox_ = $('head-checkbox', this.shadow_);
       this.headingCheckbox_.addEventListener(
         'click',
         e => this.handleCheckboxClicked_(this.headingCheckbox_, e),
@@ -30,10 +52,6 @@ class SongTable extends HTMLElement {
       );
       this.numCheckedSongs_ = 0;
     }
-    createElement('th', 'artist', row, 'Artist');
-    createElement('th', 'title', row, 'Title');
-    createElement('th', 'album', row, 'Album');
-    createElement('th', 'time', row, 'Time');
   }
 
   setArtistClickedCallback(cb) {

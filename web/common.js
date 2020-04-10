@@ -1,8 +1,8 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-export function $(id) {
-  return document.getElementById(id);
+export function $(id, root) {
+  return (root || document).getElementById(id);
 }
 
 function pad(num, width) {
@@ -40,6 +40,12 @@ export function createShadow(el, styleUrl) {
   shadow.appendChild(link);
 
   return shadow;
+}
+
+export function createTemplate(html) {
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  return template;
 }
 
 export const KeyCodes = {

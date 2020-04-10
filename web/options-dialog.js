@@ -1,7 +1,36 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
-import {$, createElement, createShadow, KeyCodes} from './common.js';
+import {
+  $,
+  createElement,
+  createShadow,
+  createTemplate,
+  KeyCodes,
+} from './common.js';
+
+const template = createTemplate(`
+<style>
+  @import 'dialog.css';
+  #volumeRange {
+    vertical-align: middle;
+  }
+  #volumeSpan {
+    display: inline-block;
+    width: 3em;
+  }
+</style>
+<div class="title">Options</div>
+<hr class="title" />
+<p>
+  <label for="volumeRange">Volume:</label>
+  <input id="volumeRange" type="range" min="0.0" max="1.0" step="0.1" />
+  <span id="volumeSpan"></span>
+</p>
+<div class="button-container">
+  <button id="ok-button">OK</button>
+</div>
+`);
 
 export default class OptionsDialog {
   constructor(config, manager, closeCallback) {
@@ -12,17 +41,10 @@ export default class OptionsDialog {
     const volume = this.config_.getVolume();
 
     this.container_ = this.manager_.createDialog();
-    this.shadow_ = createShadow(this.container_, 'options-dialog.css');
-    createElement('div', 'title', this.shadow_, 'Options');
-    createElement('hr', 'title', this.shadow_);
+    this.shadow_ = this.container_.attachShadow({mode: 'open'});
+    this.shadow_.appendChild(template.content.cloneNode(true));
 
-    const p = createElement('p', undefined, this.shadow_);
-    createElement('label', undefined, p, 'Volume:').for = 'volumeRange';
-    this.volumeRange_ = createElement('input', 'volume', p);
-    this.volumeRange_.type = 'range';
-    this.volumeRange_.min = '0.0';
-    this.volumeRange_.max = '1.0';
-    this.volumeRange_.step = '0.1';
+    this.volumeRange_ = $('volumeRange', this.shadow_);
     this.volumeRange_.value = volume;
     this.volumeRange_.addEventListener(
       'input',
@@ -33,11 +55,11 @@ export default class OptionsDialog {
       },
       false,
     );
-    this.volumeSpan_ = createElement('span', 'volume', p, '100%');
+
+    this.volumeSpan_ = $('volumeSpan', this.shadow_);
     this.updateVolumeSpan_(volume);
 
-    const cont = createElement('div', 'button-container', this.shadow_);
-    createElement('button', undefined, cont, 'OK').addEventListener(
+    $('ok-button', this.shadow_).addEventListener(
       'click',
       () => this.close(),
       false,
