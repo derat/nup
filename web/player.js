@@ -8,7 +8,7 @@ import {
   KeyCodes,
   updateTitleAttributeForTruncation,
 } from './common.js';
-import OptionsDialog from './options_dialog.js';
+import OptionsDialog from './options-dialog.js';
 import Updater from './updater.js';
 
 export default class Player {
@@ -66,7 +66,7 @@ export default class Player {
 
     this.updater = new Updater();
 
-    this.dialogManager = document.dialogManager;
+    this.dialogManager = $('dialogManager');
     this.presentationLayer = $('presentationLayer');
     this.presentationLayer.setPlayNextTrackFunction(() => this.cycleTrack(1));
     this.optionsDialog = null;
@@ -597,14 +597,11 @@ export default class Player {
 
     this.optionsDialog = new OptionsDialog(
       this.config,
-      this.dialogManager.createDialog(),
+      this.dialogManager,
+      () => {
+        this.optionsDialog = null;
+      },
     );
-    this.optionsDialog.setCloseCallback(() => this.closeOptions());
-  }
-
-  closeOptions() {
-    this.dialogManager.closeDialog(this.optionsDialog.getContainer());
-    this.optionsDialog = null;
   }
 
   processAccelerator(e) {

@@ -10,12 +10,11 @@
       rel="icon"
     />
 
-    <link href="dialog_manager.css" rel="stylesheet" type="text/css" />
     <link href="playlist.css" rel="stylesheet" type="text/css" />
-    <link href="options_dialog.css" rel="stylesheet" type="text/css" />
     <link href="player.css" rel="stylesheet" type="text/css" />
     <link href="index.css" rel="stylesheet" type="text/css" />
 
+    <script src="dialog-manager.js" type="module"></script>
     <script src="presentation-layer.js" type="module"></script>
     <script src="song-table.js" type="module"></script>
     <script src="tag-suggester.js" type="module"></script>
@@ -23,6 +22,7 @@
   </head>
 
   <body>
+    <dialog-manager id="dialogManager"></dialog-manager>
     <presentation-layer id="presentationLayer"></presentation-layer>
 
     <div id="playlistContainer">
@@ -74,7 +74,7 @@
           <tag-suggester id="editTagsSuggester" target-id="editTagsTextarea" />
         </div>
 
-        <song-table id="playlistTable" />
+        <song-table id="playlistTable"></song-table>
       </div>
 
       <div id="centerDivider"></div>
@@ -247,7 +247,7 @@
           />
         </div>
 
-        <song-table id="searchResultsTable" use-checkboxes />
+        <song-table id="searchResultsTable" use-checkboxes></song-table>
       </div>
     </div>
 

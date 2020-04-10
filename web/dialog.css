@@ -1,0 +1,24 @@
+/* Copyright 2020 Daniel Erat.
+ * All rights reserved. */
+
+div.title {
+  color: #36c;
+  font-size: 18px;
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+hr.title {
+  background-color: #aaa;
+  color: #aaa;
+  border: 0;
+  height: 1px;
+  margin-top: 4px 0;
+}
+
+div.button-container {
+  margin-top: 4px;
+  text-align: right;
+}

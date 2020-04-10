@@ -1,0 +1,9 @@
+/* Copyright 2020 Daniel Erat.
+ * All rights reserved. */
+
+@import 'dialog.css';
+
+div.message {
+  line-height: 18px;
+  margin-top: 10px;
+}

@@ -137,8 +137,7 @@ export default class Playlist {
       false,
     );
 
-    this.dialogManager = document.dialogManager;
-
+    this.dialogManager = $('dialogManager');
     this.tagSuggester = $('tagsInputSuggester');
 
     document.body.addEventListener(
