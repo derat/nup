@@ -1,7 +1,9 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
-class OptionsDialog {
+import {$, KeyCodes} from './common.js';
+
+export default class OptionsDialog {
   constructor(config, container) {
     this.config = config;
     this.container = container;

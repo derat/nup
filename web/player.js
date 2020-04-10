@@ -1,7 +1,18 @@
 // Copyright 2010 Daniel Erat.
 // All rights reserved.
 
-class Player {
+import {
+  $,
+  formatTime,
+  getCurrentTimeSec,
+  KeyCodes,
+  updateTitleAttributeForTruncation,
+} from './common.js';
+import OptionsDialog from './options_dialog.js';
+import Suggester from './suggester.js';
+import Updater from './updater.js';
+
+export default class Player {
   // Number of seconds that a seek operation should traverse.
   SEEK_SECONDS = 10;
 

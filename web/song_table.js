@@ -1,7 +1,9 @@
 // Copyright 2014 Daniel Erat.
 // All rights reserved.
 
-class SongTable {
+import {formatTime, updateTitleAttributeForTruncation} from './common.js';
+
+export default class SongTable {
   constructor(
     table,
     useCheckboxes,

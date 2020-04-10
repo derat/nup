@@ -1,7 +1,9 @@
 // Copyright 2011 Daniel Erat.
 // All rights reserved.
 
-class DialogManager {
+import {createElement} from './common.js';
+
+export default class DialogManager {
   constructor() {
     this.listeners = [];
     const lightbox = document.createElement('div');

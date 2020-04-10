@@ -1,7 +1,11 @@
 // Copyright 2010 Daniel Erat.
 // All rights reserved.
 
-class Playlist {
+import {$, getCurrentTimeSec, KeyCodes} from './common.js';
+import SongTable from './song_table.js';
+import Suggester from './suggester.js';
+
+export default class Playlist {
   constructor(player) {
     this.player = player;
     this.currentIndex = -1;

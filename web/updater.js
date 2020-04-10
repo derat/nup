@@ -1,7 +1,7 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
-class Updater {
+export default class Updater {
   QUEUED_PLAY_REPORTS_KEY = 'queued_play_reports';
   IN_PROGRESS_PLAY_REPORTS_KEY = 'in_progress_play_reports';
   QUEUED_RATINGS_AND_TAGS_KEY = 'queued_ratings_and_tags';

@@ -1,7 +1,9 @@
 // Copyright 2017 Daniel Erat.
 // All rights reserved.
 
-class PresentationLayer {
+import {$, formatTime} from './common.js';
+
+export default class PresentationLayer {
   constructor(nextTrackFunc) {
     this.overlay = $('presentationOverlay');
 

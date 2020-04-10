@@ -1,7 +1,7 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-function $(id) {
+export function $(id) {
   return document.getElementById(id);
 }
 
@@ -11,19 +11,19 @@ function pad(num, width) {
   return str;
 }
 
-function formatTime(sec) {
+export function formatTime(sec) {
   return parseInt(sec / 60) + ':' + pad(parseInt(sec % 60), 2);
 }
 
-function getCurrentTimeSec() {
+export function getCurrentTimeSec() {
   return new Date().getTime() / 1000.0;
 }
 
-function updateTitleAttributeForTruncation(element, text) {
+export function updateTitleAttributeForTruncation(element, text) {
   element.title = element.scrollWidth > element.offsetWidth ? text : '';
 }
 
-function createElement(type, className, parentElement, text) {
+export function createElement(type, className, parentElement, text) {
   const element = document.createElement(type);
   if (className) element.className = className;
   parentElement.appendChild(element);
@@ -31,7 +31,7 @@ function createElement(type, className, parentElement, text) {
   return element;
 }
 
-const KeyCodes = {
+export const KeyCodes = {
   ENTER: 13,
   ESCAPE: 27,
   LEFT: 37,

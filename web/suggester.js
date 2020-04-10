@@ -1,7 +1,9 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
-class Suggester {
+import {KeyCodes} from './common.js';
+
+export default class Suggester {
   constructor(textarea, suggestionsDiv, words, tabAdvancesFocus) {
     this.textarea = textarea;
     this.suggestionsDiv = suggestionsDiv;

@@ -1,7 +1,7 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
-class Config {
+export default class Config {
   VOLUME_KEY = 'volume';
 
   constructor() {
