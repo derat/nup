@@ -21,9 +21,11 @@ export default class Player {
   // Number of seconds that a notification is shown when the song changes.
   NOTIFICATION_SECONDS = 3;
 
-  constructor(config) {
+  constructor(config, dialogManager, presentationLayer) {
     this.config_ = config;
     this.config_.addListener(this);
+    this.dialogManager_ = dialogManager;
+    this.presentationLayer_ = presentationLayer;
     this.playlist_ = undefined;
 
     this.songs = [];
@@ -69,10 +71,7 @@ export default class Player {
     this.closeNotificationTimeoutId = 0;
 
     this.updater = new Updater();
-
-    this.dialogManager = $('dialogManager');
-    this.presentationLayer = $('presentationLayer');
-    this.presentationLayer.setPlayNextTrackFunction(() => this.cycleTrack(1));
+    this.presentationLayer_.setPlayNextTrackFunction(() => this.cycleTrack(1));
     this.optionsDialog = null;
 
     this.audio = $('audio');
@@ -330,7 +329,7 @@ export default class Player {
       nextSong = this.songs[this.currentIndex + 1];
     }
 
-    this.presentationLayer.updateSongs(this.getCurrentSong(), nextSong);
+    this.presentationLayer_.updateSongs(this.getCurrentSong(), nextSong);
   }
 
   getRatingString(rating, withLabel, includeEmpty) {
@@ -469,7 +468,7 @@ export default class Player {
       }
     }
 
-    this.presentationLayer.updatePosition(this.audio.currentTime);
+    this.presentationLayer_.updatePosition(this.audio.currentTime);
   }
 
   onError(e) {
@@ -603,7 +602,7 @@ export default class Player {
 
     this.optionsDialog = new OptionsDialog(
       this.config_,
-      this.dialogManager,
+      this.dialogManager_,
       () => {
         this.optionsDialog = null;
       },
@@ -611,7 +610,7 @@ export default class Player {
   }
 
   processAccelerator(e) {
-    if (this.dialogManager.getNumDialogs()) return false;
+    if (this.dialogManager_.getNumDialogs()) return false;
 
     if (e.altKey && e.keyCode == KeyCodes.D) {
       const song = this.getCurrentSong();
@@ -633,8 +632,8 @@ export default class Player {
       if (this.showUpdateDiv()) this.tagsTextarea.focus();
       return true;
     } else if (e.altKey && e.keyCode == KeyCodes.V) {
-      if (this.presentationLayer.isShown()) this.presentationLayer.hide();
-      else this.presentationLayer.show();
+      if (this.presentationLayer_.isShown()) this.presentationLayer_.hide();
+      else this.presentationLayer_.show();
       return true;
     } else if (e.keyCode == KeyCodes.SPACE && !this.updateSong) {
       this.togglePause();
@@ -644,9 +643,9 @@ export default class Player {
       return true;
     } else if (
       e.keyCode == KeyCodes.ESCAPE &&
-      this.presentationLayer.isShown()
+      this.presentationLayer_.isShown()
     ) {
-      this.presentationLayer.hide();
+      this.presentationLayer_.hide();
       return true;
     } else if (e.keyCode == KeyCodes.ESCAPE && this.updateSong) {
       this.hideUpdateDiv(false);

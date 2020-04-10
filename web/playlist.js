@@ -4,8 +4,9 @@
 import {$, getCurrentTimeSec, KeyCodes} from './common.js';
 
 export default class Playlist {
-  constructor(player) {
+  constructor(player, dialogManager) {
     this.player = player;
+    this.dialogManager_ = dialogManager;
     this.currentIndex = -1;
     this.request = null;
 
@@ -137,7 +138,6 @@ export default class Playlist {
       false,
     );
 
-    this.dialogManager = $('dialogManager');
     this.tagSuggester = $('tagsInputSuggester');
 
     document.body.addEventListener(
@@ -247,7 +247,7 @@ export default class Playlist {
     }
 
     if (!terms.length) {
-      this.dialogManager.createMessageDialog(
+      this.dialogManager_.createMessageDialog(
         'Invalid Search',
         'You must supply search terms.',
       );
@@ -268,19 +268,19 @@ export default class Playlist {
           this.searchResultsTable.setAllCheckboxes(true);
           if (appendToQueue) this.enqueueSearchResults(true, true);
         } else {
-          this.dialogManager.createMessageDialog(
+          this.dialogManager_.createMessageDialog(
             'Search Failed',
             'Response from server was empty.',
           );
         }
       } else {
         if (req.status && req.responseText) {
-          this.dialogManager.createMessageDialog(
+          this.dialogManager_.createMessageDialog(
             'Search Failed',
             'Got ' + req.status + ': ' + req.responseText,
           );
         } else {
-          this.dialogManager.createMessageDialog(
+          this.dialogManager_.createMessageDialog(
             'Search Failed',
             'Missing status in request.',
           );
@@ -292,7 +292,7 @@ export default class Playlist {
     };
 
     this.request.onerror = e => {
-      this.dialogManager.createMessageDialog(
+      this.dialogManager_.createMessageDialog(
         'Search Failed',
         'Request to server failed.',
       );
@@ -453,7 +453,7 @@ export default class Playlist {
   }
 
   processAccelerator_(e) {
-    if (this.dialogManager.getNumDialogs()) return false;
+    if (this.dialogManager_.getNumDialogs()) return false;
 
     if (e.keyCode == KeyCodes.SLASH) {
       this.keywordsInput.focus();
