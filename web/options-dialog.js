@@ -1,13 +1,7 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
-import {
-  $,
-  createElement,
-  createShadow,
-  createTemplate,
-  KeyCodes,
-} from './common.js';
+import {$, createShadow, createTemplate, KeyCodes} from './common.js';
 
 const template = createTemplate(`
 <style>
@@ -41,8 +35,7 @@ export default class OptionsDialog {
     const volume = this.config_.getVolume();
 
     this.container_ = this.manager_.createDialog();
-    this.shadow_ = this.container_.attachShadow({mode: 'open'});
-    this.shadow_.appendChild(template.content.cloneNode(true));
+    this.shadow_ = createShadow(this.container_, template);
 
     this.volumeRange_ = $('volumeRange', this.shadow_);
     this.volumeRange_.value = volume;

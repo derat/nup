@@ -104,11 +104,10 @@ class Page(object):
         self.driver.refresh()
 
     def reset(self):
-        self.driver.execute_script('document.playlist.resetForTesting()')
+        self.driver.execute_script('document.resetForTesting()')
 
     def refresh_tags(self):
-        self.driver.execute_script(
-            'document.player.updateTagsFromServer(false)');
+        self.driver.execute_script('document.updateTagsForTesting()');
 
     def get_songs_from_table(self, table):
         songs = []

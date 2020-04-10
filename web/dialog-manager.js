@@ -1,7 +1,7 @@
 // Copyright 2011 Daniel Erat.
 // All rights reserved.
 
-import {$, createElement, createShadow, createTemplate} from './common.js';
+import {$, createElement, createTemplate} from './common.js';
 
 const template = createTemplate(`
 <style>

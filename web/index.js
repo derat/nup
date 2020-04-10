@@ -12,3 +12,7 @@ const config = new Config();
 const player = new Player(config, dialogManager, $('presentationLayer'));
 const playlist = new Playlist(player, dialogManager);
 player.setPlaylist(playlist); // ugly circular dependency
+
+// Used by browser tests.
+document.resetForTesting = () => playlist.resetForTesting();
+document.updateTagsForTesting = () => player.updateTagsFromServer(false);

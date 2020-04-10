@@ -1,13 +1,7 @@
 // Copyright 2017 Daniel Erat.
 // All rights reserved.
 
-import {
-  $,
-  createElement,
-  createShadow,
-  createTemplate,
-  formatTime,
-} from './common.js';
+import {$, createShadow, createTemplate, formatTime} from './common.js';
 
 const template = createTemplate(`
 <style>
@@ -132,18 +126,16 @@ customElements.define(
 
       // TODO: Is there a better way to do this?
       this.style.cssText = `
-      background-color: black;
-      display: none;
-      font-family: Arial, Helvetica, sans-serif;
-      height: 100%;
-      position: absolute;
-      width: 100%;
-      z-index: 5;
-    `;
+        background-color: black;
+        display: none;
+        font-family: Arial, Helvetica, sans-serif;
+        height: 100%;
+        position: absolute;
+        width: 100%;
+        z-index: 5;
+      `;
 
-      this.shadow_ = this.attachShadow({mode: 'open'});
-      this.shadow_.appendChild(template.content.cloneNode(true));
-
+      this.shadow_ = createShadow(this, template);
       this.currentCover_ = $('current-cover', this.shadow_);
       this.currentArtist_ = $('current-artist', this.shadow_);
       this.currentTitle_ = $('current-title', this.shadow_);

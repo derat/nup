@@ -50,8 +50,7 @@ customElements.define(
       this.words_ = [];
 
       this.style.display = 'block';
-      this.shadow_ = this.attachShadow({mode: 'open'});
-      this.shadow_.appendChild(template.content.cloneNode(true));
+      this.shadow_ = createShadow(this, template);
       this.suggestionsDiv_ = $('suggestions', this.shadow_);
 
       const targetId = this.getAttribute('target-id');
@@ -161,8 +160,7 @@ customElements.define(
         if (div.childNodes.length > 0) {
           div.appendChild(document.createTextNode(' '));
         }
-        const span = document.createElement('span');
-        span.innerText = word;
+        const span = createElement('span', null, null, word);
         span.addEventListener(
           'click',
           () => {

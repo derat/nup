@@ -26,19 +26,14 @@ export function updateTitleAttributeForTruncation(element, text) {
 export function createElement(type, className, parentElement, text) {
   const element = document.createElement(type);
   if (className) element.className = className;
-  parentElement.appendChild(element);
+  if (parentElement) parentElement.appendChild(element);
   if (text != null) element.appendChild(document.createTextNode(text));
   return element;
 }
 
-export function createShadow(el, styleUrl) {
+export function createShadow(el, template) {
   const shadow = el.attachShadow({mode: 'open'});
-
-  const link = document.createElement('link');
-  link.setAttribute('rel', 'stylesheet');
-  link.setAttribute('href', styleUrl);
-  shadow.appendChild(link);
-
+  if (template) shadow.appendChild(template.content.cloneNode(true));
   return shadow;
 }
 
