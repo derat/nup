@@ -68,55 +68,56 @@ const messageDialogTemplate = createTemplate(`
 </div>
 `);
 
-class DialogManager extends HTMLElement {
-  constructor() {
-    super();
+customElements.define(
+  'dialog-manager',
+  class extends HTMLElement {
+    constructor() {
+      super();
 
-    this.shadow_ = this.attachShadow({mode: 'open'});
-    this.shadow_.appendChild(template.content.cloneNode(true));
-    this.lightbox_ = $('lightbox', this.shadow_);
-    this.lightbox_.addEventListener('click', e => e.stopPropagation(), false);
-    this.container_ = $('container', this.shadow_);
-  }
+      this.shadow_ = this.attachShadow({mode: 'open'});
+      this.shadow_.appendChild(template.content.cloneNode(true));
+      this.lightbox_ = $('lightbox', this.shadow_);
+      this.lightbox_.addEventListener('click', e => e.stopPropagation(), false);
+      this.container_ = $('container', this.shadow_);
+    }
 
-  getNumDialogs() {
-    return this.container_.children.length;
-  }
+    getNumDialogs() {
+      return this.container_.children.length;
+    }
 
-  createDialog() {
-    const dialog = createElement('span', 'dialog', this.container_);
-    if (this.getNumDialogs() == 1) this.lightbox_.classList.add('shown');
-    return dialog;
-  }
+    createDialog() {
+      const dialog = createElement('span', 'dialog', this.container_);
+      if (this.getNumDialogs() == 1) this.lightbox_.classList.add('shown');
+      return dialog;
+    }
 
-  closeDialog(dialog) {
-    this.container_.removeChild(dialog);
-    if (!this.getNumDialogs()) this.lightbox_.classList.remove('shown');
-  }
+    closeDialog(dialog) {
+      this.container_.removeChild(dialog);
+      if (!this.getNumDialogs()) this.lightbox_.classList.remove('shown');
+    }
 
-  createMessageDialog(titleText, messageText) {
-    const dialog = this.createDialog();
-    dialog.addEventListener(
-      'keydown',
-      e => {
-        if (e.keyCode == 27) {
-          // escape
-          e.preventDefault();
-          this.closeDialog(dialog);
-        }
-      },
-      false,
-    );
+    createMessageDialog(titleText, messageText) {
+      const dialog = this.createDialog();
+      dialog.addEventListener(
+        'keydown',
+        e => {
+          if (e.keyCode == 27) {
+            // escape
+            e.preventDefault();
+            this.closeDialog(dialog);
+          }
+        },
+        false,
+      );
 
-    dialog.classList.add('message-dialog');
-    const shadow = dialog.attachShadow({mode: 'open'});
-    shadow.appendChild(messageDialogTemplate.content.cloneNode(true));
-    $('title', shadow).innerText = titleText;
-    $('message', shadow).innerText = messageText;
-    const button = $('ok-button', shadow);
-    button.addEventListener('click', () => this.closeDialog(dialog), false);
-    button.focus();
-  }
-}
-
-customElements.define('dialog-manager', DialogManager);
+      dialog.classList.add('message-dialog');
+      const shadow = dialog.attachShadow({mode: 'open'});
+      shadow.appendChild(messageDialogTemplate.content.cloneNode(true));
+      $('title', shadow).innerText = titleText;
+      $('message', shadow).innerText = messageText;
+      const button = $('ok-button', shadow);
+      button.addEventListener('click', () => this.closeDialog(dialog), false);
+      button.focus();
+    }
+  },
+);

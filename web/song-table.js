@@ -29,7 +29,7 @@ const checkboxTemplate = createTemplate(`
 </th>
 `);
 
-class SongTable extends HTMLElement {
+customElements.define('song-table', class extends HTMLElement {
   constructor() {
     super();
 
@@ -287,6 +287,4 @@ class SongTable extends HTMLElement {
         ? ''
         : 'transparent';
   }
-}
-
-customElements.define('song-table', SongTable);
+});
