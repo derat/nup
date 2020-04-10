@@ -30,12 +30,12 @@ export default class Config {
 
   load() {
     if (!window.localStorage) return;
-    const volume = localStorage[Config.VOLUME_KEY];
+    const volume = localStorage[this.VOLUME_KEY];
     if (volume != null) this.volume = volume;
   }
 
   save() {
     if (!window.localStorage) return;
-    localStorage[Config.VOLUME_KEY] = this.volume;
+    localStorage[this.VOLUME_KEY] = this.volume;
   }
 }

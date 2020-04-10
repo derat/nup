@@ -102,9 +102,9 @@ export default class Player {
       ms.setActionHandler('play', () => this.play());
       ms.setActionHandler('pause', () => this.pause());
       ms.setActionHandler('seekbackward', () =>
-        this.seek(-Player.SEEK_SECONDS),
+        this.seek(-this.SEEK_SECONDS),
       );
-      ms.setActionHandler('seekforward', () => this.seek(Player.SEEK_SECONDS));
+      ms.setActionHandler('seekforward', () => this.seek(this.SEEK_SECONDS));
       ms.setActionHandler('previoustrack', () => this.cycleTrack(-1));
       ms.setActionHandler('nexttrack', () => this.cycleTrack(1));
     }
@@ -372,7 +372,7 @@ export default class Player {
     });
     this.closeNotificationTimeoutId = window.setTimeout(
       () => this.closeNotification(),
-      Player.NOTIFICATION_SECONDS * 1000,
+      this.NOTIFICATION_SECONDS * 1000,
     );
   }
 
@@ -485,7 +485,7 @@ export default class Player {
       case error.MEDIA_ERR_NETWORK: // 2
       case error.MEDIA_ERR_DECODE: // 3
       case error.MEDIA_ERR_SRC_NOT_SUPPORTED: // 4
-        if (this.numErrors <= Player.MAX_RETRIES) {
+        if (this.numErrors <= this.MAX_RETRIES) {
           console.log('Retrying from position ' + this.lastPositionSec);
           this.audio.load();
           this.audio.currentTime = this.lastPositionSec;
