@@ -67,7 +67,7 @@ export default class Player {
     this.updater = new Updater();
 
     this.dialogManager = document.dialogManager;
-    this.presentationLayer = document.presentationLayer;
+    this.presentationLayer = $('presentationLayer');
     this.presentationLayer.setPlayNextTrackFunction(() => this.cycleTrack(1));
     this.optionsDialog = null;
 

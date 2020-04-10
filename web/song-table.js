@@ -3,6 +3,7 @@
 
 import {
   createElement,
+  createShadow,
   formatTime,
   updateTitleAttributeForTruncation,
 } from './common.js';
@@ -14,17 +15,9 @@ class SongTable extends HTMLElement {
     this.useCheckboxes_ = this.hasAttribute('use-checkboxes');
     this.lastClickedCheckboxIndex_ = -1; // 0 is header
 
-    // Needed to e.g. let a margin be set on the custom element.
     this.style.display = 'block';
-
-    this.shadow_ = this.attachShadow({mode: 'open'});
-
-    const link = document.createElement('link');
-    link.setAttribute('rel', 'stylesheet');
-    link.setAttribute('href', 'song-table.css');
-    this.shadow_.appendChild(link);
-
-    this.table_ = document.createElement('table');
+    this.shadow_ = createShadow(this, 'song-table.css');
+    this.table_ = createElement('table', undefined, this.shadow_);
     const row = createElement('tr', undefined, this.table_.createTHead());
     if (this.useCheckboxes_) {
       const th = createElement('th', 'checkbox', row);
@@ -41,8 +34,6 @@ class SongTable extends HTMLElement {
     createElement('th', 'title', row, 'Title');
     createElement('th', 'album', row, 'Album');
     createElement('th', 'time', row, 'Time');
-
-    this.shadow_.appendChild(this.table_);
   }
 
   setArtistClickedCallback(cb) {

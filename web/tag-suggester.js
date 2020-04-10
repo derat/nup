@@ -1,7 +1,7 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
-import {$, createElement, KeyCodes} from './common.js';
+import {$, createElement, createShadow, KeyCodes} from './common.js';
 
 class TagSuggester extends HTMLElement {
   constructor() {
@@ -12,11 +12,7 @@ class TagSuggester extends HTMLElement {
     this.tabAdvancesFocus = this.hasAttribute('tab-advances-focus');
     this.words = [];
 
-    this.shadow_ = this.attachShadow({mode: 'open'});
-    const link = document.createElement('link');
-    link.setAttribute('rel', 'stylesheet');
-    link.setAttribute('href', 'tag-suggester.css');
-    this.shadow_.appendChild(link);
+    this.shadow_ = createShadow(this, 'tag-suggester.css');
     this.suggestionsDiv = createElement('div', 'suggestions', this.shadow_);
 
     const targetId = this.getAttribute('target-id');

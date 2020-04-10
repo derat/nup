@@ -10,49 +10,20 @@
       rel="icon"
     />
 
-    <link href="presentation_layer.css" rel="stylesheet" type="text/css" />
     <link href="dialog_manager.css" rel="stylesheet" type="text/css" />
     <link href="playlist.css" rel="stylesheet" type="text/css" />
     <link href="options_dialog.css" rel="stylesheet" type="text/css" />
     <link href="player.css" rel="stylesheet" type="text/css" />
     <link href="index.css" rel="stylesheet" type="text/css" />
 
+    <script src="presentation-layer.js" type="module"></script>
     <script src="song-table.js" type="module"></script>
     <script src="tag-suggester.js" type="module"></script>
     <script src="index.js" type="module" defer></script>
   </head>
 
   <body>
-    <div id="presentationOverlay">
-      <div id="presentationLeft">
-        <img id="presentationCurrentCoverImg" />
-      </div>
-      <div id="presentationRight">
-        <div id="presentationCurrentText">
-          <div id="presentationCurrentArtist" class="artist"></div>
-          <div id="presentationCurrentTitle" class="title"></div>
-          <div id="presentationCurrentAlbum" class="album"></div>
-          <div id="presentationProgressBorder">
-            <div id="presentationProgressBar"></div>
-          </div>
-          <div id="presentationProgressTimes">
-            <div id="presentationTime"></div>
-            <div id="presentationDuration"></div>
-          </div>
-        </div>
-        <div id="presentationNextDiv">
-          <div id="presentationNextHeading">Next</div>
-          <div id="presentationNextDetails">
-            <img id="presentationNextCover" />
-            <div id="presentationNextText">
-              <div id="presentationNextArtist" class="artist"></div>
-              <div id="presentationNextTitle" class="title"></div>
-              <div id="presentationNextAlbum" class="album"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <presentation-layer id="presentationLayer"></presentation-layer>
 
     <div id="playlistContainer">
       <div id="leftPane">

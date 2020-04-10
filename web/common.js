@@ -31,6 +31,17 @@ export function createElement(type, className, parentElement, text) {
   return element;
 }
 
+export function createShadow(el, styleUrl) {
+  const shadow = el.attachShadow({mode: 'open'});
+
+  const link = document.createElement('link');
+  link.setAttribute('rel', 'stylesheet');
+  link.setAttribute('href', styleUrl);
+  shadow.appendChild(link);
+
+  return shadow;
+}
+
 export const KeyCodes = {
   ENTER: 13,
   ESCAPE: 27,
