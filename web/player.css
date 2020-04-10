@@ -1,6 +1,7 @@
 body {
   margin: 0;
-  font-family: Verdana, "DejaVu Sans", Arial, Helvetica, "Liberation Sans", sans-serif;
+  font-family: Verdana, 'DejaVu Sans', Arial, Helvetica, 'Liberation Sans',
+    sans-serif;
   font-size: 12px;
 }
 
@@ -122,7 +123,7 @@ a.debugLink {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-#editTagsSuggestionsDiv {
+#editTagsSuggester {
   position: absolute;
   left: 4px;
   bottom: 52px;

@@ -1,24 +1,32 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
-import {KeyCodes} from './common.js';
+import {$, createElement, KeyCodes} from './common.js';
 
-export default class Suggester {
-  constructor(textarea, suggestionsDiv, words, tabAdvancesFocus) {
-    this.textarea = textarea;
-    this.suggestionsDiv = suggestionsDiv;
-    this.words = words;
-    this.tabAdvancesFocus = tabAdvancesFocus;
+class TagSuggester extends HTMLElement {
+  constructor() {
+    super();
 
-    this.suggestionsDiv.classList.add('suggestions');
+    this.style.display = 'block';
 
-    textarea.addEventListener(
-      'keydown',
-      e => this.handleTextareaKeyDown(e),
-      false,
-    );
-    textarea.addEventListener('focus', e => this.handleTextareaFocus(e), false);
-    textarea.spellcheck = false;
+    this.tabAdvancesFocus = this.hasAttribute('tab-advances-focus');
+    this.words = [];
+
+    this.shadow_ = this.attachShadow({mode: 'open'});
+    const link = document.createElement('link');
+    link.setAttribute('rel', 'stylesheet');
+    link.setAttribute('href', 'tag-suggester.css');
+    this.shadow_.appendChild(link);
+    this.suggestionsDiv = createElement('div', 'suggestions', this.shadow_);
+
+    const targetId = this.getAttribute('target-id');
+    this.target = $(targetId);
+    if (!this.target) {
+      throw new Error(`Unable to find target element "${targetId}"`);
+    }
+    this.target.addEventListener('keydown', e => this.handleKeyDown(e), false);
+    this.target.addEventListener('focus', e => this.handleFocus(e), false);
+    this.target.spellcheck = false;
 
     document.addEventListener('click', e => this.handleDocumentClick(e), false);
   }
@@ -36,13 +44,13 @@ export default class Suggester {
   }
 
   getTextParts() {
-    const text = this.textarea.value;
+    const text = this.target.value;
     const res = {};
 
-    res.wordStart = this.textarea.selectionStart;
+    res.wordStart = this.target.selectionStart;
     while (res.wordStart > 0 && text[res.wordStart - 1] != ' ') res.wordStart--;
 
-    res.wordEnd = this.textarea.selectionStart;
+    res.wordEnd = this.target.selectionStart;
     while (res.wordEnd < text.length && text[res.wordEnd] != ' ') res.wordEnd++;
 
     res.word = text.substring(res.wordStart, res.wordEnd);
@@ -52,7 +60,7 @@ export default class Suggester {
     return res;
   }
 
-  handleTextareaKeyDown(e) {
+  handleKeyDown(e) {
     this.hideSuggestions();
 
     if (e.keyCode != KeyCodes.TAB) return;
@@ -68,13 +76,13 @@ export default class Suggester {
 
       const text =
         parts.before + word + (parts.after.length == 0 ? ' ' : parts.after);
-      this.textarea.value = text;
+      this.target.value = text;
 
       let nextWordStart = parts.wordStart + word.length;
       while (nextWordStart < text.length && text[nextWordStart] == ' ') {
         nextWordStart++;
       }
-      this.textarea.selectionStart = this.textarea.selectionEnd = nextWordStart;
+      this.target.selectionStart = this.target.selectionEnd = nextWordStart;
     } else if (matchingWords.length > 1) {
       let longestSharedPrefix = parts.word;
       for (
@@ -91,8 +99,8 @@ export default class Suggester {
         } else break;
       }
 
-      this.textarea.value = parts.before + longestSharedPrefix + parts.after;
-      this.textarea.selectionStart = this.textarea.selectionEnd =
+      this.target.value = parts.before + longestSharedPrefix + parts.after;
+      this.target.selectionStart = this.target.selectionEnd =
         parts.before.length + longestSharedPrefix.length;
       this.showSuggestions(matchingWords.sort());
     }
@@ -101,12 +109,12 @@ export default class Suggester {
     e.stopPropagation();
   }
 
-  handleTextareaFocus(e) {
-    const text = this.textarea.value;
+  handleFocus(e) {
+    const text = this.target.value;
     if (text.length > 0 && text[text.length - 1] != ' ') {
-      this.textarea.value += ' ';
+      this.target.value += ' ';
     }
-    this.textarea.selectionStart = this.textarea.selectionEnd = this.textarea.value.length;
+    this.target.selectionStart = this.target.selectionEnd = this.target.value.length;
   }
 
   handleDocumentClick(e) {
@@ -116,8 +124,8 @@ export default class Suggester {
   handleSuggestionClick(word, e) {
     this.hideSuggestions();
     const parts = this.getTextParts();
-    this.textarea.value = parts.before + word + parts.after;
-    this.textarea.focus();
+    this.target.value = parts.before + word + parts.after;
+    this.target.focus();
   }
 
   showSuggestions(words) {
@@ -145,3 +153,5 @@ export default class Suggester {
     this.suggestionsDiv.classList.remove('shown');
   }
 }
+
+customElements.define('tag-suggester', TagSuggester);

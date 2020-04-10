@@ -9,7 +9,6 @@ import {
   updateTitleAttributeForTruncation,
 } from './common.js';
 import OptionsDialog from './options_dialog.js';
-import Suggester from './suggester.js';
 import Updater from './updater.js';
 
 export default class Player {
@@ -101,9 +100,7 @@ export default class Player {
       const ms = navigator.mediaSession;
       ms.setActionHandler('play', () => this.play());
       ms.setActionHandler('pause', () => this.pause());
-      ms.setActionHandler('seekbackward', () =>
-        this.seek(-this.SEEK_SECONDS),
-      );
+      ms.setActionHandler('seekbackward', () => this.seek(-this.SEEK_SECONDS));
       ms.setActionHandler('seekforward', () => this.seek(this.SEEK_SECONDS));
       ms.setActionHandler('previoustrack', () => this.cycleTrack(-1));
       ms.setActionHandler('nexttrack', () => this.cycleTrack(1));
@@ -137,12 +134,7 @@ export default class Player {
       false,
     );
 
-    this.tagSuggester = new Suggester(
-      this.tagsTextarea,
-      $('editTagsSuggestionsDiv'),
-      [],
-      false,
-    );
+    this.tagSuggester = $('editTagsSuggester');
 
     document.body.addEventListener(
       'keydown',

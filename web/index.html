@@ -9,14 +9,16 @@
       type="image/png"
       rel="icon"
     />
+
     <link href="presentation_layer.css" rel="stylesheet" type="text/css" />
-    <link href="suggester.css" rel="stylesheet" type="text/css" />
     <link href="dialog_manager.css" rel="stylesheet" type="text/css" />
     <link href="playlist.css" rel="stylesheet" type="text/css" />
     <link href="options_dialog.css" rel="stylesheet" type="text/css" />
     <link href="player.css" rel="stylesheet" type="text/css" />
     <link href="index.css" rel="stylesheet" type="text/css" />
-    <script src="song_table.js" type="module"></script>
+
+    <script src="song-table.js" type="module"></script>
+    <script src="tag-suggester.js" type="module"></script>
     <script src="index.js" type="module" defer></script>
   </head>
 
@@ -98,7 +100,7 @@
             <a id="dumpSongCacheLink" class="debugLink" target="_blank">[c]</a>
           </div>
           <textarea id="editTagsTextarea"></textarea>
-          <div id="editTagsSuggestionsDiv"></div>
+          <tag-suggester id="editTagsSuggester" target-id="editTagsTextarea" />
         </div>
 
         <song-table id="playlistTable" />
@@ -134,7 +136,11 @@
                     id="tagsClearButton"
                     src="images/playlist_clear_text.png"
                   />
-                  <div id="tagsInputSuggestionsDiv"></div>
+                  <tag-suggester
+                    id="tagsInputSuggester"
+                    target-id="tagsInput"
+                    tab-advances-focus
+                  />
                 </div>
               </td>
             </tr>

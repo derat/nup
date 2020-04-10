@@ -79,7 +79,7 @@ body {
 #tagsInputDiv {
   position: relative;
 }
-#tagsInputSuggestionsDiv {
+#tagsInputSuggester {
   position: absolute;
   left: 4px;
   top: 26px;

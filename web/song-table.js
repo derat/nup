@@ -21,7 +21,7 @@ class SongTable extends HTMLElement {
 
     const link = document.createElement('link');
     link.setAttribute('rel', 'stylesheet');
-    link.setAttribute('href', 'song_table.css');
+    link.setAttribute('href', 'song-table.css');
     this.shadow_.appendChild(link);
 
     this.table_ = document.createElement('table');

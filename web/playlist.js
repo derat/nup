@@ -2,7 +2,6 @@
 // All rights reserved.
 
 import {$, getCurrentTimeSec, KeyCodes} from './common.js';
-import Suggester from './suggester.js';
 
 export default class Playlist {
   constructor(player) {
@@ -140,12 +139,7 @@ export default class Playlist {
 
     this.dialogManager = document.dialogManager;
 
-    this.tagSuggester = new Suggester(
-      tagsInput,
-      $('tagsInputSuggestionsDiv'),
-      [],
-      true,
-    );
+    this.tagSuggester = $('tagsInputSuggester');
 
     document.body.addEventListener(
       'keydown',
