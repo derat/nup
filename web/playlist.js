@@ -307,14 +307,14 @@ export default class Playlist {
   }
 
   enqueueSearchResults(clearFirst, afterCurrent) {
-    if (this.searchResultsTable.getNumSongs() == 0) return;
+    if (!this.searchResultsTable.numSongs) return;
 
     const newSongs = clearFirst ? [] : this.player.songs.slice(0);
     let index = afterCurrent
       ? Math.min(this.currentIndex + 1, newSongs.length)
       : newSongs.length;
 
-    const checkedSongs = this.searchResultsTable.getCheckedSongs();
+    const checkedSongs = this.searchResultsTable.checkedSongs;
     for (let i = 0; i < checkedSongs.length; i++) {
       newSongs.splice(index++, 0, checkedSongs[i]);
     }
@@ -327,7 +327,7 @@ export default class Playlist {
     this.playlistTable.updateSongs(newSongs);
     this.player.setSongs(newSongs);
 
-    if (checkedSongs.length == this.searchResultsTable.getNumSongs()) {
+    if (checkedSongs.length == this.searchResultsTable.numSongs) {
       this.searchResultsTable.updateSongs([]);
     }
   }
@@ -432,7 +432,7 @@ export default class Playlist {
   handleSongChange(index) {
     this.playlistTable.highlightRow(this.currentIndex, false);
 
-    if (index >= 0 && index < this.playlistTable.getNumSongs()) {
+    if (index >= 0 && index < this.playlistTable.numSongs) {
       this.playlistTable.highlightRow(index, true);
       this.currentIndex = index;
     } else {

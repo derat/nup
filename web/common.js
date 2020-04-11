@@ -23,24 +23,36 @@ export function updateTitleAttributeForTruncation(element, text) {
   element.title = element.scrollWidth > element.offsetWidth ? text : '';
 }
 
+// Creates and returns a new |type| element. All other parameters are optional.
 export function createElement(type, className, parentElement, text) {
   const element = document.createElement(type);
   if (className) element.className = className;
   if (parentElement) parentElement.appendChild(element);
-  if (text != null) element.appendChild(document.createTextNode(text));
+  if (text || text === '') element.appendChild(document.createTextNode(text));
   return element;
 }
 
+// Creates and returns a new shadow DOM attached to |el|. If |template| is
+// supplied, a copy of it is attached as a child of the root node.
 export function createShadow(el, template) {
   const shadow = el.attachShadow({mode: 'open'});
   if (template) shadow.appendChild(template.content.cloneNode(true));
   return shadow;
 }
 
+// Creates and returns a new <template> containing the supplied HTML.
 export function createTemplate(html) {
   const template = document.createElement('template');
   template.innerHTML = html;
   return template;
+}
+
+// Creates and returns a <style> element containing the supplied CSS.
+export function createStyle(text) {
+  const style = document.createElement('style');
+  style.type = 'text/css';
+  style.innerText = text;
+  return style;
 }
 
 export const KeyCodes = {

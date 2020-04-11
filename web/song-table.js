@@ -3,8 +3,8 @@
 
 import {
   $,
-  createElement,
   createShadow,
+  createStyle,
   createTemplate,
   formatTime,
   updateTitleAttributeForTruncation,
@@ -67,23 +67,37 @@ const template = createTemplate(`
     vertical-align: middle;
     width: 12px;
   }
-  input[type='checkbox'][class~='opaque'] {
-    opacity: 1;
-  }
   input[type='checkbox'][class~='transparent'] {
     opacity: 0.3;
   }
 </style>
-<table id="table">
+<table>
   <thead>
-    <tr id="head-row">
+    <tr>
+      <th class="checkbox">
+        <input type="checkbox" />
+      </th>
       <th class="artist">Artist</th>
       <th class="title">Title</th>
       <th class="album">Album</th>
       <th class="time">Time</th>
     </tr>
   </thead>
+  <tbody>
+  </tbody>
 </table>
+`);
+
+const rowTemplate = createTemplate(`
+<tr>
+  <td class="checkbox">
+    <input type="checkbox" />
+  </td>
+  <td class="artist"><a></a></td>
+  <td class="title"></td>
+  <td class="album"><a></a></td>
+  <td class="time"></td>
+</tr>
 `);
 
 customElements.define(
@@ -94,18 +108,20 @@ customElements.define(
 
       this.useCheckboxes_ = this.hasAttribute('use-checkboxes');
       this.lastClickedCheckboxIndex_ = -1; // 0 is header
+      this.numCheckedSongs_ = 0;
 
       this.style.display = 'block';
       this.shadow_ = createShadow(this, template);
-      this.table_ = $('table', this.shadow_);
+      this.table_ = this.shadow_.querySelector('table');
 
-      if (this.useCheckboxes_) {
-        this.headingCheckbox_ = this.prependCheckbox_(
-          $('head-row', this.shadow_),
-          'th',
-          false,
-        );
-        this.numCheckedSongs_ = 0;
+      this.headingCheckbox_ = this.shadow_.querySelector(
+        'input[type="checkbox"]',
+      );
+      this.headingCheckbox_.addEventListener('click', e =>
+        this.handleCheckboxClicked_(this.headingCheckbox_, e),
+      );
+      if (!this.useCheckboxes_) {
+        this.shadow_.appendChild(createStyle('.checkbox { display: none }'));
       }
     }
 
@@ -119,25 +135,28 @@ customElements.define(
       this.checkedSongsChangedCallback_ = cb;
     }
 
-    getNumSongs() {
-      return this.table_.rows.length - 1;
+    get songRows_() {
+      return [].slice.call(this.table_.rows, 1); // exclude header
+    }
+
+    get numSongs() {
+      return this.songRows_.length;
+    }
+
+    get checkedSongs() {
+      return !this.useCheckboxes_
+        ? []
+        : this.songRows_
+            .filter(r => r.cells[0].children[0].checked)
+            .map(r => r.song);
     }
 
     highlightRow(index, highlight) {
-      if (index >= 0 && index < this.getNumSongs()) {
-        this.table_.rows[index + 1].className = highlight ? 'highlight' : '';
-      }
-    }
+      if (index < 0 || index >= this.numSongs) return;
 
-    getCheckedSongs() {
-      if (!this.useCheckboxes_) return [];
-
-      const songs = [];
-      for (let i = 1; i < this.table_.rows.length; i++) {
-        const row = this.table_.rows[i];
-        if (row.cells[0].children[0].checked) songs.push(row.song);
-      }
-      return songs;
+      const row = this.songRows_[index];
+      if (highlight) row.classList.add('highlight');
+      else row.classList.remove('highlight');
     }
 
     setAllCheckboxes(checked) {
@@ -147,19 +166,13 @@ customElements.define(
       this.handleCheckboxClicked_(this.headingCheckbox_);
     }
 
-    // Update to contain |newSongs|.
-    // Try to be smart about not doing any more work than necessary.
+    // Updates the table to contain |newSongs| while trying to be smart about
+    // not doing any more work than necessary.
     updateSongs(newSongs) {
-      const oldSongs = [];
-      for (
-        let i = 1; // Start at 1 to skip the header.
-        i < this.table_.rows.length;
-        i++
-      ) {
-        oldSongs.push(this.table_.rows[i].song);
-      }
+      const oldSongs = this.songRows_.map(r => r.song);
 
-      // Walk forward from the beginning and backward from the end to look for common runs of songs.
+      // Walk forward from the beginning and backward from the end to look for
+      // common runs of songs.
       const minLength = Math.min(oldSongs.length, newSongs.length);
       let startMatchLength = 0;
       let endMatchLength = 0;
@@ -188,104 +201,85 @@ customElements.define(
 
       // Get to the correct number of rows.
       for (let i = numOldMiddleSongs; i < numNewMiddleSongs; i++) {
-        this.initRow_(this.table_.insertRow(startMatchLength + 1));
+        this.insertSongRow_(startMatchLength);
       }
       for (let i = numOldMiddleSongs; i > numNewMiddleSongs; i--) {
-        this.table_.deleteRow(startMatchLength + 1);
+        this.deleteSongRow_(startMatchLength);
       }
 
       // Update all of the rows in the middle to contain the correct data.
       for (let i = 0; i < numNewMiddleSongs; i++) {
-        const song = newSongs[startMatchLength + i];
-        const row = this.table_.rows[startMatchLength + i + 1];
-        this.updateRow_(row, song);
+        const index = startMatchLength + i;
+        this.updateSongRow_(index, newSongs[index]);
       }
 
       // Clear all of the checkboxes.
       if (this.useCheckboxes_) {
-        for (let i = 1; i < this.table_.rows.length; i++) {
-          this.table_.rows[i].cells[0].children[0].checked = null;
-        }
+        this.songRows_.forEach(r => (r.cells[0].children[0].checked = null));
+        this.lastClickedCheckboxIndex_ = -1;
         this.numCheckedSongs_ = 0;
         this.updateHeadingCheckbox_();
         if (this.checkedSongsChangedCallback_) {
-          this.checkedSongsChangedCallback_(this.numCheckedSongs_);
+          this.checkedSongsChangedCallback_(0);
         }
       }
-
-      this.lastClickedCheckboxIndex_ = -1;
     }
 
-    // Initialize newly-created |row| to contain song data.
-    initRow_(row) {
-      if (this.useCheckboxes_) this.prependCheckbox_(row, 'td', true);
-
-      const artist = row.insertCell();
-      createElement('a', undefined, artist).addEventListener(
-        'click',
-        () =>
-          this.artistClickedCallback_ &&
-          this.artistClickedCallback_(row.song.artist),
+    // Insert and initialize a new song row at |index|.
+    insertSongRow_(index) {
+      const row = rowTemplate.content.cloneNode(true);
+      const check = row.querySelector('input[type="checkbox"]');
+      check.addEventListener('click', e =>
+        this.handleCheckboxClicked_(check, e),
       );
+      row
+        .querySelector('.artist a')
+        .addEventListener(
+          'click',
+          () =>
+            this.artistClickedCallback_ &&
+            this.artistClickedCallback_(row.song.artist),
+        );
+      row
+        .querySelector('.album a')
+        .addEventListener(
+          'click',
+          () =>
+            this.albumClickedCallback_ &&
+            this.albumClickedCallback_(row.song.album),
+        );
 
-      row.insertCell(); // title
-
-      const album = row.insertCell();
-      createElement('a', undefined, album).addEventListener(
-        'click',
-        () =>
-          this.albumClickedCallback_ &&
-          this.albumClickedCallback_(row.song.album),
-      );
-
-      row.insertCell().className = 'time'; // time
+      const tbody = this.table_.querySelector('tbody');
+      tbody.insertBefore(row, tbody.children ? tbody.children[index] : null);
     }
 
-    // |cellTag| is either 'td' or 'th'.
-    prependCheckbox_(row, cellTag, checked, callback) {
-      const cell = createElement(cellTag, 'checkbox');
-      row.insertBefore(cell, row.firstChild);
-
-      const checkbox = createElement('input', undefined, cell);
-      checkbox.type = 'checkbox';
-      checkbox.addEventListener('click', e =>
-        this.handleCheckboxClicked_(checkbox, e),
-      );
-      if (checked) checkbox.checked = 'checked';
-
-      return checkbox;
+    // Deletes the row at |index| (ignoring the header row).
+    deleteSongRow_(index) {
+      this.table_.deleteRow(index + 1); // skip header
     }
 
-    // Update |row| to display data about |song|.
-    updateRow_(row, song) {
+    // Updates |row| to display data about |song|.
+    updateSongRow_(index, song) {
+      const row = this.songRows_[index];
       row.song = song;
+      row.classList.remove('highlight');
 
-      const updateCell = (cell, text, updateChild) => {
+      const update = (cell, text, updateChild) => {
         (updateChild ? cell.children[0] : cell).innerText = text;
         updateTitleAttributeForTruncation(cell, text);
       };
-
-      // Skip the checkbox if present.
-      const artistCellIndex = this.useCheckboxes_ ? 1 : 0;
-      updateCell(row.cells[artistCellIndex], song.artist, true);
-      updateCell(row.cells[artistCellIndex + 1], song.title, false);
-      updateCell(row.cells[artistCellIndex + 2], song.album, true);
-      updateCell(
-        row.cells[artistCellIndex + 3],
-        formatTime(parseFloat(song.length)),
-        false,
-      );
-
-      // Clear highlighting.
-      row.className = null;
+      update(row.cells[1], song.artist, true);
+      update(row.cells[2], song.title, false);
+      update(row.cells[3], song.album, true);
+      update(row.cells[4], formatTime(parseFloat(song.length)), false);
     }
 
-    // Handle one of the checkboxes being clicked.
+    // Handles one of the checkboxes being clicked.
     handleCheckboxClicked_(checkbox, e) {
-      const table = this.table_;
-      const getCheckbox = index => table.rows[index].cells[0].children[0];
+      const getCheckbox = i => this.table_.rows[i].cells[0].children[0];
+
       let index = -1;
-      for (let i = 0; i < table.rows.length; i++) {
+      for (let i = 0; i < this.table_.rows.length; i++) {
         if (checkbox == getCheckbox(i)) {
           index = i;
           break;
@@ -294,17 +288,17 @@ customElements.define(
       const checked = checkbox.checked;
 
       if (index == 0) {
-        for (let i = 1; i < table.rows.length; i++) {
+        for (let i = 1; i < this.table_.rows.length; i++) {
           getCheckbox(i).checked = checked ? 'checked' : null;
         }
-        this.numCheckedSongs_ = checked ? this.getNumSongs() : 0;
+        this.numCheckedSongs_ = checked ? this.numSongs : 0;
       } else {
         this.numCheckedSongs_ += checked ? 1 : -1;
 
         if (e && e.shiftKey) {
           if (
             this.lastClickedCheckboxIndex_ > 0 &&
-            this.lastClickedCheckboxIndex_ < table.rows.length &&
+            this.lastClickedCheckboxIndex_ < this.table_.rows.length &&
             this.lastClickedCheckboxIndex_ != index
           ) {
             const start = Math.min(index, this.lastClickedCheckboxIndex_);
@@ -331,14 +325,15 @@ customElements.define(
       }
     }
 
-    // Update the |headingCheckbox_|'s visual state for the current number of checked songs.
+    // Updates |headingCheckbox_|'s visual state for the current number of
+    // checked songs.
     updateHeadingCheckbox_() {
-      const head = this.headingCheckbox_;
-      head.checked = !this.numCheckedSongs_ ? null : 'checked';
-      head.className =
-        !this.numCheckedSongs_ || this.numCheckedSongs_ == this.getNumSongs()
-          ? ''
-          : 'transparent';
+      this.headingCheckbox_.checked = this.numCheckedSongs_ ? 'checked' : null;
+      if (this.numCheckedSongs_ && this.numCheckedSongs_ != this.numSongs) {
+        this.headingCheckbox_.classList.add('transparent');
+      } else {
+        this.headingCheckbox_.classList.remove('transparent');
+      }
     }
   },
 );
