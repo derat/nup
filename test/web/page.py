@@ -59,7 +59,7 @@ class Page(object):
     NEXT_BUTTON = MUSIC_PLAYER + (By.ID, 'next')
     OPTIONS_OK_BUTTON = DIALOG_MANAGER + (By.CSS_SELECTOR, '.dialog', By.ID, 'ok-button')
     PLAY_PAUSE_BUTTON = MUSIC_PLAYER + (By.ID, 'play-pause')
-    PLAYLIST_TABLE = (By.ID, 'playlistTable', By.CSS_SELECTOR, 'table')
+    PLAYLIST_TABLE = MUSIC_PLAYER + (By.ID, 'playlist', By.CSS_SELECTOR, 'table')
     PRESET_SELECT = (By.ID, 'presetSelect')
     PREV_BUTTON = MUSIC_PLAYER + (By.ID, 'prev')
     RATING_OVERLAY_DIV = MUSIC_PLAYER + (By.ID, 'rating-overlay')

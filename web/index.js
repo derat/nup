@@ -24,7 +24,10 @@ document.test = {
     player.updater_.rateAndTag(songId, rating, tags),
   reportPlay: (songId, startTime) =>
     player.updater_.reportPlay(songId, startTime),
-  reset: () => playlist.resetForTesting(),
+  reset: () => {
+    player.resetForTesting();
+    playlist.resetForTesting();
+  },
   showOptions: () => player.showOptions_(),
   updateTags: () => player.updateTagsFromServer_(false),
 };

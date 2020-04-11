@@ -232,22 +232,18 @@ customElements.define(
       check.addEventListener('click', e =>
         this.handleCheckboxClicked_(check, e),
       );
-      row
-        .querySelector('.artist a')
-        .addEventListener(
-          'click',
-          () =>
-            this.artistClickedCallback_ &&
-            this.artistClickedCallback_(row.song.artist),
-        );
-      row
-        .querySelector('.album a')
-        .addEventListener(
-          'click',
-          () =>
-            this.albumClickedCallback_ &&
-            this.albumClickedCallback_(row.song.album),
-        );
+      row.querySelector('.artist a').addEventListener('click', e => {
+        // Using the |song| property that we later set on the row doesn't work
+        // here or in the album callback.
+        if (this.artistClickedCallback_) {
+          this.artistClickedCallback_(e.target.innerText);
+        }
+      });
+      row.querySelector('.album a').addEventListener('click', e => {
+        if (this.albumClickedCallback_) {
+          this.albumClickedCallback_(e.target.innerText);
+        }
+      });
 
       const tbody = this.table_.querySelector('tbody');
       tbody.insertBefore(row, tbody.children ? tbody.children[index] : null);

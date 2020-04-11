@@ -124,6 +124,10 @@ const template = createTemplate(`
     max-width: 210px;
     max-height: 26px;
   }
+  #playlist {
+    border-top: 1px solid #888;
+    margin-top: 2px;
+  }
 </style>
 
 <audio type="audio/mpeg">
@@ -158,6 +162,8 @@ const template = createTemplate(`
     <textarea id="edit-tags" slot="text"></textarea>
   </tag-suggester>
 </div>
+
+<song-table id="playlist"></song-table>
 `);
 
 customElements.define(
@@ -239,6 +245,19 @@ customElements.define(
       this.tagsTextarea_ = get('edit-tags');
       this.tagSuggester_ = get('edit-tags-suggester');
 
+      this.playlistTable_ = get('playlist');
+      // TODO: What's the right way to do this? These methods can't be called
+      // synchronously since the song-table c'tor hasn't been called at this
+      // point, presumably because it's part of our shadow DOM.
+      window.setTimeout(() => {
+        this.playlistTable_.setArtistClickedCallback(artist => {
+          if (this.playlist_) this.playlist_.resetSearchForm(artist, null);
+        });
+        this.playlistTable_.setAlbumClickedCallback(album => {
+          if (this.playlist_) this.playlist_.resetSearchForm(null, album);
+        });
+      });
+
       if ('mediaSession' in navigator) {
         const ms = navigator.mediaSession;
         ms.setActionHandler('play', () => this.play_());
@@ -282,10 +301,8 @@ customElements.define(
 
     set playlist(playlist) {
       this.playlist_ = playlist;
-      if (playlist) {
-        this.notifyPlaylistAboutSongChange_();
-        this.playlist_.handleTagsUpdated(this.tags_); // TODO: get rid of this
-      }
+      // TODO: Get rid of this.
+      if (playlist) this.playlist_.handleTagsUpdated(this.tags_);
     }
 
     updateTagsFromServer_(async) {
@@ -315,27 +332,30 @@ customElements.define(
       return this.songs_;
     }
 
-    // TODO: Make this not be called by the playlist?
-    setSongs(songs) {
-      const oldSong = this.currentSong;
+    resetForTesting() {
+      this.hideUpdateDiv_(false /* saveChanges */);
+      this.enqueueSongs([], true);
+    }
 
-      this.songs_ = songs;
-
-      // If we're currently playing a track that's no longer in the playlist,
-      // then jump to the first song. Otherwise, just keep playing it (some
-      // tracks were probably just appended to the previous playlist).
-      const song = this.currentSong;
-      if (!song || oldSong != song) {
+    enqueueSongs(songs, clearFirst, afterCurrent) {
+      if (clearFirst) {
         this.audio_.pause();
         this.audio_.src = '';
-        this.currentIndex_ = -1;
+        this.playlistTable_.highlightRow(this.currentIndex_, false);
+        this.songs_ = [];
         this.selectTrack_(0);
-      } else if (this.reachedEndOfSongs_) {
-        this.cycleTrack_(1);
-      } else {
-        this.updateButtonState_();
-        this.notifyPlaylistAboutSongChange_();
       }
+
+      let index = afterCurrent
+        ? Math.min(this.currentIndex_ + 1, this.songs_.length)
+        : this.songs_.length;
+      songs.forEach(s => this.songs_.splice(index++, 0, s));
+
+      this.playlistTable_.updateSongs(this.songs_);
+
+      if (this.currentIndex_ == -1) this.selectTrack_(0);
+      else if (this.reachedEndOfSongs_) this.cycleTrack_(1);
+      else this.updateButtonState_();
     }
 
     cycleTrack_(offset) {
@@ -347,6 +367,7 @@ customElements.define(
         this.currentIndex_ = -1;
         this.updateSongDisplay_();
         this.updateButtonState_();
+        this.reachedEndOfSongs_ = false;
         return;
       }
 
@@ -355,8 +376,10 @@ customElements.define(
 
       if (index == this.currentIndex_) return;
 
+      this.playlistTable_.highlightRow(this.currentIndex_, false);
+      this.playlistTable_.highlightRow(index, true);
       this.currentIndex_ = index;
-      this.notifyPlaylistAboutSongChange_();
+
       this.updateSongDisplay_();
       this.updatePresentationLayerSongs_();
       this.startCurrentTrack_();
@@ -367,6 +390,7 @@ customElements.define(
     updateTags_(tags) {
       this.tags_ = tags.slice(0);
       this.tagSuggester_.words = this.tags_;
+      // TODO: Get rid of this ugly call.
       if (this.playlist_) this.playlist_.handleTagsUpdated(this.tags_);
     }
 
@@ -636,11 +660,6 @@ customElements.define(
           }
           break;
       }
-    }
-
-    // TODO: Get rid of this.
-    notifyPlaylistAboutSongChange_() {
-      if (this.playlist_) this.playlist_.handleSongChange(this.currentIndex_);
     }
 
     showUpdateDiv_() {

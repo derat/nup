@@ -25,11 +25,6 @@ body {
   padding-bottom: 2px;
 }
 
-#playlistTable th.time {
-  /* This causes a doubly-thick border on high-DPI. */
-  /* border-right: solid 1px #888; */
-}
-
 #centerDivider {
   flex: 0 0 1px;
   background-color: #888;

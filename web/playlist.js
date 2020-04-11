@@ -10,15 +10,6 @@ export default class Playlist {
     this.currentIndex = -1;
     this.request = null;
 
-    // TODO: Move the playlist into music-player, probably.
-    this.playlistTable = $('playlistTable');
-    this.playlistTable.setArtistClickedCallback(artist =>
-      this.resetSearchForm(artist, null, false),
-    );
-    this.playlistTable.setAlbumClickedCallback(album =>
-      this.resetSearchForm(null, album, false),
-    );
-
     this.rightPane = $('rightPane');
     this.keywordsInput = $('keywordsInput');
     this.keywordsClearButton = $('keywordsClearButton');
@@ -43,10 +34,10 @@ export default class Playlist {
 
     this.searchResultsTable = $('searchResultsTable');
     this.searchResultsTable.setArtistClickedCallback(artist =>
-      this.resetSearchForm(artist, null, false),
+      this.resetSearchForm(artist, null),
     );
     this.searchResultsTable.setAlbumClickedCallback(album =>
-      this.resetSearchForm(null, album, false),
+      this.resetSearchForm(null, album),
     );
     this.searchResultsTable.setCheckedSongsChangedCallback(() =>
       this.handleCheckedSongsChanged_(),
@@ -150,9 +141,6 @@ export default class Playlist {
 
   resetForTesting() {
     this.resetSearchForm(null, null, true);
-    this.playlistTable.updateSongs([]);
-    this.player.hideUpdateDiv_(false /* saveChanges */); // TODO: remove
-    this.player.setSongs([]);
   }
 
   handleTagsUpdated(tags) {
@@ -307,25 +295,9 @@ export default class Playlist {
   enqueueSearchResults(clearFirst, afterCurrent) {
     if (!this.searchResultsTable.numSongs) return;
 
-    const newSongs = clearFirst ? [] : this.player.songs.slice();
-    let index = afterCurrent
-      ? Math.min(this.currentIndex + 1, newSongs.length)
-      : newSongs.length;
-
-    const checkedSongs = this.searchResultsTable.checkedSongs;
-    for (let i = 0; i < checkedSongs.length; i++) {
-      newSongs.splice(index++, 0, checkedSongs[i]);
-    }
-
-    // If we're replacing the current songs but e.g. the last song was highlighted
-    // and is the same for both the old and new lists, make sure that the
-    // highlighting on it gets cleared.
-    if (clearFirst) this.playlistTable.highlightRow(this.currentIndex, false);
-
-    this.playlistTable.updateSongs(newSongs);
-    this.player.setSongs(newSongs);
-
-    if (checkedSongs.length == this.searchResultsTable.numSongs) {
+    const songs = this.searchResultsTable.checkedSongs;
+    this.player.enqueueSongs(songs, clearFirst, afterCurrent);
+    if (songs.length == this.searchResultsTable.numSongs) {
       this.searchResultsTable.updateSongs([]);
     }
   }
@@ -424,18 +396,6 @@ export default class Playlist {
     this.presetSelect.blur();
 
     this.submitQuery(play);
-  }
-
-  // Handle notification from the player that the current song has changed.
-  handleSongChange(index) {
-    this.playlistTable.highlightRow(this.currentIndex, false);
-
-    if (index >= 0 && index < this.playlistTable.numSongs) {
-      this.playlistTable.highlightRow(index, true);
-      this.currentIndex = index;
-    } else {
-      this.currentIndex = -1;
-    }
   }
 
   handleCheckedSongsChanged_(numChecked) {
