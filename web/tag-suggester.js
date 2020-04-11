@@ -12,20 +12,21 @@ import {
 const template = createTemplate(`
 <style>
 #suggestions {
-  z-index: 2;
+  background-color: #eee;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px 1px rgba(0, 0, 0, 0.3);
   font-size: 10px;
   font-family: Arial, Helvetica, sans-serif;
-  background-color: #eee;
-  box-shadow: 0 1px 2px 1px rgba(0, 0, 0, 0.3);
   color: black;
-  padding: 3px;
-  border-radius: 6px;
-  pointer-events: none;
   opacity: 0;
+  overflow: hidden;
+  padding: 3px;
+  pointer-events: none;
+  position: absolute;
+  text-overflow: ellipsis;
+  z-index: 1;
   -webkit-transition: opacity 200ms ease-out;
   -webkit-user-select: none;
-  text-overflow: ellipsis;
-  overflow: hidden;
 }
 #suggestions.shown {
   pointer-events: auto;
@@ -37,6 +38,7 @@ const template = createTemplate(`
   cursor: pointer;
 }
 </style>
+<slot name="text"></slot>
 <div id="suggestions"></div>
 `);
 
@@ -47,27 +49,26 @@ customElements.define(
       super();
 
       this.tabAdvancesFocus_ = this.hasAttribute('tab-advances-focus');
-      this.target_ = null;
       this.words_ = [];
 
-      this.style.display = 'block';
+      this.style.display = 'contents';
       this.shadow_ = createShadow(this, template);
       this.suggestionsDiv_ = $('suggestions', this.shadow_);
 
-      document.addEventListener('click', e => this.hideSuggestions_(), false);
-    }
-
-    set target(target) {
-      this.target_ = target;
+      const slotElements = this.shadow_
+        .querySelector('slot')
+        .assignedElements();
+      if (slotElements.length != 1) {
+        throw new Error('Editable element must be provided via slot');
+      }
+      this.target_ = slotElements[0];
       this.target_.addEventListener('keydown', e => this.handleKeyDown_(e));
       this.target_.addEventListener('focus', () => {
-        const text = this.target_.value;
-        if (text.length > 0 && text[text.length - 1] != ' ') {
-          this.target_.value += ' ';
-        }
         this.target_.selectionStart = this.target_.selectionEnd = this.target_.value.length;
       });
       this.target_.spellcheck = false;
+
+      document.addEventListener('click', e => this.hideSuggestions_(), false);
     }
 
     set words(words) {
@@ -152,19 +153,16 @@ customElements.define(
           div.appendChild(document.createTextNode(' '));
         }
         const span = createElement('span', null, null, word);
-        span.addEventListener(
-          'click',
-          () => {
-            this.hideSuggestions_();
-            const parts = this.getTextParts_();
-            this.target_.value = parts.before + word + parts.after;
-            this.target_.focus();
-          },
-          false,
-        );
+        span.addEventListener('click', () => {
+          this.hideSuggestions_();
+          const parts = this.getTextParts_();
+          this.target_.value = parts.before + word + parts.after;
+          this.target_.focus();
+        });
         div.appendChild(span);
       }
 
+      // TODO: Also move the div near the text cursor?
       this.suggestionsDiv_.classList.add('shown');
     }
 

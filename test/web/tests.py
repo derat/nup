@@ -655,7 +655,7 @@ class Test(unittest.TestCase):
                 self.fail('Tag suggestions were %s; expected %s' %
                           (str(actual), str(expected)))
 
-        check_textarea('a0 a1 b')
+        check_textarea('a0 a1 b ')
 
         TAB = u'\ue004'
         textarea.send_keys('d' + TAB)

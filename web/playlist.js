@@ -140,7 +140,6 @@ export default class Playlist {
     );
 
     this.tagSuggester = $('tagsInputSuggester');
-    this.tagSuggester.target = this.tagsInput;
 
     document.body.addEventListener(
       'keydown',

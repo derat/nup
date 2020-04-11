@@ -56,12 +56,13 @@
               <td><label for="tagsInput">Tags</label></td>
               <td>
                 <div id="tagsInputDiv">
-                  <input id="tagsInput" type="text" size="32" />
+                  <tag-suggester id="tagsInputSuggester" tab-advances-focus>
+                    <input id="tagsInput" slot="text" type="text" size="32" />
+                  </tag-suggester>
                   <img
                     id="tagsClearButton"
                     src="images/playlist_clear_text.png"
                   />
-                  <tag-suggester id="tagsInputSuggester" tab-advances-focus />
                 </div>
               </td>
             </tr>

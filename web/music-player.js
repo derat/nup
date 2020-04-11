@@ -81,7 +81,7 @@ const template = createTemplate(`
     z-index: 1;
     display: none;
   }
-  #update-close-img {
+  #update-close {
     position: absolute;
     right: 5px;
     top: 5px;
@@ -154,8 +154,9 @@ const template = createTemplate(`
     <a id="dump-song" class="debug-link" target="_blank">[d]</a>
     <a id="dump-song-cache" class="debug-link" target="_blank">[c]</a>
   </div>
-  <textarea id="edit-tags"></textarea>
-  <tag-suggester id="edit-tags-suggester" />
+  <tag-suggester id="edit-tags-suggester">
+    <textarea id="edit-tags" slot="text"></textarea>
+  </tag-suggester>
 </div>
 `);
 
@@ -180,7 +181,8 @@ customElements.define(
       this.songs_ = []; // songs in the order in which they should be played
       this.tags_ = []; // available tags loaded from server
       this.currentIndex_ = -1; // index into |songs| of current track
-      this.lastPositionSec_ = 0; // playback position at last onTimeUpdate_()
+      this.lastTimeUpdatePosition_ = 0; // playback position at last onTimeUpdate_()
+      this.lastTimeUpdateSong_ = null; // current song at last onTimeUpdate_()
       this.numErrors_ = 0; // consecutive playback errors
       this.startTime_ = -1; // seconds since epoch when current track started
       this.totalPlayedSec_ = 0; // total seconds playing current song
@@ -197,6 +199,11 @@ customElements.define(
       const get = id => $(id, this.shadow_);
 
       this.audio_ = this.shadow_.querySelector('audio');
+      this.audio_.addEventListener('ended', () => this.onEnded_());
+      this.audio_.addEventListener('pause', () => this.onPause_());
+      this.audio_.addEventListener('play', () => this.onPlay_());
+      this.audio_.addEventListener('timeupdate', () => this.onTimeUpdate_());
+      this.audio_.addEventListener('error', e => this.onError_(e));
 
       this.coverImage_ = get('cover-img');
       this.coverImage_.addEventListener('click', () => this.showUpdateDiv_());
@@ -229,16 +236,8 @@ customElements.define(
       );
       this.dumpSongLink_ = get('dump-song');
       this.dumpSongCacheLink_ = get('dump-song-cache');
-      this.tagsTextarea = get('edit-tags');
-
-      this.tagSuggester = get('edit-tags-suggester');
-      this.tagSuggester.target = this.tagsTextarea;
-
-      this.audio_.addEventListener('ended', () => this.onEnded_());
-      this.audio_.addEventListener('pause', () => this.onPause_());
-      this.audio_.addEventListener('play', () => this.onPlay_());
-      this.audio_.addEventListener('timeupdate', () => this.onTimeUpdate_());
-      this.audio_.addEventListener('error', e => this.onError_(e));
+      this.tagsTextarea_ = get('edit-tags');
+      this.tagSuggester_ = get('edit-tags-suggester');
 
       if ('mediaSession' in navigator) {
         const ms = navigator.mediaSession;
@@ -367,7 +366,7 @@ customElements.define(
 
     updateTags_(tags) {
       this.tags_ = tags.slice(0);
-      this.tagSuggester.words = this.tags_;
+      this.tagSuggester_.words = this.tags_;
       if (this.playlist_) this.playlist_.handleTagsUpdated(this.tags_);
     }
 
@@ -507,7 +506,8 @@ customElements.define(
     }
 
     startCurrentTrack_() {
-      this.lastPositionSec_ = 0;
+      this.lastTimeUpdatePosition_ = 0;
+      this.lastTimeUpdateSong_ = null;
       this.numErrors_ = 0;
       this.startTime_ = getCurrentTimeSec();
       this.totalPlayedSec_ = 0;
@@ -569,18 +569,29 @@ customElements.define(
 
     onTimeUpdate_() {
       const song = this.currentSong;
-      const duration = song ? song.length : this.audio_.duration;
+      const position = this.audio_.currentTime;
 
-      if (this.audio_.duration > 0) {
-        const cur = formatTime(this.audio_.currentTime);
+      // Avoid resetting |numErrors_| if we get called repeatedly without making
+      // any progress.
+      if (
+        song == this.lastTimeUpdateSong_ &&
+        position == this.lastTimeUpdatePosition_
+      ) {
+        return;
+      }
+
+      this.lastTimeUpdatePosition_ = position;
+      this.lastTimeUpdateSong_ = song;
+      this.numErrors_ = 0;
+
+      const duration = song ? song.length : this.audio_.duration;
+      if (duration) {
+        const cur = formatTime(position);
         const dur = formatTime(duration);
         this.timeDiv_.innerText = `[${cur} / ${dur}]`;
       } else {
         this.timeDiv_.innerText = '';
       }
-
-      this.lastPositionSec_ = this.audio_.currentTime;
-      this.numErrors_ = 0;
 
       const now = getCurrentTimeSec();
       if (this.lastUpdateTime_ > 0) {
@@ -598,7 +609,7 @@ customElements.define(
         }
       }
 
-      this.presentationLayer_.updatePosition(this.audio_.currentTime);
+      this.presentationLayer_.updatePosition(position);
     }
 
     onError_(e) {
@@ -613,9 +624,11 @@ customElements.define(
         case error.MEDIA_ERR_DECODE: // 3
         case error.MEDIA_ERR_SRC_NOT_SUPPORTED: // 4
           if (this.numErrors_ <= this.MAX_RETRIES) {
-            console.log('Retrying from position ' + this.lastPositionSec_);
+            console.log(
+              'Retrying from position ' + this.lastTimeUpdatePosition_,
+            );
             this.audio_.load();
-            this.audio_.currentTime = this.lastPositionSec_;
+            this.audio_.currentTime = this.lastTimeUpdatePosition_;
             this.audio_.play();
           } else {
             console.log('Giving up after ' + this.numErrors_ + ' error(s)');
@@ -640,7 +653,7 @@ customElements.define(
       this.setRating_(song.rating);
       this.dumpSongLink_.href = getDumpSongUrl(song, false);
       this.dumpSongCacheLink_.href = getDumpSongUrl(song, true);
-      this.tagsTextarea.value = song.tags.sort().join(' ');
+      this.tagsTextarea_.value = song.tags.sort().join(' ') + ' ';
       this.updateDiv_.style.display = 'block';
       this.updateSong_ = song;
       return true;
@@ -649,7 +662,7 @@ customElements.define(
     hideUpdateDiv_(saveChanges) {
       this.updateDiv_.style.display = 'none';
       this.ratingSpan_.blur();
-      this.tagsTextarea.blur();
+      this.tagsTextarea_.blur();
 
       const song = this.updateSong_;
       this.updateSong_ = null;
@@ -658,7 +671,7 @@ customElements.define(
 
       const ratingChanged = this.updatedRating_ != song.rating;
 
-      const newRawTags = this.tagsTextarea.value.trim().split(/\s+/);
+      const newRawTags = this.tagsTextarea_.value.trim().split(/\s+/);
       let newTags = [];
       const createdTags = [];
       for (let i = 0; i < newRawTags.length; ++i) {
@@ -758,7 +771,7 @@ customElements.define(
         if (this.showUpdateDiv_()) this.ratingSpan_.focus();
         return true;
       } else if (e.altKey && e.keyCode == KeyCodes.T) {
-        if (this.showUpdateDiv_()) this.tagsTextarea.focus();
+        if (this.showUpdateDiv_()) this.tagsTextarea_.focus();
         return true;
       } else if (e.altKey && e.keyCode == KeyCodes.V) {
         if (this.presentationLayer_.isShown()) this.presentationLayer_.hide();
