@@ -45,6 +45,8 @@ const template = createTemplate(`
 customElements.define(
   'tag-suggester',
   class extends HTMLElement {
+    SUGGESTION_MARGIN = 4;
+
     constructor() {
       super();
 
@@ -162,7 +164,14 @@ customElements.define(
         div.appendChild(span);
       }
 
-      // TODO: Also move the div near the text cursor?
+      // Move the suggestions a bit below the target.
+      const offset =
+        this.target_.offsetTop +
+        this.target_.offsetHeight +
+        this.SUGGESTION_MARGIN;
+      this.suggestionsDiv_.style.top = `${offset}px`;
+      this.suggestionsDiv_.style.left = `${this.target_.offsetLeft}px`;
+
       this.suggestionsDiv_.classList.add('shown');
     }
 
