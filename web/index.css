@@ -1,6 +1,13 @@
 /* Copyright 2020 Daniel Erat.
  * All rights reserved. */
 
+body {
+  margin: 0;
+  font-family: Verdana, 'DejaVu Sans', Arial, Helvetica, 'Liberation Sans',
+    sans-serif;
+  font-size: 12px;
+}
+
 #playlistTable {
   border-top: 1px solid #888;
   margin-top: 2px;

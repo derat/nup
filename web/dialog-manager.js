@@ -1,7 +1,7 @@
 // Copyright 2011 Daniel Erat.
 // All rights reserved.
 
-import {$, createElement, createTemplate} from './common.js';
+import {$, createElement, createShadow, createTemplate} from './common.js';
 
 const template = createTemplate(`
 <style>
@@ -76,8 +76,7 @@ customElements.define(
 
       this.style.pointerEvents = 'none';
 
-      this.shadow_ = this.attachShadow({mode: 'open'});
-      this.shadow_.appendChild(template.content.cloneNode(true));
+      this.shadow_ = createShadow(this, template);
       this.lightbox_ = $('lightbox', this.shadow_);
       this.lightbox_.addEventListener('click', e => e.stopPropagation(), false);
       this.container_ = $('container', this.shadow_);

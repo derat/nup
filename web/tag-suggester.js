@@ -47,39 +47,30 @@ customElements.define(
       super();
 
       this.tabAdvancesFocus_ = this.hasAttribute('tab-advances-focus');
+      this.target_ = null;
       this.words_ = [];
 
       this.style.display = 'block';
       this.shadow_ = createShadow(this, template);
       this.suggestionsDiv_ = $('suggestions', this.shadow_);
 
-      const targetId = this.getAttribute('target-id');
-      this.target_ = $(targetId);
-      if (!this.target_) {
-        throw new Error(`Unable to find target element "${targetId}"`);
-      }
-      this.target_.addEventListener(
-        'keydown',
-        e => this.handleKeyDown_(e),
-        false,
-      );
-      this.target_.addEventListener(
-        'focus',
-        () => {
-          const text = this.target_.value;
-          if (text.length > 0 && text[text.length - 1] != ' ') {
-            this.target_.value += ' ';
-          }
-          this.target_.selectionStart = this.target_.selectionEnd = this.target_.value.length;
-        },
-        false,
-      );
-      this.target_.spellcheck = false;
-
       document.addEventListener('click', e => this.hideSuggestions_(), false);
     }
 
-    setWords(words) {
+    set target(target) {
+      this.target_ = target;
+      this.target_.addEventListener('keydown', e => this.handleKeyDown_(e));
+      this.target_.addEventListener('focus', () => {
+        const text = this.target_.value;
+        if (text.length > 0 && text[text.length - 1] != ' ') {
+          this.target_.value += ' ';
+        }
+        this.target_.selectionStart = this.target_.selectionEnd = this.target_.value.length;
+      });
+      this.target_.spellcheck = false;
+    }
+
+    set words(words) {
       this.words_ = words.slice(0);
     }
 

@@ -30,11 +30,16 @@ def setUpModule():
     global server
     server = Server(file_thread.host_port())
 
-    global driver
+    # https://www.programcreek.com/python/example/100025/selenium.webdriver.ChromeOptions
+    # https://github.com/obsproject/obs-browser/issues/105
+    opts = webdriver.ChromeOptions()
+    opts.add_argument('--autoplay-policy=no-user-gesture-required')
+
     # Collect browser logs:
     # https://intellipaat.com/community/5478/getting-console-log-output-from-chrome-with-selenium-python-api-bindings
     caps = DesiredCapabilities.CHROME
     caps['goog:loggingPrefs'] = { 'browser':'ALL' }
+
     # For some reason, even when the chromedriver executable is in $PATH, I get
     # an error like the following here:
     #
@@ -43,8 +48,9 @@ def setUpModule():
     #
     # Passing the path manually seems to work:
     # https://stackoverflow.com/a/12611523
+    global driver
     driver = webdriver.Chrome(distutils.spawn.find_executable('chromedriver'),
-                              desired_capabilities=caps)
+                              chrome_options=opts, desired_capabilities=caps)
 
     # Makes no sense: Chrome starts at a data: URL, so I get a "Cookies are
     # disabled inside 'data:' URLs" exception if I try to add the cookie before

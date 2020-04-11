@@ -10,6 +10,7 @@ export default class Playlist {
     this.currentIndex = -1;
     this.request = null;
 
+    // TODO: Move the playlist into music-player, probably.
     this.playlistTable = $('playlistTable');
     this.playlistTable.setArtistClickedCallback(artist =>
       this.resetSearchForm(artist, null, false),
@@ -139,26 +140,24 @@ export default class Playlist {
     );
 
     this.tagSuggester = $('tagsInputSuggester');
+    this.tagSuggester.target = this.tagsInput;
 
     document.body.addEventListener(
       'keydown',
       e => this.handleBodyKeyDown_(e),
       false,
     );
-
-    this.playlistTable.updateSongs(this.player.songs);
-    this.handleSongChange(this.player.currentIndex);
   }
 
   resetForTesting() {
     this.resetSearchForm(null, null, true);
     this.playlistTable.updateSongs([]);
-    this.player.hideUpdateDiv(false /* saveChanges */);
+    this.player.hideUpdateDiv_(false /* saveChanges */); // TODO: remove
     this.player.setSongs([]);
   }
 
   handleTagsUpdated(tags) {
-    this.tagSuggester.setWords(tags);
+    this.tagSuggester.words = tags;
   }
 
   parseQueryString(text) {
@@ -309,7 +308,7 @@ export default class Playlist {
   enqueueSearchResults(clearFirst, afterCurrent) {
     if (!this.searchResultsTable.numSongs) return;
 
-    const newSongs = clearFirst ? [] : this.player.songs.slice(0);
+    const newSongs = clearFirst ? [] : this.player.songs.slice();
     let index = afterCurrent
       ? Math.min(this.currentIndex + 1, newSongs.length)
       : newSongs.length;

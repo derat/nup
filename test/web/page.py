@@ -36,32 +36,34 @@ class Page(object):
     tags = TagsInput()
     max_plays = MaxPlaysInput()
 
+    # Locators for elements with shadow DOMs.
+    DIALOG_MANAGER = (By.TAG_NAME, 'dialog-manager')
+    MUSIC_PLAYER = (By.TAG_NAME, 'music-player')
+    OPTIONS_DIALOG = DIALOG_MANAGER + (By.CSS_SELECTOR, '.dialog')
+
     # Locators for various elements.
-    ALBUM_DIV = (By.ID, 'albumDiv')
+    ALBUM_DIV = MUSIC_PLAYER + (By.ID, 'album')
     APPEND_BUTTON = (By.ID, 'appendButton')
-    ARTIST_DIV = (By.ID, 'artistDiv')
-    AUDIO = (By.ID, 'audio')
+    ARTIST_DIV = MUSIC_PLAYER + (By.ID, 'artist')
+    AUDIO = MUSIC_PLAYER + (By.CSS_SELECTOR, 'audio')
     BODY = (By.TAG_NAME, 'body')
-    COVER_IMAGE = (By.ID, 'coverImage')
-    EDIT_TAGS_SUGGESTER = (By.ID, 'editTagsSuggester')
-    EDIT_TAGS_TEXTAREA = (By.ID, 'editTagsTextarea')
+    COVER_IMAGE = MUSIC_PLAYER + (By.ID, 'cover-img')
+    EDIT_TAGS_SUGGESTER = MUSIC_PLAYER + (By.CSS_SELECTOR, 'edit-tags-suggester')
+    EDIT_TAGS_TEXTAREA = MUSIC_PLAYER + (By.ID, 'edit-tags')
     FIRST_PLAYED_SELECT = (By.ID, 'firstPlayedSelect')
     FIRST_TRACK_CHECKBOX = (By.ID, 'firstTrackCheckbox')
     INSERT_BUTTON = (By.ID, 'insertButton')
     LAST_PLAYED_SELECT = (By.ID, 'lastPlayedSelect')
     LUCKY_BUTTON = (By.ID, 'luckyButton')
     MIN_RATING_SELECT = (By.ID, 'minRatingSelect')
-    NEXT_BUTTON = (By.ID, 'nextButton')
-    OPTIONS_OK_BUTTON = (By.ID, 'dialogManager',
-                         By.CSS_SELECTOR, '.dialog',
-                         By.ID, 'ok-button')
-    PLAY_PAUSE_BUTTON = (By.ID, 'playPauseButton')
-    PLAYLIST_TABLE = (By.ID, 'playlistTable',
-                      By.CSS_SELECTOR, 'table')
+    NEXT_BUTTON = MUSIC_PLAYER + (By.ID, 'next')
+    OPTIONS_OK_BUTTON = DIALOG_MANAGER + (By.CSS_SELECTOR, '.dialog', By.ID, 'ok-button')
+    PLAY_PAUSE_BUTTON = MUSIC_PLAYER + (By.ID, 'play-pause')
+    PLAYLIST_TABLE = (By.ID, 'playlistTable', By.CSS_SELECTOR, 'table')
     PRESET_SELECT = (By.ID, 'presetSelect')
-    PREV_BUTTON = (By.ID, 'prevButton')
-    RATING_OVERLAY_DIV = (By.ID, 'ratingOverlayDiv')
-    RATING_SPAN = (By.ID, 'ratingSpan')
+    PREV_BUTTON = MUSIC_PLAYER + (By.ID, 'prev')
+    RATING_OVERLAY_DIV = MUSIC_PLAYER + (By.ID, 'rating-container')
+    RATING_SPAN = MUSIC_PLAYER + (By.ID, 'rating')
     REPLACE_BUTTON = (By.ID, 'replaceButton')
     RESET_BUTTON = (By.ID, 'resetButton')
     SEARCH_BUTTON = (By.ID, 'searchButton')
@@ -69,16 +71,12 @@ class Page(object):
                                By.CSS_SELECTOR, 'th input[type="checkbox"]')
     SEARCH_RESULTS_TABLE = (By.ID, 'searchResultsTable',
                             By.CSS_SELECTOR, 'table')
-    TIME_DIV = (By.ID, 'timeDiv')
-    TITLE_DIV = (By.ID, 'titleDiv')
+    TIME_DIV = MUSIC_PLAYER + (By.ID, 'time')
+    TITLE_DIV = MUSIC_PLAYER + (By.ID, 'title')
     UNRATED_CHECKBOX = (By.ID, 'unratedCheckbox')
-    UPDATE_CLOSE_IMAGE = (By.ID, 'updateCloseImage')
-    VOLUME_RANGE = (By.ID, 'dialogManager',
-                    By.CSS_SELECTOR, '.dialog',
-                    By.ID, 'volume-range')
-    VOLUME_SPAN = (By.ID, 'dialogManager',
-                   By.CSS_SELECTOR, '.dialog',
-                   By.ID, 'volume-span')
+    UPDATE_CLOSE_IMAGE = MUSIC_PLAYER + (By.ID, 'update-close')
+    VOLUME_RANGE = OPTIONS_DIALOG + (By.ID, 'volume-range')
+    VOLUME_SPAN = OPTIONS_DIALOG + (By.ID, 'volume-span')
 
     # Values for FIRST_PLAYED_SELECT and LAST_PLAYED_SELECT.
     UNSET_TIME = '...'
@@ -175,24 +173,23 @@ class Page(object):
     # (By.CSS_SELECTOR, 'div.foo').
     #
     # To handle elements nested within one or more Shadow DOMs, |locator|
-    # can also contain additional pairs using (only) By.ID or By.CSS_SELECTOR,
-    # which will be used to search within nested Shadow DOMs.
+    # can also contain additional By a <criterion>) pairs. Note that shadow DOMs
+    # only support certain mechanisms (just By.ID or By.CSS_SELECTOR?).
     def get(self, locator):
         utils.wait(lambda: self.driver.find_element(locator[0], locator[1]))
         return self.get_nowait(locator)
 
-    def get_nowait(self, locator):
-        el = None
-        while len(locator):
-            if el:
-                root = self.driver.execute_script(
-                        'return arguments[0].shadowRoot', el)
-            else:
-                root = self.driver
-            el = root.find_element(locator[0], locator[1])
-            locator = locator[2:]
+    def get_nowait(self, locator, el=None):
+        if not len(locator) or len(locator) % 2 != 0:
+            raise RuntimeError('Invalid locator %s', locator)
 
-        return el
+        el = (el if el else self.driver).find_element(locator[0], locator[1])
+        if len(locator) == 2:
+            return el
+
+        root = self.driver.execute_script(
+            'return arguments[0].shadowRoot', el)
+        return self.get_nowait(locator[2:], root if root else el)
 
     def click(self, locator):
         self.get(locator).click()

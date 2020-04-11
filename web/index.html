@@ -11,10 +11,10 @@
     />
 
     <link href="playlist.css" rel="stylesheet" type="text/css" />
-    <link href="player.css" rel="stylesheet" type="text/css" />
     <link href="index.css" rel="stylesheet" type="text/css" />
 
     <script src="dialog-manager.js" type="module"></script>
+    <script src="music-player.js" type="module"></script>
     <script src="presentation-layer.js" type="module"></script>
     <script src="song-table.js" type="module"></script>
     <script src="tag-suggester.js" type="module"></script>
@@ -22,58 +22,12 @@
   </head>
 
   <body>
-    <dialog-manager id="dialogManager"></dialog-manager>
-    <presentation-layer id="presentationLayer"></presentation-layer>
+    <dialog-manager></dialog-manager>
+    <presentation-layer></presentation-layer>
 
     <div id="playlistContainer">
       <div id="leftPane">
-        <audio id="audio" type="audio/mpeg">
-          Your browser doesn't support the audio element.
-        </audio>
-
-        <div id="songInfoDiv">
-          <div id="coverDiv">
-            <img id="coverImage" alt="" />
-          </div>
-          <div id="ratingOverlayDiv"></div>
-          <div id="artistDiv"></div>
-          <div id="titleDiv"></div>
-          <div id="albumDiv"></div>
-          <div id="timeDiv"></div>
-        </div>
-
-        <div id="controlsDiv">
-          <input
-            id="prevButton"
-            type="button"
-            value="Prev"
-            disabled="disabled"
-          />
-          <input
-            id="nextButton"
-            type="button"
-            value="Next"
-            disabled="disabled"
-          />
-          <input
-            id="playPauseButton"
-            type="button"
-            value="Pause"
-            disabled="disabled"
-          />
-        </div>
-
-        <div id="updateDiv">
-          <img id="updateCloseImage" src="images/update_close.png" />
-          <div id="ratingDiv">
-            Rating: <span id="ratingSpan" tabindex="0"></span>
-            <a id="dumpSongLink" class="debugLink" target="_blank">[d]</a>
-            <a id="dumpSongCacheLink" class="debugLink" target="_blank">[c]</a>
-          </div>
-          <textarea id="editTagsTextarea"></textarea>
-          <tag-suggester id="editTagsSuggester" target-id="editTagsTextarea" />
-        </div>
-
+        <music-player></music-player>
         <song-table id="playlistTable"></song-table>
       </div>
 
@@ -107,11 +61,7 @@
                     id="tagsClearButton"
                     src="images/playlist_clear_text.png"
                   />
-                  <tag-suggester
-                    id="tagsInputSuggester"
-                    target-id="tagsInput"
-                    tab-advances-focus
-                  />
+                  <tag-suggester id="tagsInputSuggester" tab-advances-focus />
                 </div>
               </td>
             </tr>
