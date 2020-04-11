@@ -453,7 +453,7 @@ export default class Playlist {
   }
 
   processAccelerator_(e) {
-    if (this.dialogManager_.getNumDialogs()) return false;
+    if (this.dialogManager_.numDialogs) return false;
 
     if (e.keyCode == KeyCodes.SLASH) {
       this.keywordsInput.focus();

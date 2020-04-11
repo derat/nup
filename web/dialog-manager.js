@@ -83,19 +83,19 @@ customElements.define(
       this.container_ = $('container', this.shadow_);
     }
 
-    getNumDialogs() {
+    get numDialogs() {
       return this.container_.children.length;
     }
 
     createDialog() {
       const dialog = createElement('span', 'dialog', this.container_);
-      if (this.getNumDialogs() == 1) this.lightbox_.classList.add('shown');
+      if (this.numDialogs == 1) this.lightbox_.classList.add('shown');
       return dialog;
     }
 
     closeDialog(dialog) {
       this.container_.removeChild(dialog);
-      if (!this.getNumDialogs()) this.lightbox_.classList.remove('shown');
+      if (!this.numDialogs) this.lightbox_.classList.remove('shown');
     }
 
     createMessageDialog(titleText, messageText) {

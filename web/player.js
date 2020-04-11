@@ -610,7 +610,7 @@ export default class Player {
   }
 
   processAccelerator(e) {
-    if (this.dialogManager_.getNumDialogs()) return false;
+    if (this.dialogManager_.numDialogs) return false;
 
     if (e.altKey && e.keyCode == KeyCodes.D) {
       const song = this.getCurrentSong();
