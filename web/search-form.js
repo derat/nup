@@ -253,8 +253,8 @@ customElements.define(
 
       this.musicPlayer_ = null;
       this.dialogManager_ = null;
-      this.currentIndex = -1;
-      this.request = null;
+      this.currentIndex_ = -1;
+      this.request_ = null;
 
       this.style.display = 'block';
       document.body.addEventListener('keydown', e =>
@@ -264,94 +264,95 @@ customElements.define(
       this.shadow_ = createShadow(this, template);
       const get = id => $(id, this.shadow_);
 
-      this.keywordsInput = get('keywords-input');
-      this.keywordsInput.addEventListener('keydown', e =>
-        this.handleFormKeyDown(e),
+      this.keywordsInput_ = get('keywords-input');
+      this.keywordsInput_.addEventListener('keydown', e =>
+        this.handleFormKeyDown_(e),
       );
       get('keywords-clear').addEventListener(
         'click',
-        () => (this.keywordsInput.value = null),
+        () => (this.keywordsInput_.value = null),
       );
 
-      this.tagSuggester = get('tags-suggester');
-      this.tagsInput = get('tags-input');
-      this.tagsInput.addEventListener('keydown', e =>
-        this.handleFormKeyDown(e),
+      this.tagSuggester_ = get('tags-suggester');
+      this.tagsInput_ = get('tags-input');
+      this.tagsInput_.addEventListener('keydown', e =>
+        this.handleFormKeyDown_(e),
       );
       get('tags-clear').addEventListener(
         'click',
-        () => (this.tagsInput.value = null),
+        () => (this.tagsInput_.value = null),
       );
 
-      this.shuffleCheckbox = get('shuffle-checkbox');
-      this.shuffleCheckbox.addEventListener('keydown', e =>
-        this.handleFormKeyDown(e),
+      this.shuffleCheckbox_ = get('shuffle-checkbox');
+      this.shuffleCheckbox_.addEventListener('keydown', e =>
+        this.handleFormKeyDown_(e),
       );
-      this.firstTrackCheckbox = get('first-track-checkbox');
-      this.firstTrackCheckbox.addEventListener('keydown', e =>
-        this.handleFormKeyDown(e),
+      this.firstTrackCheckbox_ = get('first-track-checkbox');
+      this.firstTrackCheckbox_.addEventListener('keydown', e =>
+        this.handleFormKeyDown_(e),
       );
-      this.unratedCheckbox = get('unrated-checkbox');
-      this.unratedCheckbox.addEventListener('keydown', e =>
-        this.handleFormKeyDown(e),
+      this.unratedCheckbox_ = get('unrated-checkbox');
+      this.unratedCheckbox_.addEventListener('keydown', e =>
+        this.handleFormKeyDown_(e),
       );
-      this.unratedCheckbox.addEventListener('change', e =>
-        this.handleUnratedCheckboxChanged(e),
+      this.unratedCheckbox_.addEventListener('change', e =>
+        this.handleUnratedCheckboxChanged_(e),
       );
-      this.minRatingSelect = get('min-rating-select');
-      this.maxPlaysInput = get('max-plays-input');
-      this.maxPlaysInput.addEventListener('keydown', e =>
-        this.handleFormKeyDown(e),
+      this.minRatingSelect_ = get('min-rating-select');
+      this.maxPlaysInput_ = get('max-plays-input');
+      this.maxPlaysInput_.addEventListener('keydown', e =>
+        this.handleFormKeyDown_(e),
       );
-      this.firstPlayedSelect = get('first-played-select');
-      this.lastPlayedSelect = get('last-played-select');
-      this.presetSelect = get('preset-select');
-      this.presetSelect.addEventListener('change', e =>
-        this.handlePresetSelectChanged(e),
+      this.firstPlayedSelect_ = get('first-played-select');
+      this.lastPlayedSelect_ = get('last-played-select');
+      this.presetSelect_ = get('preset-select');
+      this.presetSelect_.addEventListener('change', e =>
+        this.handlePresetSelectChanged_(e),
       );
 
-      this.searchButton = get('search-button');
-      this.searchButton.addEventListener('click', () =>
-        this.submitQuery(false),
+      this.searchButton_ = get('search-button');
+      this.searchButton_.addEventListener('click', () =>
+        this.submitQuery_(false),
       );
-      this.resetButton = get('reset-button');
-      this.resetButton.addEventListener('click', () =>
-        this.resetSearchForm(null, null, true),
+      this.resetButton_ = get('reset-button');
+      this.resetButton_.addEventListener('click', () =>
+        this.resetSearchForm_(null, null, true),
       );
-      this.luckyButton = get('lucky-button');
-      this.luckyButton.addEventListener('click', () => this.doLuckySearch());
+      this.luckyButton_ = get('lucky-button');
+      this.luckyButton_.addEventListener('click', () => this.doLuckySearch_());
 
-      this.appendButton = get('append-button');
-      this.appendButton.addEventListener('click', () =>
-        this.enqueueSearchResults(
+      this.appendButton_ = get('append-button');
+      this.appendButton_.addEventListener('click', () =>
+        this.enqueueSearchResults_(
           false /* clearFirst */,
           false /* afterCurrent */,
         ),
       );
-      this.insertButton = get('insert-button');
-      this.insertButton.addEventListener('click', () =>
-        this.enqueueSearchResults(false, true),
+      this.insertButton_ = get('insert-button');
+      this.insertButton_.addEventListener('click', () =>
+        this.enqueueSearchResults_(false, true),
       );
-      this.replaceButton = get('replace-button');
-      this.replaceButton.addEventListener('click', () =>
-        this.enqueueSearchResults(true, false),
+      this.replaceButton_ = get('replace-button');
+      this.replaceButton_.addEventListener('click', () =>
+        this.enqueueSearchResults_(true, false),
       );
 
-      this.searchResultsTable = get('results-table');
+      this.searchResultsTable_ = get('results-table');
       // TODO: Find a better way to do this.
       window.setTimeout(() => {
-        this.searchResultsTable.setArtistClickedCallback(artist =>
-          this.resetSearchForm(artist, null),
+        this.searchResultsTable_.setArtistClickedCallback(artist =>
+          this.resetSearchForm_(artist, null),
         );
-        this.searchResultsTable.setAlbumClickedCallback(album =>
-          this.resetSearchForm(null, album),
+        this.searchResultsTable_.setAlbumClickedCallback(album =>
+          this.resetSearchForm_(null, album),
         );
-        this.searchResultsTable.setCheckedSongsChangedCallback(num =>
-          this.handleCheckedSongsChanged_(num),
+        this.searchResultsTable_.setCheckedSongsChangedCallback(
+          num =>
+            (this.appendButton_.disabled = this.insertButton_.disabled = this.replaceButton_.disabled = !num),
         );
       });
 
-      this.waitingDiv = get('waiting');
+      this.waitingDiv_ = get('waiting');
     }
 
     set musicPlayer(player) {
@@ -362,96 +363,40 @@ customElements.define(
     }
 
     resetForTesting() {
-      this.resetSearchForm(null, null, true);
+      this.resetSearchForm_(null, null, true);
     }
 
     handleTagsUpdated(tags) {
-      this.tagSuggester.words = tags;
+      this.tagSuggester_.words = tags;
     }
 
-    parseQueryString(text) {
+    submitQuery_(appendToQueue) {
       let terms = [];
-      let keywords = [];
-
-      text = text.trim();
-      while (text.length > 0) {
-        if (
-          text.indexOf('artist:') == 0 ||
-          text.indexOf('title:') == 0 ||
-          text.indexOf('album:') == 0
-        ) {
-          const key = text.substring(0, text.indexOf(':'));
-
-          // Skip over key and leading whitespace.
-          let index = key.length + 1;
-          for (; index < text.length && text[index] == ' '; index++);
-
-          let value = '';
-          let inEscape = false;
-          let inQuote = false;
-          for (; index < text.length; index++) {
-            const ch = text[index];
-            if (ch == '\\' && !inEscape) {
-              inEscape = true;
-            } else if (ch == '"' && !inEscape) {
-              inQuote = !inQuote;
-            } else if (ch == ' ' && !inQuote) {
-              break;
-            } else {
-              value += ch;
-              inEscape = false;
-            }
-          }
-
-          if (value.length > 0)
-            terms.push(key + '=' + encodeURIComponent(value));
-          text = text.substring(index);
-        } else {
-          const match = text.match(/^(\S+)(.*)/);
-          // The server splits on non-alphanumeric characters to make keywords.
-          // Split on miscellaneous punctuation here to at least handle some of this.
-          keywords = keywords.concat(
-            match[1].split(/[-_+=~!?@#$%^&*()'".,:;]+/).filter(s => s.length),
-          );
-          text = match[2];
-        }
-        text = text.trim();
+      if (this.keywordsInput_.value.trim()) {
+        terms = terms.concat(parseQueryString(this.keywordsInput_.value));
       }
-
-      if (keywords.length > 0) {
-        terms.push('keywords=' + encodeURIComponent(keywords.join(' ')));
+      if (this.tagsInput_.value.trim()) {
+        terms.push('tags=' + encodeURIComponent(this.tagsInput_.value.trim()));
       }
-
-      return terms;
-    }
-
-    submitQuery(appendToQueue) {
-      let terms = [];
-      if (this.keywordsInput.value.trim()) {
-        terms = terms.concat(this.parseQueryString(this.keywordsInput.value));
+      if (this.minRatingSelect_.value != 0 && !this.unratedCheckbox_.checked) {
+        terms.push('minRating=' + this.minRatingSelect_.value);
       }
-      if (this.tagsInput.value.trim()) {
-        terms.push('tags=' + encodeURIComponent(this.tagsInput.value.trim()));
+      if (this.shuffleCheckbox_.checked) terms.push('shuffle=1');
+      if (this.firstTrackCheckbox_.checked) terms.push('firstTrack=1');
+      if (this.unratedCheckbox_.checked) terms.push('unrated=1');
+      if (!isNaN(parseInt(this.maxPlaysInput_.value))) {
+        terms.push('maxPlays=' + parseInt(this.maxPlaysInput_.value));
       }
-      if (this.minRatingSelect.value != 0 && !this.unratedCheckbox.checked) {
-        terms.push('minRating=' + this.minRatingSelect.value);
-      }
-      if (this.shuffleCheckbox.checked) terms.push('shuffle=1');
-      if (this.firstTrackCheckbox.checked) terms.push('firstTrack=1');
-      if (this.unratedCheckbox.checked) terms.push('unrated=1');
-      if (!isNaN(parseInt(this.maxPlaysInput.value))) {
-        terms.push('maxPlays=' + parseInt(this.maxPlaysInput.value));
-      }
-      if (this.firstPlayedSelect.value != 0) {
+      if (this.firstPlayedSelect_.value != 0) {
         terms.push(
           'minFirstPlayed=' +
-            (getCurrentTimeSec() - parseInt(this.firstPlayedSelect.value)),
+            (getCurrentTimeSec() - parseInt(this.firstPlayedSelect_.value)),
         );
       }
-      if (this.lastPlayedSelect.value != 0) {
+      if (this.lastPlayedSelect_.value != 0) {
         terms.push(
           'maxLastPlayed=' +
-            (getCurrentTimeSec() - parseInt(this.lastPlayedSelect.value)),
+            (getCurrentTimeSec() - parseInt(this.lastPlayedSelect_.value)),
         );
       }
 
@@ -463,19 +408,19 @@ customElements.define(
         return;
       }
 
-      if (this.request) this.request.abort();
+      if (this.request_) this.request_.abort();
 
-      this.request = new XMLHttpRequest();
+      this.request_ = new XMLHttpRequest();
 
-      this.request.onload = () => {
-        const req = this.request;
+      this.request_.onload = () => {
+        const req = this.request_;
         if (req.status == 200) {
           if (req.responseText) {
             const songs = eval('(' + req.responseText + ')');
             console.log('Got response with ' + songs.length + ' song(s)');
-            this.searchResultsTable.updateSongs(songs);
-            this.searchResultsTable.setAllCheckboxes(true);
-            if (appendToQueue) this.enqueueSearchResults(true, true);
+            this.searchResultsTable_.updateSongs(songs);
+            this.searchResultsTable_.setAllCheckboxes(true);
+            if (appendToQueue) this.enqueueSearchResults_(true, true);
           } else {
             this.dialogManager_.createMessageDialog(
               'Search Failed',
@@ -496,11 +441,11 @@ customElements.define(
           }
         }
 
-        this.waitingDiv.style.display = 'none';
-        this.request = null;
+        this.waitingDiv_.style.display = 'none';
+        this.request_ = null;
       };
 
-      this.request.onerror = e => {
+      this.request_.onerror = e => {
         this.dialogManager_.createMessageDialog(
           'Search Failed',
           'Request to server failed.',
@@ -508,27 +453,27 @@ customElements.define(
         console.log(e);
       };
 
-      this.waitingDiv.style.display = 'block';
+      this.waitingDiv_.style.display = 'block';
       const url = 'query?' + terms.join('&');
       console.log('Sending query: ' + url);
-      this.request.open('GET', url, true);
-      this.request.send();
+      this.request_.open('GET', url, true);
+      this.request_.send();
     }
 
-    enqueueSearchResults(clearFirst, afterCurrent) {
-      if (!this.searchResultsTable.numSongs) return;
+    enqueueSearchResults_(clearFirst, afterCurrent) {
+      if (!this.searchResultsTable_.numSongs) return;
 
-      const songs = this.searchResultsTable.checkedSongs;
+      const songs = this.searchResultsTable_.checkedSongs;
       this.musicPlayer_.enqueueSongs(songs, clearFirst, afterCurrent);
-      if (songs.length == this.searchResultsTable.numSongs) {
-        this.searchResultsTable.updateSongs([]);
+      if (songs.length == this.searchResultsTable_.numSongs) {
+        this.searchResultsTable_.updateSongs([]);
       }
     }
 
     // Reset all of the fields in the search form.  If |artist| or |album| are
     // non-null, the supplied values are used.  Also jumps to the top of the
     // page so the form is visible.
-    resetSearchForm(artist, album, clearResults) {
+    resetSearchForm_(artist, album, clearResults) {
       const keywords = [];
       const clean = s => {
         s = s.replace(/"/g, '\\"');
@@ -538,45 +483,45 @@ customElements.define(
       if (artist) keywords.push('artist:' + clean(artist));
       if (album) keywords.push('album:' + clean(album));
 
-      this.keywordsInput.value = keywords.join(' ');
-      this.tagsInput.value = null;
-      this.shuffleCheckbox.checked = false;
-      this.firstTrackCheckbox.checked = false;
-      this.unratedCheckbox.checked = false;
-      this.minRatingSelect.selectedIndex = 0;
-      this.minRatingSelect.disabled = false;
-      this.maxPlaysInput.value = null;
-      this.firstPlayedSelect.selectedIndex = 0;
-      this.lastPlayedSelect.selectedIndex = 0;
-      this.presetSelect.selectedIndex = 0;
-      if (clearResults) this.searchResultsTable.updateSongs([]);
+      this.keywordsInput_.value = keywords.join(' ');
+      this.tagsInput_.value = null;
+      this.shuffleCheckbox_.checked = false;
+      this.firstTrackCheckbox_.checked = false;
+      this.unratedCheckbox_.checked = false;
+      this.minRatingSelect_.selectedIndex = 0;
+      this.minRatingSelect_.disabled = false;
+      this.maxPlaysInput_.value = null;
+      this.firstPlayedSelect_.selectedIndex = 0;
+      this.lastPlayedSelect_.selectedIndex = 0;
+      this.presetSelect_.selectedIndex = 0;
+      if (clearResults) this.searchResultsTable_.updateSongs([]);
       this.scrollIntoView();
     }
 
     // Handles the "I'm Feeling Lucky" button being clicked.
-    doLuckySearch() {
+    doLuckySearch_() {
       if (
-        !this.keywordsInput.value &&
-        !this.tagsInput.value &&
-        !this.shuffleCheckbox.checked &&
-        !this.firstTrackCheckbox.checked &&
-        !this.unratedCheckbox.checked &&
-        this.minRatingSelect.selectedIndex == 0 &&
-        !this.maxPlaysInput.value &&
-        this.firstPlayedSelect.selectedIndex == 0 &&
-        this.lastPlayedSelect.selectedIndex == 0
+        !this.keywordsInput_.value &&
+        !this.tagsInput_.value &&
+        !this.shuffleCheckbox_.checked &&
+        !this.firstTrackCheckbox_.checked &&
+        !this.unratedCheckbox_.checked &&
+        this.minRatingSelect_.selectedIndex == 0 &&
+        !this.maxPlaysInput_.value &&
+        this.firstPlayedSelect_.selectedIndex == 0 &&
+        this.lastPlayedSelect_.selectedIndex == 0
       ) {
-        this.resetSearchForm(null, null, false);
-        this.shuffleCheckbox.checked = true;
-        this.minRatingSelect.selectedIndex = 3;
+        this.resetSearchForm_(null, null, false);
+        this.shuffleCheckbox_.checked = true;
+        this.minRatingSelect_.selectedIndex = 3;
       }
-      this.submitQuery(true);
+      this.submitQuery_(true);
     }
 
     // Handle a key being pressed in the search form.
-    handleFormKeyDown(e) {
+    handleFormKeyDown_(e) {
       if (e.keyCode == KeyCodes.ENTER) {
-        this.submitQuery(false);
+        this.submitQuery_(false);
       } else if (
         e.keyCode == KeyCodes.SPACE ||
         e.keyCode == KeyCodes.LEFT ||
@@ -587,62 +532,106 @@ customElements.define(
       }
     }
 
-    handleUnratedCheckboxChanged(event) {
-      this.minRatingSelect.disabled = this.unratedCheckbox.checked;
+    handleUnratedCheckboxChanged_(event) {
+      this.minRatingSelect_.disabled = this.unratedCheckbox_.checked;
     }
 
-    handlePresetSelectChanged(event) {
-      if (this.presetSelect.value == '') return;
+    handlePresetSelectChanged_(event) {
+      if (this.presetSelect_.value == '') return;
 
-      const index = this.presetSelect.selectedIndex;
-      this.resetSearchForm(null, null, false);
-      this.presetSelect.selectedIndex = index;
+      const index = this.presetSelect_.selectedIndex;
+      this.resetSearchForm_(null, null, false);
+      this.presetSelect_.selectedIndex = index;
 
       let play = false;
 
-      const vals = this.presetSelect.value.split(';');
+      const vals = this.presetSelect_.value.split(';');
       for (let i = 0; i < vals.length; i++) {
         const parts = vals[i].split('=');
-        if (parts[0] == 'fp') this.firstPlayedSelect.selectedIndex = parts[1];
-        else if (parts[0] == 'ft') this.firstTrackCheckbox.checked = !!parts[1];
+        if (parts[0] == 'fp') this.firstPlayedSelect_.selectedIndex = parts[1];
+        else if (parts[0] == 'ft')
+          this.firstTrackCheckbox_.checked = !!parts[1];
         else if (parts[0] == 'lp')
-          this.lastPlayedSelect.selectedIndex = parts[1];
+          this.lastPlayedSelect_.selectedIndex = parts[1];
         else if (parts[0] == 'mr')
-          this.minRatingSelect.selectedIndex = parts[1];
+          this.minRatingSelect_.selectedIndex = parts[1];
         else if (parts[0] == 'play') play = !!parts[1];
-        else if (parts[0] == 's') this.shuffleCheckbox.checked = !!parts[1];
-        else if (parts[0] == 't') this.tagsInput.value = parts[1];
-        else if (parts[0] == 'u') this.unratedCheckbox.checked = !!parts[1];
+        else if (parts[0] == 's') this.shuffleCheckbox_.checked = !!parts[1];
+        else if (parts[0] == 't') this.tagsInput_.value = parts[1];
+        else if (parts[0] == 'u') this.unratedCheckbox_.checked = !!parts[1];
         else console.log('Unknown preset setting ' + vals[i]);
       }
 
       // Unfocus the element so that arrow keys or Page Up/Down won't select new
       // presets.
-      this.presetSelect.blur();
+      this.presetSelect_.blur();
 
-      this.submitQuery(play);
-    }
-
-    handleCheckedSongsChanged_(numChecked) {
-      this.appendButton.disabled = this.insertButton.disabled = this.replaceButton.disabled = !numChecked;
+      this.submitQuery_(play);
     }
 
     handleBodyKeyDown_(e) {
-      if (this.processAccelerator_(e)) {
+      if (this.dialogManager_.numDialogs) return;
+
+      if (e.keyCode == KeyCodes.SLASH) {
+        this.keywordsInput_.focus();
         e.preventDefault();
         e.stopPropagation();
       }
     }
-
-    processAccelerator_(e) {
-      if (this.dialogManager_.numDialogs) return false;
-
-      if (e.keyCode == KeyCodes.SLASH) {
-        this.keywordsInput.focus();
-        return true;
-      }
-
-      return false;
-    }
   },
 );
+
+function parseQueryString(text) {
+  let terms = [];
+  let keywords = [];
+
+  text = text.trim();
+  while (text.length > 0) {
+    if (
+      text.indexOf('artist:') == 0 ||
+      text.indexOf('title:') == 0 ||
+      text.indexOf('album:') == 0
+    ) {
+      const key = text.substring(0, text.indexOf(':'));
+
+      // Skip over key and leading whitespace.
+      let index = key.length + 1;
+      for (; index < text.length && text[index] == ' '; index++);
+
+      let value = '';
+      let inEscape = false;
+      let inQuote = false;
+      for (; index < text.length; index++) {
+        const ch = text[index];
+        if (ch == '\\' && !inEscape) {
+          inEscape = true;
+        } else if (ch == '"' && !inEscape) {
+          inQuote = !inQuote;
+        } else if (ch == ' ' && !inQuote) {
+          break;
+        } else {
+          value += ch;
+          inEscape = false;
+        }
+      }
+
+      if (value.length > 0) terms.push(key + '=' + encodeURIComponent(value));
+      text = text.substring(index);
+    } else {
+      const match = text.match(/^(\S+)(.*)/);
+      // The server splits on non-alphanumeric characters to make keywords.
+      // Split on miscellaneous punctuation here to at least handle some of this.
+      keywords = keywords.concat(
+        match[1].split(/[-_+=~!?@#$%^&*()'".,:;]+/).filter(s => s.length),
+      );
+      text = match[2];
+    }
+    text = text.trim();
+  }
+
+  if (keywords.length > 0) {
+    terms.push('keywords=' + encodeURIComponent(keywords.join(' ')));
+  }
+
+  return terms;
+}
