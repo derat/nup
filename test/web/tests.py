@@ -644,7 +644,7 @@ class Test(unittest.TestCase):
                           (actual, expected))
 
         def check_suggestions(expected):
-            actual = page.get_tag_suggestions(page.EDIT_TAGS_SUGGESTIONS_DIV)
+            actual = page.get_tag_suggestions(page.EDIT_TAGS_SUGGESTER)
             if actual != expected:
                 self.fail('Tag suggestions were %s; expected %s' %
                           (str(actual), str(expected)))
@@ -688,13 +688,13 @@ class Test(unittest.TestCase):
         wait_for_volume(0.5)
 
         page.click(page.OPTIONS_OK_BUTTON)
-        page.wait_until_gone(page.OPTIONS_DIV)
+        page.wait_until_gone(page.OPTIONS_OK_BUTTON)
 
         page.show_options()
         wait_for_volume(0.5)
         ESCAPE = u'\ue00c'
         page.get(page.BODY).send_keys(ESCAPE)
-        page.wait_until_gone(page.OPTIONS_DIV)
+        page.wait_until_gone(page.OPTIONS_OK_BUTTON)
 
         page.reload()
         wait_for_volume(0.5, check_span=False)

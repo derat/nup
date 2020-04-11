@@ -43,7 +43,7 @@ class Page(object):
     AUDIO = (By.ID, 'audio')
     BODY = (By.TAG_NAME, 'body')
     COVER_IMAGE = (By.ID, 'coverImage')
-    EDIT_TAGS_SUGGESTIONS_DIV = (By.ID, 'editTagsSuggestionsDiv')
+    EDIT_TAGS_SUGGESTER = (By.ID, 'editTagsSuggester')
     EDIT_TAGS_TEXTAREA = (By.ID, 'editTagsTextarea')
     FIRST_PLAYED_SELECT = (By.ID, 'firstPlayedSelect')
     FIRST_TRACK_CHECKBOX = (By.ID, 'firstTrackCheckbox')
@@ -52,10 +52,12 @@ class Page(object):
     LUCKY_BUTTON = (By.ID, 'luckyButton')
     MIN_RATING_SELECT = (By.ID, 'minRatingSelect')
     NEXT_BUTTON = (By.ID, 'nextButton')
-    OPTIONS_DIV = (By.ID, 'optionsDiv')
-    OPTIONS_OK_BUTTON = (By.ID, 'optionsOkButton')
+    OPTIONS_OK_BUTTON = (By.ID, 'dialogManager',
+                         By.CSS_SELECTOR, '.dialog',
+                         By.ID, 'ok-button')
     PLAY_PAUSE_BUTTON = (By.ID, 'playPauseButton')
-    PLAYLIST_TABLE = (By.ID, 'playlistTable')
+    PLAYLIST_TABLE = (By.ID, 'playlistTable',
+                      By.CSS_SELECTOR, 'table')
     PRESET_SELECT = (By.ID, 'presetSelect')
     PREV_BUTTON = (By.ID, 'prevButton')
     RATING_OVERLAY_DIV = (By.ID, 'ratingOverlayDiv')
@@ -63,14 +65,20 @@ class Page(object):
     REPLACE_BUTTON = (By.ID, 'replaceButton')
     RESET_BUTTON = (By.ID, 'resetButton')
     SEARCH_BUTTON = (By.ID, 'searchButton')
-    SEARCH_RESULTS_CHECKBOX = (By.ID, 'searchResultsCheckbox')
-    SEARCH_RESULTS_TABLE = (By.ID, 'searchResultsTable')
+    SEARCH_RESULTS_CHECKBOX = (By.ID, 'searchResultsTable',
+                               By.CSS_SELECTOR, 'th input[type="checkbox"]')
+    SEARCH_RESULTS_TABLE = (By.ID, 'searchResultsTable',
+                            By.CSS_SELECTOR, 'table')
     TIME_DIV = (By.ID, 'timeDiv')
     TITLE_DIV = (By.ID, 'titleDiv')
     UNRATED_CHECKBOX = (By.ID, 'unratedCheckbox')
     UPDATE_CLOSE_IMAGE = (By.ID, 'updateCloseImage')
-    VOLUME_RANGE = (By.ID, 'volumeRange')
-    VOLUME_SPAN = (By.ID, 'volumeSpan')
+    VOLUME_RANGE = (By.ID, 'dialogManager',
+                    By.CSS_SELECTOR, '.dialog',
+                    By.ID, 'volume-range')
+    VOLUME_SPAN = (By.ID, 'dialogManager',
+                   By.CSS_SELECTOR, '.dialog',
+                   By.ID, 'volume-span')
 
     # Values for FIRST_PLAYED_SELECT and LAST_PLAYED_SELECT.
     UNSET_TIME = '...'
@@ -104,10 +112,10 @@ class Page(object):
         self.driver.refresh()
 
     def reset(self):
-        self.driver.execute_script('document.resetForTesting()')
+        self.driver.execute_script('document.test.reset()')
 
     def refresh_tags(self):
-        self.driver.execute_script('document.updateTagsForTesting()');
+        self.driver.execute_script('document.test.updateTags()');
 
     def get_songs_from_table(self, table):
         songs = []
@@ -162,9 +170,29 @@ class Page(object):
                 self.get(Page.RATING_OVERLAY_DIV).text,
                 self.get(Page.COVER_IMAGE).get_attribute('title'))
 
+    # Waits for and returns the element described by |locator|.
+    # |locator| is typically a tuple like (By.ID, 'some-element') or
+    # (By.CSS_SELECTOR, 'div.foo').
+    #
+    # To handle elements nested within one or more Shadow DOMs, |locator|
+    # can also contain additional pairs using (only) By.ID or By.CSS_SELECTOR,
+    # which will be used to search within nested Shadow DOMs.
     def get(self, locator):
-        utils.wait(lambda: self.driver.find_element(*locator))
-        return self.driver.find_element(*locator)
+        utils.wait(lambda: self.driver.find_element(locator[0], locator[1]))
+        return self.get_nowait(locator)
+
+    def get_nowait(self, locator):
+        el = None
+        while len(locator):
+            if el:
+                root = self.driver.execute_script(
+                        'return arguments[0].shadowRoot', el)
+            else:
+                root = self.driver
+            el = root.find_element(locator[0], locator[1])
+            locator = locator[2:]
+
+        return el
 
     def click(self, locator):
         self.get(locator).click()
@@ -180,7 +208,7 @@ class Page(object):
     def wait_until_gone(self, locator):
         def exists():
             try:
-                self.driver.find_element(*locator)
+                self.get_nowait(locator)
                 return True
             except selenium.common.exceptions.NoSuchElementException:
                 return False
@@ -212,13 +240,16 @@ class Page(object):
         stars[num_stars-1].click()
 
     def get_tag_suggestions(self, locator):
-        spans = self.get(locator).find_elements_by_tag_name('span')
+        suggester = self.get(locator)
+        root = self.driver.execute_script('return arguments[0].shadowRoot',
+                                          suggester)
+        spans = root.find_elements_by_css_selector('span')
         return [s.text for s in spans]
 
     def show_options(self):
         # TODO: This ought to be using Alt+O, but my version of selenium is
         # broken and barfs when modifiers are sent.
-        self.driver.execute_script('document.player.showOptions()')
+        self.driver.execute_script('document.test.showOptions()')
 
     def rate_and_tag_song(self, song_id, rating=None, tags=None):
         '''Rates and/or tags a song, bypassing the UI.
@@ -233,7 +264,7 @@ class Page(object):
         if tags is None:
             tags = 'null'
         self.driver.execute_script(
-            'document.player.updater.rateAndTag(%s, %s, %s)' %
+            'document.test.rateAndTag(%s, %s, %s)' %
             (song_id, rating, tags))
 
     def report_play(self, song_id, start_time):
@@ -244,5 +275,4 @@ class Page(object):
                start_time: float timestamp
         '''
         self.driver.execute_script(
-            'document.player.updater.reportPlay(%s, %f)' %
-            (song_id, start_time))
+            'document.test.reportPlay(%s, %f)' % (song_id, start_time))

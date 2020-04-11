@@ -14,5 +14,12 @@ const playlist = new Playlist(player, dialogManager);
 player.setPlaylist(playlist); // ugly circular dependency
 
 // Used by browser tests.
-document.resetForTesting = () => playlist.resetForTesting();
-document.updateTagsForTesting = () => player.updateTagsFromServer(false);
+document.test = {
+  rateAndTag: (songId, rating, tags) =>
+    player.updater.rateAndTag(songId, rating, tags),
+  reportPlay: (songId, startTime) =>
+    player.updater.reportPlay(songId, startTime),
+  reset: () => playlist.resetForTesting(),
+  showOptions: () => player.showOptions(),
+  updateTags: () => player.updateTagsFromServer(false),
+};

@@ -74,6 +74,8 @@ customElements.define(
     constructor() {
       super();
 
+      this.style.pointerEvents = 'none';
+
       this.shadow_ = this.attachShadow({mode: 'open'});
       this.shadow_.appendChild(template.content.cloneNode(true));
       this.lightbox_ = $('lightbox', this.shadow_);
