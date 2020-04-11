@@ -11,6 +11,9 @@ from song import Song
 
 # Loosely based on https://selenium-python.readthedocs.org/page-objects.html.
 class InputElement(object):
+    def __init__(self, locator):
+        self.locator = locator
+
     def __set__(self, obj, value):
         element = obj.get(self.locator)
         element.clear()
@@ -22,61 +25,52 @@ class InputElement(object):
     def send_keys(self, value):
         obj.get(self.locator).send_keys(value)
 
-class KeywordsInput(InputElement):
-    locator = (By.ID, 'keywordsInput')
-
-class MaxPlaysInput(InputElement):
-    locator = (By.ID, 'maxPlaysInput')
-
-class TagsInput(InputElement):
-    locator = (By.ID, 'tagsInput')
-
 class Page(object):
-    keywords = KeywordsInput()
-    tags = TagsInput()
-    max_plays = MaxPlaysInput()
-
-    # Locators for elements with shadow DOMs.
-    DIALOG_MANAGER = (By.TAG_NAME, 'dialog-manager')
-    MUSIC_PLAYER = (By.TAG_NAME, 'music-player')
-    OPTIONS_DIALOG = DIALOG_MANAGER + (By.CSS_SELECTOR, '.dialog')
-
     # Locators for various elements.
+    BODY = (By.TAG_NAME, 'body')
+
+    DIALOG_MANAGER = (By.TAG_NAME, 'dialog-manager')
+    OPTIONS_DIALOG = DIALOG_MANAGER + (By.CSS_SELECTOR, '.dialog')
+    OPTIONS_OK_BUTTON = OPTIONS_DIALOG + (By.ID, 'ok-button')
+    VOLUME_RANGE = OPTIONS_DIALOG + (By.ID, 'volume-range')
+    VOLUME_SPAN = OPTIONS_DIALOG + (By.ID, 'volume-span')
+
+    MUSIC_PLAYER = (By.TAG_NAME, 'music-player')
     ALBUM_DIV = MUSIC_PLAYER + (By.ID, 'album')
-    APPEND_BUTTON = (By.ID, 'appendButton')
     ARTIST_DIV = MUSIC_PLAYER + (By.ID, 'artist')
     AUDIO = MUSIC_PLAYER + (By.CSS_SELECTOR, 'audio')
-    BODY = (By.TAG_NAME, 'body')
     COVER_IMAGE = MUSIC_PLAYER + (By.ID, 'cover-img')
     EDIT_TAGS_SUGGESTER = MUSIC_PLAYER + (By.ID, 'edit-tags-suggester')
     EDIT_TAGS_TEXTAREA = MUSIC_PLAYER + (By.ID, 'edit-tags')
-    FIRST_PLAYED_SELECT = (By.ID, 'firstPlayedSelect')
-    FIRST_TRACK_CHECKBOX = (By.ID, 'firstTrackCheckbox')
-    INSERT_BUTTON = (By.ID, 'insertButton')
-    LAST_PLAYED_SELECT = (By.ID, 'lastPlayedSelect')
-    LUCKY_BUTTON = (By.ID, 'luckyButton')
-    MIN_RATING_SELECT = (By.ID, 'minRatingSelect')
     NEXT_BUTTON = MUSIC_PLAYER + (By.ID, 'next')
-    OPTIONS_OK_BUTTON = DIALOG_MANAGER + (By.CSS_SELECTOR, '.dialog', By.ID, 'ok-button')
     PLAY_PAUSE_BUTTON = MUSIC_PLAYER + (By.ID, 'play-pause')
     PLAYLIST_TABLE = MUSIC_PLAYER + (By.ID, 'playlist', By.CSS_SELECTOR, 'table')
-    PRESET_SELECT = (By.ID, 'presetSelect')
     PREV_BUTTON = MUSIC_PLAYER + (By.ID, 'prev')
     RATING_OVERLAY_DIV = MUSIC_PLAYER + (By.ID, 'rating-overlay')
     RATING_SPAN = MUSIC_PLAYER + (By.ID, 'rating')
-    REPLACE_BUTTON = (By.ID, 'replaceButton')
-    RESET_BUTTON = (By.ID, 'resetButton')
-    SEARCH_BUTTON = (By.ID, 'searchButton')
-    SEARCH_RESULTS_CHECKBOX = (By.ID, 'searchResultsTable',
-                               By.CSS_SELECTOR, 'th input[type="checkbox"]')
-    SEARCH_RESULTS_TABLE = (By.ID, 'searchResultsTable',
-                            By.CSS_SELECTOR, 'table')
     TIME_DIV = MUSIC_PLAYER + (By.ID, 'time')
     TITLE_DIV = MUSIC_PLAYER + (By.ID, 'title')
-    UNRATED_CHECKBOX = (By.ID, 'unratedCheckbox')
     UPDATE_CLOSE_IMAGE = MUSIC_PLAYER + (By.ID, 'update-close')
-    VOLUME_RANGE = OPTIONS_DIALOG + (By.ID, 'volume-range')
-    VOLUME_SPAN = OPTIONS_DIALOG + (By.ID, 'volume-span')
+
+    SEARCH_FORM = (By.TAG_NAME, 'search-form');
+    APPEND_BUTTON = SEARCH_FORM + (By.ID, 'append-button')
+    FIRST_PLAYED_SELECT = SEARCH_FORM + (By.ID, 'first-played-select')
+    FIRST_TRACK_CHECKBOX = SEARCH_FORM + (By.ID, 'first-track-checkbox')
+    INSERT_BUTTON = SEARCH_FORM + (By.ID, 'insert-button')
+    LAST_PLAYED_SELECT = SEARCH_FORM + (By.ID, 'last-played-select')
+    LUCKY_BUTTON = SEARCH_FORM + (By.ID, 'lucky-button')
+    MIN_RATING_SELECT = SEARCH_FORM + (By.ID, 'min-rating-select')
+    PRESET_SELECT = SEARCH_FORM + (By.ID, 'preset-select')
+    REPLACE_BUTTON = SEARCH_FORM + (By.ID, 'replace-button')
+    RESET_BUTTON = SEARCH_FORM + (By.ID, 'reset-button')
+    SEARCH_BUTTON = SEARCH_FORM + (By.ID, 'search-button')
+    SEARCH_RESULTS_CHECKBOX = SEARCH_FORM + (By.ID, 'results-table', By.CSS_SELECTOR, 'th input[type="checkbox"]')
+    SEARCH_RESULTS_TABLE = SEARCH_FORM + (By.ID, 'results-table', By.CSS_SELECTOR, 'table')
+    UNRATED_CHECKBOX = SEARCH_FORM + (By.ID, 'unrated-checkbox')
+
+    keywords = InputElement(SEARCH_FORM + (By.ID, 'keywords-input'))
+    max_plays = InputElement(SEARCH_FORM + (By.ID, 'max-plays-input'))
+    tags = InputElement(SEARCH_FORM + (By.ID, 'tags-input'))
 
     # Values for FIRST_PLAYED_SELECT and LAST_PLAYED_SELECT.
     UNSET_TIME = '...'

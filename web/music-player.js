@@ -177,7 +177,7 @@ customElements.define(
       super();
 
       this.config_ = null;
-      this.playlist_ = null;
+      this.searchForm_ = null;
       this.dialogManager_ = null;
       this.presentationLayer_ = null;
       this.favicon_ = null;
@@ -251,10 +251,10 @@ customElements.define(
       // point, presumably because it's part of our shadow DOM.
       window.setTimeout(() => {
         this.playlistTable_.setArtistClickedCallback(artist => {
-          if (this.playlist_) this.playlist_.resetSearchForm(artist, null);
+          if (this.searchForm_) this.searchForm_.resetSearchForm(artist, null);
         });
         this.playlistTable_.setAlbumClickedCallback(album => {
-          if (this.playlist_) this.playlist_.resetSearchForm(null, album);
+          if (this.searchForm_) this.searchForm_.resetSearchForm(null, album);
         });
       });
 
@@ -299,10 +299,10 @@ customElements.define(
       layer.setPlayNextTrackFunction(() => this.cycleTrack_(1));
     }
 
-    set playlist(playlist) {
-      this.playlist_ = playlist;
+    set searchForm(form) {
+      this.searchForm_ = form;
       // TODO: Get rid of this.
-      if (playlist) this.playlist_.handleTagsUpdated(this.tags_);
+      if (form) this.searchForm_.handleTagsUpdated(this.tags_);
     }
 
     updateTagsFromServer_(async) {
@@ -391,7 +391,7 @@ customElements.define(
       this.tags_ = tags.slice(0);
       this.tagSuggester_.words = this.tags_;
       // TODO: Get rid of this ugly call.
-      if (this.playlist_) this.playlist_.handleTagsUpdated(this.tags_);
+      if (this.searchForm_) this.searchForm_.handleTagsUpdated(this.tags_);
     }
 
     updateButtonState_() {

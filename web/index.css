@@ -1,9 +1,35 @@
 /* Copyright 2020 Daniel Erat.
  * All rights reserved. */
 
+html {
+  height: 100%;
+}
 body {
-  margin: 0;
+  background-color: white;
+  color: black;
   font-family: Verdana, 'DejaVu Sans', Arial, Helvetica, 'Liberation Sans',
     sans-serif;
   font-size: 12px;
+  height: 100%;
+  margin: 0;
+}
+
+#container {
+  min-height: 100%;
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: stretch;
+}
+#left {
+  flex-grow: 1;
+  min-height: 100%;
+  padding-bottom: 2px;
+}
+#divider {
+  flex: 0 0 1px;
+  background-color: #888;
+}
+#right {
+  flex-grow: 1;
+  padding-bottom: 2px;
 }

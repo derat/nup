@@ -3,31 +3,32 @@
 
 import {$} from './common.js';
 import Config from './config.js';
-import Playlist from './playlist.js';
 
 const config = new Config();
 const dialogManager = document.querySelector('dialog-manager');
+const musicPlayer = document.querySelector('music-player');
 const presentationLayer = document.querySelector('presentation-layer');
+const searchForm = document.querySelector('search-form');
 
-const player = document.querySelector('music-player');
-player.config = config;
-player.dialogManager = dialogManager;
-player.presentationLayer = presentationLayer;
-player.favicon = $('favicon');
+musicPlayer.config = config;
+musicPlayer.dialogManager = dialogManager;
+musicPlayer.presentationLayer = presentationLayer;
+musicPlayer.searchForm = searchForm;
+musicPlayer.favicon = $('favicon');
 
-const playlist = new Playlist(player, dialogManager);
-player.playlist = playlist; // ugly circular dependency
+searchForm.dialogManager = dialogManager;
+searchForm.musicPlayer = musicPlayer;
 
 // Used by browser tests.
 document.test = {
   rateAndTag: (songId, rating, tags) =>
-    player.updater_.rateAndTag(songId, rating, tags),
+    musicPlayer.updater_.rateAndTag(songId, rating, tags),
   reportPlay: (songId, startTime) =>
-    player.updater_.reportPlay(songId, startTime),
+    musicPlayer.updater_.reportPlay(songId, startTime),
   reset: () => {
-    player.resetForTesting();
-    playlist.resetForTesting();
+    musicPlayer.resetForTesting();
+    searchForm.resetForTesting();
   },
-  showOptions: () => player.showOptions_(),
-  updateTags: () => player.updateTagsFromServer_(false),
+  showOptions: () => musicPlayer.showOptions_(),
+  updateTags: () => musicPlayer.updateTagsFromServer_(false),
 };
