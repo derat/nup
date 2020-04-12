@@ -75,6 +75,7 @@ const template = createTemplate(`
     font-size: 18px;
   }
   #next-cover {
+    cursor: pointer;
     height: 80px;
     margin-right: 16px;
     object-fit: contain;
@@ -113,6 +114,10 @@ const template = createTemplate(`
 </div>
 `);
 
+// <presentation-layer> is a simple fullscreen overlay displaying information
+// about the current and next song.
+//
+// When the next track's cover image is clicked, a 'next' event is emitted.
 customElements.define(
   'presentation-layer',
   class extends HTMLElement {
@@ -150,21 +155,20 @@ customElements.define(
       this.nextTitle_ = $('next-title', this.shadow_);
       this.nextAlbum_ = $('next-album', this.shadow_);
 
-      this.nextCover_.addEventListener(
-        'click',
-        () => this.playNextTrackFunction_ && this.playNextTrackFunction_(),
-        false,
-      );
+      this.nextCover_.addEventListener('click', () => {
+        this.dispatchEvent(new Event('next'));
+        this.playNextTrackFunction_ && this.playNextTrackFunction_();
+      });
+
+      this.updateSongs(null, null);
     }
 
     updateSongs(currentSong, nextSong) {
+      this.currentCover_.src = currentSong ? currentSong.coverUrl : '';
+      this.currentCover_.style.display = currentSong ? 'block' : 'none';
       this.currentArtist_.innerText = currentSong ? currentSong.artist : '';
       this.currentTitle_.innerText = currentSong ? currentSong.title : '';
       this.currentAlbum_.innerText = currentSong ? currentSong.album : '';
-      this.currentCover_.src =
-        currentSong && currentSong.coverUrl
-          ? currentSong.coverUrl
-          : 'images/missing_cover.png';
 
       nextSong
         ? this.nextDiv_.classList.add('shown')
@@ -172,10 +176,7 @@ customElements.define(
       this.nextArtist_.innerText = nextSong ? nextSong.artist : '';
       this.nextTitle_.innerText = nextSong ? nextSong.title : '';
       this.nextAlbum_.innerText = nextSong ? nextSong.album : '';
-      this.nextCover_.src =
-        nextSong && nextSong.coverUrl
-          ? nextSong.coverUrl
-          : 'images/missing_cover.png';
+      this.nextCover_.src = nextSong ? nextSong.coverUrl : '';
 
       this.progressBorder_.style.display = currentSong ? 'block' : 'none';
       this.progressBar_.style.width = '0px';

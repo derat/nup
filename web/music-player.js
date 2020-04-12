@@ -290,9 +290,10 @@ customElements.define(
     set dialogManager(manager) {
       this.dialogManager_ = manager;
     }
+    // TODO: Should <presentation-layer> be part of <music-player>?
     set presentationLayer(layer) {
       this.presentationLayer_ = layer;
-      layer.setPlayNextTrackFunction(() => this.cycleTrack_(1));
+      layer.addEventListener('next', () => this.cycleTrack_(1));
     }
     set favicon(favicon) {
       this.favicon_ = favicon;
@@ -416,9 +417,7 @@ customElements.define(
           this.favicon_.type = url.match(/\.png$/) ? 'image/png' : 'image/jpeg';
         }
       };
-      setCover(
-        song && song.coverUrl ? song.coverUrl : 'images/missing_cover.png',
-      );
+      setCover(song ? song.coverUrl : 'images/missing_cover.png');
 
       this.updateCoverTitleAttribute_();
       this.updateRatingOverlay_();
