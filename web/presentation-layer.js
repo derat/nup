@@ -199,8 +199,8 @@ customElements.define(
     }
     set visible(visible) {
       document.body.style.overflow = visible
-        ? this.origOverflowStyle
-        : 'hidden';
+        ? 'hidden'
+        : this.origOverflowStyle;
       this.style.display = visible ? 'flex' : 'none';
       this.visible_ = visible;
     }
