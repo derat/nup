@@ -11,44 +11,42 @@ export default class Updater {
   MAX_RETRY_DELAY_MS = 300 * 1000; // Five minutes.
 
   constructor() {
-    this.retryTimeoutId = -1;
-
-    this.lastRetryDelayMs = 0;
+    this.retryTimeoutId_ = -1; // for doRetry_()
+    this.lastRetryDelayMs_ = 0; // used by scheduleRetry_()
 
     // [{'songId': songId, 'startTime': startTime}, {'songId': songId, 'startTime': startTime}, ...]
     // Put reports that were in-progress during the last run into the queue.
-    this.queuedPlayReports = this.readObject(
+    this.queuedPlayReports_ = readObject(
       this.QUEUED_PLAY_REPORTS_KEY,
       [],
-    ).concat(this.readObject(this.IN_PROGRESS_PLAY_REPORTS_KEY, []));
-    this.inProgressPlayReports = [];
+    ).concat(readObject(this.IN_PROGRESS_PLAY_REPORTS_KEY, []));
+    this.inProgressPlayReports_ = [];
 
     // {songId: {'rating': rating, 'tags': tags}, songId: {'rating': rating, 'tags': tags}, ...}
     // Either ratings or tags can be null.
-    this.queuedRatingsAndTags = this.readObject(
+    this.queuedRatingsAndTags_ = readObject(
       this.QUEUED_RATINGS_AND_TAGS_KEY,
       {},
     );
-    const oldInProgress = this.readObject(
-      this.IN_PROGRESS_RATINGS_AND_TAGS_KEY,
-      {},
-    );
+    const oldInProgress = readObject(this.IN_PROGRESS_RATINGS_AND_TAGS_KEY, {});
     for (const songId in Object.keys(oldInProgress)) {
-      this.queuedRatingsAndTags[songId] = oldInProgress[songId];
+      this.queuedRatingsAndTags_[songId] = oldInProgress[songId];
     }
-    this.inProgressRatingsAndTags = {};
+    this.inProgressRatingsAndTags_ = {};
 
-    this.writeState();
+    this.writeState_();
 
     // Start sending queued updates.
-    this.doRetry();
+    this.doRetry_();
   }
 
+  // Asynchronously notifies the server that song |songId| was played starting
+  // at |startTime| seconds since the Unix expoch.
   reportPlay(songId, startTime) {
     // Move from queued (if present) to in-progress.
-    this.removePlayReportFromArray(songId, startTime, this.queuedPlayReports);
-    this.addPlayReportToArray(songId, startTime, this.inProgressPlayReports);
-    this.writeState();
+    removePlayReport(songId, startTime, this.queuedPlayReports_);
+    addPlayReport(songId, startTime, this.inProgressPlayReports_);
+    this.writeState_();
 
     const url =
       'report_played?songId=' +
@@ -60,25 +58,17 @@ export default class Updater {
 
     const handleError = () => {
       console.log('Reporting to ' + url + ' failed; queuing to retry later');
-      this.removePlayReportFromArray(
-        songId,
-        startTime,
-        this.inProgressPlayReports,
-      );
-      this.addPlayReportToArray(songId, startTime, this.queuedPlayReports);
-      this.writeState();
-      this.scheduleRetry(false);
+      removePlayReport(songId, startTime, this.inProgressPlayReports_);
+      addPlayReport(songId, startTime, this.queuedPlayReports_);
+      this.writeState_();
+      this.scheduleRetry_(false);
     };
 
     req.onload = () => {
       if (req.status == 200) {
-        this.removePlayReportFromArray(
-          songId,
-          startTime,
-          this.inProgressPlayReports,
-        );
-        this.writeState();
-        this.scheduleRetry(true);
+        removePlayReport(songId, startTime, this.inProgressPlayReports_);
+        this.writeState_();
+        this.scheduleRetry_(true);
       } else {
         console.log('Got ' + req.status + ': ' + req.responseText);
         handleError();
@@ -90,28 +80,20 @@ export default class Updater {
     req.send();
   }
 
+  // Asynchronously notifies the server that song |songId| was given |rating| (a
+  // float) and |tags| (a string array).
   rateAndTag(songId, rating, tags) {
     if (rating == null && tags == null) return;
 
-    delete this.queuedRatingsAndTags[songId];
+    delete this.queuedRatingsAndTags_[songId];
 
-    if (this.inProgressRatingsAndTags[songId] != null) {
-      this.addRatingAndTagsToObject(
-        songId,
-        rating,
-        tags,
-        this.queuedRatingsAndTags,
-      );
+    if (this.inProgressRatingsAndTags_[songId] != null) {
+      addRatingAndTags(songId, rating, tags, this.queuedRatingsAndTags_);
       return;
     }
 
-    this.addRatingAndTagsToObject(
-      songId,
-      rating,
-      tags,
-      this.inProgressRatingsAndTags,
-    );
-    this.writeState();
+    addRatingAndTags(songId, rating, tags, this.inProgressRatingsAndTags_);
+    this.writeState_();
 
     let url = 'rate_and_tag?songId=' + encodeURIComponent(songId);
     if (rating != null) url += '&rating=' + encodeURIComponent(rating);
@@ -123,22 +105,17 @@ export default class Updater {
       console.log(
         'Rating/tagging to ' + url + ' failed; queuing to retry later',
       );
-      delete this.inProgressRatingsAndTags[songId];
-      this.addRatingAndTagsToObject(
-        songId,
-        rating,
-        tags,
-        this.queuedRatingsAndTags,
-      );
-      this.writeState();
-      this.scheduleRetry(false);
+      delete this.inProgressRatingsAndTags_[songId];
+      addRatingAndTags(songId, rating, tags, this.queuedRatingsAndTags_);
+      this.writeState_();
+      this.scheduleRetry_(false);
     };
 
     req.onload = () => {
       if (req.status == 200) {
-        delete this.inProgressRatingsAndTags[songId];
-        this.writeState();
-        this.scheduleRetry(true);
+        delete this.inProgressRatingsAndTags_[songId];
+        this.writeState_();
+        this.scheduleRetry_(true);
       } else {
         console.log('Got ' + req.status + ': ' + req.responseText);
         handleError();
@@ -150,92 +127,102 @@ export default class Updater {
     req.send();
   }
 
-  readObject(key, defaultObject) {
-    const value = localStorage[key];
-    return value != null ? JSON.parse(value) : defaultObject;
-  }
-
-  writeState() {
+  // Persists the current state to local storage.
+  writeState_() {
     localStorage[this.QUEUED_PLAY_REPORTS_KEY] = JSON.stringify(
-      this.queuedPlayReports,
+      this.queuedPlayReports_,
     );
     localStorage[this.QUEUED_RATINGS_AND_TAGS_KEY] = JSON.stringify(
-      this.queuedRatingsAndTags,
+      this.queuedRatingsAndTags_,
     );
     localStorage[this.IN_PROGRESS_PLAY_REPORTS_KEY] = JSON.stringify(
-      this.inProgressPlayReports,
+      this.inProgressPlayReports_,
     );
     localStorage[this.IN_PROGRESS_RATINGS_AND_TAGS_KEY] = JSON.stringify(
-      this.inProgressRatingsAndTags,
+      this.inProgressRatingsAndTags_,
     );
   }
 
-  scheduleRetry(lastWasSuccessful) {
+  // Schedules a doRetry_() call.
+  scheduleRetry_(lastWasSuccessful) {
     // Already scheduled.
-    if (this.retryTimeoutId >= 0) return;
+    if (this.retryTimeoutId_ >= 0) return;
 
     // Nothing to do.
     if (
-      !this.queuedPlayReports.length &&
-      !Object.keys(this.queuedRatingsAndTags).length
+      !this.queuedPlayReports_.length &&
+      !Object.keys(this.queuedRatingsAndTags_).length
     ) {
       return;
     }
 
     let delayMs = lastWasSuccessful
       ? 0
-      : this.lastRetryDelayMs > 0
-      ? this.lastRetryDelayMs * 2
+      : this.lastRetryDelayMs_ > 0
+      ? this.lastRetryDelayMs_ * 2
       : this.MIN_RETRY_DELAY_MS;
     delayMs = Math.min(delayMs, this.MAX_RETRY_DELAY_MS);
     console.log('Scheduling retry in ' + delayMs + ' ms');
-    this.retryTimeoutId = window.setTimeout(() => this.doRetry(), delayMs);
-    this.lastRetryDelayMs = delayMs;
+    this.retryTimeoutId_ = window.setTimeout(() => this.doRetry_(), delayMs);
+    this.lastRetryDelayMs_ = delayMs;
   }
 
-  doRetry() {
-    this.retryTimeoutId = -1;
+  // Sends queued plays and ratings/tags to the server.
+  doRetry_() {
+    this.retryTimeoutId_ = -1;
 
     // Already have an in-progress update; try again in a bit.
     if (
-      this.inProgressPlayReports.length ||
-      Object.keys(this.inProgressRatingsAndTags).length
+      this.inProgressPlayReports_.length ||
+      Object.keys(this.inProgressRatingsAndTags_).length
     ) {
-      this.retryTimeoutId = window.setTimeout(
-        () => this.doRetry(),
+      // TODO: Why is this here instead of there just being a call to
+      // scheduleRetry_()?
+      this.retryTimeoutId_ = window.setTimeout(
+        () => this.doRetry_(),
         this.MIN_RETRY_DELAY_MS,
       );
       return;
     }
 
-    if (Object.keys(this.queuedRatingsAndTags).length) {
-      const songId = Object.keys(this.queuedRatingsAndTags)[0];
-      const entry = this.queuedRatingsAndTags[songId];
+    if (Object.keys(this.queuedRatingsAndTags_).length) {
+      const songId = Object.keys(this.queuedRatingsAndTags_)[0];
+      const entry = this.queuedRatingsAndTags_[songId];
       this.rateAndTag(songId, entry.rating, entry.tags);
       return;
     }
 
-    if (this.queuedPlayReports.length) {
-      const entry = this.queuedPlayReports[0];
+    if (this.queuedPlayReports_.length) {
+      const entry = this.queuedPlayReports_[0];
       this.reportPlay(entry.songId, entry.startTime);
       return;
     }
   }
+}
 
-  addPlayReportToArray(songId, startTime, list) {
-    list.push({songId: songId, startTime: startTime});
-  }
+// Reads |key| from local storage and parses it as JSON.
+// |defaultObject| is returned if the key is unset.
+function readObject(key, defaultObject) {
+  const value = localStorage[key];
+  return value != null ? JSON.parse(value) : defaultObject;
+}
 
-  removePlayReportFromArray(songId, startTime, list) {
-    for (let i = 0; i < list.length; i++) {
-      if (list[i].songId == songId && list[i].startTime == startTime) {
-        list.splice(i, 1);
-        return;
-      }
+// Appends a play report to |list|.
+function addPlayReport(songId, startTime, list) {
+  list.push({songId: songId, startTime: startTime});
+}
+
+// Removes the specified play report from |list|.
+function removePlayReport(songId, startTime, list) {
+  for (let i = 0; i < list.length; i++) {
+    if (list[i].songId == songId && list[i].startTime == startTime) {
+      list.splice(i, 1);
+      return;
     }
   }
+}
 
-  addRatingAndTagsToObject(songId, rating, tags, obj) {
-    obj[songId] = {rating: rating, tags: tags};
-  }
+// Sets |songId|'s rating and tags within |obj|.
+function addRatingAndTags(songId, rating, tags, obj) {
+  obj[songId] = {rating: rating, tags: tags};
 }
