@@ -130,6 +130,8 @@ const template = createTemplate(`
   }
 </style>
 
+<presentation-layer></presentation-layer>
+
 <audio type="audio/mpeg">
   Your browser doesn't support the audio element.
 </audio>
@@ -179,10 +181,9 @@ customElements.define(
       this.config_ = null;
       this.searchForm_ = null;
       this.dialogManager_ = null;
-      this.presentationLayer_ = null;
-      this.favicon_ = null;
       this.optionsDialog_ = null;
       this.updater_ = new Updater();
+      this.favicon_ = getFavicon();
 
       this.songs_ = []; // songs in the order in which they should be played
       this.tags_ = []; // available tags loaded from server
@@ -203,6 +204,13 @@ customElements.define(
       this.style.display = 'block';
       this.shadow_ = createShadow(this, template);
       const get = id => $(id, this.shadow_);
+
+      this.presentationLayer_ = this.shadow_.querySelector(
+        'presentation-layer',
+      );
+      this.presentationLayer_.addEventListener('next', () => {
+        this.cycleTrack_(1);
+      });
 
       this.audio_ = this.shadow_.querySelector('audio');
       this.audio_.addEventListener('ended', () => this.onEnded_());
@@ -275,7 +283,7 @@ customElements.define(
         return null;
       });
 
-      this.updateTagsFromServer_(true /* async */);
+      this.updateTagsFromServer_();
     }
 
     set config(config) {
@@ -290,18 +298,10 @@ customElements.define(
     set dialogManager(manager) {
       this.dialogManager_ = manager;
     }
-    // TODO: Should <presentation-layer> be part of <music-player>?
-    set presentationLayer(layer) {
-      this.presentationLayer_ = layer;
-      layer.addEventListener('next', () => this.cycleTrack_(1));
-    }
-    set favicon(favicon) {
-      this.favicon_ = favicon;
-    }
 
-    updateTagsFromServer_(async) {
+    updateTagsFromServer_(sync) {
       const req = new XMLHttpRequest();
-      req.open('GET', 'list_tags', async);
+      req.open('GET', 'list_tags', !sync);
       req.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
       req.onreadystatechange = () => {
         if (req.readyState == 4) {
@@ -784,8 +784,7 @@ customElements.define(
         if (this.showUpdateDiv_()) this.tagsTextarea_.focus();
         return true;
       } else if (e.altKey && e.keyCode == KeyCodes.V) {
-        if (this.presentationLayer_.isShown()) this.presentationLayer_.hide();
-        else this.presentationLayer_.show();
+        this.presentationLayer_.visible = !this.presentationLayer_.visible;
         return true;
       } else if (e.keyCode == KeyCodes.SPACE && !this.updateSong_) {
         this.togglePause_();
@@ -795,9 +794,9 @@ customElements.define(
         return true;
       } else if (
         e.keyCode == KeyCodes.ESCAPE &&
-        this.presentationLayer_.isShown()
+        this.presentationLayer_.visible
       ) {
-        this.presentationLayer_.hide();
+        this.presentationLayer_.visible = false;
         return true;
       } else if (e.keyCode == KeyCodes.ESCAPE && this.updateSong_) {
         this.hideUpdateDiv_(false);
@@ -857,4 +856,14 @@ function getRatingString(rating, withLabel, includeEmpty) {
 
 function getDumpSongUrl(song, cache) {
   return 'dump_song?id=' + song.songId + (cache ? '&cache=1' : '');
+}
+
+// Returns the first <link> element containing a 'rel' attribute of 'icon', or
+// null if not found.
+function getFavicon() {
+  const links = document.getElementsByTagName('link');
+  for (let i = 0; i < links.length; i++) {
+    if (links[i].getAttribute('rel') == 'icon') return links[i];
+  }
+  return null;
 }

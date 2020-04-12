@@ -7,14 +7,11 @@ import Config from './config.js';
 const config = new Config();
 const dialogManager = document.querySelector('dialog-manager');
 const musicPlayer = document.querySelector('music-player');
-const presentationLayer = document.querySelector('presentation-layer');
 const searchForm = document.querySelector('search-form');
 
 musicPlayer.config = config;
 musicPlayer.dialogManager = dialogManager;
-musicPlayer.presentationLayer = presentationLayer;
 musicPlayer.searchForm = searchForm;
-musicPlayer.favicon = $('favicon');
 
 searchForm.dialogManager = dialogManager;
 searchForm.musicPlayer = musicPlayer;
@@ -27,8 +24,8 @@ document.test = {
     musicPlayer.updater_.reportPlay(songId, startTime),
   reset: () => {
     musicPlayer.resetForTesting();
-    searchForm.reset(null, null, true);
+    searchForm.reset(null, null, true /* clearResults */);
   },
   showOptions: () => musicPlayer.showOptions_(),
-  updateTags: () => musicPlayer.updateTagsFromServer_(false),
+  updateTags: () => musicPlayer.updateTagsFromServer_(true /* sync */),
 };

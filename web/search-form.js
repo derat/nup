@@ -316,7 +316,7 @@ customElements.define(
       );
       this.resetButton_ = get('reset-button');
       this.resetButton_.addEventListener('click', () =>
-        this.reset(null, null, true),
+        this.reset(null, null, true /* clearResults */),
       );
       this.luckyButton_ = get('lucky-button');
       this.luckyButton_.addEventListener('click', () => this.doLuckySearch_());
@@ -339,7 +339,7 @@ customElements.define(
 
       this.searchResultsTable_ = get('results-table');
       this.searchResultsTable_.addEventListener('field', e => {
-        this.reset(e.detail.artist, e.detail.album);
+        this.reset(e.detail.artist, e.detail.album, false /* clearResults */);
       });
       this.searchResultsTable_.addEventListener('check', e => {
         const checked = !!e.detail.count;
@@ -503,7 +503,7 @@ customElements.define(
         this.firstPlayedSelect_.selectedIndex == 0 &&
         this.lastPlayedSelect_.selectedIndex == 0
       ) {
-        this.reset(null, null, false);
+        this.reset(null, null, false /* clearResults */);
         this.shuffleCheckbox_.checked = true;
         this.minRatingSelect_.selectedIndex = 3;
       }
@@ -532,7 +532,7 @@ customElements.define(
       if (this.presetSelect_.value == '') return;
 
       const index = this.presetSelect_.selectedIndex;
-      this.reset(null, null, false);
+      this.reset(null, null, false /* clearResults */);
       this.presetSelect_.selectedIndex = index;
 
       let play = false;

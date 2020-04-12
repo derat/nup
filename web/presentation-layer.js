@@ -57,7 +57,7 @@ const template = createTemplate(`
   #next {
     display: none;
   }
-  #next.shown {
+  #next.visible {
     display: block;
   }
   #next div {
@@ -125,7 +125,7 @@ customElements.define(
       super();
 
       this.duration_ = 0; // duration of current song in seconds
-      this.shown_ = false;
+      this.visible_ = false;
       this.playNextTrackFunction_ = null;
       this.origOverflowStyle_ = document.body.style.overflow;
 
@@ -135,7 +135,7 @@ customElements.define(
         display: none;
         font-family: Arial, Helvetica, sans-serif;
         height: 100%;
-        position: absolute;
+        position: fixed;
         width: 100%;
         z-index: 5;
       `;
@@ -171,8 +171,8 @@ customElements.define(
       this.currentAlbum_.innerText = currentSong ? currentSong.album : '';
 
       nextSong
-        ? this.nextDiv_.classList.add('shown')
-        : this.nextDiv_.classList.remove('shown');
+        ? this.nextDiv_.classList.add('visible')
+        : this.nextDiv_.classList.remove('visible');
       this.nextArtist_.innerText = nextSong ? nextSong.artist : '';
       this.nextTitle_.innerText = nextSong ? nextSong.title : '';
       this.nextAlbum_.innerText = nextSong ? nextSong.album : '';
@@ -195,20 +195,15 @@ customElements.define(
       this.timeDiv_.innerText = formatTime(sec);
     }
 
-    isShown() {
-      return this.shown_;
+    get visible() {
+      return this.visible_;
     }
-
-    show() {
-      document.body.style.overflow = 'hidden';
-      this.style.display = 'flex';
-      this.shown_ = true;
-    }
-
-    hide() {
-      document.body.style.overflow = this.origOverflowStyle;
-      this.style.display = 'none';
-      this.shown_ = false;
+    set visible(visible) {
+      document.body.style.overflow = visible
+        ? this.origOverflowStyle
+        : 'hidden';
+      this.style.display = visible ? 'flex' : 'none';
+      this.visible_ = visible;
     }
 
     setPlayNextTrackFunction(f) {
