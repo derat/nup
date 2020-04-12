@@ -11,37 +11,40 @@ import {
 
 const template = createTemplate(`
 <style>
-#suggestions {
-  background-color: #eee;
-  border-radius: 4px;
-  box-shadow: 0 1px 2px 1px rgba(0, 0, 0, 0.3);
-  display: inline-flex;
-  flex-wrap: wrap;
-  font-size: 10px;
-  font-family: Arial, Helvetica, sans-serif;
-  color: black;
-  opacity: 0;
-  overflow: hidden;
-  padding: 4px 0 0 4px; // see margin on div below
-  pointer-events: none;
-  position: absolute;
-  text-overflow: ellipsis;
-  z-index: 1;
-  -webkit-transition: opacity 200ms ease-out;
-  -webkit-user-select: none;
-}
-#suggestions.shown {
-  pointer-events: auto;
-  opacity: 1;
-  -webkit-transition: opacity 0s;
-}
-#suggestions div {
-  margin: 0 4px 4px 0;
-}
-#suggestions div:hover {
-  color: #666;
-  cursor: pointer;
-}
+  :host {
+    display: contents;
+  }
+  #suggestions {
+    background-color: #eee;
+    border-radius: 4px;
+    box-shadow: 0 1px 2px 1px rgba(0, 0, 0, 0.3);
+    display: inline-flex;
+    flex-wrap: wrap;
+    font-size: 10px;
+    font-family: Arial, Helvetica, sans-serif;
+    color: black;
+    opacity: 0;
+    overflow: hidden;
+    padding: 4px 0 0 4px; // see margin on div below
+    pointer-events: none;
+    position: absolute;
+    text-overflow: ellipsis;
+    z-index: 1;
+    -webkit-transition: opacity 200ms ease-out;
+    -webkit-user-select: none;
+  }
+  #suggestions.shown {
+    pointer-events: auto;
+    opacity: 1;
+    -webkit-transition: opacity 0s;
+  }
+  #suggestions div {
+    margin: 0 4px 4px 0;
+  }
+  #suggestions div:hover {
+    color: #666;
+    cursor: pointer;
+  }
 </style>
 <slot name="text"></slot>
 <div id="suggestions"></div>
@@ -58,7 +61,6 @@ customElements.define(
       this.tabAdvancesFocus_ = this.hasAttribute('tab-advances-focus');
       this.words_ = [];
 
-      this.style.display = 'contents';
       this.shadow_ = createShadow(this, template);
       this.suggestionsDiv_ = $('suggestions', this.shadow_);
 

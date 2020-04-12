@@ -5,6 +5,16 @@ import {$, createShadow, createTemplate, formatTime} from './common.js';
 
 const template = createTemplate(`
 <style>
+  :host {
+    background-color: black;
+    display: none;
+    font-family: Arial, Helvetica, sans-serif;
+    height: 100%;
+    position: fixed;
+    width: 100%;
+    z-index: 5;
+  }
+
   #left {
     width: calc(60% - 40px);
     height: calc(100% - 40px);
@@ -128,17 +138,6 @@ customElements.define(
       this.visible_ = false;
       this.playNextTrackFunction_ = null;
       this.origOverflowStyle_ = document.body.style.overflow;
-
-      // TODO: Is there a better way to do this?
-      this.style.cssText = `
-        background-color: black;
-        display: none;
-        font-family: Arial, Helvetica, sans-serif;
-        height: 100%;
-        position: fixed;
-        width: 100%;
-        z-index: 5;
-      `;
 
       this.shadow_ = createShadow(this, template);
       this.currentCover_ = $('current-cover', this.shadow_);

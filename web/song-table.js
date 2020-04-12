@@ -12,6 +12,9 @@ import {
 
 const template = createTemplate(`
 <style>
+  :host {
+    display: block;
+  }
   table {
     border-collapse: collapse;
     padding-right: 10px;
@@ -88,6 +91,14 @@ const template = createTemplate(`
 </table>
 `);
 
+const noCheckboxesTemplate = createTemplate(`
+<style>
+  .checkbox {
+    display: none;
+  }
+</style>
+`);
+
 const rowTemplate = createTemplate(`
 <tr>
   <td class="checkbox">
@@ -118,7 +129,6 @@ customElements.define(
       this.lastClickedCheckboxIndex_ = -1; // 0 is header
       this.numCheckedSongs_ = 0;
 
-      this.style.display = 'block';
       this.shadow_ = createShadow(this, template);
       this.table_ = this.shadow_.querySelector('table');
 
@@ -129,7 +139,7 @@ customElements.define(
         this.onCheckboxClick_(this.headingCheckbox_, e.shiftKey);
       });
       if (!this.useCheckboxes_) {
-        this.shadow_.appendChild(createStyle('.checkbox { display: none }'));
+        this.shadow_.appendChild(noCheckboxesTemplate.content.cloneNode(true));
       }
     }
 

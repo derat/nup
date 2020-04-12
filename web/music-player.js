@@ -16,6 +16,9 @@ import Updater from './updater.js';
 
 const template = createTemplate(`
 <style>
+  :host {
+    display: block;
+  }
   #song-info {
     padding: 5px;
   }
@@ -225,7 +228,6 @@ customElements.define(
       this.notification_ = null; // song notification currently shown
       this.closeNotificationTimeoutId_ = 0; // for closeNotification_()
 
-      this.style.display = 'block';
       this.shadow_ = createShadow(this, template);
       const get = id => $(id, this.shadow_);
 

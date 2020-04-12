@@ -11,6 +11,9 @@ import {
 
 const template = createTemplate(`
 <style>
+  :host {
+    display: block;
+  }
   #search-title {
     padding-top: 8px;
     font-weight: bold;
@@ -265,7 +268,6 @@ customElements.define(
 
       this.request_ = null;
 
-      this.style.display = 'block';
       document.body.addEventListener('keydown', e =>
         this.handleBodyKeyDown_(e),
       );

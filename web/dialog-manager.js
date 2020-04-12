@@ -5,46 +5,49 @@ import {$, createElement, createShadow, createTemplate} from './common.js';
 
 const template = createTemplate(`
 <style>
-.lightbox {
-  background-color: black;
-  display: none;
-  height: 100%;
-  opacity: 0.1;
-  pointer-events: auto;
-  position: fixed;
-  width: 100%;
-  z-index: 10;
-}
-.lightbox.shown {
-  display: block;
-}
-.outer-container {
-  display: table;
-  height: 100%;
-  pointer-events: none;
-  position: absolute;
-  width: 100%;
-  z-index: 11;
-}
-.inner-container {
-  display: table-cell;
-  text-align: center;
-  vertical-align: middle;
-}
-.dialog {
-  background-color: white;
-  border: solid 1px #aaa;
-  box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
-  -moz-box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
-  -webkit-box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
-  display: inline-block;
-  padding: 10px;
-  pointer-events: auto;
-  text-align: left;
-}
-.message-dialog {
-  width: 400px;
-}
+  :host {
+    pointer-events: none;
+  }
+  .lightbox {
+    background-color: black;
+    display: none;
+    height: 100%;
+    opacity: 0.1;
+    pointer-events: auto;
+    position: fixed;
+    width: 100%;
+    z-index: 10;
+  }
+  .lightbox.shown {
+    display: block;
+  }
+  .outer-container {
+    display: table;
+    height: 100%;
+    pointer-events: none;
+    position: absolute;
+    width: 100%;
+    z-index: 11;
+  }
+  .inner-container {
+    display: table-cell;
+    text-align: center;
+    vertical-align: middle;
+  }
+  .dialog {
+    background-color: white;
+    border: solid 1px #aaa;
+    box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
+    -moz-box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
+    -webkit-box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
+    display: inline-block;
+    padding: 10px;
+    pointer-events: auto;
+    text-align: left;
+  }
+  .message-dialog {
+    width: 400px;
+  }
 </style>
 <div id="lightbox" class="lightbox"></div>
 <div class="outer-container">
@@ -73,8 +76,6 @@ customElements.define(
   class extends HTMLElement {
     constructor() {
       super();
-
-      this.style.pointerEvents = 'none';
 
       this.shadow_ = createShadow(this, template);
       this.lightbox_ = $('lightbox', this.shadow_);
