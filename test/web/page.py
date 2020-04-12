@@ -234,8 +234,8 @@ class Page(object):
         suggester = self.get(locator)
         root = self.driver.execute_script('return arguments[0].shadowRoot',
                                           suggester)
-        spans = root.find_elements_by_css_selector('span')
-        return [s.text for s in spans]
+        items = root.find_elements_by_css_selector('#suggestions div')
+        return [i.text for i in items]
 
     def show_options(self):
         # TODO: This ought to be using Alt+O, but my version of selenium is

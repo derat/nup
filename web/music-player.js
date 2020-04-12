@@ -316,8 +316,9 @@ customElements.define(
       req.onreadystatechange = () => {
         if (req.readyState == 4) {
           if (req.status == 200) {
-            this.updateTags_(JSON.parse(req.responseText));
-            console.log('Loaded ' + this.tags_.length + ' tags');
+            const tags = JSON.parse(req.responseText);
+            this.updateTags_(tags);
+            console.log('Loaded ' + tags.length + ' tag(s)');
           } else {
             console.log('Got ' + req.status + ' while loading tags');
           }

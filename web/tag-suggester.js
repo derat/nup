@@ -13,14 +13,16 @@ const template = createTemplate(`
 <style>
 #suggestions {
   background-color: #eee;
-  border-radius: 6px;
+  border-radius: 4px;
   box-shadow: 0 1px 2px 1px rgba(0, 0, 0, 0.3);
+  display: inline-flex;
+  flex-wrap: wrap;
   font-size: 10px;
   font-family: Arial, Helvetica, sans-serif;
   color: black;
   opacity: 0;
   overflow: hidden;
-  padding: 3px;
+  padding: 4px 0 0 4px; // see margin on div below
   pointer-events: none;
   position: absolute;
   text-overflow: ellipsis;
@@ -33,7 +35,10 @@ const template = createTemplate(`
   opacity: 1;
   -webkit-transition: opacity 0s;
 }
-#suggestions span:hover {
+#suggestions div {
+  margin: 0 4px 4px 0;
+}
+#suggestions div:hover {
   color: #666;
   cursor: pointer;
 }
@@ -146,22 +151,22 @@ customElements.define(
     }
 
     showSuggestions_(words) {
-      const div = this.suggestionsDiv_;
-      while (div.childNodes.length > 0) div.removeChild(div.lastChild);
+      const cont = this.suggestionsDiv_;
+      while (cont.childNodes.length > 0) cont.removeChild(cont.lastChild);
 
       for (let i = 0; i < words.length; i++) {
         const word = words[i];
-        if (div.childNodes.length > 0) {
-          div.appendChild(document.createTextNode(' '));
+        if (cont.childNodes.length > 0) {
+          cont.appendChild(document.createTextNode(' '));
         }
-        const span = createElement('span', null, null, word);
-        span.addEventListener('click', () => {
+        const item = createElement('div', null, null, word);
+        item.addEventListener('click', () => {
           this.hideSuggestions_();
           const parts = this.getTextParts_();
           this.target_.value = parts.before + word + parts.after;
           this.target_.focus();
         });
-        div.appendChild(span);
+        cont.appendChild(item);
       }
 
       // Move the suggestions a bit below the target.
