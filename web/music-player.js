@@ -10,6 +10,7 @@ import {
   KeyCodes,
   updateTitleAttributeForTruncation,
 } from './common.js';
+import Config from './config.js';
 import OptionsDialog from './options-dialog.js';
 import Updater from './updater.js';
 
@@ -168,6 +169,8 @@ const template = createTemplate(`
 <song-table id="playlist"></song-table>
 `);
 
+// <music-player> plays and displays information about songs. It also maintains
+// and displays a playlist.
 customElements.define(
   'music-player',
   class extends HTMLElement {
@@ -178,12 +181,18 @@ customElements.define(
     constructor() {
       super();
 
-      this.config_ = null;
       this.searchForm_ = null;
-      this.dialogManager_ = null;
       this.optionsDialog_ = null;
       this.updater_ = new Updater();
       this.favicon_ = getFavicon();
+
+      this.config_ = new Config();
+      this.config_.addCallback((name, value) => {
+        if (name == this.config_.VOLUME) this.audio_.volume = value;
+      });
+
+      this.dialogManager_ = document.querySelector('dialog-manager');
+      if (!this.dialogManager_) throw new Error('No <dialog-manager>');
 
       this.songs_ = []; // songs in the order in which they should be played
       this.tags_ = []; // available tags loaded from server
@@ -218,6 +227,7 @@ customElements.define(
       this.audio_.addEventListener('play', () => this.onPlay_());
       this.audio_.addEventListener('timeupdate', () => this.onTimeUpdate_());
       this.audio_.addEventListener('error', e => this.onError_(e));
+      this.audio_.volume = this.config_.get(this.config_.VOLUME);
 
       this.coverImage_ = get('cover-img');
       this.coverImage_.addEventListener('click', () => this.showUpdateDiv_());
@@ -286,17 +296,9 @@ customElements.define(
       this.updateTagsFromServer_();
     }
 
-    set config(config) {
-      this.config_ = config;
-      config.addListener(this);
-      this.onVolumeChange(config.getVolume());
-    }
     set searchForm(form) {
       this.searchForm_ = form;
       this.searchForm_.tags = this.tags_;
-    }
-    set dialogManager(manager) {
-      this.dialogManager_ = manager;
     }
 
     updateTagsFromServer_(sync) {
@@ -824,11 +826,6 @@ customElements.define(
         e.preventDefault();
         e.stopPropagation();
       }
-    }
-
-    // TODO: Make this not be called by Config.
-    onVolumeChange(volume) {
-      this.audio_.volume = volume;
     }
   },
 );

@@ -32,7 +32,7 @@ export default class OptionsDialog {
     this.manager_ = manager;
     this.closeCallback_ = closeCallback;
 
-    const volume = this.config_.getVolume();
+    const volume = this.config_.get(this.config_.VOLUME);
 
     this.container_ = this.manager_.createDialog();
     this.shadow_ = createShadow(this.container_, template);
@@ -43,7 +43,7 @@ export default class OptionsDialog {
       'input',
       () => {
         const volume = this.volumeRange_.value;
-        this.config_.setVolume(volume);
+        this.config_.set(this.config_.VOLUME, volume);
         this.updateVolumeSpan_(volume);
       },
       false,

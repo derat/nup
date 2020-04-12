@@ -252,9 +252,10 @@ customElements.define(
       super();
 
       this.musicPlayer_ = null;
-      this.dialogManager_ = null;
-      this.currentIndex_ = -1;
       this.request_ = null;
+
+      this.dialogManager_ = document.querySelector('dialog-manager');
+      if (!this.dialogManager_) throw new Error('No <dialog-manager>');
 
       this.style.display = 'block';
       document.body.addEventListener('keydown', e =>
@@ -351,9 +352,6 @@ customElements.define(
 
     set musicPlayer(player) {
       this.musicPlayer_ = player;
-    }
-    set dialogManager(manager) {
-      this.dialogManager_ = manager;
     }
     set tags(tags) {
       this.tagSuggester_.words = tags;
