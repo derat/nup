@@ -316,7 +316,7 @@ customElements.define(
       );
       this.resetButton_ = get('reset-button');
       this.resetButton_.addEventListener('click', () =>
-        this.resetSearchForm_(null, null, true),
+        this.reset(null, null, true),
       );
       this.luckyButton_ = get('lucky-button');
       this.luckyButton_.addEventListener('click', () => this.doLuckySearch_());
@@ -341,10 +341,10 @@ customElements.define(
       // TODO: Find a better way to do this.
       window.setTimeout(() => {
         this.searchResultsTable_.setArtistClickedCallback(artist =>
-          this.resetSearchForm_(artist, null),
+          this.reset(artist, null),
         );
         this.searchResultsTable_.setAlbumClickedCallback(album =>
-          this.resetSearchForm_(null, album),
+          this.reset(null, album),
         );
         this.searchResultsTable_.setCheckedSongsChangedCallback(
           num =>
@@ -361,12 +361,7 @@ customElements.define(
     set dialogManager(manager) {
       this.dialogManager_ = manager;
     }
-
-    resetForTesting() {
-      this.resetSearchForm_(null, null, true);
-    }
-
-    handleTagsUpdated(tags) {
+    set tags(tags) {
       this.tagSuggester_.words = tags;
     }
 
@@ -470,18 +465,18 @@ customElements.define(
       }
     }
 
-    // Reset all of the fields in the search form.  If |artist| or |album| are
-    // non-null, the supplied values are used.  Also jumps to the top of the
+    // Reset all of the fields in the search form. If |newArtist| or |newAlbum|
+    // are non-null, the supplied values are used. Also jumps to the top of the
     // page so the form is visible.
-    resetSearchForm_(artist, album, clearResults) {
+    reset(newArtist, newAlbum, clearResults) {
       const keywords = [];
       const clean = s => {
         s = s.replace(/"/g, '\\"');
         if (s.indexOf(' ') != -1) s = '"' + s + '"';
         return s;
       };
-      if (artist) keywords.push('artist:' + clean(artist));
-      if (album) keywords.push('album:' + clean(album));
+      if (newArtist) keywords.push('artist:' + clean(newArtist));
+      if (newAlbum) keywords.push('album:' + clean(newAlbum));
 
       this.keywordsInput_.value = keywords.join(' ');
       this.tagsInput_.value = null;
@@ -511,7 +506,7 @@ customElements.define(
         this.firstPlayedSelect_.selectedIndex == 0 &&
         this.lastPlayedSelect_.selectedIndex == 0
       ) {
-        this.resetSearchForm_(null, null, false);
+        this.reset(null, null, false);
         this.shuffleCheckbox_.checked = true;
         this.minRatingSelect_.selectedIndex = 3;
       }
@@ -540,7 +535,7 @@ customElements.define(
       if (this.presetSelect_.value == '') return;
 
       const index = this.presetSelect_.selectedIndex;
-      this.resetSearchForm_(null, null, false);
+      this.reset(null, null, false);
       this.presetSelect_.selectedIndex = index;
 
       let play = false;

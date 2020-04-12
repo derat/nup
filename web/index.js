@@ -27,7 +27,7 @@ document.test = {
     musicPlayer.updater_.reportPlay(songId, startTime),
   reset: () => {
     musicPlayer.resetForTesting();
-    searchForm.resetForTesting();
+    searchForm.reset(null, null, true);
   },
   showOptions: () => musicPlayer.showOptions_(),
   updateTags: () => musicPlayer.updateTagsFromServer_(false),

@@ -251,10 +251,10 @@ customElements.define(
       // point, presumably because it's part of our shadow DOM.
       window.setTimeout(() => {
         this.playlistTable_.setArtistClickedCallback(artist => {
-          if (this.searchForm_) this.searchForm_.resetSearchForm(artist, null);
+          if (this.searchForm_) this.searchForm_.reset(artist, null, false);
         });
         this.playlistTable_.setAlbumClickedCallback(album => {
-          if (this.searchForm_) this.searchForm_.resetSearchForm(null, album);
+          if (this.searchForm_) this.searchForm_.reset(null, album, false);
         });
       });
 
@@ -289,20 +289,19 @@ customElements.define(
       config.addListener(this);
       this.onVolumeChange(config.getVolume());
     }
-
+    set searchForm(form) {
+      this.searchForm_ = form;
+      this.searchForm_.tags = this.tags_;
+    }
     set dialogManager(manager) {
       this.dialogManager_ = manager;
     }
-
     set presentationLayer(layer) {
       this.presentationLayer_ = layer;
       layer.setPlayNextTrackFunction(() => this.cycleTrack_(1));
     }
-
-    set searchForm(form) {
-      this.searchForm_ = form;
-      // TODO: Get rid of this.
-      if (form) this.searchForm_.handleTagsUpdated(this.tags_);
+    set favicon(favicon) {
+      this.favicon_ = favicon;
     }
 
     updateTagsFromServer_(async) {
@@ -388,10 +387,9 @@ customElements.define(
     }
 
     updateTags_(tags) {
-      this.tags_ = tags.slice(0);
-      this.tagSuggester_.words = this.tags_;
-      // TODO: Get rid of this ugly call.
-      if (this.searchForm_) this.searchForm_.handleTagsUpdated(this.tags_);
+      this.tags_ = tags;
+      this.tagSuggester_.words = tags;
+      if (this.searchForm_) this.searchForm_.tags = tags;
     }
 
     updateButtonState_() {
@@ -420,8 +418,8 @@ customElements.define(
       const setCover = url => {
         this.coverImage_.src = url;
         if (this.favicon_) {
-          this.favicon.href = url;
-          this.favicon.type = /\.png$/.match(url) ? 'image/png' : 'image/jpeg';
+          this.favicon_.href = url;
+          this.favicon_.type = url.match(/\.png$/) ? 'image/png' : 'image/jpeg';
         }
       };
       setCover(
