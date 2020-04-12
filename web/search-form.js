@@ -251,11 +251,19 @@ customElements.define(
     constructor() {
       super();
 
-      this.musicPlayer_ = null;
-      this.request_ = null;
-
       this.dialogManager_ = document.querySelector('dialog-manager');
       if (!this.dialogManager_) throw new Error('No <dialog-manager>');
+
+      const player = document.querySelector('music-player');
+      if (!player) throw new Error('No <music-player>');
+      player.addEventListener('field', e => {
+        this.reset_(e.detail.artist, e.detail.album, false /* clearResults */);
+      });
+      player.addEventListener('tags', e => {
+        this.tagSuggester_.words = e.detail.tags;
+      });
+
+      this.request_ = null;
 
       this.style.display = 'block';
       document.body.addEventListener('keydown', e =>
@@ -317,7 +325,7 @@ customElements.define(
       );
       this.resetButton_ = get('reset-button');
       this.resetButton_.addEventListener('click', () =>
-        this.reset(null, null, true /* clearResults */),
+        this.reset_(null, null, true /* clearResults */),
       );
       this.luckyButton_ = get('lucky-button');
       this.luckyButton_.addEventListener('click', () => this.doLuckySearch_());
@@ -340,7 +348,7 @@ customElements.define(
 
       this.searchResultsTable_ = get('results-table');
       this.searchResultsTable_.addEventListener('field', e => {
-        this.reset(e.detail.artist, e.detail.album, false /* clearResults */);
+        this.reset_(e.detail.artist, e.detail.album, false /* clearResults */);
       });
       this.searchResultsTable_.addEventListener('check', e => {
         const checked = !!e.detail.count;
@@ -350,11 +358,8 @@ customElements.define(
       this.waitingDiv_ = get('waiting');
     }
 
-    set musicPlayer(player) {
-      this.musicPlayer_ = player;
-    }
-    set tags(tags) {
-      this.tagSuggester_.words = tags;
+    resetForTesting() {
+      this.reset_(null, null, true /* clearResults */);
     }
 
     submitQuery_(appendToQueue) {
@@ -454,16 +459,24 @@ customElements.define(
       if (!this.searchResultsTable_.numSongs) return;
 
       const songs = this.searchResultsTable_.checkedSongs;
-      this.musicPlayer_.enqueueSongs(songs, clearFirst, afterCurrent);
+      this.dispatchEvent(
+        new CustomEvent('enqueue', {
+          detail: {
+            songs,
+            clearFirst,
+            afterCurrent,
+          },
+        }),
+      );
       if (songs.length == this.searchResultsTable_.numSongs) {
         this.searchResultsTable_.setSongs([]);
       }
     }
 
-    // Reset all of the fields in the search form. If |newArtist| or |newAlbum|
+    // Resets all of the fields in the search form. If |newArtist| or |newAlbum|
     // are non-null, the supplied values are used. Also jumps to the top of the
     // page so the form is visible.
-    reset(newArtist, newAlbum, clearResults) {
+    reset_(newArtist, newAlbum, clearResults) {
       const keywords = [];
       const clean = s => {
         s = s.replace(/"/g, '\\"');
@@ -501,7 +514,7 @@ customElements.define(
         this.firstPlayedSelect_.selectedIndex == 0 &&
         this.lastPlayedSelect_.selectedIndex == 0
       ) {
-        this.reset(null, null, false /* clearResults */);
+        this.reset_(null, null, false /* clearResults */);
         this.shuffleCheckbox_.checked = true;
         this.minRatingSelect_.selectedIndex = 3;
       }
@@ -530,7 +543,7 @@ customElements.define(
       if (this.presetSelect_.value == '') return;
 
       const index = this.presetSelect_.selectedIndex;
-      this.reset(null, null, false /* clearResults */);
+      this.reset_(null, null, false /* clearResults */);
       this.presetSelect_.selectedIndex = index;
 
       let play = false;

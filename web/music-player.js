@@ -171,6 +171,12 @@ const template = createTemplate(`
 
 // <music-player> plays and displays information about songs. It also maintains
 // and displays a playlist.
+//
+// When the list of available tags changes, a 'tags' CustomEvent with a
+// 'detail.tags' property containing a string array of the new tags is emitted.
+//
+// When an artist or album field in the playlist is clicked, a 'field' Custom
+// event is emitted. See <song-table> for more details.
 customElements.define(
   'music-player',
   class extends HTMLElement {
@@ -181,11 +187,6 @@ customElements.define(
     constructor() {
       super();
 
-      this.searchForm_ = null;
-      this.optionsDialog_ = null;
-      this.updater_ = new Updater();
-      this.favicon_ = getFavicon();
-
       this.config_ = new Config();
       this.config_.addCallback((name, value) => {
         if (name == this.config_.VOLUME) this.audio_.volume = value;
@@ -193,6 +194,20 @@ customElements.define(
 
       this.dialogManager_ = document.querySelector('dialog-manager');
       if (!this.dialogManager_) throw new Error('No <dialog-manager>');
+
+      const search = document.querySelector('search-form');
+      if (!search) throw new Error('No <search-form>');
+      search.addEventListener('enqueue', e => {
+        this.enqueueSongs_(
+          e.detail.songs,
+          e.detail.clearFirst,
+          e.detail.afterCurrent,
+        );
+      });
+
+      this.updater_ = new Updater();
+      this.optionsDialog_ = null;
+      this.favicon_ = getFavicon();
 
       this.songs_ = []; // songs in the order in which they should be played
       this.tags_ = []; // available tags loaded from server
@@ -265,9 +280,7 @@ customElements.define(
 
       this.playlistTable_ = get('playlist');
       this.playlistTable_.addEventListener('field', e => {
-        if (this.searchForm_) {
-          this.searchForm_.reset(e.detail.artist, e.detail.album, false);
-        }
+        this.dispatchEvent(new CustomEvent('field', {detail: e.detail}));
       });
 
       if ('mediaSession' in navigator) {
@@ -296,11 +309,6 @@ customElements.define(
       this.updateTagsFromServer_();
     }
 
-    set searchForm(form) {
-      this.searchForm_ = form;
-      this.searchForm_.tags = this.tags_;
-    }
-
     updateTagsFromServer_(sync) {
       const req = new XMLHttpRequest();
       req.open('GET', 'list_tags', !sync);
@@ -318,22 +326,18 @@ customElements.define(
       req.send(null);
     }
 
-    get currentSong() {
+    get currentSong_() {
       return this.currentIndex_ >= 0 && this.currentIndex_ < this.songs_.length
         ? this.songs_[this.currentIndex_]
         : null;
     }
 
-    get songs() {
-      return this.songs_;
-    }
-
     resetForTesting() {
       this.hideUpdateDiv_(false /* saveChanges */);
-      this.enqueueSongs([], true);
+      this.enqueueSongs_([], true);
     }
 
-    enqueueSongs(songs, clearFirst, afterCurrent) {
+    enqueueSongs_(songs, clearFirst, afterCurrent) {
       if (clearFirst) {
         this.audio_.pause();
         this.audio_.src = '';
@@ -386,7 +390,7 @@ customElements.define(
     updateTags_(tags) {
       this.tags_ = tags;
       this.tagSuggester_.words = tags;
-      if (this.searchForm_) this.searchForm_.tags = tags;
+      this.dispatchEvent(new CustomEvent('tags', {detail: {tags}}));
     }
 
     updateButtonState_() {
@@ -397,7 +401,7 @@ customElements.define(
     }
 
     updateSongDisplay_() {
-      const song = this.currentSong;
+      const song = this.currentSong_;
       document.title = song ? song.artist + ' - ' + song.title : 'Player';
 
       this.artistDiv_.innerText = song ? song.artist : '';
@@ -428,7 +432,7 @@ customElements.define(
     }
 
     updateCoverTitleAttribute_() {
-      const song = this.currentSong;
+      const song = this.currentSong_;
       if (!song) {
         this.coverImage_.title = '';
         return;
@@ -440,7 +444,7 @@ customElements.define(
     }
 
     updateRatingOverlay_() {
-      const song = this.currentSong;
+      const song = this.currentSong_;
       this.ratingOverlayDiv_.innerText =
         song && song.rating >= 0.0
           ? getRatingString(song.rating, false, false)
@@ -450,7 +454,7 @@ customElements.define(
     updateMediaSessionMetadata_(imageLoaded) {
       if (!('mediaSession' in navigator)) return;
 
-      const song = this.currentSong;
+      const song = this.currentSong_;
       if (!song) {
         navigator.mediaSession.metadata = null;
         return;
@@ -483,7 +487,7 @@ customElements.define(
         nextSong = this.songs_[this.currentIndex_ + 1];
       }
 
-      this.presentationLayer_.updateSongs(this.currentSong, nextSong);
+      this.presentationLayer_.updateSongs(this.currentSong_, nextSong);
     }
 
     showNotification_() {
@@ -501,7 +505,7 @@ customElements.define(
         this.closeNotification_();
       }
 
-      const song = this.currentSong;
+      const song = this.currentSong_;
       if (!song) return;
 
       this.notification_ = new Notification(song.artist + '\n' + song.title, {
@@ -532,7 +536,7 @@ customElements.define(
       this.reportedCurrentTrack_ = false;
       this.reachedEndOfSongs_ = false;
 
-      const song = this.currentSong;
+      const song = this.currentSong_;
       console.log('Starting ' + song.songId + ' (' + song.url + ')');
       this.audio_.src = song.url;
       this.audio_.currentTime = 0;
@@ -585,7 +589,7 @@ customElements.define(
     }
 
     onTimeUpdate_() {
-      const song = this.currentSong;
+      const song = this.currentSong_;
       const position = this.audio_.currentTime;
 
       // Avoid resetting |numErrors_| if we get called repeatedly without making
@@ -656,7 +660,7 @@ customElements.define(
     }
 
     showUpdateDiv_() {
-      const song = this.currentSong;
+      const song = this.currentSong_;
       if (!song) return false;
 
       // Already shown.
@@ -665,7 +669,9 @@ customElements.define(
       this.setRating_(song.rating);
       this.dumpSongLink_.href = getDumpSongUrl(song, false);
       this.dumpSongCacheLink_.href = getDumpSongUrl(song, true);
-      this.tagsTextarea_.value = song.tags.sort().join(' ') + ' ';
+      this.tagsTextarea_.value = song.tags.length
+        ? song.tags.sort().join(' ') + ' ' // append space to ease editing
+        : '';
       this.updateDiv_.style.display = 'block';
       this.updateSong_ = song;
       return true;
@@ -767,7 +773,7 @@ customElements.define(
       if (this.dialogManager_.numDialogs) return false;
 
       if (e.altKey && e.keyCode == KeyCodes.D) {
-        const song = this.currentSong;
+        const song = this.currentSong_;
         if (song) window.open(getDumpSongUrl(song, false), '_blank');
         return true;
       } else if (e.altKey && e.keyCode == KeyCodes.N) {

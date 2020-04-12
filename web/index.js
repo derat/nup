@@ -4,9 +4,6 @@
 const musicPlayer = document.querySelector('music-player');
 const searchForm = document.querySelector('search-form');
 
-musicPlayer.searchForm = searchForm;
-searchForm.musicPlayer = musicPlayer;
-
 // Used by browser tests.
 document.test = {
   rateAndTag: (songId, rating, tags) =>
@@ -15,7 +12,7 @@ document.test = {
     musicPlayer.updater_.reportPlay(songId, startTime),
   reset: () => {
     musicPlayer.resetForTesting();
-    searchForm.reset(null, null, true /* clearResults */);
+    searchForm.resetForTesting();
   },
   showOptions: () => musicPlayer.showOptions_(),
   updateTags: () => musicPlayer.updateTagsFromServer_(true /* sync */),
