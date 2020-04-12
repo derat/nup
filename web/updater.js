@@ -176,12 +176,8 @@ export default class Updater {
       this.inProgressPlayReports_.length ||
       Object.keys(this.inProgressRatingsAndTags_).length
     ) {
-      // TODO: Why is this here instead of there just being a call to
-      // scheduleRetry_()?
-      this.retryTimeoutId_ = window.setTimeout(
-        () => this.doRetry_(),
-        this.MIN_RETRY_DELAY_MS,
-      );
+      this.lastRetryDelayMs_ = 0; // use min retry delay
+      this.scheduleRetry_(false);
       return;
     }
 
