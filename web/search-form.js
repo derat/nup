@@ -338,18 +338,12 @@ customElements.define(
       );
 
       this.searchResultsTable_ = get('results-table');
-      // TODO: Find a better way to do this.
-      window.setTimeout(() => {
-        this.searchResultsTable_.setArtistClickedCallback(artist =>
-          this.reset(artist, null),
-        );
-        this.searchResultsTable_.setAlbumClickedCallback(album =>
-          this.reset(null, album),
-        );
-        this.searchResultsTable_.setCheckedSongsChangedCallback(
-          num =>
-            (this.appendButton_.disabled = this.insertButton_.disabled = this.replaceButton_.disabled = !num),
-        );
+      this.searchResultsTable_.addEventListener('field', e => {
+        this.reset(e.detail.artist, e.detail.album);
+      });
+      this.searchResultsTable_.addEventListener('check', e => {
+        const checked = !!e.detail.count;
+        this.appendButton_.disabled = this.insertButton_.disabled = this.replaceButton_.disabled = !checked;
       });
 
       this.waitingDiv_ = get('waiting');
@@ -413,7 +407,7 @@ customElements.define(
           if (req.responseText) {
             const songs = eval('(' + req.responseText + ')');
             console.log('Got response with ' + songs.length + ' song(s)');
-            this.searchResultsTable_.updateSongs(songs);
+            this.searchResultsTable_.setSongs(songs);
             this.searchResultsTable_.setAllCheckboxes(true);
             if (appendToQueue) this.enqueueSearchResults_(true, true);
           } else {
@@ -461,7 +455,7 @@ customElements.define(
       const songs = this.searchResultsTable_.checkedSongs;
       this.musicPlayer_.enqueueSongs(songs, clearFirst, afterCurrent);
       if (songs.length == this.searchResultsTable_.numSongs) {
-        this.searchResultsTable_.updateSongs([]);
+        this.searchResultsTable_.setSongs([]);
       }
     }
 
@@ -489,7 +483,7 @@ customElements.define(
       this.firstPlayedSelect_.selectedIndex = 0;
       this.lastPlayedSelect_.selectedIndex = 0;
       this.presetSelect_.selectedIndex = 0;
-      if (clearResults) this.searchResultsTable_.updateSongs([]);
+      if (clearResults) this.searchResultsTable_.setSongs([]);
       this.scrollIntoView();
     }
 

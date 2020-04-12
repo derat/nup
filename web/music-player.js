@@ -246,16 +246,10 @@ customElements.define(
       this.tagSuggester_ = get('edit-tags-suggester');
 
       this.playlistTable_ = get('playlist');
-      // TODO: What's the right way to do this? These methods can't be called
-      // synchronously since the song-table c'tor hasn't been called at this
-      // point, presumably because it's part of our shadow DOM.
-      window.setTimeout(() => {
-        this.playlistTable_.setArtistClickedCallback(artist => {
-          if (this.searchForm_) this.searchForm_.reset(artist, null, false);
-        });
-        this.playlistTable_.setAlbumClickedCallback(album => {
-          if (this.searchForm_) this.searchForm_.reset(null, album, false);
-        });
+      this.playlistTable_.addEventListener('field', e => {
+        if (this.searchForm_) {
+          this.searchForm_.reset(e.detail.artist, e.detail.album, false);
+        }
       });
 
       if ('mediaSession' in navigator) {
@@ -350,7 +344,7 @@ customElements.define(
         : this.songs_.length;
       songs.forEach(s => this.songs_.splice(index++, 0, s));
 
-      this.playlistTable_.updateSongs(this.songs_);
+      this.playlistTable_.setSongs(this.songs_);
 
       if (this.currentIndex_ == -1) this.selectTrack_(0);
       else if (this.reachedEndOfSongs_) this.cycleTrack_(1);
