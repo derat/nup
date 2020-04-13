@@ -14,18 +14,20 @@ const template = createTemplate(`
   :host {
     display: block;
   }
-  #search-title {
-    padding-top: 8px;
+  .heading {
+    font-size: 13px;
     font-weight: bold;
+    user-select: none;
+  }
+  #search-heading {
     padding-left: 10px;
-    cursor: default;
-    -webkit-user-select: none;
+    padding-top: 8px;
   }
   #search-table {
     border: 0;
-    margin-top: 5px;
     border-collapse: collapse;
-    -webkit-user-select: none;
+    margin-top: 5px;
+    user-select: none;
     white-space: nowrap;
   }
   #search-left {
@@ -35,16 +37,16 @@ const template = createTemplate(`
     padding-left: 10px;
   }
   #search-table label {
-    -webkit-user-select: none;
+    user-select: none;
   }
   #search-table input[type='text'] {
-    border: 1px solid #aaa;
+    border: 1px solid #ddd;
     padding-left: 2px;
   }
   #keywords-input,
-  #tags-input,
-  #minRatingInput {
+  #tags-input {
     padding-right: 17px;
+    width: 200px;
   }
   #tags-input-div {
     position: relative;
@@ -63,6 +65,10 @@ const template = createTemplate(`
     top: 2px;
     cursor: pointer;
   }
+  #min-rating-select {
+    /* The stars end up too close to the bottom of the element otherwise. */
+    padding-bottom: 3px;
+  }
   #max-plays-input {
     padding-right: 2px;
     width: 2em;
@@ -70,36 +76,33 @@ const template = createTemplate(`
   #search-buttons {
     padding-top: 5px;
   }
-  #results-title {
-    font-weight: bold;
+  #results-heading {
     padding-right: 10px;
-    cursor: default;
-    -webkit-user-select: none;
   }
   #results-controls {
-    border-top: 1px solid #888;
+    border-top: 1px solid #ddd;
     margin-top: 10px;
     padding-top: 10px;
     padding-left: 10px;
-    -webkit-user-select: none;
+    user-select: none;
   }
   #results-table {
     margin-top: 10px;
   }
   #waiting {
-    position: fixed;
-    top: 8px;
-    right: 8px;
     background-color: #a00;
-    color: white;
-    padding: 5px;
-    font-size: 11px;
     border-radius: 8px;
+    color: white;
     display: none;
+    font-size: 11px;
+    padding: 5px;
+    position: fixed;
+    right: 8px;
+    top: 8px;
   }
 </style>
 
-<div id="search-title">Search</div>
+<div id="search-heading" class="heading">Search</div>
 
 <form id="search-form">
   <table id="search-table">
@@ -237,7 +240,7 @@ const template = createTemplate(`
 </form>
 
 <div id="results-controls">
-  <span id="results-title">Results</span>
+  <span id="results-heading" class="heading">Results</span>
   <button id="append-button" disabled>Append</button>
   <button id="insert-button" disabled>Insert</button>
   <button id="replace-button" disabled>Replace</button>

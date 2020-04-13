@@ -23,73 +23,71 @@ const template = createTemplate(`
     padding: 5px;
   }
   #cover-div {
+    align-items: center;
+    display: flex;
     float: left;
-    width: 65px;
     height: 65px;
+    justify-content: center;
     padding-left: 2px;
     padding-right: 5px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    width: 65px;
   }
   #cover-img {
-    max-width: 65px;
-    max-height: 65px;
-    height: auto;
     cursor: pointer;
-    -webkit-user-select: none;
+    height: auto;
+    max-height: 65px;
+    max-width: 65px;
+    user-select: none;
   }
   #rating-overlay {
-    position: absolute;
-    left: 8px;
-    top: 52px;
     color: white;
-    text-shadow: 0 0 8px black;
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 13px;
-    -webkit-user-select: none;
+    font-size: 12px;
+    left: 8px;
     pointer-events: none;
+    position: absolute;
+    text-shadow: 0 0 8px black;
+    top: 52px;
+    user-select: none;
   }
   #artist {
     font-weight: bold;
     line-height: 1.3;
-    white-space: nowrap;
     overflow: hidden;
+    white-space: nowrap;
   }
   #title {
     font-style: italic;
     line-height: 1.3;
-    white-space: nowrap;
     overflow: hidden;
+    white-space: nowrap;
   }
   #album {
-    white-space: nowrap;
     line-height: 1.3;
     overflow: hidden;
+    white-space: nowrap;
   }
   #controls {
-    padding: 5px;
     clear: both;
-    -webkit-user-select: none;
+    padding: 5px;
+    user-select: none;
   }
   #update-container {
-    position: absolute;
+    background-color: white;
+    box-shadow: 0 1px 4px 1px rgba(0, 0, 0, 0.3);
+    display: none;
+    height: 78px;
     left: 12px;
+    position: absolute;
     top: 12px;
     width: 225px;
-    height: 78px;
-    background-color: white;
-    -moz-box-shadow: 0 1px 4px 1px rgba(0, 0, 0, 0.3);
-    -webkit-box-shadow: 0 1px 4px 1px rgba(0, 0, 0, 0.3);
-    box-shadow: 0 1px 4px 1px rgba(0, 0, 0, 0.3);
     z-index: 1;
-    display: none;
   }
   #update-close {
+    cursor: pointer;
     position: absolute;
     right: 5px;
     top: 5px;
-    cursor: pointer;
   }
   #rating-container {
     margin-left: 6px;
@@ -113,23 +111,23 @@ const template = createTemplate(`
     margin-left: 40px;
   }
   #edit-tags {
-    border: solid 1px #ccc;
-    width: 210px;
+    border: solid 1px #ddd;
+    font-family: Arial, Helvetica, sans-serif;
     height: 35px;
     margin-left: 4px;
     margin-top: 10px;
     resize: none;
-    font-family: Arial, Helvetica, sans-serif;
+    width: 210px;
   }
   #edit-tags-suggester {
-    position: absolute;
-    left: 4px;
     bottom: 52px;
-    max-width: 210px;
+    left: 4px;
     max-height: 26px;
+    max-width: 210px;
+    position: absolute;
   }
   #playlist {
-    border-top: 1px solid #888;
+    border-top: 1px solid #ddd;
     margin-top: 2px;
   }
 </style>
@@ -142,7 +140,7 @@ const template = createTemplate(`
 
 <div id="song-info">
   <div id="cover-div">
-    <img id="cover-img" alt="" />
+    <img id="cover-img" />
   </div>
   <div id="rating-overlay"></div>
   <div id="artist"></div>

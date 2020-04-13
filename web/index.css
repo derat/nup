@@ -27,7 +27,7 @@ body {
 }
 #divider {
   flex: 0 0 1px;
-  background-color: #888;
+  background-color: #ddd;
 }
 #right {
   flex-grow: 1;
