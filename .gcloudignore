@@ -25,6 +25,7 @@
 *.out
 
 # Stuff not needed by the App Engine server.
-README.md
+*.md
+*.txt
 cmd/
 test/

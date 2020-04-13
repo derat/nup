@@ -1,15 +1,16 @@
 /* Copyright 2020 Daniel Erat.
  * All rights reserved. */
 
+@import 'common.css';
+
 html {
   height: 100%;
 }
 body {
   background-color: white;
   color: black;
-  font-family: Verdana, 'DejaVu Sans', Arial, Helvetica, 'Liberation Sans',
-    sans-serif;
-  font-size: 12px;
+  font-family: var(--font-family);
+  font-size: var(--font-size);
   height: 100%;
   margin: 0;
 }

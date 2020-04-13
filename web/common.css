@@ -1,0 +1,16 @@
+/* Copyright 2020 Daniel Erat.
+ * All rights reserved. */
+
+/* Star characters don't appear to be provided by either Verdana or Arial. They
+ * *are* provided by DejaVu Sans, but that's not present on Chrome OS -- Noto
+ * Sans SC is used instead. Unfortunately, the metrics are different in
+ * different fonts, which leads to inconsistent sizing and padding. So, use a
+ * handy custom font generated using fontello.com. */
+@import 'fontello-23133a7b/css/fontello.css';
+
+:root {
+  --font-family: Verdana, 'DejaVu Sans', Arial, Helvetica, sans-serif;
+  --font-size: 12px;
+
+  --star-font-family: fontello, sans-serif;
+}

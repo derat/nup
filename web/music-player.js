@@ -16,6 +16,7 @@ import Updater from './updater.js';
 
 const template = createTemplate(`
 <style>
+  @import 'common.css';
   :host {
     display: block;
   }
@@ -41,13 +42,14 @@ const template = createTemplate(`
   }
   #rating-overlay {
     color: white;
-    font-family: Arial, Helvetica, sans-serif;
-    font-size: 12px;
-    left: 8px;
+    font-family: var(--star-font-family);
+    font-size: 11px;
+    left: 9px;
+    letter-spacing: 2px;
     pointer-events: none;
     position: absolute;
     text-shadow: 0 0 8px black;
-    top: 52px;
+    top: 56px;
     user-select: none;
   }
   #artist {
@@ -93,10 +95,15 @@ const template = createTemplate(`
     margin-left: 6px;
     margin-top: 8px;
   }
-  #rating a.star {
-    cursor: pointer;
+  #rating {
+    font-family: var(--star-font-family);
     font-size: 16px;
-    line-height: 12px;
+  }
+  #rating a.star {
+    color: #666;
+    cursor: pointer;
+    display: inline-block;
+    min-width: 17px; /* black and white stars have different sizes :-/ */
   }
   #rating a.star:hover {
     color: #888;
@@ -115,7 +122,7 @@ const template = createTemplate(`
     font-family: Arial, Helvetica, sans-serif;
     height: 35px;
     margin-left: 4px;
-    margin-top: 10px;
+    margin-top: 8px;
     resize: none;
     width: 210px;
   }
@@ -851,8 +858,8 @@ function getRatingString(rating, withLabel, includeEmpty) {
   let ratingString = withLabel ? 'Rating: ' : '';
   const numStars = ratingToNumStars(rating);
   for (let i = 1; i <= 5; ++i) {
-    if (i <= numStars) ratingString += '\u2605';
-    else if (includeEmpty) ratingString += '\u2606';
+    if (i <= numStars) ratingString += '★';
+    else if (includeEmpty) ratingString += '☆';
     else break;
   }
   return ratingString;

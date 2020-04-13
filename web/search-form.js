@@ -11,8 +11,13 @@ import {
 
 const template = createTemplate(`
 <style>
+  @import 'common.css';
   :host {
     display: block;
+  }
+  select {
+    font-family: var(--font-family);
+    font-size: var(--font-size);
   }
   .heading {
     font-size: 13px;
@@ -66,8 +71,16 @@ const template = createTemplate(`
     cursor: pointer;
   }
   #min-rating-select {
-    /* The stars end up too close to the bottom of the element otherwise. */
-    padding-bottom: 3px;
+    /* The stars are too close together, but letter-spacing unfortunately
+     * doesn't work on <select>. */
+    color: #555;
+    font-family: var(--star-font-family);
+    font-size: 12px;
+    margin-left: 2px;
+    padding: 4px 0 2px 0;
+  }
+  #min-rating-select:disabled {
+    opacity: 0.5;
   }
   #max-plays-input {
     padding-right: 2px;
