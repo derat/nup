@@ -361,10 +361,12 @@ customElements.define(
       else this.updateButtonState_();
     }
 
+    // Plays the song at |offset| in the playlist relative to the current song.
     cycleTrack_(offset) {
       this.selectTrack_(this.currentIndex_ + offset);
     }
 
+    // Plays the song at |index| in the playlist.
     selectTrack_(index) {
       if (!this.songs_.length) {
         this.currentIndex_ = -1;
@@ -385,7 +387,7 @@ customElements.define(
 
       this.updateSongDisplay_();
       this.updatePresentationLayerSongs_();
-      this.startCurrentTrack_();
+      this.play_();
       this.updateButtonState_();
       if (!document.hasFocus()) this.showNotification_();
     }
@@ -529,41 +531,51 @@ customElements.define(
       this.closeNotificationTimeoutId_ = 0;
     }
 
-    startCurrentTrack_() {
-      this.lastTimeUpdatePosition_ = 0;
-      this.lastTimeUpdateSong_ = null;
-      this.numErrors_ = 0;
-      this.startTime_ = getCurrentTimeSec();
-      this.totalPlayedSec_ = 0;
-      this.lastUpdateTime_ = -1;
-      this.reportedCurrentTrack_ = false;
-      this.reachedEndOfSongs_ = false;
-
-      const song = this.currentSong_;
-      console.log('Starting ' + song.songId + ' (' + song.url + ')');
-      this.audio_.src = song.url;
-      this.audio_.currentTime = 0;
-      this.play_();
-    }
-
+    // Starts playback. If |currentSong_| isn't being played, switches to it
+    // even if we were already playing. Also restarts playback if we were
+    // stopped at the end of the last song in the playlist.
     play_() {
+      const song = this.currentSong_;
+      if (this.audio_.src != song.url || this.reachedEndOfSongs_) {
+        console.log('Starting ' + song.songId + ' (' + song.url + ')');
+        this.audio_.src = song.url;
+        this.audio_.currentTime = 0;
+        this.lastTimeUpdatePosition_ = 0;
+        this.lastTimeUpdateSong_ = null;
+        this.numErrors_ = 0;
+        this.startTime_ = getCurrentTimeSec();
+        this.totalPlayedSec_ = 0;
+        this.lastUpdateTime_ = -1;
+        this.reportedCurrentTrack_ = false;
+        this.reachedEndOfSongs_ = false;
+      }
+
       console.log('Playing');
-      this.audio_.play();
+      this.audio_.play().catch(e => {
+        // play() actually returns a promise that is resolved after playback
+        // actually starts. If we change the <audio>'s src or call its pause()
+        // method while in the preparatory state, it complains. Ignore those
+        // errors.
+        // https://developers.google.com/web/updates/2017/06/play-request-was-interrupted
+        if (
+          e.name == 'AbortError' &&
+          (e.message.match(/interrupted by a new load request/) ||
+            e.message.match(/interrupted by a call to pause/))
+        ) {
+          return;
+        }
+        throw e;
+      });
     }
 
+    // Pauses playback. Safe to call if already paused or stopped.
     pause_() {
       console.log('Pausing');
       this.audio_.pause();
     }
 
     togglePause_() {
-      if (this.reachedEndOfSongs_) {
-        this.startCurrentTrack_();
-      } else if (this.audio_.paused) {
-        this.play_();
-      } else {
-        this.pause_();
-      }
+      this.audio_.paused ? this.play_() : this.pause_();
     }
 
     seek_(seconds) {
