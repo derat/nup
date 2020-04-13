@@ -178,7 +178,7 @@ const template = createTemplate(`
 `);
 
 // <music-player> plays and displays information about songs. It also maintains
-// and displays a playlist.
+// and displays a playlist. Songs can be enqueued by calling enqueueSongs().
 //
 // When the list of available tags changes, a 'tags' CustomEvent with a
 // 'detail.tags' property containing a string array of the new tags is emitted.
@@ -198,19 +198,6 @@ customElements.define(
       this.config_ = new Config();
       this.config_.addCallback((name, value) => {
         if (name == this.config_.VOLUME) this.audio_.volume = value;
-      });
-
-      this.dialogManager_ = document.querySelector('dialog-manager');
-      if (!this.dialogManager_) throw new Error('No <dialog-manager>');
-
-      const search = document.querySelector('search-form');
-      if (!search) throw new Error('No <search-form>');
-      search.addEventListener('enqueue', e => {
-        this.enqueueSongs_(
-          e.detail.songs,
-          e.detail.clearFirst,
-          e.detail.afterCurrent,
-        );
       });
 
       this.updater_ = new Updater();
@@ -316,6 +303,10 @@ customElements.define(
       this.updateTagsFromServer_();
     }
 
+    set dialogManager(manager) {
+      this.dialogManager_ = manager;
+    }
+
     updateTagsFromServer_(sync) {
       const req = new XMLHttpRequest();
       req.open('GET', 'list_tags', !sync);
@@ -342,10 +333,14 @@ customElements.define(
 
     resetForTesting() {
       this.hideUpdateDiv_(false /* saveChanges */);
-      this.enqueueSongs_([], true);
+      this.enqueueSongs([], true);
     }
 
-    enqueueSongs_(songs, clearFirst, afterCurrent) {
+    // Adds |songs| to the playlist.
+    // If |clearFirst| is true, the existing playlist is cleared first.
+    // If |afterCurrent| is true, |songs| are inserted immediately after the
+    // current song. Otherwise, they are appended to the end of the playlist.
+    enqueueSongs(songs, clearFirst, afterCurrent) {
       if (clearFirst) {
         this.audio_.pause();
         this.audio_.src = '';
@@ -767,6 +762,7 @@ customElements.define(
 
     showOptions_() {
       if (this.optionsDialog_) return;
+      if (!this.dialogManager_) throw new Error('No <dialog-manager>');
 
       this.optionsDialog_ = new OptionsDialog(
         this.config_,
@@ -778,7 +774,7 @@ customElements.define(
     }
 
     processAccelerator_(e) {
-      if (this.dialogManager_.numDialogs) return false;
+      if (this.dialogManager_ && this.dialogManager_.numDialogs) return false;
 
       if (e.altKey && e.keyCode == KeyCodes.D) {
         const song = this.currentSong_;

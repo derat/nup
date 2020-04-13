@@ -1,8 +1,14 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
+const dialogManager = document.querySelector('dialog-manager');
 const musicPlayer = document.querySelector('music-player');
 const searchForm = document.querySelector('search-form');
+
+// Wire up dependencies between components.
+musicPlayer.dialogManager = dialogManager;
+searchForm.dialogManager = dialogManager;
+searchForm.musicPlayer = musicPlayer;
 
 // Used by browser tests.
 document.test = {

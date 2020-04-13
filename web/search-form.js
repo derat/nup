@@ -117,7 +117,7 @@ const template = createTemplate(`
 
 <div id="search-heading" class="heading">Search</div>
 
-<form id="search-form">
+<form>
   <table id="search-table">
     <colgroup>
       <col id="search-left" />
@@ -264,23 +264,13 @@ const template = createTemplate(`
 <div id="waiting">Waiting for server...</div>
 `);
 
+// <search-form> sends queries to the server and supports enqueuing the
+// resulting songs in a <music-player>.
 customElements.define(
   'search-form',
   class extends HTMLElement {
     constructor() {
       super();
-
-      this.dialogManager_ = document.querySelector('dialog-manager');
-      if (!this.dialogManager_) throw new Error('No <dialog-manager>');
-
-      const player = document.querySelector('music-player');
-      if (!player) throw new Error('No <music-player>');
-      player.addEventListener('field', e => {
-        this.reset_(e.detail.artist, e.detail.album, false /* clearResults */);
-      });
-      player.addEventListener('tags', e => {
-        this.tagSuggester_.words = e.detail.tags;
-      });
 
       this.request_ = null;
 
@@ -376,6 +366,19 @@ customElements.define(
       this.waitingDiv_ = get('waiting');
     }
 
+    set dialogManager(manager) {
+      this.dialogManager_ = manager;
+    }
+    set musicPlayer(player) {
+      this.musicPlayer_ = player;
+      player.addEventListener('field', e => {
+        this.reset_(e.detail.artist, e.detail.album, false /* clearResults */);
+      });
+      player.addEventListener('tags', e => {
+        this.tagSuggester_.words = e.detail.tags;
+      });
+    }
+
     resetForTesting() {
       this.reset_(null, null, true /* clearResults */);
     }
@@ -411,10 +414,7 @@ customElements.define(
       }
 
       if (!terms.length) {
-        this.dialogManager_.createMessageDialog(
-          'Invalid Search',
-          'You must supply search terms.',
-        );
+        this.showMessage_('Invalid Search', 'You must supply search terms.');
         return;
       }
 
@@ -435,22 +435,19 @@ customElements.define(
             this.searchResultsTable_.setAllCheckboxes(true);
             if (appendToQueue) this.enqueueSearchResults_(true, true);
           } else {
-            this.dialogManager_.createMessageDialog(
+            this.showMessage_(
               'Search Failed',
               'Response from server was empty.',
             );
           }
         } else {
           if (req.status && req.responseText) {
-            this.dialogManager_.createMessageDialog(
+            this.showMessage_(
               'Search Failed',
               'Got ' + req.status + ': ' + req.responseText,
             );
           } else {
-            this.dialogManager_.createMessageDialog(
-              'Search Failed',
-              'Missing status in request.',
-            );
+            this.showMessage_('Search Failed', 'Missing status in request.');
           }
         }
 
@@ -459,10 +456,7 @@ customElements.define(
       };
 
       this.request_.onerror = e => {
-        this.dialogManager_.createMessageDialog(
-          'Search Failed',
-          'Request to server failed.',
-        );
+        this.showMessage_('Search Failed', 'Request to server failed.');
         console.log(e);
       };
 
@@ -474,18 +468,11 @@ customElements.define(
     }
 
     enqueueSearchResults_(clearFirst, afterCurrent) {
+      if (!this.musicPlayer_) throw new Error('No <music-player>');
       if (!this.searchResultsTable_.numSongs) return;
 
       const songs = this.searchResultsTable_.checkedSongs;
-      this.dispatchEvent(
-        new CustomEvent('enqueue', {
-          detail: {
-            songs,
-            clearFirst,
-            afterCurrent,
-          },
-        }),
-      );
+      this.musicPlayer_.enqueueSongs(songs, clearFirst, afterCurrent);
       if (songs.length == this.searchResultsTable_.numSongs) {
         this.searchResultsTable_.setSongs([]);
       }
@@ -591,13 +578,19 @@ customElements.define(
     }
 
     handleBodyKeyDown_(e) {
-      if (this.dialogManager_.numDialogs) return;
+      if (this.dialogManager_ && this.dialogManager_.numDialogs) return;
 
       if (e.keyCode == KeyCodes.SLASH) {
         this.keywordsInput_.focus();
         e.preventDefault();
         e.stopPropagation();
       }
+    }
+
+    // Displays a dialog with the supplied title and message.
+    showMessage_(title, message) {
+      if (!this.dialogManager_) return;
+      this.dialogManager_.createMessageDialog(title, message);
     }
   },
 );
