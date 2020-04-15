@@ -481,12 +481,12 @@ class Test(unittest.TestCase):
         page = Page(driver)
         page.keywords = song.artist
         page.click(page.LUCKY_BUTTON)
-        self.wait_for_song(page, song, False, time='[0:00 / 0:05]')
-        self.wait_for_song(page, song, False, time='[0:01 / 0:05]')
-        self.wait_for_song(page, song, False, time='[0:02 / 0:05]')
-        self.wait_for_song(page, song, False, time='[0:03 / 0:05]')
-        self.wait_for_song(page, song, False, time='[0:04 / 0:05]')
-        self.wait_for_song(page, song, True, time='[0:05 / 0:05]')
+        self.wait_for_song(page, song, False, time='[ 0:00 / 0:05 ]')
+        self.wait_for_song(page, song, False, time='[ 0:01 / 0:05 ]')
+        self.wait_for_song(page, song, False, time='[ 0:02 / 0:05 ]')
+        self.wait_for_song(page, song, False, time='[ 0:03 / 0:05 ]')
+        self.wait_for_song(page, song, False, time='[ 0:04 / 0:05 ]')
+        self.wait_for_song(page, song, True, time='[ 0:05 / 0:05 ]')
 
     def test_report_played(self):
         song1 = Song('ar', 't1', 'al', 1, filename=Song.FILE_5S, length=5.0)
@@ -563,7 +563,7 @@ class Test(unittest.TestCase):
         self.wait_for_song(page, song, rating=page.THREE_STARS,
                            title=u'Rating: ★★★☆☆\nTags: guitar rock')
 
-        page.click(page.COVER_IMAGE)
+        page.show_update_div()
         page.click_rating(4)
         page.click(page.UPDATE_CLOSE_IMAGE)
         self.wait_for_song(page, song, rating=page.FOUR_STARS,
@@ -572,7 +572,7 @@ class Test(unittest.TestCase):
             song.sha1: (0.75, ['guitar', 'rock'], None),
         })
 
-        page.click(page.COVER_IMAGE)
+        page.show_update_div()
         page.get(page.EDIT_TAGS_TEXTAREA).send_keys(' +metal')
         page.click(page.UPDATE_CLOSE_IMAGE)
         self.wait_for_server_user_data({
@@ -640,7 +640,7 @@ class Test(unittest.TestCase):
         page.click(page.LUCKY_BUTTON)
         self.wait_for_song(page, song1)
 
-        page.click(page.COVER_IMAGE)
+        page.show_update_div()
         textarea = page.get(page.EDIT_TAGS_TEXTAREA)
 
         def check_textarea(expected):

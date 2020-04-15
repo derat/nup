@@ -260,6 +260,19 @@ class Page(object):
             )
         ''')
 
+    def show_update_div(self):
+        # Send a keyboard event instead of clicking on COVER_IMAGE since the
+        # image will be hidden if the song's cover is missing.
+        self.driver.execute_script('''
+            document.body.dispatchEvent(
+                new KeyboardEvent('keydown', {
+                    key: 'r',
+                    keyCode: 82,
+                    altKey: true,
+                })
+            )
+        ''')
+
     def rate_and_tag_song(self, song_id, rating=None, tags=None):
         '''Rates and/or tags a song, bypassing the UI.
 
