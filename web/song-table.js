@@ -12,6 +12,7 @@ import {
 
 const template = createTemplate(`
 <style>
+  @import 'common.css';
   :host {
     display: block;
   }
@@ -22,14 +23,15 @@ const template = createTemplate(`
     width: 100%;
   }
   th {
-    text-align: left;
-    padding-right: 10px;
-    border-top: solid 1px #ccc;
-    border-bottom: solid 1px #ccc;
-    padding-left: 8px;
     background-color: #f5f5f5;
-    -webkit-user-select: none;
+    border-bottom: solid 1px #ddd;
+    border-top: solid 1px #ddd;
     cursor: default;
+    padding-left: 8px;
+    padding-right: 10px;
+    padding-top: 2px;
+    text-align: left;
+    user-select: none;
   }
   td {
     padding-left: 8px;
@@ -37,6 +39,7 @@ const template = createTemplate(`
     overflow: hidden;
     text-overflow: ellipsis;
   }
+
   td a {
     color: black;
     text-decoration: none;
@@ -46,12 +49,15 @@ const template = createTemplate(`
     color: #666;
     text-decoration: underline;
   }
+  tr.highlight td a {
+    color: white;
+  }
+
   td.checkbox,
   th.checkbox {
-    width: 1px;
+    width: 4px;
   }
-  td.time,
-  th.artist {
+  td.time {
     padding-left: 6px;
   }
   td.time,
@@ -62,13 +68,11 @@ const template = createTemplate(`
     text-overflow: clip;
   }
   tr.highlight {
-    background-color: #bde;
+    background-color: var(--accent-color);
+    color: white;
   }
   input[type='checkbox'] {
-    height: 12px;
-    margin: 0;
-    vertical-align: middle;
-    width: 12px;
+    margin: 2px 0 0 0;
   }
   input[type='checkbox'][class~='transparent'] {
     opacity: 0.3;
@@ -78,7 +82,7 @@ const template = createTemplate(`
   <thead>
     <tr>
       <th class="checkbox">
-        <input type="checkbox" />
+        <input type="checkbox" class="small" />
       </th>
       <th class="artist">Artist</th>
       <th class="title">Title</th>
@@ -102,7 +106,7 @@ const noCheckboxesTemplate = createTemplate(`
 const rowTemplate = createTemplate(`
 <tr>
   <td class="checkbox">
-    <input type="checkbox" />
+    <input type="checkbox" class="small" />
   </td>
   <td class="artist"><a></a></td>
   <td class="title"></td>

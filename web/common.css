@@ -1,16 +1,135 @@
 /* Copyright 2020 Daniel Erat.
  * All rights reserved. */
 
+@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+
 /* Star characters don't appear to be provided by either Verdana or Arial. They
  * *are* provided by DejaVu Sans, but that's not present on Chrome OS -- Noto
  * Sans SC is used instead. Unfortunately, the metrics are different in
  * different fonts, which leads to inconsistent sizing and padding. So, use a
  * handy custom font generated using fontello.com. */
-@import 'fontello-23133a7b/css/fontello.css';
+@import 'fontello/css/fontello.css';
 
 :root {
-  --font-family: Verdana, 'DejaVu Sans', Arial, Helvetica, sans-serif;
-  --font-size: 12px;
+  --font-family: 'Roboto', sans-serif;
+  --font-size: 13.3333px;
 
-  --star-font-family: fontello, sans-serif;
+  --accent-color: #42a5f5;
+
+  --control-border: 1px solid #ddd;
+  --control-border-radius: 4px;
+  --control-line-height: 16px;
+
+  --icon-font-family: fontello, sans-serif;
 }
+
+span.x-icon {
+  color: #aaa;
+  font-family: fontello, sans-serif;
+  font-size: 10px;
+  padding: 4px;
+}
+span.x-icon:hover {
+  color: #666;
+}
+span.x-icon::before {
+  content: '×';
+}
+
+button {
+  background-color: #aaa;
+  border: none;
+  border-radius: var(--control-border-radius);
+  color: white;
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: bold;
+  height: 28px;
+  letter-spacing: 0.0892857143em;
+  line-height: 28px;
+  padding: 1px 12px 0 12px;
+  text-transform: uppercase;
+}
+button:disabled {
+  background-color: #ddd;
+  box-shadow: none;
+}
+
+input[type='text'],
+textarea {
+  appearance: none;
+  -moz-appearance: none;
+  -ms-appearance: none;
+  -webkit-appearance: none;
+  border: var(--control-border);
+  border-radius: var(--control-border-radius);
+  font-family: var(--font-family);
+  line-height: var(--control-line-height);
+  padding: 6px 4px 4px 6px;
+}
+
+input[type='checkbox'] {
+  appearance: none;
+  -moz-appearance: none;
+  -ms-appearance: none;
+  -webkit-appearance: none;
+  background-color: white;
+  border: solid 1px #ddd;
+  border-radius: 2px;
+  height: 14px;
+  width: 14px;
+}
+input[type='checkbox']:checked {
+  border-color: #999;
+  color: #999;
+}
+input[type='checkbox']:checked:before {
+  content: '✓';
+  font-family: var(--icon-font-family);
+  font-size: 9px;
+  margin-left: 2px;
+  margin-top: 2px;
+  position: absolute;
+}
+
+input[type='checkbox'].small {
+  height: 12px;
+  width: 12px;
+}
+input[type='checkbox'].small:checked:before {
+  font-size: 7px;
+  margin-left: 2px;
+  margin-top: 1px;
+}
+
+.select-wrapper {
+  display: inline-block;
+  margin-right: -8px;
+}
+.select-wrapper:after {
+  color: #aaa;
+  font-family: fontello, sans-serif;
+  font-size: 10px;
+  position: relative;
+  top: 1px;
+  right: 21px;
+  content: '⌄';
+  pointer-events: none;
+}
+select {
+  appearance: none;
+  -moz-appearance: none;
+  -ms-appearance: none;
+  -webkit-appearance: none;
+  background-color: white;
+  border: var(--control-border);
+  border-radius: var(--control-border-radius);
+  font-family: var(--font-family);
+  line-height: var(--control-line-height);
+  padding: 4px 24px 4px 4px;
+}
+select:disabled {
+  opacity: 0.5;
+}
+
+/* TODO: Also style range inputs since they're used by <options-dialog>. */

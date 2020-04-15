@@ -1,8 +1,10 @@
 /* Copyright 2020 Daniel Erat.
  * All rights reserved. */
 
+@import 'common.css';
+
 div.title {
-  color: #36c;
+  color: var(--accent-color);
   font-size: 18px;
   font-weight: bold;
   overflow: hidden;
@@ -11,7 +13,7 @@ div.title {
 }
 
 hr.title {
-  background-color: #aaa;
+  background-color: #ddd;
   color: #aaa;
   border: 0;
   height: 1px;

@@ -9,46 +9,41 @@ const template = createTemplate(`
   :host {
     display: block;
   }
-  select {
-    font-family: var(--font-family);
-    font-size: var(--font-size);
-  }
   .heading {
-    font-size: 13px;
+    font-size: 15px;
     font-weight: bold;
     user-select: none;
   }
   #search-heading {
-    padding-left: 10px;
-    padding-top: 8px;
+    padding: 10px 0 4px 10px;
   }
   #search-form {
     display: block;
     margin-top: 5px;
     white-space: nowrap;
   }
+  #search-form input[type='checkbox'] {
+    margin: 4px 3px -3px 0;
+  }
   #search-form .row {
     align-items: baseline;
     display: flex;
+    margin-bottom: 4px;
+    margin-left: 10px;
   }
-  #search-form .row > * {
-    padding-left: 10px;
-    margin-bottom: 2px;
+  #search-form .row > .checkbox-col {
+    width: 8em;
   }
-  #search-form .row > .left {
+  #search-form .row .label-col {
     width: 6em;
   }
   #search-form label {
     user-select: none;
   }
-  #search-form input[type='text'] {
-    border: 1px solid #ddd;
-    padding-left: 2px;
-  }
   #keywords-input,
   #tags-input {
-    padding-right: 17px;
-    width: 200px;
+    padding-right: 20px;
+    width: 240px;
   }
   #tags-input-div {
     position: relative;
@@ -62,29 +57,29 @@ const template = createTemplate(`
   }
   #keywords-clear,
   #tags-clear {
-    position: relative;
-    left: -22px;
-    top: 2px;
+    bottom: 1px;
     cursor: pointer;
+    position: relative;
+    right: 24px;
   }
   #min-rating-select {
     /* The stars are too close together, but letter-spacing unfortunately
      * doesn't work on <select>. */
     color: #555;
-    font-family: var(--star-font-family);
+    font-family: var(--icon-font-family);
     font-size: 12px;
     margin-left: 2px;
-    padding: 4px 0 2px 0;
-  }
-  #min-rating-select:disabled {
-    opacity: 0.5;
   }
   #max-plays-input {
+    margin: 0 2px;
     padding-right: 2px;
     width: 2em;
   }
   #search-buttons {
     padding-top: 5px;
+  }
+  #search-buttons > *:not(:first-child) {
+    margin-left: 4px;
   }
   #results-heading {
     padding-right: 10px;
@@ -95,6 +90,9 @@ const template = createTemplate(`
     padding-top: 10px;
     padding-left: 10px;
     user-select: none;
+  }
+  #results-controls > *:not(:first-child) {
+    margin-left: 4px;
   }
   #results-table {
     margin-top: 10px;
@@ -116,50 +114,42 @@ const template = createTemplate(`
 
 <form id="search-form">
   <div class="row">
-    <div class="left"><label for="keywords-input">Keywords</label></div>
     <div>
-      <input id="keywords-input" type="text" size="32" />
-      <img
-        id="keywords-clear"
-        src="images/playlist_clear_text.png"
-      />
+      <input id="keywords-input" type="text" placeholder="Keywords" />
+      <span id="keywords-clear" class="x-icon" title="Clear text"></span>
     </div>
   </div>
 
   <div class="row">
-    <div class="left"><label for="tags-input">Tags</label></div>
     <div id="tags-input-div">
       <tag-suggester id="tags-suggester" tab-advances-focus>
-        <input id="tags-input" slot="text" type="text" size="32" />
+        <input id="tags-input" slot="text" type="text" placeholder="Tags" />
       </tag-suggester>
-      <img
-        id="tags-clear"
-        src="images/playlist_clear_text.png"
-      />
+      <span id="tags-clear" class="x-icon" title="Clear text"></span>
     </div>
   </div>
 
   <div class="row">
-    <div class="left">
-      <label for="shuffle-checkbox">Shuffle</label>
+    <div class="checkbox-col">
       <input id="shuffle-checkbox" type="checkbox" value="shuffle" />
+      <label for="shuffle-checkbox">Shuffle</label>
     </div>
     <div>
-      <label for="first-track-checkbox">First track</label>
       <input
         id="first-track-checkbox"
         type="checkbox"
         value="firstTrack"
       />
+      <label for="first-track-checkbox">First track</label>
     </div>
   </div>
 
   <div class="row">
-    <div class="left">
-      <label for="unrated-checkbox">Unrated</label>
+    <div class="checkbox-col">
       <input id="unrated-checkbox" type="checkbox" value="unrated" />
+      <label for="unrated-checkbox">Unrated</label>
     </div>
-    <div>
+    <div class="select-wrapper">
       <label for="min-rating-select">Min rating</label>
       <select id="min-rating-select">
         <option value="0.00">★</option>
@@ -180,48 +170,52 @@ const template = createTemplate(`
   </div>
 
   <div class="row">
-    <div class="left">
+    <div class="label-col">
       <label for="first-played-select">First played</label>
     </div>
     <div>
-      <select id="first-played-select">
-        <option value="0">...</option>
-        <option value="86400">one day</option>
-        <option value="604800">one week</option>
-        <option value="2592000">one month</option>
-        <option value="7776000">three months</option>
-        <option value="15552000">six months</option>
-        <option value="31536000">one year</option>
-        <option value="94608000">three years</option>
-      </select>
+      <div class="select-wrapper">
+        <select id="first-played-select">
+          <option value="0">...</option>
+          <option value="86400">one day</option>
+          <option value="604800">one week</option>
+          <option value="2592000">one month</option>
+          <option value="7776000">three months</option>
+          <option value="15552000">six months</option>
+          <option value="31536000">one year</option>
+          <option value="94608000">three years</option>
+        </select>
+      </div>
       <label for="first-played-select">or less ago</label>
     </div>
   </div>
 
   <div class="row">
-    <div class="left">
+    <div class="label-col">
       <label for="last-played-select">Last played</label>
     </div>
     <div>
-      <select id="last-played-select">
-        <option value="0">...</option>
-        <option value="86400">one day</option>
-        <option value="604800">one week</option>
-        <option value="2592000">one month</option>
-        <option value="7776000">three months</option>
-        <option value="15552000">six months</option>
-        <option value="31536000">one year</option>
-        <option value="94608000">three years</option>
-      </select>
+      <div class="select-wrapper">
+        <select id="last-played-select">
+          <option value="0">...</option>
+          <option value="86400">one day</option>
+          <option value="604800">one week</option>
+          <option value="2592000">one month</option>
+          <option value="7776000">three months</option>
+          <option value="15552000">six months</option>
+          <option value="31536000">one year</option>
+          <option value="94608000">three years</option>
+        </select>
+      </div>
       <label for="last-played-select">or longer ago</label>
     </div>
   </div>
 
   <div class="row">
-    <div class="left">
+    <div class="label-col">
       <label for="preset-select">Preset</label>
     </div>
-    <div>
+    <div class="select-wrapper">
       <select id="preset-select">
         <option value="">...</option>
         <option value="mr=3;t=instrumental;lp=6;s=1;play=1"
@@ -424,6 +418,7 @@ customElements.define(
             const songs = eval('(' + req.responseText + ')');
             console.log('Got response with ' + songs.length + ' song(s)');
             songs.forEach(s => {
+              // TODO: Stop setting this.
               if (!s.coverUrl) s.coverUrl = 'images/missing_cover.png';
             });
             this.resultsTable_.setSongs(songs);

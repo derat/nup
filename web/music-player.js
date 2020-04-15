@@ -20,69 +20,80 @@ const template = createTemplate(`
     display: block;
   }
   #song-info {
-    padding: 5px;
+    display: flex;
+    margin: 8px;
   }
+
   #cover-div {
     align-items: center;
     display: flex;
-    float: left;
-    height: 65px;
     justify-content: center;
-    padding-left: 2px;
-    padding-right: 5px;
-    width: 65px;
+    margin-right: 6px;
+  }
+  #cover-div.empty {
+    background-color: #f5f5f5;
+    outline: solid 1px #ddd;
+    outline-offset: -1px;
   }
   #cover-img {
     cursor: pointer;
-    height: auto;
-    max-height: 65px;
-    max-width: 65px;
+    height: 70px;
+    object-fit: cover;
     user-select: none;
+    width: 70px;
+  }
+  #cover-div.empty #cover-img {
+    visibility: hidden;
   }
   #rating-overlay {
     color: white;
-    font-family: var(--star-font-family);
-    font-size: 11px;
-    left: 9px;
+    font-family: var(--icon-font-family);
+    font-size: 12px;
+    left: 11px;
     letter-spacing: 2px;
     pointer-events: none;
     position: absolute;
     text-shadow: 0 0 8px black;
-    top: 56px;
+    top: 63px;
     user-select: none;
+  }
+
+  #details {
+    line-height: 1.3;
+    overflow: hidden;
+    white-space: nowrap;
   }
   #artist {
     font-weight: bold;
-    line-height: 1.3;
-    overflow: hidden;
-    white-space: nowrap;
   }
   #title {
     font-style: italic;
-    line-height: 1.3;
-    overflow: hidden;
-    white-space: nowrap;
-  }
-  #album {
-    line-height: 1.3;
-    overflow: hidden;
-    white-space: nowrap;
   }
   #controls {
-    clear: both;
-    padding: 5px;
+    margin: 8px;
     user-select: none;
+  }
+  #controls button {
+    font-family: var(--icon-font-family);
+    font-size: 10px;
+    width: 44px;
+  }
+  #controls > *:not(:first-child) {
+    margin-left: 4px;
   }
   #update-container {
     background-color: white;
+    border-radius: 4px;
     box-shadow: 0 1px 4px 1px rgba(0, 0, 0, 0.3);
     display: none;
-    height: 78px;
     left: 12px;
+    padding: 8px;
     position: absolute;
     top: 12px;
-    width: 225px;
     z-index: 1;
+  }
+  #update-container.shown {
+    display: block;
   }
   #update-close {
     cursor: pointer;
@@ -90,12 +101,8 @@ const template = createTemplate(`
     right: 5px;
     top: 5px;
   }
-  #rating-container {
-    margin-left: 6px;
-    margin-top: 8px;
-  }
   #rating {
-    font-family: var(--star-font-family);
+    font-family: var(--icon-font-family);
     font-size: 16px;
   }
   #rating a.star {
@@ -119,11 +126,11 @@ const template = createTemplate(`
   #edit-tags {
     border: solid 1px #ddd;
     font-family: Arial, Helvetica, sans-serif;
-    height: 35px;
-    margin-left: 4px;
+    height: 48px;
+    margin-bottom: -4px;
     margin-top: 8px;
     resize: none;
-    width: 210px;
+    width: 220px;
   }
   #edit-tags-suggester {
     bottom: 52px;
@@ -133,7 +140,6 @@ const template = createTemplate(`
     position: absolute;
   }
   #playlist {
-    border-top: 1px solid #ddd;
     margin-top: 2px;
   }
 </style>
@@ -147,22 +153,24 @@ const template = createTemplate(`
 <div id="song-info">
   <div id="cover-div">
     <img id="cover-img" />
+    <div id="rating-overlay"></div>
   </div>
-  <div id="rating-overlay"></div>
-  <div id="artist"></div>
-  <div id="title"></div>
-  <div id="album"></div>
-  <div id="time"></div>
+  <div id="details">
+    <div id="artist"></div>
+    <div id="title"></div>
+    <div id="album"></div>
+    <div id="time"></div>
+  </div>
 </div>
 
 <div id="controls">
-  <button id="prev" disabled>Prev</button>
-  <button id="next" disabled>Next</button>
-  <button id="play-pause" disabled>Pause</button>
+  <button id="prev" disabled>⏮</button>
+  <button id="play-pause" disabled>⏸</button>
+  <button id="next" disabled>⏭</button>
 </div>
 
 <div id="update-container">
-  <img id="update-close" src="images/update_close.png" />
+  <span id="update-close" class="x-icon" title="Close"></span>
   <div id="rating-container">
     Rating: <span id="rating" tabindex="0"></span>
     <a id="dump-song" class="debug-link" target="_blank">[d]</a>
@@ -237,6 +245,7 @@ customElements.define(
       this.audio_.addEventListener('error', e => this.onError_(e));
       this.audio_.volume = this.config_.get(this.config_.VOLUME);
 
+      this.coverDiv_ = get('cover-div');
       this.coverImage_ = get('cover-img');
       this.coverImage_.addEventListener('click', () => this.showUpdateDiv_());
       this.coverImage_.addEventListener('load', () =>
@@ -300,6 +309,7 @@ customElements.define(
       });
 
       this.updateTagsFromServer_();
+      this.updateSongDisplay_();
     }
 
     set dialogManager(manager) {
@@ -420,14 +430,14 @@ customElements.define(
       updateTitleAttributeForTruncation(this.titleDiv_, song ? song.title : '');
       updateTitleAttributeForTruncation(this.albumDiv_, song ? song.album : '');
 
-      const setCover = url => {
-        this.coverImage_.src = url;
-        if (this.favicon_) {
-          this.favicon_.href = url;
-          this.favicon_.type = url.match(/\.png$/) ? 'image/png' : 'image/jpeg';
-        }
-      };
-      setCover(song ? song.coverUrl : 'images/missing_cover.png');
+      if (song && song.coverUrl) {
+        this.coverDiv_.classList.remove('empty');
+        this.coverImage_.src = song.coverUrl;
+        if (this.favicon_) this.favicon_.href = song.coverUrl;
+      } else {
+        this.coverDiv_.classList.add('empty');
+        if (this.favicon_) this.favicon_.href = 'images/missing_cover.png';
+      }
 
       this.updateCoverTitleAttribute_();
       this.updateRatingOverlay_();
@@ -593,12 +603,12 @@ customElements.define(
     }
 
     onPause_() {
-      this.playPauseButton_.innerText = 'Play';
+      this.playPauseButton_.innerText = '▶';
       this.lastUpdateTime_ = -1;
     }
 
     onPlay_() {
-      this.playPauseButton_.innerText = 'Pause';
+      this.playPauseButton_.innerText = '⏸';
       this.lastUpdateTime_ = getCurrentTimeSec();
     }
 
@@ -623,7 +633,7 @@ customElements.define(
       if (duration) {
         const cur = formatTime(position);
         const dur = formatTime(duration);
-        this.timeDiv_.innerText = `[${cur} / ${dur}]`;
+        this.timeDiv_.innerText = `[ ${cur} / ${dur} ]`;
       } else {
         this.timeDiv_.innerText = '';
       }
@@ -686,13 +696,13 @@ customElements.define(
       this.tagsTextarea_.value = song.tags.length
         ? song.tags.sort().join(' ') + ' ' // append space to ease editing
         : '';
-      this.updateDiv_.style.display = 'block';
+      this.updateDiv_.classList.add('shown');
       this.updateSong_ = song;
       return true;
     }
 
     hideUpdateDiv_(saveChanges) {
-      this.updateDiv_.style.display = 'none';
+      this.updateDiv_.classList.remove('shown');
       this.ratingSpan_.blur();
       this.tagsTextarea_.blur();
 
