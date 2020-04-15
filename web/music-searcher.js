@@ -22,23 +22,26 @@ const template = createTemplate(`
     padding-left: 10px;
     padding-top: 8px;
   }
-  #search-table {
-    border: 0;
-    border-collapse: collapse;
+  #search-form {
+    display: block;
     margin-top: 5px;
-    user-select: none;
     white-space: nowrap;
   }
-  #search-left {
-    width: 4em;
+  #search-form .row {
+    align-items: baseline;
+    display: flex;
   }
-  #search-table td {
+  #search-form .row > * {
     padding-left: 10px;
+    margin-bottom: 2px;
   }
-  #search-table label {
+  #search-form .row > .left {
+    width: 6em;
+  }
+  #search-form label {
     user-select: none;
   }
-  #search-table input[type='text'] {
+  #search-form input[type='text'] {
     border: 1px solid #ddd;
     padding-left: 2px;
   }
@@ -111,139 +114,137 @@ const template = createTemplate(`
 
 <div id="search-heading" class="heading">Search</div>
 
-<form>
-  <table id="search-table">
-    <colgroup>
-      <col id="search-left" />
-      <col id="search-right" />
-    </colgroup>
-    <tr>
-      <td><label for="keywords-input">Keywords</label></td>
-      <td>
-        <input id="keywords-input" type="text" size="32" />
-        <img
-          id="keywords-clear"
-          src="images/playlist_clear_text.png"
-        />
-      </td>
-    </tr>
-    <tr>
-      <td><label for="tags-input">Tags</label></td>
-      <td>
-        <div id="tags-input-div">
-          <tag-suggester id="tags-suggester" tab-advances-focus>
-            <input id="tags-input" slot="text" type="text" size="32" />
-          </tag-suggester>
-          <img
-            id="tags-clear"
-            src="images/playlist_clear_text.png"
-          />
-        </div>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <label for="shuffle-checkbox">Shuffle</label>
-        <input id="shuffle-checkbox" type="checkbox" value="shuffle" />
-      </td>
-      <td>
-        <label for="first-track-checkbox">First track</label>
-        <input
-          id="first-track-checkbox"
-          type="checkbox"
-          value="firstTrack"
-        />
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <label for="unrated-checkbox">Unrated</label>
-        <input id="unrated-checkbox" type="checkbox" value="unrated" />
-      </td>
-      <td>
-        <label for="min-rating-select">Min rating</label>
-        <select id="min-rating-select">
-          <option value="0.00">★</option>
-          <option value="0.25">★★</option>
-          <option value="0.50">★★★</option>
-          <option value="0.75">★★★★</option>
-          <option value="1.00">★★★★★</option>
-        </select>
-      </td>
-    </tr>
-    <tr>
-      <td colspan="2">
-        <label for="max-plays-input">Played</label>
-        <input id="max-plays-input" type="text" />
-        <label for="max-plays-input">or fewer times</label>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <label for="first-played-select">First played</label>
-      </td>
-      <td>
-        <select id="first-played-select">
-          <option value="0">...</option>
-          <option value="86400">one day</option>
-          <option value="604800">one week</option>
-          <option value="2592000">one month</option>
-          <option value="7776000">three months</option>
-          <option value="15552000">six months</option>
-          <option value="31536000">one year</option>
-          <option value="94608000">three years</option>
-        </select>
-        <label for="first-played-select">or less ago</label>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <label for="last-played-select">Last played</label>
-      </td>
-      <td>
-        <select id="last-played-select">
-          <option value="0">...</option>
-          <option value="86400">one day</option>
-          <option value="604800">one week</option>
-          <option value="2592000">one month</option>
-          <option value="7776000">three months</option>
-          <option value="15552000">six months</option>
-          <option value="31536000">one year</option>
-          <option value="94608000">three years</option>
-        </select>
-        <label for="last-played-select">or longer ago</label>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <label for="preset-select">Preset</label>
-      </td>
-      <td>
-        <select id="preset-select">
-          <option value="">...</option>
-          <option value="mr=3;t=instrumental;lp=6;s=1;play=1"
-            >instrumental old</option
-          >
-          <option value="mr=3;t=mellow;s=1;play=1">mellow</option>
-          <option value="ft=1;fp=3">new albums</option>
-          <option value="u=1;play=1">unrated</option>
-          <option value="mr=3;lp=6;s=1;play=1">old</option>
-        </select>
-      </td>
-    </tr>
-    <tr>
-      <td colspan="2">
-        <div id="search-buttons">
-          <!-- A "button" type is needed to prevent these from submitting the
-               form by default, which seems really dumb.
-               https://stackoverflow.com/q/932653 -->
-          <button id="search-button" type="button">Search</button>
-          <button id="reset-button" type="button">Reset</button>
-          <button id="lucky-button" type="button">I'm Feeling Lucky</button>
-        </div>
-      </td>
-    </tr>
-  </table>
+<form id="search-form">
+  <div class="row">
+    <div class="left"><label for="keywords-input">Keywords</label></div>
+    <div>
+      <input id="keywords-input" type="text" size="32" />
+      <img
+        id="keywords-clear"
+        src="images/playlist_clear_text.png"
+      />
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="left"><label for="tags-input">Tags</label></div>
+    <div id="tags-input-div">
+      <tag-suggester id="tags-suggester" tab-advances-focus>
+        <input id="tags-input" slot="text" type="text" size="32" />
+      </tag-suggester>
+      <img
+        id="tags-clear"
+        src="images/playlist_clear_text.png"
+      />
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="left">
+      <label for="shuffle-checkbox">Shuffle</label>
+      <input id="shuffle-checkbox" type="checkbox" value="shuffle" />
+    </div>
+    <div>
+      <label for="first-track-checkbox">First track</label>
+      <input
+        id="first-track-checkbox"
+        type="checkbox"
+        value="firstTrack"
+      />
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="left">
+      <label for="unrated-checkbox">Unrated</label>
+      <input id="unrated-checkbox" type="checkbox" value="unrated" />
+    </div>
+    <div>
+      <label for="min-rating-select">Min rating</label>
+      <select id="min-rating-select">
+        <option value="0.00">★</option>
+        <option value="0.25">★★</option>
+        <option value="0.50">★★★</option>
+        <option value="0.75">★★★★</option>
+        <option value="1.00">★★★★★</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label for="max-plays-input">Played</label>
+      <input id="max-plays-input" type="text" />
+      <label for="max-plays-input">or fewer times</label>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="left">
+      <label for="first-played-select">First played</label>
+    </div>
+    <div>
+      <select id="first-played-select">
+        <option value="0">...</option>
+        <option value="86400">one day</option>
+        <option value="604800">one week</option>
+        <option value="2592000">one month</option>
+        <option value="7776000">three months</option>
+        <option value="15552000">six months</option>
+        <option value="31536000">one year</option>
+        <option value="94608000">three years</option>
+      </select>
+      <label for="first-played-select">or less ago</label>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="left">
+      <label for="last-played-select">Last played</label>
+    </div>
+    <div>
+      <select id="last-played-select">
+        <option value="0">...</option>
+        <option value="86400">one day</option>
+        <option value="604800">one week</option>
+        <option value="2592000">one month</option>
+        <option value="7776000">three months</option>
+        <option value="15552000">six months</option>
+        <option value="31536000">one year</option>
+        <option value="94608000">three years</option>
+      </select>
+      <label for="last-played-select">or longer ago</label>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="left">
+      <label for="preset-select">Preset</label>
+    </div>
+    <div>
+      <select id="preset-select">
+        <option value="">...</option>
+        <option value="mr=3;t=instrumental;lp=6;s=1;play=1"
+          >instrumental old</option
+        >
+        <option value="mr=3;t=mellow;s=1;play=1">mellow</option>
+        <option value="ft=1;fp=3">new albums</option>
+        <option value="u=1;play=1">unrated</option>
+        <option value="mr=3;lp=6;s=1;play=1">old</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="row">
+    <div id="search-buttons">
+      <!-- A "button" type is needed to prevent these from submitting the
+           form by default, which seems really dumb.
+           https://stackoverflow.com/q/932653 -->
+      <button id="search-button" type="button">Search</button>
+      <button id="reset-button" type="button">Reset</button>
+      <button id="lucky-button" type="button">I'm Feeling Lucky</button>
+    </div>
+  </div>
 </form>
 
 <div id="results-controls">
@@ -348,11 +349,11 @@ customElements.define(
         this.enqueueSearchResults_(true, false),
       );
 
-      this.searchResultsTable_ = get('results-table');
-      this.searchResultsTable_.addEventListener('field', e => {
+      this.resultsTable_ = get('results-table');
+      this.resultsTable_.addEventListener('field', e => {
         this.reset_(e.detail.artist, e.detail.album, false /* clearResults */);
       });
-      this.searchResultsTable_.addEventListener('check', e => {
+      this.resultsTable_.addEventListener('check', e => {
         const checked = !!e.detail.count;
         this.appendButton_.disabled = this.insertButton_.disabled = this.replaceButton_.disabled = !checked;
       });
@@ -425,8 +426,8 @@ customElements.define(
             songs.forEach(s => {
               if (!s.coverUrl) s.coverUrl = 'images/missing_cover.png';
             });
-            this.searchResultsTable_.setSongs(songs);
-            this.searchResultsTable_.setAllCheckboxes(true);
+            this.resultsTable_.setSongs(songs);
+            this.resultsTable_.setAllCheckboxes(true);
             if (appendToQueue) this.enqueueSearchResults_(true, true);
           } else {
             this.showMessage_(
@@ -463,12 +464,12 @@ customElements.define(
 
     enqueueSearchResults_(clearFirst, afterCurrent) {
       if (!this.musicPlayer_) throw new Error('No <music-player>');
-      if (!this.searchResultsTable_.numSongs) return;
+      if (!this.resultsTable_.numSongs) return;
 
-      const songs = this.searchResultsTable_.checkedSongs;
+      const songs = this.resultsTable_.checkedSongs;
       this.musicPlayer_.enqueueSongs(songs, clearFirst, afterCurrent);
-      if (songs.length == this.searchResultsTable_.numSongs) {
-        this.searchResultsTable_.setSongs([]);
+      if (songs.length == this.resultsTable_.numSongs) {
+        this.resultsTable_.setSongs([]);
       }
     }
 
@@ -496,7 +497,7 @@ customElements.define(
       this.firstPlayedSelect_.selectedIndex = 0;
       this.lastPlayedSelect_.selectedIndex = 0;
       this.presetSelect_.selectedIndex = 0;
-      if (clearResults) this.searchResultsTable_.setSongs([]);
+      if (clearResults) this.resultsTable_.setSongs([]);
       this.scrollIntoView();
     }
 
