@@ -2,6 +2,7 @@
 # coding=UTF-8
 
 import selenium
+import time
 import utils
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
@@ -44,7 +45,8 @@ class Page(object):
     EDIT_TAGS_TEXTAREA = MUSIC_PLAYER + (By.ID, 'edit-tags')
     NEXT_BUTTON = MUSIC_PLAYER + (By.ID, 'next')
     PLAY_PAUSE_BUTTON = MUSIC_PLAYER + (By.ID, 'play-pause')
-    PLAYLIST_TABLE = MUSIC_PLAYER + (By.ID, 'playlist', By.CSS_SELECTOR, 'table')
+    PLAYLIST_TABLE = MUSIC_PLAYER + (
+        By.ID, 'playlist', By.CSS_SELECTOR, 'table')
     PREV_BUTTON = MUSIC_PLAYER + (By.ID, 'prev')
     RATING_OVERLAY_DIV = MUSIC_PLAYER + (By.ID, 'rating-overlay')
     RATING_SPAN = MUSIC_PLAYER + (By.ID, 'rating')
@@ -52,25 +54,27 @@ class Page(object):
     TITLE_DIV = MUSIC_PLAYER + (By.ID, 'title')
     UPDATE_CLOSE_IMAGE = MUSIC_PLAYER + (By.ID, 'update-close')
 
-    SEARCH_FORM = (By.TAG_NAME, 'search-form');
-    APPEND_BUTTON = SEARCH_FORM + (By.ID, 'append-button')
-    FIRST_PLAYED_SELECT = SEARCH_FORM + (By.ID, 'first-played-select')
-    FIRST_TRACK_CHECKBOX = SEARCH_FORM + (By.ID, 'first-track-checkbox')
-    INSERT_BUTTON = SEARCH_FORM + (By.ID, 'insert-button')
-    LAST_PLAYED_SELECT = SEARCH_FORM + (By.ID, 'last-played-select')
-    LUCKY_BUTTON = SEARCH_FORM + (By.ID, 'lucky-button')
-    MIN_RATING_SELECT = SEARCH_FORM + (By.ID, 'min-rating-select')
-    PRESET_SELECT = SEARCH_FORM + (By.ID, 'preset-select')
-    REPLACE_BUTTON = SEARCH_FORM + (By.ID, 'replace-button')
-    RESET_BUTTON = SEARCH_FORM + (By.ID, 'reset-button')
-    SEARCH_BUTTON = SEARCH_FORM + (By.ID, 'search-button')
-    SEARCH_RESULTS_CHECKBOX = SEARCH_FORM + (By.ID, 'results-table', By.CSS_SELECTOR, 'th input[type="checkbox"]')
-    SEARCH_RESULTS_TABLE = SEARCH_FORM + (By.ID, 'results-table', By.CSS_SELECTOR, 'table')
-    UNRATED_CHECKBOX = SEARCH_FORM + (By.ID, 'unrated-checkbox')
+    MUSIC_SEARCHER = (By.TAG_NAME, 'music-searcher');
+    APPEND_BUTTON = MUSIC_SEARCHER + (By.ID, 'append-button')
+    FIRST_PLAYED_SELECT = MUSIC_SEARCHER + (By.ID, 'first-played-select')
+    FIRST_TRACK_CHECKBOX = MUSIC_SEARCHER + (By.ID, 'first-track-checkbox')
+    INSERT_BUTTON = MUSIC_SEARCHER + (By.ID, 'insert-button')
+    LAST_PLAYED_SELECT = MUSIC_SEARCHER + (By.ID, 'last-played-select')
+    LUCKY_BUTTON = MUSIC_SEARCHER + (By.ID, 'lucky-button')
+    MIN_RATING_SELECT = MUSIC_SEARCHER + (By.ID, 'min-rating-select')
+    PRESET_SELECT = MUSIC_SEARCHER + (By.ID, 'preset-select')
+    REPLACE_BUTTON = MUSIC_SEARCHER + (By.ID, 'replace-button')
+    RESET_BUTTON = MUSIC_SEARCHER + (By.ID, 'reset-button')
+    SEARCH_BUTTON = MUSIC_SEARCHER + (By.ID, 'search-button')
+    SEARCH_RESULTS_CHECKBOX = MUSIC_SEARCHER + (
+        By.ID, 'results-table', By.CSS_SELECTOR, 'th input[type="checkbox"]')
+    SEARCH_RESULTS_TABLE = MUSIC_SEARCHER + (
+        By.ID, 'results-table', By.CSS_SELECTOR, 'table')
+    UNRATED_CHECKBOX = MUSIC_SEARCHER + (By.ID, 'unrated-checkbox')
 
-    keywords = InputElement(SEARCH_FORM + (By.ID, 'keywords-input'))
-    max_plays = InputElement(SEARCH_FORM + (By.ID, 'max-plays-input'))
-    tags = InputElement(SEARCH_FORM + (By.ID, 'tags-input'))
+    keywords = InputElement(MUSIC_SEARCHER + (By.ID, 'keywords-input'))
+    max_plays = InputElement(MUSIC_SEARCHER + (By.ID, 'max-plays-input'))
+    tags = InputElement(MUSIC_SEARCHER + (By.ID, 'tags-input'))
 
     # Values for FIRST_PLAYED_SELECT and LAST_PLAYED_SELECT.
     UNSET_TIME = '...'
@@ -238,9 +242,23 @@ class Page(object):
         return [i.text for i in items]
 
     def show_options(self):
-        # TODO: This ought to be using Alt+O, but my version of selenium is
-        # broken and barfs when modifiers are sent.
-        self.driver.execute_script('document.test.showOptions()')
+        # Ideally, something like this could be used here:
+        #   ActionChains(self.driver).send_keys(Keys.ALT, 'O').perform()
+        # However, ChromeDriver apparently requires that a US keyboard layout is
+        # present in able to be able to send the requested key:
+        # https://chromedriver.chromium.org/help/keyboard-support
+        # If only Dvorak-based layouts are available, then the JS event handler
+        # receives 's' instead of 'o' (since the physical 's' key produces 'o'
+        # in Dvorak).
+        self.driver.execute_script('''
+            document.body.dispatchEvent(
+                new KeyboardEvent('keydown', {
+                    key: 'o',
+                    keyCode: 79,
+                    altKey: true,
+                })
+            )
+        ''')
 
     def rate_and_tag_song(self, song_id, rating=None, tags=None):
         '''Rates and/or tags a song, bypassing the UI.

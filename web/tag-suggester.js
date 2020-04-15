@@ -1,13 +1,7 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
-import {
-  $,
-  createElement,
-  createShadow,
-  createTemplate,
-  KeyCodes,
-} from './common.js';
+import {$, createElement, createShadow, createTemplate} from './common.js';
 
 const template = createTemplate(`
 <style>
@@ -106,7 +100,7 @@ customElements.define(
     handleKeyDown_(e) {
       this.hideSuggestions_();
 
-      if (e.keyCode != KeyCodes.TAB) return;
+      if (e.key != 'Tab') return;
 
       const parts = this.getTextParts_();
       if (parts.word.length == 0 && this.tabAdvancesFocus_) return;

@@ -54,24 +54,3 @@ export function createStyle(text) {
   style.innerText = text;
   return style;
 }
-
-export const KeyCodes = {
-  ENTER: 13,
-  ESCAPE: 27,
-  LEFT: 37,
-  RIGHT: 39,
-  SPACE: 32,
-  TAB: 9,
-  SLASH: 191,
-
-  D: 68,
-  N: 78,
-  O: 79,
-  P: 80,
-  R: 82,
-  T: 84,
-  V: 86,
-
-  ZERO: 48,
-  FIVE: 53,
-};

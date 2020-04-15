@@ -3,12 +3,12 @@
 
 const dialogManager = document.querySelector('dialog-manager');
 const musicPlayer = document.querySelector('music-player');
-const searchForm = document.querySelector('search-form');
+const musicSearcher = document.querySelector('music-searcher');
 
 // Wire up dependencies between components.
 musicPlayer.dialogManager = dialogManager;
-searchForm.dialogManager = dialogManager;
-searchForm.musicPlayer = musicPlayer;
+musicSearcher.dialogManager = dialogManager;
+musicSearcher.musicPlayer = musicPlayer;
 
 // Used by browser tests.
 document.test = {
@@ -18,7 +18,7 @@ document.test = {
     musicPlayer.updater_.reportPlay(songId, startTime),
   reset: () => {
     musicPlayer.resetForTesting();
-    searchForm.resetForTesting();
+    musicSearcher.resetForTesting();
   },
   showOptions: () => musicPlayer.showOptions_(),
   updateTags: () => musicPlayer.updateTagsFromServer_(true /* sync */),

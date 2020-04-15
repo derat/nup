@@ -1,13 +1,7 @@
 // Copyright 2010 Daniel Erat.
 // All rights reserved.
 
-import {
-  $,
-  createShadow,
-  createTemplate,
-  getCurrentTimeSec,
-  KeyCodes,
-} from './common.js';
+import {$, createShadow, createTemplate, getCurrentTimeSec} from './common.js';
 
 const template = createTemplate(`
 <style>
@@ -264,10 +258,10 @@ const template = createTemplate(`
 <div id="waiting">Waiting for server...</div>
 `);
 
-// <search-form> sends queries to the server and supports enqueuing the
+// <music-searcher> sends queries to the server and supports enqueuing the
 // resulting songs in a <music-player>.
 customElements.define(
-  'search-form',
+  'music-searcher',
   class extends HTMLElement {
     constructor() {
       super();
@@ -528,14 +522,9 @@ customElements.define(
 
     // Handle a key being pressed in the search form.
     handleFormKeyDown_(e) {
-      if (e.keyCode == KeyCodes.ENTER) {
+      if (e.key == 'Enter') {
         this.submitQuery_(false);
-      } else if (
-        e.keyCode == KeyCodes.SPACE ||
-        e.keyCode == KeyCodes.LEFT ||
-        e.keyCode == KeyCodes.RIGHT ||
-        e.keyCode == KeyCodes.SLASH
-      ) {
+      } else if ([' ', 'ArrowLeft', 'ArrowRight', '/'].indexOf(e.key) != -1) {
         e.stopPropagation();
       }
     }
@@ -580,7 +569,7 @@ customElements.define(
     handleBodyKeyDown_(e) {
       if (this.dialogManager_ && this.dialogManager_.numDialogs) return;
 
-      if (e.keyCode == KeyCodes.SLASH) {
+      if (e.key == '/') {
         this.keywordsInput_.focus();
         e.preventDefault();
         e.stopPropagation();

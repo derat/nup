@@ -1,7 +1,7 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
-import {$, createShadow, createTemplate, KeyCodes} from './common.js';
+import {$, createShadow, createTemplate} from './common.js';
 
 const template = createTemplate(`
 <style>
@@ -59,7 +59,7 @@ export default class OptionsDialog {
     );
 
     this.keyListener_ = e => {
-      if (e.keyCode == KeyCodes.ESCAPE) {
+      if (e.key == 'Escape') {
         e.preventDefault();
         e.stopPropagation();
         this.close();

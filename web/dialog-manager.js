@@ -103,8 +103,7 @@ customElements.define(
       dialog.addEventListener(
         'keydown',
         e => {
-          if (e.keyCode == 27) {
-            // escape
+          if (e.key == 'Escape') {
             e.preventDefault();
             this.closeDialog(dialog);
           }

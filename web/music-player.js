@@ -7,7 +7,6 @@ import {
   createTemplate,
   formatTime,
   getCurrentTimeSec,
-  KeyCodes,
   updateTitleAttributeForTruncation,
 } from './common.js';
 import Config from './config.js';
@@ -788,48 +787,45 @@ customElements.define(
     processAccelerator_(e) {
       if (this.dialogManager_ && this.dialogManager_.numDialogs) return false;
 
-      if (e.altKey && e.keyCode == KeyCodes.D) {
+      if (e.altKey && e.key == 'd') {
         const song = this.currentSong_;
         if (song) window.open(getDumpSongUrl(song, false), '_blank');
         return true;
-      } else if (e.altKey && e.keyCode == KeyCodes.N) {
+      } else if (e.altKey && e.key == 'n') {
         this.cycleTrack_(1);
         return true;
-      } else if (e.altKey && e.keyCode == KeyCodes.O) {
+      } else if (e.altKey && e.key == 'o') {
         this.showOptions_();
         return true;
-      } else if (e.altKey && e.keyCode == KeyCodes.P) {
+      } else if (e.altKey && e.key == 'p') {
         this.cycleTrack_(-1);
         return true;
-      } else if (e.altKey && e.keyCode == KeyCodes.R) {
+      } else if (e.altKey && e.key == 'r') {
         if (this.showUpdateDiv_()) this.ratingSpan_.focus();
         return true;
-      } else if (e.altKey && e.keyCode == KeyCodes.T) {
+      } else if (e.altKey && e.key == 't') {
         if (this.showUpdateDiv_()) this.tagsTextarea_.focus();
         return true;
-      } else if (e.altKey && e.keyCode == KeyCodes.V) {
+      } else if (e.altKey && e.key == 'v') {
         this.presentationLayer_.visible = !this.presentationLayer_.visible;
         return true;
-      } else if (e.keyCode == KeyCodes.SPACE && !this.updateSong_) {
+      } else if (e.key == ' ' && !this.updateSong_) {
         this.togglePause_();
         return true;
-      } else if (e.keyCode == KeyCodes.ENTER && this.updateSong_) {
+      } else if (e.key == 'Enter' && this.updateSong_) {
         this.hideUpdateDiv_(true);
         return true;
-      } else if (
-        e.keyCode == KeyCodes.ESCAPE &&
-        this.presentationLayer_.visible
-      ) {
+      } else if (e.key == 'Escape' && this.presentationLayer_.visible) {
         this.presentationLayer_.visible = false;
         return true;
-      } else if (e.keyCode == KeyCodes.ESCAPE && this.updateSong_) {
+      } else if (e.key == 'Escape' && this.updateSong_) {
         this.hideUpdateDiv_(false);
         return true;
-      } else if (e.keyCode == KeyCodes.LEFT && !this.updateSong_) {
-        this.seek_(-Player.SEEK_SECONDS);
+      } else if (e.key == 'ArrowLeft' && !this.updateSong_) {
+        this.seek_(-this.SEEK_SECONDS);
         return true;
-      } else if (e.keyCode == KeyCodes.RIGHT && !this.updateSong_) {
-        this.seek_(Player.SEEK_SECONDS);
+      } else if (e.key == 'ArrowRight' && !this.updateSong_) {
+        this.seek_(this.SEEK_SECONDS);
         return true;
       }
 
@@ -837,13 +833,13 @@ customElements.define(
     }
 
     handleRatingSpanKeyDown_(e) {
-      if (e.keyCode >= KeyCodes.ZERO && e.keyCode <= KeyCodes.FIVE) {
-        this.setRating_(numStarsToRating(e.keyCode - KeyCodes.ZERO));
+      if (['0', '1', '2', '3', '4', '5'].indexOf(e.key) != -1) {
+        this.setRating_(numStarsToRating(parseInt(e.key)));
         e.preventDefault();
         e.stopPropagation();
-      } else if (e.keyCode == KeyCodes.LEFT || e.keyCode == KeyCodes.RIGHT) {
+      } else if (e.key == 'ArrowLeft' || e.key == 'ArrowRight') {
         const oldStars = ratingToNumStars(this.updatedRating_);
-        const newStars = oldStars + (e.keyCode == KeyCodes.LEFT ? -1 : 1);
+        const newStars = oldStars + (e.key == 'ArrowLeft' ? -1 : 1);
         this.setRating_(numStarsToRating(newStars));
         e.preventDefault();
         e.stopPropagation();
