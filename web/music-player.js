@@ -164,9 +164,9 @@ const template = createTemplate(`
 </div>
 
 <div id="controls">
-  <button id="prev" disabled>⏮</button>
-  <button id="play-pause" disabled>⏸</button>
-  <button id="next" disabled>⏭</button>
+  <button id="prev" disabled title="Previous song">⏮</button>
+  <button id="play-pause" disabled title="Pause">⏸</button>
+  <button id="next" disabled title="Next song">⏭</button>
 </div>
 
 <div id="update-container">
@@ -604,11 +604,13 @@ customElements.define(
 
     onPause_() {
       this.playPauseButton_.innerText = '▶';
+      this.playPauseButton_.title = 'Play';
       this.lastUpdateTime_ = -1;
     }
 
     onPlay_() {
       this.playPauseButton_.innerText = '⏸';
+      this.playPauseButton_.title = 'Pause';
       this.lastUpdateTime_ = getCurrentTimeSec();
     }
 

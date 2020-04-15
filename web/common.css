@@ -41,6 +41,7 @@ button {
   border: none;
   border-radius: var(--control-border-radius);
   color: white;
+  cursor: pointer;
   font-family: var(--font-family);
   font-size: 12px;
   font-weight: bold;
@@ -53,6 +54,7 @@ button {
 button:disabled {
   background-color: #ddd;
   box-shadow: none;
+  cursor: default;
 }
 
 input[type='text'],
