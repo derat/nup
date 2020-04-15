@@ -190,8 +190,12 @@ const template = createTemplate(`
 // When the list of available tags changes, a 'tags' CustomEvent with a
 // 'detail.tags' property containing a string array of the new tags is emitted.
 //
-// When an artist or album field in the playlist is clicked, a 'field' Custom
-// event is emitted. See <song-table> for more details.
+// When an artist or album field in the playlist is clicked, a 'field'
+// CustomEvent is emitted. See <song-table> for more details.
+//
+// When the <presentation-layer>'s visibility changes, a 'present' CustomEvent
+// is emitted with a 'detail.visible' boolean property. The document's scrollbar
+// should be hidden while the layer is visible.
 customElements.define(
   'music-player',
   class extends HTMLElement {
@@ -820,6 +824,7 @@ customElements.define(
         return true;
       } else if (e.altKey && e.key == 'v') {
         this.presentationLayer_.visible = !this.presentationLayer_.visible;
+        this.emitPresentEvent_(this.presentationLayer_.visible);
         return true;
       } else if (e.key == ' ' && !this.updateSong_) {
         this.togglePause_();
@@ -829,6 +834,7 @@ customElements.define(
         return true;
       } else if (e.key == 'Escape' && this.presentationLayer_.visible) {
         this.presentationLayer_.visible = false;
+        this.emitPresentEvent_(false);
         return true;
       } else if (e.key == 'Escape' && this.updateSong_) {
         this.hideUpdateDiv_(false);
@@ -856,6 +862,10 @@ customElements.define(
         e.preventDefault();
         e.stopPropagation();
       }
+    }
+
+    emitPresentEvent_(visible) {
+      this.dispatchEvent(new CustomEvent('present', {detail: {visible}}));
     }
   },
 );

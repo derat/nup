@@ -16,6 +16,9 @@ const template = createTemplate(`
     width: 100%;
     z-index: 5;
   }
+  :host(.visible) {
+    display: flex;
+  }
 
   #left {
     width: calc(60% - 40px);
@@ -145,7 +148,6 @@ customElements.define(
       this.duration_ = 0; // duration of current song in seconds
       this.visible_ = false;
       this.playNextTrackFunction_ = null;
-      this.origOverflowStyle_ = document.body.style.overflow;
 
       this.shadow_ = createShadow(this, template);
       this.currentDetails_ = $('current-details', this.shadow_);
@@ -215,10 +217,9 @@ customElements.define(
       return this.visible_;
     }
     set visible(visible) {
-      document.body.style.overflow = visible
-        ? 'hidden'
-        : this.origOverflowStyle;
-      this.style.display = visible ? 'flex' : 'none';
+      visible
+        ? this.classList.add('visible')
+        : this.classList.remove('visible');
       this.visible_ = visible;
     }
 

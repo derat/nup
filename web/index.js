@@ -10,6 +10,13 @@ musicPlayer.dialogManager = dialogManager;
 musicSearcher.dialogManager = dialogManager;
 musicSearcher.musicPlayer = musicPlayer;
 
+// Hide the scrollbar while the presentation layer is shown.
+musicPlayer.addEventListener('present', e => {
+  e.detail.visible
+    ? document.body.classList.add('no-scroll')
+    : document.body.classList.remove('no-scroll');
+});
+
 // Used by browser tests.
 document.test = {
   rateAndTag: (songId, rating, tags) =>

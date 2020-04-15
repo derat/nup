@@ -108,6 +108,9 @@ const template = createTemplate(`
     right: 8px;
     top: 8px;
   }
+  #waiting.shown {
+    display: block;
+  }
 </style>
 
 <div id="search-heading" class="heading">Search</div>
@@ -437,7 +440,7 @@ customElements.define(
           }
         }
 
-        this.waitingDiv_.style.display = 'none';
+        this.waitingDiv_.classList.remove('shown');
         this.request_ = null;
       };
 
@@ -446,7 +449,7 @@ customElements.define(
         console.log(e);
       };
 
-      this.waitingDiv_.style.display = 'block';
+      this.waitingDiv_.classList.add('shown');
       const url = 'query?' + terms.join('&');
       console.log('Sending query: ' + url);
       this.request_.open('GET', url, true);
