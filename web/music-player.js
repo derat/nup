@@ -436,7 +436,7 @@ customElements.define(
         if (this.favicon_) this.favicon_.href = song.coverUrl;
       } else {
         this.coverDiv_.classList.add('empty');
-        if (this.favicon_) this.favicon_.href = 'images/missing_cover.png';
+        if (this.favicon_) this.favicon_.href = 'images/missing_cover_icon.png';
       }
 
       this.updateCoverTitleAttribute_();

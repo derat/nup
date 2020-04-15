@@ -417,10 +417,6 @@ customElements.define(
           if (req.responseText) {
             const songs = eval('(' + req.responseText + ')');
             console.log('Got response with ' + songs.length + ' song(s)');
-            songs.forEach(s => {
-              // TODO: Stop setting this.
-              if (!s.coverUrl) s.coverUrl = 'images/missing_cover.png';
-            });
             this.resultsTable_.setSongs(songs);
             this.resultsTable_.setAllCheckboxes(true);
             if (appendToQueue) this.enqueueSearchResults_(true, true);

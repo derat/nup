@@ -10,7 +10,9 @@ const template = createTemplate(`
     display: none;
     font-family: Arial, Helvetica, sans-serif;
     height: 100%;
+    left: 0;
     position: fixed;
+    top: 0;
     width: 100%;
     z-index: 5;
   }
@@ -25,6 +27,9 @@ const template = createTemplate(`
     width: 100%;
     height: 100%;
     object-fit: contain;
+  }
+  #current-cover.hidden {
+    visibility: hidden;
   }
 
   #right {
@@ -43,7 +48,10 @@ const template = createTemplate(`
   #right .album {
     font-style: italic;
   }
-  #current div {
+  #current-details.hidden {
+    visibility: hidden;
+  }
+  #current-details div {
     color: white;
     font-size: 24px;
     margin-bottom: 8px;
@@ -64,11 +72,8 @@ const template = createTemplate(`
     justify-content: space-between;
     width: 80%;
   }
-  #next {
+  #next.hidden {
     display: none;
-  }
-  #next.visible {
-    display: block;
   }
   #next div {
     margin-top: 4px;
@@ -91,6 +96,9 @@ const template = createTemplate(`
     object-fit: contain;
     width: 80px;
   }
+  #next-cover.hidden {
+    visibility: hidden;
+  }
 </style>
 
 <div id="left">
@@ -98,7 +106,7 @@ const template = createTemplate(`
 </div>
 
 <div id="right">
-  <div id="current">
+  <div id="current-details">
     <div id="current-artist" class="artist"></div>
     <div id="current-title" class="title"></div>
     <div id="current-album" class="album"></div>
@@ -140,6 +148,7 @@ customElements.define(
       this.origOverflowStyle_ = document.body.style.overflow;
 
       this.shadow_ = createShadow(this, template);
+      this.currentDetails_ = $('current-details', this.shadow_);
       this.currentCover_ = $('current-cover', this.shadow_);
       this.currentArtist_ = $('current-artist', this.shadow_);
       this.currentTitle_ = $('current-title', this.shadow_);
@@ -163,27 +172,35 @@ customElements.define(
     }
 
     updateSongs(currentSong, nextSong) {
-      this.currentCover_.src = currentSong ? currentSong.coverUrl : '';
-      this.currentCover_.style.display = currentSong ? 'block' : 'none';
-      this.currentArtist_.innerText = currentSong ? currentSong.artist : '';
-      this.currentTitle_.innerText = currentSong ? currentSong.title : '';
-      this.currentAlbum_.innerText = currentSong ? currentSong.album : '';
+      if (!currentSong) {
+        this.currentCover_.classList.add('hidden');
+        this.currentDetails_.classList.add('hidden');
+      } else {
+        this.currentCover_.src = currentSong.coverUrl;
+        currentSong.coverUrl
+          ? this.currentCover_.classList.remove('hidden')
+          : this.currentCover_.classList.add('hidden');
 
-      nextSong
-        ? this.nextDiv_.classList.add('visible')
-        : this.nextDiv_.classList.remove('visible');
-      this.nextArtist_.innerText = nextSong ? nextSong.artist : '';
-      this.nextTitle_.innerText = nextSong ? nextSong.title : '';
-      this.nextAlbum_.innerText = nextSong ? nextSong.album : '';
-      this.nextCover_.src = nextSong ? nextSong.coverUrl : '';
+        this.currentDetails_.classList.remove('hidden');
+        this.currentArtist_.innerText = currentSong.artist;
+        this.currentTitle_.innerText = currentSong.title;
+        this.currentAlbum_.innerText = currentSong.album;
 
-      this.progressBorder_.style.display = currentSong ? 'block' : 'none';
-      this.progressBar_.style.width = '0px';
-      this.timeDiv_.innerText = '';
-      this.durationDiv_.innerText = currentSong
-        ? formatTime(currentSong.length)
-        : '';
-      this.duration_ = currentSong ? currentSong.length : 0;
+        this.progressBar_.style.width = '0px';
+        this.timeDiv_.innerText = '';
+        this.durationDiv_.innerText = formatTime(currentSong.length);
+        this.duration_ = currentSong.length;
+      }
+
+      if (!nextSong) {
+        this.nextDiv_.classList.add('hidden');
+      } else {
+        this.nextArtist_.innerText = nextSong.artist;
+        this.nextTitle_.innerText = nextSong.title;
+        this.nextAlbum_.innerText = nextSong.album;
+        this.nextCover_.src = nextSong.coverUrl;
+        this.nextDiv_.classList.remove('hidden');
+      }
     }
 
     updatePosition(sec) {
