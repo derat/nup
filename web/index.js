@@ -17,6 +17,20 @@ musicPlayer.addEventListener('present', e => {
     : document.body.classList.remove('no-scroll');
 });
 
+// Use the cover art as the favicon.
+musicPlayer.addEventListener('cover', e => {
+  const favicon = document.getElementById('favicon');
+  if (e.detail.href) {
+    favicon.href = e.detail.href;
+    favicon.type = 'image/jpeg';
+    favicon.sizes = null;
+  } else {
+    favicon.href = 'favicon.ico';
+    favicon.type = 'image/png';
+    favicon.sizes = '48x48';
+  }
+});
+
 // Used by browser tests.
 document.test = {
   rateAndTag: (songId, rating, tags) =>

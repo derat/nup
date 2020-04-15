@@ -196,6 +196,10 @@ const template = createTemplate(`
 // When the <presentation-layer>'s visibility changes, a 'present' CustomEvent
 // is emitted with a 'detail.visible' boolean property. The document's scrollbar
 // should be hidden while the layer is visible.
+//
+// When the current cover art changes due to a song change, a 'cover'
+// CustomEvent is emitted with a 'detail.href' string property. The property is
+// null if no cover art is available.
 customElements.define(
   'music-player',
   class extends HTMLElement {
@@ -213,7 +217,6 @@ customElements.define(
 
       this.updater_ = new Updater();
       this.optionsDialog_ = null;
-      this.favicon_ = getFavicon();
 
       this.songs_ = []; // songs in the order in which they should be played
       this.tags_ = []; // available tags loaded from server
@@ -435,12 +438,12 @@ customElements.define(
       updateTitleAttributeForTruncation(this.albumDiv_, song ? song.album : '');
 
       if (song && song.coverUrl) {
-        this.coverDiv_.classList.remove('empty');
         this.coverImage_.src = song.coverUrl;
-        if (this.favicon_) this.favicon_.href = song.coverUrl;
+        this.coverDiv_.classList.remove('empty');
+        this.emitCoverEvent_(song.coverUrl);
       } else {
         this.coverDiv_.classList.add('empty');
-        if (this.favicon_) this.favicon_.href = 'images/missing_cover_icon.png';
+        this.emitCoverEvent_(null);
       }
 
       this.updateCoverTitleAttribute_();
@@ -864,6 +867,10 @@ customElements.define(
       }
     }
 
+    emitCoverEvent_(href) {
+      this.dispatchEvent(new CustomEvent('cover', {detail: {href}}));
+    }
+
     emitPresentEvent_(visible) {
       this.dispatchEvent(new CustomEvent('present', {detail: {visible}}));
     }
@@ -893,14 +900,4 @@ function getRatingString(rating, withLabel, includeEmpty) {
 
 function getDumpSongUrl(song, cache) {
   return 'dump_song?id=' + song.songId + (cache ? '&cache=1' : '');
-}
-
-// Returns the first <link> element containing a 'rel' attribute of 'icon', or
-// null if not found.
-function getFavicon() {
-  const links = document.getElementsByTagName('link');
-  for (let i = 0; i < links.length; i++) {
-    if (links[i].getAttribute('rel') == 'icon') return links[i];
-  }
-  return null;
 }
