@@ -12,25 +12,19 @@ const template = createTemplate(`
     background-color: #eee;
     border-radius: 4px;
     box-shadow: 0 1px 2px 1px rgba(0, 0, 0, 0.3);
-    display: inline-flex;
-    flex-wrap: wrap;
-    font-size: 10px;
-    font-family: Arial, Helvetica, sans-serif;
     color: black;
-    opacity: 0;
+    display: none;
+    flex-wrap: wrap;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10px;
     overflow: hidden;
-    padding: 4px 0 0 4px; // see margin on div below
-    pointer-events: none;
+    padding: 4px 0 0 4px; /* see margin on div below */
     position: absolute;
     text-overflow: ellipsis;
     z-index: 1;
-    -webkit-transition: opacity 200ms ease-out;
-    -webkit-user-select: none;
   }
   #suggestions.shown {
-    pointer-events: auto;
-    opacity: 1;
-    -webkit-transition: opacity 0s;
+    display: inline-flex;
   }
   #suggestions div {
     margin: 0 4px 4px 0;
