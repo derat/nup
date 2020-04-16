@@ -8,7 +8,6 @@ const template = createTemplate(`
   :host {
     background-color: black;
     display: none;
-    font-family: Arial, Helvetica, sans-serif;
     height: 100%;
     left: 0;
     position: fixed;
@@ -145,9 +144,9 @@ const template = createTemplate(`
     <div id="next-body">
       <img id="next-cover" />
       <div id="next-details">
-        <div id="next-artist"></div>
-        <div id="next-title"></div>
-        <div id="next-album"></div>
+        <div id="next-artist" class="artist"></div>
+        <div id="next-title" class="title"></div>
+        <div id="next-album" class="album"></div>
       </div>
     </div>
   </div>
