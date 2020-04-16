@@ -2,12 +2,66 @@
 
 App Engine app for streaming a music collection.
 
-## Deploying the app
+## Configuration
+
+Create an `config.json` file in the same directory as `app.yaml` corresponding
+to the `ServerConfig` struct in [types/types.go](./types/types.go):
+
+```json
+{
+  "googleUsers": [
+    "example@gmail.com",
+    "example.2@gmail.com",
+  ],
+  "basicAuthUsers": [
+    {
+      "username": "myuser",
+      "password": "mypass"
+    }
+  ],
+  "songBucket": "my-songs",
+  "coverBucket": "my-covers",
+  "cacheSongs": false,
+  "cacheQueries": true,
+  "cacheTags": true,
+  "useDatastoreForCache": true
+}
+```
+
+Here is a description of the fields:
+
+*   `googleUsers` - Google accounts authorized to use the web interface.
+*   `basicAuthUsers` - HTTP basic authentication username and password pairs
+    authorized to communicate with the AppEngine app. Command-line utilities
+    like `update_music` and `dump_music` use basic auth, as does the <a
+    href="https://github.com/derat/nup-android">Android client</a>.
+*   `songBucket` - Google Cloud Storage bucket containing music files.
+*   `coverBucket` - Google Cloud Storage bucket containing album cover images.
+*   `cacheSongs` - If true, song objects will be cached by the server to reduce
+    datastore operations. This doesn't accomplish anything if
+    `useDatastoreForCache` is true.
+*   `cacheQueries` - If true, query results will be cached by the server to
+    reduce datastore operations.
+*   `cacheTags` - If true, the list of in-use tags will be cached by the server
+    to reduce datastore operations.
+*   `useDatastoreForCache`: If true, datastore (rather than memcached) will be
+    used for caching data.
+
+## Deploying
 
 From the base directory, run:
 
 ```sh
 gcloud app deploy --project=<PROJECT_ID>
+```
+
+To delete old, non-serving versions of the app, run:
+
+```sh
+gcloud app --project=<PROJECT_ID> versions delete $(
+  gcloud app --project=<PROJECT_ID> versions list |
+    sed -nre 's/^default +([^ ]+) +0\.00 .*/\1/p'
+)
 ```
 
 ## Development and testing

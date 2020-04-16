@@ -139,6 +139,7 @@ type ServerConfig struct {
 	CacheTags    bool `json:"cacheTags"`
 
 	// Should datastore (rather than memcache) be used for caching query results and tags?
+	// TODO: Invert this to UseMemstoreForCache, probably.
 	UseDatastoreForCache bool `json:"useDatastoreForCache"`
 
 	// Should failure be reported for all user data updates (ratings, tags, plays)?
