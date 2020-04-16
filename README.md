@@ -9,6 +9,7 @@ to the `ServerConfig` struct in [types/types.go](./types/types.go):
 
 ```json
 {
+  "projectId": "my-project",
   "googleUsers": [
     "example@gmail.com",
     "example.2@gmail.com",
@@ -30,6 +31,9 @@ to the `ServerConfig` struct in [types/types.go](./types/types.go):
 
 Here is a description of the fields:
 
+*   `projectId` - GCP project ID. This is not used by the server; it's just
+    defined here to simplify deployment commands since the `gcloud` program
+    doesn't support specifying a per-directory default project ID.
 *   `googleUsers` - Google accounts authorized to use the web interface.
 *   `basicAuthUsers` - HTTP basic authentication username and password pairs
     authorized to communicate with the AppEngine app. Command-line utilities
@@ -49,20 +53,13 @@ Here is a description of the fields:
 
 ## Deploying
 
-From the base directory, run:
+(The following commands depend on the [jq](https://stedolan.github.io/jq/)
+program being present and `projectId` being set in `config.json` as described
+above.)
 
-```sh
-gcloud app deploy --project=<PROJECT_ID>
-```
+To deploy the AppEngine app, run the `deploy.sh` script.
 
-To delete old, non-serving versions of the app, run:
-
-```sh
-gcloud app --project=<PROJECT_ID> versions delete $(
-  gcloud app --project=<PROJECT_ID> versions list |
-    sed -nre 's/^default +([^ ]+) +0\.00 .*/\1/p'
-)
-```
+To delete old, non-serving versions of the app, run `delete_old_versions.sh`.
 
 ## Development and testing
 

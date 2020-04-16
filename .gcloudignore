@@ -26,6 +26,7 @@
 
 # Stuff not needed by the App Engine server.
 *.md
+*.sh
 *.txt
 cmd/
 test/
