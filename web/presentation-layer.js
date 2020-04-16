@@ -30,32 +30,29 @@ const template = createTemplate(`
     visibility: hidden;
   }
 
-  #right {
+  #bottom {
+    align-items: flex-end;
+    bottom: 40px;
     color: white;
     display: flex;
-    flex-direction: column;
-    height: 100%;
     justify-content: space-between;
-    /* Setting a vertical margin or padding here ends up pushing #next off the
-     * bottom of the screen, so vertical margins are instead applied directly on
-     * #current-details and #next. */
+    left: 0;
     position: absolute;
-    right: 0;
     text-shadow: 0 0 8px black;
-    top: 0;
     white-space: nowrap;
-    width: calc(40% - 40px);
+    width: 100%;
     z-index: 1;
   }
-  #right .artist {
+  #bottom .artist {
     font-weight: bold;
   }
-  #right .album {
+  #bottom .album {
     font-style: italic;
   }
 
   #current-details {
-    margin-top: 40px;
+    margin-left: 40px;
+    max-width: 600px;
   }
   #current-details.hidden {
     visibility: hidden;
@@ -72,7 +69,7 @@ const template = createTemplate(`
     box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
     height: 6px;
     margin: 8px;
-    width: 80%;
+    width: 360px;
   }
   #progress-bar {
     background-color: white;
@@ -83,14 +80,15 @@ const template = createTemplate(`
     font-size: 16px;
     justify-content: space-between;
     margin: 0 8px;
-    width: 80%;
+    width: 360px;
   }
   #current-times div {
     padding: 2px 4px;
   }
 
   #next {
-    margin-bottom: 40px;
+    margin-right: 40px;
+    max-width: 360px;
   }
   #next.hidden {
     display: none;
@@ -100,11 +98,13 @@ const template = createTemplate(`
     font-weight: bold;
     margin-bottom: 8px;
     padding: 2px 6px;
-    opacity: 0.7;
   }
-  #next-details {
+  #next-body {
     display: flex;
     font-size: 18px;
+  }
+  #next-details {
+    overflow: hidden; /* needed to elide artist/title/album */
   }
   #next-artist, #next-title, #next-album {
     overflow: hidden;
@@ -126,7 +126,7 @@ const template = createTemplate(`
 
 <img id="current-cover" />
 
-<div id="right">
+<div id="bottom">
   <div id="current-details">
     <div id="current-artist" class="artist"></div>
     <div id="current-title" class="title"></div>
@@ -139,11 +139,12 @@ const template = createTemplate(`
       <div id="current-duration"></div>
     </div>
   </div>
+
   <div id="next">
     <div id="next-heading">Next</div>
-    <div id="next-details">
+    <div id="next-body">
       <img id="next-cover" />
-      <div>
+      <div id="next-details">
         <div id="next-artist"></div>
         <div id="next-title"></div>
         <div id="next-album"></div>
