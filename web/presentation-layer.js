@@ -20,30 +20,32 @@ const template = createTemplate(`
     display: flex;
   }
 
-  #left {
-    width: calc(60% - 40px);
-    height: calc(100% - 40px);
-    max-height: calc(100% - 40px);
-    margin: 20px;
-  }
   #current-cover {
-    width: 100%;
     height: 100%;
-    object-fit: contain;
+    width: 100%;
+    object-fit: cover;
+    position: absolute:
   }
   #current-cover.hidden {
     visibility: hidden;
   }
 
   #right {
-    width: calc(40% - 41px);
+    color: white;
     display: flex;
     flex-direction: column;
+    height: 100%;
     justify-content: space-between;
-    margin: 60px 20px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* Setting a vertical margin or padding here ends up pushing #next off the
+     * bottom of the screen, so vertical margins are instead applied directly on
+     * #current-details and #next. */
+    position: absolute;
+    right: 0;
+    text-shadow: 0 0 8px black;
+    top: 0;
     white-space: nowrap;
+    width: calc(40% - 40px);
+    z-index: 1;
   }
   #right .artist {
     font-weight: bold;
@@ -51,62 +53,78 @@ const template = createTemplate(`
   #right .album {
     font-style: italic;
   }
+
+  #current-details {
+    margin-top: 40px;
+  }
   #current-details.hidden {
     visibility: hidden;
   }
-  #current-details div {
-    color: white;
+  #current-artist, #current-title, #current-album {
     font-size: 24px;
-    margin-bottom: 8px;
+    overflow: hidden;
+    padding: 4px 8px;
+    text-overflow: ellipsis;
   }
   #progress-border {
-    width: 80%;
-    height: 6px;
-    margin-top: 16px;
+    background-color: rgba(0, 0, 0, 0.2);
     border: solid white 1px;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+    height: 6px;
+    margin: 8px;
+    width: 80%;
   }
   #progress-bar {
-    height: 6px;
     background-color: white;
+    height: 6px;
   }
   #current-times {
     display: flex;
     font-size: 16px;
     justify-content: space-between;
+    margin: 0 8px;
     width: 80%;
+  }
+  #current-times div {
+    padding: 2px 4px;
+  }
+
+  #next {
+    margin-bottom: 40px;
   }
   #next.hidden {
     display: none;
   }
-  #next div {
-    margin-top: 4px;
-  }
   #next-heading {
-    color: #999;
     font-size: 16px;
     font-weight: bold;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+    padding: 2px 6px;
+    opacity: 0.7;
   }
   #next-details {
-    color: white;
     display: flex;
     font-size: 18px;
   }
+  #next-artist, #next-title, #next-album {
+    overflow: hidden;
+    padding: 3px 6px;
+    text-overflow: ellipsis;
+  }
   #next-cover {
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
     cursor: pointer;
     height: 80px;
-    margin-right: 16px;
-    object-fit: contain;
+    margin-right: 8px;
+    object-fit: cover;
     width: 80px;
   }
   #next-cover.hidden {
-    visibility: hidden;
+    display: none;
   }
 </style>
 
-<div id="left">
-  <img id="current-cover" />
-</div>
+<img id="current-cover" />
 
 <div id="right">
   <div id="current-details">
@@ -155,7 +173,6 @@ customElements.define(
       this.currentArtist_ = $('current-artist', this.shadow_);
       this.currentTitle_ = $('current-title', this.shadow_);
       this.currentAlbum_ = $('current-album', this.shadow_);
-      this.progressBorder_ = $('progress-border', this.shadow_);
       this.progressBar_ = $('progress-bar', this.shadow_);
       this.timeDiv_ = $('current-time', this.shadow_);
       this.durationDiv_ = $('current-duration', this.shadow_);
@@ -197,11 +214,14 @@ customElements.define(
       if (!nextSong) {
         this.nextDiv_.classList.add('hidden');
       } else {
+        this.nextDiv_.classList.remove('hidden');
         this.nextArtist_.innerText = nextSong.artist;
         this.nextTitle_.innerText = nextSong.title;
         this.nextAlbum_.innerText = nextSong.album;
         this.nextCover_.src = nextSong.coverUrl;
-        this.nextDiv_.classList.remove('hidden');
+        nextSong.coverUrl
+          ? this.nextCover_.classList.remove('hidden')
+          : this.nextCover_.classList.add('hidden');
       }
     }
 
