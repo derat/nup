@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -265,12 +266,16 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 	var err error
 	if r.FormValue("cache") == "1" {
 		var songs map[int64]types.Song
-		if songs, err = getSongsFromCache(ctx, []int64{id}); err == nil {
-			if song, ok := songs[id]; ok {
-				s = &song
-				s.SongID = strconv.FormatInt(id, 10)
-			} else {
-				err = fmt.Errorf("Song %v not cached", id)
+		if !getConfig(ctx).CacheSongs {
+			err = errors.New("song caching is disabled")
+		} else {
+			if songs, err = getSongsFromMemcache(ctx, []int64{id}); err == nil {
+				if song, ok := songs[id]; ok {
+					s = &song
+					s.SongID = strconv.FormatInt(id, 10)
+				} else {
+					err = fmt.Errorf("song %v not cached", id)
+				}
 			}
 		}
 	} else {

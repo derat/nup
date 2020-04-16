@@ -24,7 +24,7 @@ func dumpEntities(ctx context.Context, q *datastore.Query, cursor string, entiti
 	if len(cursor) > 0 {
 		dc, err := datastore.DecodeCursor(cursor)
 		if err != nil {
-			return nil, nil, "", fmt.Errorf("Unable to decode cursor %q: %v", cursor, err)
+			return nil, nil, "", fmt.Errorf("unable to decode cursor %q: %v", cursor, err)
 		}
 		q = q.Start(dc)
 	}
@@ -54,7 +54,7 @@ func dumpEntities(ctx context.Context, q *datastore.Query, cursor string, entiti
 		if len(keys) == len(entities) {
 			nc, err := it.Cursor()
 			if err != nil {
-				return nil, nil, "", fmt.Errorf("Unable to get cursor: %v", err)
+				return nil, nil, "", fmt.Errorf("unable to get cursor: %v", err)
 			}
 			nextCursor = nc.String()
 			break
@@ -64,7 +64,7 @@ func dumpEntities(ctx context.Context, q *datastore.Query, cursor string, entiti
 	entities = entities[0:len(keys)]
 	if len(keys) > 0 {
 		if err := datastore.GetMulti(ctx, keys, entities); err != nil {
-			return nil, nil, "", fmt.Errorf("Failed to get %v entities: %v", len(keys), err)
+			return nil, nil, "", fmt.Errorf("failed to get %v entities: %v", len(keys), err)
 		}
 	}
 	return ids, parentIds, nextCursor, nil

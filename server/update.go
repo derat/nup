@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -110,15 +111,17 @@ func replacePlays(ctx context.Context, songKey *datastore.Key, plays []types.Pla
 
 func updateExistingSong(ctx context.Context, id int64,
 	f func(context.Context, *types.Song) error, updateDelay time.Duration) error {
-	if err := flushSongFromCache(ctx, id); err != nil {
-		return fmt.Errorf("Not updating song %v due to cache eviction error: %v", id, err)
+	cfg := getConfig(ctx)
+	if cfg.CacheSongs {
+		if err := flushSongFromMemcache(ctx, id); err != nil {
+			return fmt.Errorf("not updating song %v due to cache eviction error: %v", id, err)
+		}
 	}
 
 	if updateDelay > 0 {
 		time.Sleep(updateDelay)
 	}
 
-	cfg := getConfig(ctx)
 	return datastore.RunInTransaction(ctx, func(ctx context.Context) error {
 		key := datastore.NewKey(ctx, songKind, "", id, nil)
 		song := &types.Song{}
@@ -126,7 +129,7 @@ func updateExistingSong(ctx context.Context, id int64,
 			return err
 		}
 		if err := f(ctx, song); err != nil {
-			if err == ErrUnmodified {
+			if err == errUnmodified {
 				log.Debugf(ctx, "Song %v wasn't changed", id)
 				return nil
 			}
@@ -138,7 +141,7 @@ func updateExistingSong(ctx context.Context, id int64,
 		log.Debugf(ctx, "Updated song %v", id)
 
 		if cfg.CacheSongs {
-			if err := writeSongsToCache(ctx, []int64{id}, []types.Song{*song}, true); err != nil {
+			if err := writeSongsToMemcache(ctx, []int64{id}, []types.Song{*song}, true); err != nil {
 				return err
 			}
 		}
@@ -151,10 +154,10 @@ func addPlay(ctx context.Context, id int64, startTime time.Time, ip string) erro
 		songKey := datastore.NewKey(ctx, songKind, "", id, nil)
 		existingKeys, err := datastore.NewQuery(playKind).Ancestor(songKey).KeysOnly().Filter("StartTime =", startTime).Filter("IpAddress =", ip).GetAll(ctx, nil)
 		if err != nil {
-			return fmt.Errorf("Querying for existing play failed: %v", err)
+			return fmt.Errorf("querying for existing play failed: %v", err)
 		} else if len(existingKeys) > 0 {
 			log.Debugf(ctx, "Already have play for song %v starting at %v from %v", id, startTime, ip)
-			return ErrUnmodified
+			return errUnmodified
 		}
 
 		s.NumPlays++
@@ -167,7 +170,7 @@ func addPlay(ctx context.Context, id int64, startTime time.Time, ip string) erro
 
 		newKey := datastore.NewIncompleteKey(ctx, playKind, songKey)
 		if _, err = datastore.Put(ctx, newKey, &types.Play{startTime, ip}); err != nil {
-			return fmt.Errorf("Putting play failed: %v", err)
+			return fmt.Errorf("putting play failed: %v", err)
 		}
 		return nil
 	}, time.Duration(0))
@@ -203,7 +206,7 @@ func updateRatingAndTags(ctx context.Context, id int64, hasRating bool, rating f
 			s.LastModifiedTime = time.Now()
 			return nil
 		} else {
-			return ErrUnmodified
+			return errUnmodified
 		}
 	}, updateDelay)
 
@@ -220,11 +223,13 @@ func updateOrInsertSong(ctx context.Context, updatedSong *types.Song, replaceUse
 	sha1 := updatedSong.SHA1
 	queryKeys, err := datastore.NewQuery(songKind).KeysOnly().Filter("Sha1 =", sha1).GetAll(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("Querying for SHA1 %v failed: %v", sha1, err)
+		return fmt.Errorf("querying for SHA1 %v failed: %v", sha1, err)
 	}
 	if len(queryKeys) > 1 {
-		return fmt.Errorf("Found %v songs with SHA1 %v; expected 0 or 1", len(queryKeys), sha1)
+		return fmt.Errorf("found %v songs with SHA1 %v; expected 0 or 1", len(queryKeys), sha1)
 	}
+
+	cfg := getConfig(ctx)
 
 	return datastore.RunInTransaction(ctx, func(ctx context.Context) error {
 		var key *datastore.Key
@@ -232,12 +237,14 @@ func updateOrInsertSong(ctx context.Context, updatedSong *types.Song, replaceUse
 		if len(queryKeys) == 1 {
 			log.Debugf(ctx, "Updating %v with SHA1 %v", updatedSong.Filename, sha1)
 			key = queryKeys[0]
-			if err := flushSongFromCache(ctx, key.IntID()); err != nil {
-				return fmt.Errorf("Not updating song %v due to cache eviction error: %v", key.IntID(), err)
+			if cfg.CacheSongs {
+				if err := flushSongFromMemcache(ctx, key.IntID()); err != nil {
+					return fmt.Errorf("not updating song %v due to cache eviction error: %v", key.IntID(), err)
+				}
 			}
 			if !replaceUserData {
 				if err := datastore.Get(ctx, key, song); err != nil {
-					return fmt.Errorf("Getting %v with key %v failed: %v", sha1, key.IntID(), err)
+					return fmt.Errorf("getting %v with key %v failed: %v", sha1, key.IntID(), err)
 				}
 			}
 		} else {
@@ -258,7 +265,7 @@ func updateOrInsertSong(ctx context.Context, updatedSong *types.Song, replaceUse
 		}
 		key, err = datastore.Put(ctx, key, song)
 		if err != nil {
-			return fmt.Errorf("Putting %v failed: %v", key.IntID(), err)
+			return fmt.Errorf("putting %v failed: %v", key.IntID(), err)
 		}
 		log.Debugf(ctx, "Put %v with key %v", songKind, key.IntID())
 
@@ -267,50 +274,54 @@ func updateOrInsertSong(ctx context.Context, updatedSong *types.Song, replaceUse
 				return err
 			}
 		}
-		if err := writeSongsToCache(ctx, []int64{key.IntID()}, []types.Song{*song}, true); err != nil {
-			return err
+		if cfg.CacheSongs {
+			if err := writeSongsToMemcache(ctx, []int64{key.IntID()}, []types.Song{*song}, true); err != nil {
+				return err
+			}
 		}
 		return nil
 	}, nil)
 }
 
 func deleteSong(ctx context.Context, id int64) error {
-	if err := flushSongFromCache(ctx, id); err != nil {
-		return fmt.Errorf("Not deleting song %v due to cache eviction error: %v", id, err)
+	if getConfig(ctx).CacheSongs {
+		if err := flushSongFromMemcache(ctx, id); err != nil {
+			return fmt.Errorf("not deleting song %v due to cache eviction error: %v", id, err)
+		}
 	}
 
 	err := datastore.RunInTransaction(ctx, func(ctx context.Context) error {
 		songKey := datastore.NewKey(ctx, songKind, "", id, nil)
 		song := types.Song{}
 		if err := datastore.Get(ctx, songKey, &song); err != nil {
-			return fmt.Errorf("Getting song %v failed: %v", id, err)
+			return fmt.Errorf("getting song %v failed: %v", id, err)
 		}
 		plays := make([]types.Play, 0)
 		playKeys, err := datastore.NewQuery(playKind).Ancestor(songKey).GetAll(ctx, &plays)
 		if err != nil {
-			return fmt.Errorf("Getting plays for song %v failed: %v", id, err)
+			return fmt.Errorf("getting plays for song %v failed: %v", id, err)
 		}
 
 		// Delete the old song and plays.
 		if err = datastore.Delete(ctx, songKey); err != nil {
-			return fmt.Errorf("Deleting song %v failed: %v", id, err)
+			return fmt.Errorf("deleting song %v failed: %v", id, err)
 		}
 		if err = datastore.DeleteMulti(ctx, playKeys); err != nil {
-			return fmt.Errorf("Deleting %v play(s) for song %v failed: %v", len(playKeys), id, err)
+			return fmt.Errorf("deleting %v play(s) for song %v failed: %v", len(playKeys), id, err)
 		}
 
 		// Put the deleted song and plays.
 		song.LastModifiedTime = time.Now()
 		delSongKey := datastore.NewKey(ctx, deletedSongKind, "", id, nil)
 		if _, err := datastore.Put(ctx, delSongKey, &song); err != nil {
-			return fmt.Errorf("Putting deleted song %v failed: %v", id, err)
+			return fmt.Errorf("putting deleted song %v failed: %v", id, err)
 		}
 		delPlayKeys := make([]*datastore.Key, len(plays))
 		for i := range plays {
 			delPlayKeys[i] = datastore.NewIncompleteKey(ctx, deletedPlayKind, delSongKey)
 		}
 		if _, err = datastore.PutMulti(ctx, delPlayKeys, plays); err != nil {
-			return fmt.Errorf("Putting %v deleted play(s) for song %v failed: %v", len(plays), id, err)
+			return fmt.Errorf("putting %v deleted play(s) for song %v failed: %v", len(plays), id, err)
 		}
 
 		return nil
@@ -325,17 +336,17 @@ func deleteSong(ctx context.Context, id int64) error {
 func clearData(ctx context.Context) error {
 	// Can't be too careful.
 	if !appengine.IsDevAppServer() {
-		return fmt.Errorf("Can't clear data on non-dev server")
+		return errors.New("can't clear data on non-dev server")
 	}
 
 	log.Debugf(ctx, "Clearing all data")
 	for _, kind := range []string{songKind, playKind} {
 		keys, err := datastore.NewQuery(kind).KeysOnly().GetAll(ctx, nil)
 		if err != nil {
-			return fmt.Errorf("Getting all %v keys failed: %v", kind, err)
+			return fmt.Errorf("getting all %v keys failed: %v", kind, err)
 		}
 		if err = datastore.DeleteMulti(ctx, keys); err != nil {
-			return fmt.Errorf("Deleting all %v entities failed: %v", kind, err)
+			return fmt.Errorf("deleting all %v entities failed: %v", kind, err)
 		}
 	}
 	return nil

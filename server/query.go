@@ -330,7 +330,7 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 	// Get whatever we can from memcache.
 	if cfg.CacheSongs {
 		startTime := time.Now()
-		if hits, err := getSongsFromCache(ctx, ids); err != nil {
+		if hits, err := getSongsFromMemcache(ctx, ids); err != nil {
 			log.Errorf(ctx, "Got error while getting cached songs: %v", err)
 		} else {
 			log.Debugf(ctx, "Got %v of %v song(s) from cache in %v ms", len(hits), len(ids), getMsecSinceTime(startTime))
@@ -358,7 +358,7 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 
 		if cfg.CacheSongs {
 			startTime = time.Now()
-			if err := writeSongsToCache(ctx, storedIds, storedSongs, false); err != nil {
+			if err := writeSongsToMemcache(ctx, storedIds, storedSongs, false); err != nil {
 				log.Errorf(ctx, "Failed to write just-fetched song(s) to cache: %v", err)
 			} else {
 				log.Debugf(ctx, "Wrote %v song(s) to cache in %v ms", len(storedSongs), getMsecSinceTime(startTime))

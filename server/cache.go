@@ -70,17 +70,17 @@ func computeQueryHash(q *songQuery) (string, error) {
 
 func getAllCachedQueries(ctx context.Context) (cachedQueries, error) {
 	queries := make(cachedQueries)
-	if getConfig(ctx).UseDatastoreForCache {
+	if getConfig(ctx).UseMemcache {
+		if _, err := jsonCodec.Get(ctx, queriesCacheKey, &queries); err != nil && err != memcache.ErrCacheMiss {
+			return nil, err
+		}
+	} else {
 		eq := encodedCachedQueries{}
 		if err := datastore.Get(ctx, getDatastoreCachedQueriesKey(ctx), &eq); err == nil {
 			if err := json.Unmarshal(eq.Data, &queries); err != nil {
 				return nil, err
 			}
 		} else if err != datastore.ErrNoSuchEntity {
-			return nil, err
-		}
-	} else {
-		if _, err := jsonCodec.Get(ctx, queriesCacheKey, &queries); err != nil && err != memcache.ErrCacheMiss {
 			return nil, err
 		}
 	}
@@ -112,21 +112,21 @@ func updateCachedQueries(ctx context.Context, f func(cachedQueries) error) error
 		return err
 	}
 
-	if err := f(queries); err == ErrUnmodified {
+	if err := f(queries); err == errUnmodified {
 		return nil
 	} else if err != nil {
 		return err
 	}
 
-	if getConfig(ctx).UseDatastoreForCache {
+	if getConfig(ctx).UseMemcache {
+		return jsonCodec.Set(ctx, &memcache.Item{Key: queriesCacheKey, Object: &queries})
+	} else {
 		b, err := json.Marshal(queries)
 		if err != nil {
 			return err
 		}
 		_, err = datastore.Put(ctx, getDatastoreCachedQueriesKey(ctx), &encodedCachedQueries{b})
 		return err
-	} else {
-		return jsonCodec.Set(ctx, &memcache.Item{Key: queriesCacheKey, Object: &queries})
 	}
 }
 
@@ -155,7 +155,7 @@ func flushDataFromCacheForUpdate(ctx context.Context, updateType uint) error {
 			}
 		}
 		if numFlushed == 0 {
-			return ErrUnmodified
+			return errUnmodified
 		}
 		return nil
 	}); err != nil {
@@ -181,14 +181,14 @@ func getDatastoreCachedTagsKey(ctx context.Context) *datastore.Key {
 
 func getTagsFromCache(ctx context.Context) ([]string, error) {
 	t := cachedTags{}
-	if getConfig(ctx).UseDatastoreForCache {
-		if err := datastore.Get(ctx, getDatastoreCachedTagsKey(ctx), &t); err == datastore.ErrNoSuchEntity {
-			return nil, nil
-		} else if err != nil {
+	if getConfig(ctx).UseMemcache {
+		if _, err := jsonCodec.Get(ctx, tagsCacheKey, &t); err != nil && err != memcache.ErrCacheMiss {
 			return nil, err
 		}
 	} else {
-		if _, err := jsonCodec.Get(ctx, tagsCacheKey, &t); err != nil && err != memcache.ErrCacheMiss {
+		if err := datastore.Get(ctx, getDatastoreCachedTagsKey(ctx), &t); err == datastore.ErrNoSuchEntity {
+			return nil, nil
+		} else if err != nil {
 			return nil, err
 		}
 	}
@@ -197,21 +197,21 @@ func getTagsFromCache(ctx context.Context) ([]string, error) {
 
 func writeTagsToCache(ctx context.Context, tags []string) error {
 	t := cachedTags{tags}
-	if getConfig(ctx).UseDatastoreForCache {
+	if getConfig(ctx).UseMemcache {
+		return jsonCodec.Set(ctx, &memcache.Item{Key: tagsCacheKey, Object: &t})
+	} else {
 		_, err := datastore.Put(ctx, getDatastoreCachedTagsKey(ctx), &t)
 		return err
-	} else {
-		return jsonCodec.Set(ctx, &memcache.Item{Key: tagsCacheKey, Object: &t})
 	}
 }
 
 func flushTagsFromCache(ctx context.Context) error {
-	if getConfig(ctx).UseDatastoreForCache {
-		if err := datastore.Delete(ctx, getDatastoreCachedTagsKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
+	if getConfig(ctx).UseMemcache {
+		if err := memcache.Delete(ctx, tagsCacheKey); err != nil && err != memcache.ErrCacheMiss {
 			return err
 		}
 	} else {
-		if err := memcache.Delete(ctx, tagsCacheKey); err != nil && err != memcache.ErrCacheMiss {
+		if err := datastore.Delete(ctx, getDatastoreCachedTagsKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
 			return err
 		}
 	}
@@ -222,14 +222,14 @@ func getSongCacheKey(id int64) string {
 	return songCachePrefix + strconv.FormatInt(id, 10)
 }
 
-func flushSongFromCache(ctx context.Context, id int64) error {
+func flushSongFromMemcache(ctx context.Context, id int64) error {
 	if err := memcache.Delete(ctx, getSongCacheKey(id)); err != nil && err != memcache.ErrCacheMiss {
 		return err
 	}
 	return nil
 }
 
-func getSongsFromCache(ctx context.Context, ids []int64) (songs map[int64]types.Song, err error) {
+func getSongsFromMemcache(ctx context.Context, ids []int64) (songs map[int64]types.Song, err error) {
 	keys := make([]string, len(ids))
 	for i, id := range ids {
 		keys[i] = getSongCacheKey(id)
@@ -244,27 +244,27 @@ func getSongsFromCache(ctx context.Context, ids []int64) (songs map[int64]types.
 
 	for idStr, item := range items {
 		if !strings.HasPrefix(idStr, songCachePrefix) {
-			return nil, fmt.Errorf("Got unexpected key %q from cache", idStr)
+			return nil, fmt.Errorf("got unexpected key %q from cache", idStr)
 		}
 		id, err := strconv.ParseInt(idStr[len(songCachePrefix):], 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to parse key %q: %v", idStr, err)
+			return nil, fmt.Errorf("failed to parse key %q: %v", idStr, err)
 		}
 		s := types.Song{}
 		if err = json.Unmarshal(item.Value, &s); err != nil {
-			return nil, fmt.Errorf("Failed to unmarshal cached song %v: %v", id, err)
+			return nil, fmt.Errorf("failed to unmarshal cached song %v: %v", id, err)
 		}
 		songs[id] = s
 	}
 	return songs, nil
 }
 
-func flushSongsFromCacheAfterMultiError(ctx context.Context, ids []int64, me appengine.MultiError) error {
+func flushSongsFromMemcacheAfterMultiError(ctx context.Context, ids []int64, me appengine.MultiError) error {
 	for i, err := range me {
 		id := ids[i]
 		if err == memcache.ErrNotStored {
 			log.Debugf(ctx, "Song %v already present in cache; flushing", id)
-			if err := flushSongFromCache(ctx, id); err != nil {
+			if err := flushSongFromMemcache(ctx, id); err != nil {
 				return err
 			}
 		} else if err != nil {
@@ -274,9 +274,9 @@ func flushSongsFromCacheAfterMultiError(ctx context.Context, ids []int64, me app
 	return nil
 }
 
-func writeSongsToCache(ctx context.Context, ids []int64, songs []types.Song, flushIfAlreadyPresent bool) error {
+func writeSongsToMemcache(ctx context.Context, ids []int64, songs []types.Song, flushIfAlreadyPresent bool) error {
 	if len(ids) != len(songs) {
-		return fmt.Errorf("Got request to write %v ID(s) with %v song(s) to cache", len(ids), len(songs))
+		return fmt.Errorf("got request to write %v ID(s) with %v song(s) to cache", len(ids), len(songs))
 	}
 
 	items := make([]*memcache.Item, len(songs))
@@ -288,7 +288,7 @@ func writeSongsToCache(ctx context.Context, ids []int64, songs []types.Song, flu
 		// memcache.Delete() is missing a lock duration (https://code.google.com/p/googleappengine/issues/detail?id=10983),
 		// so just do the best we can and try to delete the possibly-stale cached values.
 		if me, ok := err.(appengine.MultiError); ok && flushIfAlreadyPresent {
-			return flushSongsFromCacheAfterMultiError(ctx, ids, me)
+			return flushSongsFromMemcacheAfterMultiError(ctx, ids, me)
 		}
 		return err
 	}
@@ -296,6 +296,8 @@ func writeSongsToCache(ctx context.Context, ids []int64, songs []types.Song, flu
 }
 
 func flushCache(ctx context.Context) error {
+	// This is only used by tests, so we flush both memcache and datastore
+	// regardless of what the config says.
 	if err := memcache.Flush(ctx); err != nil {
 		return err
 	}

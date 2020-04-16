@@ -106,11 +106,15 @@ func (a PlayArray) Less(i, j int) bool { return a[i].StartTime.Before(a[j].Start
 
 // ClientConfig holds configuration details shared across client binaries.
 type ClientConfig struct {
+	// ServerURL contains the AppEngine server URL.
 	ServerURL string `json:"serverUrl"`
-	Username  string `json:"username"`
-	Password  string `json:"password"`
+	// Username contains an HTTP basic auth username.
+	Username string `json:"username"`
+	// Password contains an HTTP basic auth password.
+	Password string `json:"password"`
 }
 
+// BasicAuthInfo contains information used for validating HTTP basic authentication.
 type BasicAuthInfo struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -118,31 +122,39 @@ type BasicAuthInfo struct {
 
 // ServerConfig holds the App Engine server's configuration.
 type ServerConfig struct {
-	// Email addresses of Google users allowed to use the server.
+	// GoogleUsers contains email addresses of Google accounts allowed to access
+	// the web interface.
 	GoogleUsers []string `json:"googleUsers"`
 
-	// Credentials of accounts using HTTP basic authentication.
+	// BasicAuthUsers contains for accounts using HTTP basic authentication
+	// (i.e. command-line tools or the Android client).
 	BasicAuthUsers []BasicAuthInfo `json:"basicAuthUsers"`
 
-	// Names of the Cloud Storage buckets where song and cover files are stored.
-	SongBucket  string `json:"songBucket"`
+	// SongBucket contains the name of the Google Cloud Storage bucket holding song files.
+	SongBucket string `json:"songBucket"`
+	// CoverBucket contains the name of the Google Cloud Storage bucket holding album cover images.
 	CoverBucket string `json:"coverBucket"`
 
-	// Base URLs where song and cover files are stored.
-	// Exactly one of *Bucket and *BaseURL must be set.
-	SongBaseURL  string `json:"songBaseUrl"`
+	// SongBaseURL contains the slash-terminated URL under which song files are stored.
+	// Exactly one of SongBucket and SongBaseURL must be set.
+	SongBaseURL string `json:"songBaseUrl"`
+	// CoverBaseURL contains the slash-terminated URL under which album cover images are stored.
+	// Exactly one of CoverBucket and CoverBaseURL must be set.
 	CoverBaseURL string `json:"coverBaseUrl"`
 
-	// Should songs, query results, and tags be cached?
-	CacheSongs   bool `json:"cacheSongs"`
+	// CacheSongs controls whether Song database objects are cached to reduce datastore operations.
+	// This option is experimental and is only applicable if UseMemcache is true.
+	CacheSongs bool `json:"cacheSongs"`
+	// CacheQueries controls whether queries are cached to reduce datastore operations.
 	CacheQueries bool `json:"cacheQueries"`
-	CacheTags    bool `json:"cacheTags"`
+	// CacheTags controls whether the list of in-use tags is cached to reduce datastore operations.
+	CacheTags bool `json:"cacheTags"`
 
-	// Should datastore (rather than memcache) be used for caching query results and tags?
-	// TODO: Invert this to UseMemstoreForCache, probably.
-	UseDatastoreForCache bool `json:"useDatastoreForCache"`
+	// Should memcache (rather than datastore) be used for caching database objects?
+	// This option is experimental and requires additional configuration in GCP.
+	UseMemcache bool `json:"useMemcache"`
 
-	// Should failure be reported for all user data updates (ratings, tags, plays)?
-	// Ignored for non-development servers.
+	// ForceUpdateFailures is set by tests to indicate that failure be reported
+	// for all user data updates (ratings, tags, plays). Ignored for non-development servers.
 	ForceUpdateFailures bool `json:"forceUpdateFailures"`
 }

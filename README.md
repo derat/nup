@@ -25,31 +25,15 @@ to the `ServerConfig` struct in [types/types.go](./types/types.go):
   "cacheSongs": false,
   "cacheQueries": true,
   "cacheTags": true,
-  "useDatastoreForCache": true
+  "useMemcache": false
 }
 ```
 
-Here is a description of the fields:
+The `projectId` property contains the GCP project ID. It isn't used by the
+server; it's just defined here to simplify deployment commands since the
+`gcloud` program doesn't support specifying a per-directory default project ID.
 
-*   `projectId` - GCP project ID. This is not used by the server; it's just
-    defined here to simplify deployment commands since the `gcloud` program
-    doesn't support specifying a per-directory default project ID.
-*   `googleUsers` - Google accounts authorized to use the web interface.
-*   `basicAuthUsers` - HTTP basic authentication username and password pairs
-    authorized to communicate with the AppEngine app. Command-line utilities
-    like `update_music` and `dump_music` use basic auth, as does the <a
-    href="https://github.com/derat/nup-android">Android client</a>.
-*   `songBucket` - Google Cloud Storage bucket containing music files.
-*   `coverBucket` - Google Cloud Storage bucket containing album cover images.
-*   `cacheSongs` - If true, song objects will be cached by the server to reduce
-    datastore operations. This doesn't accomplish anything if
-    `useDatastoreForCache` is true.
-*   `cacheQueries` - If true, query results will be cached by the server to
-    reduce datastore operations.
-*   `cacheTags` - If true, the list of in-use tags will be cached by the server
-    to reduce datastore operations.
-*   `useDatastoreForCache`: If true, datastore (rather than memcached) will be
-    used for caching data.
+All other fields are documented in the Go file linked above.
 
 ## Deploying
 

@@ -17,9 +17,7 @@ const (
 	deletedSongKind = "DeletedSong"
 )
 
-var (
-	ErrUnmodified = errors.New("Object wasn't modified")
-)
+var errUnmodified = errors.New("object wasn't modified")
 
 func prepareSongForClient(s *types.Song, id int64, cfg *types.ServerConfig, client cloudutil.ClientType) {
 	// Set fields that are only present in search results (i.e. not in Datastore).

@@ -32,7 +32,8 @@ type cachePolicy int
 
 const (
 	noCaching cachePolicy = iota
-	cacheData
+	useMemcache
+	useDatastoreCache
 )
 
 func setUpTest(cp cachePolicy) *Tester {
@@ -47,12 +48,12 @@ func setUpTest(cp cachePolicy) *Tester {
 	t.DoPost("flush_cache", nil)
 
 	b, err := json.Marshal(types.ServerConfig{
-		SongBucket:           songBucket,
-		CoverBucket:          coverBucket,
-		CacheSongs:           cp == cacheData,
-		CacheQueries:         cp == cacheData,
-		CacheTags:            cp == cacheData,
-		UseDatastoreForCache: false,
+		SongBucket:   songBucket,
+		CoverBucket:  coverBucket,
+		CacheSongs:   cp == useMemcache, // songs can only be cached in memcache
+		CacheQueries: cp == useMemcache || cp == useDatastoreCache,
+		CacheTags:    cp == useMemcache || cp == useDatastoreCache,
+		UseMemcache:  cp == useMemcache,
 	})
 	if err != nil {
 		panic(err)
@@ -292,11 +293,29 @@ func TestQueries(tt *testing.T) {
 	}
 }
 
-func TestCaching(tt *testing.T) {
-	t := setUpTest(cacheData)
+func TestCachingMemcache(t *testing.T) {
+	testCaching(t, useMemcache)
+}
+
+func TestCachingDatastore(t *testing.T) {
+	testCaching(t, useDatastoreCache)
+}
+
+func testCaching(tt *testing.T, cp cachePolicy) {
+	t := setUpTest(cp)
 	defer cleanUpTest(t)
 
-	log.Print("posting and querying a song")
+	var desc string
+	switch cp {
+	case useMemcache:
+		desc = "memcache caching"
+	case useDatastoreCache:
+		desc = "datastore caching"
+	default:
+		tt.Fatal("invalid cache policy ", cp)
+	}
+
+	log.Print("posting and querying a song using " + desc)
 	cacheParam := "cacheOnly=1"
 	s1 := LegacySong1
 	t.PostSongs([]types.Song{s1}, replaceUserData, 0)
@@ -305,7 +324,7 @@ func TestCaching(tt *testing.T) {
 	}
 
 	// After rating the song, the query results should still be served from the cache.
-	log.Print("rating and re-querying")
+	log.Print("rating and re-querying using " + desc)
 	id1 := t.SongID(s1.SHA1)
 	s1.Rating = 1.0
 	t.DoPost("rate_and_tag?songId="+id1+"&rating=1.0", nil)
@@ -313,14 +332,14 @@ func TestCaching(tt *testing.T) {
 		tt.Error(err)
 	}
 
-	log.Print("updating and re-querying")
+	log.Print("updating and re-querying using " + desc)
 	s1.Artist = "The Artist Formerly Known As " + s1.Artist
 	t.PostSongs([]types.Song{s1}, keepUserData, 0)
 	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 
-	log.Print("checking that time-based queries aren't cached")
+	log.Print("checking that time-based queries aren't cached using " + desc)
 	timeParam := fmt.Sprintf("maxLastPlayed=%d", s1.Plays[1].StartTime.Unix()+1)
 	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(timeParam), IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
@@ -329,7 +348,7 @@ func TestCaching(tt *testing.T) {
 		tt.Error(err)
 	}
 
-	log.Print("checking that play-count-based queries aren't cached")
+	log.Print("checking that play-count-based queries aren't cached using " + desc)
 	playParam := "maxPlays=10"
 	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(playParam), IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
@@ -338,14 +357,14 @@ func TestCaching(tt *testing.T) {
 		tt.Error(err)
 	}
 
-	log.Print("posting another song and querying")
+	log.Print("posting another song and querying using " + desc)
 	s2 := LegacySong2
 	t.PostSongs([]types.Song{s2}, replaceUserData, 0)
 	if err := compareQueryResults([]types.Song{s1, s2}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 
-	log.Print("checking that deleting a song drops cached queries")
+	log.Print("checking that deleting a song drops cached queries using " + desc)
 	if err := compareQueryResults([]types.Song{s2}, t.QuerySongs("album="+url.QueryEscape(s2.Album)), IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
@@ -357,7 +376,7 @@ func TestCaching(tt *testing.T) {
 }
 
 func TestCacheRace(tt *testing.T) {
-	t := setUpTest(cacheData)
+	t := setUpTest(useMemcache)
 	defer cleanUpTest(t)
 
 	log.Print("posting a song")
@@ -457,7 +476,7 @@ func TestAndroid(tt *testing.T) {
 }
 
 func TestTags(tt *testing.T) {
-	t := setUpTest(cacheData)
+	t := setUpTest(useMemcache)
 	defer cleanUpTest(t)
 
 	log.Print("getting hopefully-empty tag list")
@@ -486,7 +505,7 @@ func TestTags(tt *testing.T) {
 }
 
 func TestCovers(tt *testing.T) {
-	t := setUpTest(cacheData)
+	t := setUpTest(useMemcache)
 	defer cleanUpTest(t)
 
 	createCover := func(fn string) {

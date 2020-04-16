@@ -53,6 +53,10 @@ func loadBaseConfig() {
 		panic("Exactly one of CoverBucket and CoverBaseURL must be set")
 	}
 
+	if baseConfig.CacheSongs && !baseConfig.UseMemcache {
+		panic("CacheSongs requires UseMemcache to be true")
+	}
+
 	if appengine.IsDevAppServer() {
 		addTestUserToConfig(baseConfig)
 	}
