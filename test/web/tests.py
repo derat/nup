@@ -659,6 +659,8 @@ class Test(unittest.TestCase):
 
         TAB = u'\ue004'
         textarea.send_keys('d' + TAB)
+        # TODO: This check seems to be racy. I saw a failure once where the
+        # trailing space was missing.
         check_textarea('a0 a1 b d ')
 
         textarea.send_keys('c' + TAB)

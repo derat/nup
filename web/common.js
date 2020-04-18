@@ -1,6 +1,10 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
+// Empty GIF: https://stackoverflow.com/a/14115340
+export const emptyImg =
+  'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+
 export function $(id, root) {
   return (root || document).getElementById(id);
 }

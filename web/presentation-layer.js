@@ -1,7 +1,13 @@
 // Copyright 2017 Daniel Erat.
 // All rights reserved.
 
-import {$, createShadow, createTemplate, formatTime} from './common.js';
+import {
+  $,
+  createShadow,
+  createTemplate,
+  emptyImg,
+  formatTime,
+} from './common.js';
 
 const template = createTemplate(`
 <style>
@@ -191,15 +197,19 @@ customElements.define(
     }
 
     updateSongs(currentSong, nextSong) {
+      const updateImg = (img, url) => {
+        if (url) {
+          img.src = url;
+          img.classList.remove('hidden');
+        } else {
+          img.src = emptyImg;
+          img.classList.add('hidden');
+        }
+      };
+
       if (!currentSong) {
-        this.currentCover_.classList.add('hidden');
         this.currentDetails_.classList.add('hidden');
       } else {
-        this.currentCover_.src = currentSong.coverUrl;
-        currentSong.coverUrl
-          ? this.currentCover_.classList.remove('hidden')
-          : this.currentCover_.classList.add('hidden');
-
         this.currentDetails_.classList.remove('hidden');
         this.currentArtist_.innerText = currentSong.artist;
         this.currentTitle_.innerText = currentSong.title;
@@ -210,6 +220,7 @@ customElements.define(
         this.durationDiv_.innerText = formatTime(currentSong.length);
         this.duration_ = currentSong.length;
       }
+      updateImg(this.currentCover_, currentSong ? currentSong.coverUrl : '');
 
       if (!nextSong) {
         this.nextDiv_.classList.add('hidden');
@@ -218,11 +229,8 @@ customElements.define(
         this.nextArtist_.innerText = nextSong.artist;
         this.nextTitle_.innerText = nextSong.title;
         this.nextAlbum_.innerText = nextSong.album;
-        this.nextCover_.src = nextSong.coverUrl;
-        nextSong.coverUrl
-          ? this.nextCover_.classList.remove('hidden')
-          : this.nextCover_.classList.add('hidden');
       }
+      updateImg(this.nextCover_, nextSong ? nextSong.coverUrl : '');
     }
 
     updatePosition(sec) {

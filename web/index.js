@@ -1,6 +1,8 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
+import {$} from './common.js';
+
 const dialogManager = document.querySelector('dialog-manager');
 const musicPlayer = document.querySelector('music-player');
 const musicSearcher = document.querySelector('music-searcher');
@@ -19,11 +21,11 @@ musicPlayer.addEventListener('present', e => {
 
 // Use the cover art as the favicon.
 musicPlayer.addEventListener('cover', e => {
-  const favicon = document.getElementById('favicon');
-  if (e.detail.href) {
-    favicon.href = e.detail.href;
+  const favicon = $('favicon');
+  if (e.detail.url) {
+    favicon.href = e.detail.url;
     favicon.type = 'image/jpeg';
-    favicon.sizes = null;
+    favicon.sizes = null; // we don't know the actual size
   } else {
     favicon.href = 'favicon.ico';
     favicon.type = 'image/png';

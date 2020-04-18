@@ -5,6 +5,7 @@ import {
   $,
   createShadow,
   createTemplate,
+  emptyImg,
   formatTime,
   getCurrentTimeSec,
   updateTitleAttributeForTruncation,
@@ -198,8 +199,8 @@ const template = createTemplate(`
 // should be hidden while the layer is visible.
 //
 // When the current cover art changes due to a song change, a 'cover'
-// CustomEvent is emitted with a 'detail.href' string property. The property is
-// null if no cover art is available.
+// CustomEvent is emitted with a 'detail.url' string property corresponding to a
+// URL to the scaled image. This property is null if no cover art is available.
 customElements.define(
   'music-player',
   class extends HTMLElement {
@@ -359,7 +360,7 @@ customElements.define(
     enqueueSongs(songs, clearFirst, afterCurrent) {
       if (clearFirst) {
         this.audio_.pause();
-        this.audio_.src = '';
+        this.audio_.src = emptyImg;
         this.playlistTable_.highlightRow(this.currentIndex_, false);
         this.songs_ = [];
         this.selectTrack_(0);
@@ -442,13 +443,14 @@ customElements.define(
         this.coverDiv_.classList.remove('empty');
         this.emitCoverEvent_(song.coverUrl);
       } else {
+        this.coverImage_.src = emptyImg;
         this.coverDiv_.classList.add('empty');
         this.emitCoverEvent_(null);
       }
 
       this.updateCoverTitleAttribute_();
       this.updateRatingOverlay_();
-      // Metadata will be updated again after |coverImage| is loaded.
+      // Metadata will be updated again after |coverImage_| is loaded.
       this.updateMediaSessionMetadata_(false /* imageLoaded */);
     }
 
@@ -529,8 +531,8 @@ customElements.define(
       const song = this.currentSong_;
       if (!song) return;
 
-      this.notification_ = new Notification(song.artist + '\n' + song.title, {
-        body: song.album + '\n' + formatTime(song.length),
+      this.notification_ = new Notification(`${song.artist}\n${song.title}`, {
+        body: `${song.album}\n${formatTime(song.length)}`,
         icon: song.coverUrl,
       });
       this.closeNotificationTimeoutId_ = window.setTimeout(
@@ -867,8 +869,8 @@ customElements.define(
       }
     }
 
-    emitCoverEvent_(href) {
-      this.dispatchEvent(new CustomEvent('cover', {detail: {href}}));
+    emitCoverEvent_(url) {
+      this.dispatchEvent(new CustomEvent('cover', {detail: {url}}));
     }
 
     emitPresentEvent_(visible) {
