@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/derat/nup/types"
 
@@ -27,8 +28,9 @@ const (
 	queriesCacheKey = "queries"
 	tagsCacheKey    = "tags"
 
-	// Memcache key prefix for cached songs.
-	songCachePrefix = "song-"
+	// Memcache key prefix for cached songs and cover images.
+	songCachePrefix  = "song-"
+	coverCachePrefix = "cover-"
 )
 
 var jsonCodec = memcache.Codec{
@@ -228,12 +230,12 @@ func flushTagsFromCache(ctx context.Context) error {
 	return nil
 }
 
-func getSongCacheKey(id int64) string {
+func songCacheKey(id int64) string {
 	return songCachePrefix + strconv.FormatInt(id, 10)
 }
 
 func flushSongFromMemcache(ctx context.Context, id int64) error {
-	if err := memcache.Delete(ctx, getSongCacheKey(id)); err != nil && err != memcache.ErrCacheMiss {
+	if err := memcache.Delete(ctx, songCacheKey(id)); err != nil && err != memcache.ErrCacheMiss {
 		return err
 	}
 	return nil
@@ -242,7 +244,7 @@ func flushSongFromMemcache(ctx context.Context, id int64) error {
 func getSongsFromMemcache(ctx context.Context, ids []int64) (songs map[int64]types.Song, err error) {
 	keys := make([]string, len(ids))
 	for i, id := range ids {
-		keys[i] = getSongCacheKey(id)
+		keys[i] = songCacheKey(id)
 	}
 
 	// Uh, no memcache.Codec.GetMulti()?
@@ -291,7 +293,7 @@ func writeSongsToMemcache(ctx context.Context, ids []int64, songs []types.Song, 
 
 	items := make([]*memcache.Item, len(songs))
 	for i, id := range ids {
-		items[i] = &memcache.Item{Key: getSongCacheKey(id), Object: &songs[i]}
+		items[i] = &memcache.Item{Key: songCacheKey(id), Object: &songs[i]}
 	}
 	if err := jsonCodec.AddMulti(ctx, items); err != nil {
 		// Some of the songs might've been cached in response to a query in the meantime.
@@ -303,6 +305,38 @@ func writeSongsToMemcache(ctx context.Context, ids []int64, songs []types.Song, 
 		return err
 	}
 	return nil
+}
+
+// coverCacheKey returns the memcache key that should be used for caching a
+// cover image with the supplied filename and size (i.e. width/height).
+func coverCacheKey(fn string, size int) string {
+	// TODO: Hash the filename?
+	// https://godoc.org/google.golang.org/appengine/memcache#Get says that the
+	// key can be at most 250 bytes.
+	return fmt.Sprintf("%s-%s-%d", coverCachePrefix, size, fn)
+}
+
+// writeCoverToMemcache caches a cover image with the supplied filename,
+// requested size, and raw data. size should be 0 when caching the original image.
+func writeCoverToMemcache(ctx context.Context, fn string, size int, data []byte) error {
+	return memcache.Set(ctx, &memcache.Item{
+		Key:        coverCacheKey(fn, size),
+		Value:      data,
+		Expiration: 24 * time.Hour,
+	})
+}
+
+// getCoverFromMemcache attempts to look up raw data for the cover image with
+// the supplied filename and size. If the image isn't present, both the returned
+// byte slice and the error are nil.
+func getCoverFromMemcache(ctx context.Context, fn string, size int) ([]byte, error) {
+	item, err := memcache.Get(ctx, coverCacheKey(fn, size))
+	if err == memcache.ErrCacheMiss {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return item.Value, nil
 }
 
 func flushCache(ctx context.Context) error {

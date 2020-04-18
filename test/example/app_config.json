@@ -1,5 +1,6 @@
 {
   "googleUsers": ["test@example.com"],
   "songBaseURL": "http://localhost:8123/music/",
-  "coverBaseURL": "http://localhost:8123/covers/"
+  "coverBaseURL": "http://localhost:8123/covers/",
+  "cacheCovers": "memcache"
 }

@@ -60,14 +60,17 @@ func loadBaseConfig() {
 	validCachePolicy := func(v types.CachePolicy) bool {
 		return v == types.NoCaching || v == types.DatastoreCaching || v == types.MemcacheCaching
 	}
+	if !validCachePolicy(baseCfg.CacheCovers) || baseCfg.CacheCovers == types.DatastoreCaching {
+		panic(fmt.Sprintf("Invalid cover caching policy %q", baseCfg.CacheCovers))
+	}
 	if !validCachePolicy(baseCfg.CacheQueries) {
 		panic(fmt.Sprintf("Invalid query caching policy %q", baseCfg.CacheQueries))
 	}
-	if !validCachePolicy(baseCfg.CacheTags) {
-		panic(fmt.Sprintf("Invalid tag caching policy %q", baseCfg.CacheTags))
-	}
 	if !validCachePolicy(baseCfg.CacheSongs) || baseCfg.CacheSongs == types.DatastoreCaching {
 		panic(fmt.Sprintf("Invalid song caching policy %q", baseCfg.CacheSongs))
+	}
+	if !validCachePolicy(baseCfg.CacheTags) {
+		panic(fmt.Sprintf("Invalid tag caching policy %q", baseCfg.CacheTags))
 	}
 
 	if appengine.IsDevAppServer() {
