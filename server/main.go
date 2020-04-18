@@ -60,6 +60,7 @@ func basicAuth(r *http.Request) (username, password string, ok bool) {
 	return cs[:s], cs[s+1:], true
 }
 
+// writeJSONResponse serializes v to JSON and writes it to w.
 func writeJSONResponse(w http.ResponseWriter, v interface{}) {
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -70,12 +71,15 @@ func writeJSONResponse(w http.ResponseWriter, v interface{}) {
 	}
 }
 
+// writeTextResponse writes s to w as a text response.
 func writeTextResponse(w http.ResponseWriter, s string) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write([]byte(s))
 }
 
-func hasAllowedGoogleAuth(ctx context.Context, r *http.Request, cfg *types.ServerConfig) (email string, allowed bool) {
+// hasAllowedGoogleAuth checks whether ctx contains credentials for a Google
+// user registered in cfg.
+func hasAllowedGoogleAuth(ctx context.Context, cfg *types.ServerConfig) (email string, allowed bool) {
 	u := user.Current(ctx)
 	if u == nil {
 		return "", false
@@ -89,6 +93,9 @@ func hasAllowedGoogleAuth(ctx context.Context, r *http.Request, cfg *types.Serve
 	return u.Email, false
 }
 
+// hasAllowedBasicAuth checks whether r is authorized via HTTP basic
+// authentication with a user registered in cfg. If basic auth was used, the
+// username return value is set regardless of the user is allowed or not.
 func hasAllowedBasicAuth(r *http.Request, cfg *types.ServerConfig) (username string, allowed bool) {
 	username, password, ok := basicAuth(r)
 	if !ok {
@@ -103,21 +110,27 @@ func hasAllowedBasicAuth(r *http.Request, cfg *types.ServerConfig) (username str
 	return username, false
 }
 
-func hasWebdriverCookie(r *http.Request) bool {
+// hasWebDriverCookie returns true if r contains a special cookie set by browser
+// tests that use WebDriver.
+func hasWebDriverCookie(r *http.Request) bool {
 	if _, err := r.Cookie("webdriver"); err != nil {
 		return false
 	}
 	return true
 }
 
-func checkRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, method string, redirectToLogin bool) bool {
+// checkRequest verifies that r is an authorized request using method.
+// If the request is unauthorized and redirectToLogin is true, the client
+// is redirected to the login screen.
+func checkRequest(ctx context.Context, w http.ResponseWriter, r *http.Request,
+	method string, redirectToLogin bool) bool {
 	cfg := getConfig(ctx)
-	username, allowed := hasAllowedGoogleAuth(ctx, r, cfg)
+	username, allowed := hasAllowedGoogleAuth(ctx, cfg)
 	if !allowed && len(username) == 0 {
 		username, allowed = hasAllowedBasicAuth(r, cfg)
 	}
-	// Ugly hack since Webdriver doesn't support basic auth.
-	if !allowed && appengine.IsDevAppServer() && hasWebdriverCookie(r) {
+	// Ugly hack since WebDriver doesn't support basic auth.
+	if !allowed && appengine.IsDevAppServer() && hasWebDriverCookie(r) {
 		allowed = true
 	}
 	if !allowed {
@@ -142,28 +155,37 @@ func checkRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, m
 	return true
 }
 
-func parseIntParam(ctx context.Context, w http.ResponseWriter, r *http.Request, name string, v *int64) bool {
-	val, err := strconv.ParseInt(r.FormValue(name), 10, 64)
+// parseIntParam parses and returns the named int64 form parameter from r.
+// If the parameter is missing or unparseable, a bad request error is written
+// to w, an error is logged, and the ok return value is false.
+func parseIntParam(ctx context.Context, w http.ResponseWriter, r *http.Request,
+	name string) (v int64, ok bool) {
+	s := r.FormValue(name)
+	v, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
-		log.Errorf(ctx, "Unable to parse %v param %q", name, r.FormValue(name))
+		log.Errorf(ctx, "Unable to parse %v param %q", name, s)
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return false
+		return v, false
 	}
-	*v = val
-	return true
+	return v, true
 }
 
-func parseFloatParam(ctx context.Context, w http.ResponseWriter, r *http.Request, name string, v *float64) bool {
-	val, err := strconv.ParseFloat(r.FormValue(name), 64)
+// parseFloatParam parses and returns the float64 form parameter from r.
+// If the parameter is missing or unparseable, a bad request error is written
+// to w, an error is logged, and the ok return value is false.
+func parseFloatParam(ctx context.Context, w http.ResponseWriter, r *http.Request,
+	name string) (v float64, ok bool) {
+	s := r.FormValue(name)
+	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		log.Errorf(ctx, "Unable to parse %v param %q", name, r.FormValue(name))
+		log.Errorf(ctx, "Unable to parse %v param %q", name, s)
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return false
+		return v, false
 	}
-	*v = val
-	return true
+	return v, true
 }
 
+// secondsToTime converts fractional seconds since the Unix epoch to a time.Time.
 func secondsToTime(s float64) time.Time {
 	return time.Unix(0, int64(s*float64(time.Second/time.Nanosecond)))
 }
@@ -240,8 +262,8 @@ func handleDeleteSong(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var id int64
-	if !parseIntParam(ctx, w, r, "songId", &id) {
+	id, ok := parseIntParam(ctx, w, r, "songId")
+	if !ok {
 		return
 	}
 	if err := deleteSong(ctx, id); err != nil {
@@ -257,8 +279,8 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var id int64
-	if !parseIntParam(ctx, w, r, "id", &id) {
+	id, ok := parseIntParam(ctx, w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -312,8 +334,11 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var max int64 = defaultDumpBatchSize
-	if len(r.FormValue("max")) > 0 && !parseIntParam(ctx, w, r, "max", &max) {
-		return
+	if len(r.FormValue("max")) > 0 {
+		var ok bool
+		if max, ok = parseIntParam(ctx, w, r, "max"); !ok {
+			return
+		}
 	}
 	if max > maxDumpBatchSize {
 		max = maxDumpBatchSize
@@ -419,9 +444,12 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var updateDelayNsec int64 = 0
-	if len(r.FormValue("updateDelayNsec")) > 0 && !parseIntParam(ctx, w, r, "updateDelayNsec", &updateDelayNsec) {
-		return
+	var updateDelayNsec int64
+	if len(r.FormValue("updateDelayNsec")) > 0 {
+		var ok bool
+		if updateDelayNsec, ok = parseIntParam(ctx, w, r, "updateDelayNsec"); !ok {
+			return
+		}
 	}
 	updateDelay := time.Nanosecond * time.Duration(updateDelayNsec)
 
@@ -495,7 +523,8 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(r.FormValue("minRating")) > 0 {
-		if !parseFloatParam(ctx, w, r, "minRating", &q.MinRating) {
+		var ok bool
+		if q.MinRating, ok = parseFloatParam(ctx, w, r, "minRating"); !ok {
 			return
 		}
 		q.HasMinRating = true
@@ -504,25 +533,26 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(r.FormValue("maxPlays")) > 0 {
-		if !parseIntParam(ctx, w, r, "maxPlays", &q.MaxPlays) {
+		var ok bool
+		if q.MaxPlays, ok = parseIntParam(ctx, w, r, "maxPlays"); !ok {
 			return
 		}
 		q.HasMaxPlays = true
 	}
 
 	if len(r.FormValue("minFirstPlayed")) > 0 {
-		var s float64
-		if !parseFloatParam(ctx, w, r, "minFirstPlayed", &s) {
+		if s, ok := parseFloatParam(ctx, w, r, "minFirstPlayed"); !ok {
 			return
+		} else {
+			q.MinFirstStartTime = secondsToTime(s)
 		}
-		q.MinFirstStartTime = secondsToTime(s)
 	}
 	if len(r.FormValue("maxLastPlayed")) > 0 {
-		var s float64
-		if !parseFloatParam(ctx, w, r, "maxLastPlayed", &s) {
+		if s, ok := parseFloatParam(ctx, w, r, "maxLastPlayed"); !ok {
 			return
+		} else {
+			q.MaxLastStartTime = secondsToTime(s)
 		}
-		q.MaxLastStartTime = secondsToTime(s)
 	}
 
 	q.Tags = make([]string, 0)
@@ -549,23 +579,24 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 	if !checkRequest(ctx, w, r, "POST", false) {
 		return
 	}
-	var id int64
-	if !parseIntParam(ctx, w, r, "songId", &id) {
+	id, ok := parseIntParam(ctx, w, r, "songId")
+	if !ok {
 		return
 	}
 
-	var updateDelayNsec int64 = 0
-	if len(r.FormValue("updateDelayNsec")) > 0 && !parseIntParam(ctx, w, r, "updateDelayNsec", &updateDelayNsec) {
-		return
+	var updateDelayNsec int64
+	if len(r.FormValue("updateDelayNsec")) > 0 {
+		if updateDelayNsec, ok = parseIntParam(ctx, w, r, "updateDelayNsec"); !ok {
+			return
+		}
 	}
 	updateDelay := time.Nanosecond * time.Duration(updateDelayNsec)
 
 	hasRating := false
 	var rating float64
 	var tags []string
-
 	if _, ok := r.Form["rating"]; ok {
-		if !parseFloatParam(ctx, w, r, "rating", &rating) {
+		if rating, ok = parseFloatParam(ctx, w, r, "rating"); !ok {
 			return
 		}
 		hasRating = true
@@ -604,9 +635,13 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var id int64
-	var startTimeFloat float64
-	if !parseIntParam(ctx, w, r, "songId", &id) || !parseFloatParam(ctx, w, r, "startTime", &startTimeFloat) {
+	id, ok := parseIntParam(ctx, w, r, "songId")
+	if !ok {
+		return
+	}
+
+	startTimeFloat, ok := parseFloatParam(ctx, w, r, "startTime")
+	if !ok {
 		return
 	}
 	startTime := secondsToTime(startTimeFloat)
@@ -634,8 +669,11 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var max int64 = defaultDumpBatchSize
-	if len(r.FormValue("max")) > 0 && !parseIntParam(ctx, w, r, "max", &max) {
-		return
+	if len(r.FormValue("max")) > 0 {
+		var ok bool
+		if max, ok = parseIntParam(ctx, w, r, "max"); !ok {
+			return
+		}
 	}
 	if max > maxDumpBatchSize {
 		max = maxDumpBatchSize
@@ -643,8 +681,8 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 
 	var minLastModified time.Time
 	if len(r.FormValue("minLastModifiedNsec")) > 0 {
-		var ns int64
-		if !parseIntParam(ctx, w, r, "minLastModifiedNsec", &ns) {
+		ns, ok := parseIntParam(ctx, w, r, "minLastModifiedNsec")
+		if !ok {
 			return
 		}
 		if ns > 0 {
@@ -653,8 +691,11 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var deleted int64
-	if len(r.FormValue("deleted")) > 0 && !parseIntParam(ctx, w, r, "deleted", &deleted) {
-		return
+	if len(r.FormValue("deleted")) > 0 {
+		var ok bool
+		if deleted, ok = parseIntParam(ctx, w, r, "deleted"); !ok {
+			return
+		}
 	}
 
 	songs, cursor, err := dumpSongsForAndroid(ctx, minLastModified, deleted != 0, max, r.FormValue("cursor"))

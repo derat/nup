@@ -22,7 +22,10 @@ const (
 var baseConfig *types.ServerConfig
 
 func addTestUserToConfig(cfg *types.ServerConfig) {
-	cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, types.BasicAuthInfo{cloudutil.TestUsername, cloudutil.TestPassword})
+	cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, types.BasicAuthInfo{
+		Username: cloudutil.TestUsername,
+		Password: cloudutil.TestPassword,
+	})
 }
 
 // cleanBaseURL appends a trailing slash to u if not already present.

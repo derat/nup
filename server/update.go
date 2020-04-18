@@ -169,7 +169,10 @@ func addPlay(ctx context.Context, id int64, startTime time.Time, ip string) erro
 		}
 
 		newKey := datastore.NewIncompleteKey(ctx, playKind, songKey)
-		if _, err = datastore.Put(ctx, newKey, &types.Play{startTime, ip}); err != nil {
+		if _, err = datastore.Put(ctx, newKey, &types.Play{
+			StartTime: startTime,
+			IPAddress: ip,
+		}); err != nil {
 			return fmt.Errorf("putting play failed: %v", err)
 		}
 		return nil
