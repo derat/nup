@@ -45,8 +45,8 @@ func prepareSongForClient(s *types.Song, id int64, cfg *types.ServerConfig, clie
 	// but that aren't needed in search results.
 	s.SHA1 = ""
 	s.Filename = ""
-	s.CoverFilename = ""
 	s.Plays = s.Plays[:0]
+	// Preserve CoverFilename so clients can pass it to /cover.
 }
 
 func getMsecSinceTime(t time.Time) int64 {

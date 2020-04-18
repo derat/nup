@@ -24,12 +24,12 @@ import (
 )
 
 const (
-	// Path to the index file relative to the base directory.
-	indexPath = "web/index.html"
+	indexPath = "web/index.html" // path to index relative to base dir
 
-	// Default and maximum size of a batch of dumped entities.
-	defaultDumpBatchSize = 100
-	maxDumpBatchSize     = 5000
+	defaultDumpBatchSize = 100  // default size of batch of dumped entities
+	maxDumpBatchSize     = 5000 // max size of batch of dumped entities
+
+	maxCoverSize = 800 // max size permitted in /cover requests
 )
 
 // TODO: This is swiped from https://code.google.com/p/go/source/detail?r=5e03333d2dcf.
@@ -197,6 +197,7 @@ func main() {
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/clear", handleClear)
 	http.HandleFunc("/config", handleConfig)
+	http.HandleFunc("/cover", handleCover)
 	http.HandleFunc("/delete_song", handleDeleteSong)
 	http.HandleFunc("/dump_song", handleDumpSong)
 	http.HandleFunc("/export", handleExport)
@@ -253,6 +254,40 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeTextResponse(w, "ok")
+}
+
+func handleCover(w http.ResponseWriter, r *http.Request) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "GET", false) {
+		return
+	}
+
+	fn := r.FormValue("filename")
+	if fn == "" {
+		log.Errorf(ctx, "Missing filename in cover request")
+		http.Error(w, "Missing filename", http.StatusBadRequest)
+	}
+	var size int64 = 140
+	if r.FormValue("size") != "" {
+		var ok bool
+		if size, ok = parseIntParam(ctx, w, r, "size"); !ok {
+			return
+		} else if size <= 0 || size > maxCoverSize {
+			log.Errorf(ctx, "Invalid cover size %v", size)
+			http.Error(w, "Invalid size", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// This handler is expensive, so try to minimize duplicate requests:
+	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
+	w.Header().Set("Cache-Control", "public, max-age=86400, immutable")
+
+	w.Header().Set("Content-Type", "image/jpeg")
+	if err := scaleCover(ctx, fn, int(size), w); err != nil {
+		log.Errorf(ctx, "Failed to scale cover: %v", err)
+		http.Error(w, "Scaling failed", http.StatusInternalServerError)
+	}
 }
 
 func handleDeleteSong(w http.ResponseWriter, r *http.Request) {

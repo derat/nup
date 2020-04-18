@@ -28,6 +28,8 @@ type Song struct {
 
 	// Relative path from the base of the covers directory.
 	// Must be escaped for Cloud Storage when constructing CoverURL.
+	// Clients can pass this to the server's /cover endpoint to get a scaled
+	// copy of the cover.
 	CoverFilename string `datastore:",noindex" json:"coverFilename,omitempty"`
 
 	// URL of the song and cover art. Only set in search results.

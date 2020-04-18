@@ -96,7 +96,6 @@ func compareQueryResults(expected, actual []types.Song, order OrderPolicy, clien
 		s.Filename = ""
 		if len(s.CoverFilename) > 0 {
 			s.CoverURL = cloudutil.CloudStorageURL(coverBucket, s.CoverFilename, client)
-			s.CoverFilename = ""
 		}
 		expectedCleaned[i] = s
 	}
