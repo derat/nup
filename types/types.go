@@ -122,6 +122,21 @@ type BasicAuthInfo struct {
 	Password string `json:"password"`
 }
 
+// CachePolicy holds values that can be assigned to fields in ServerConfig to
+// control how different types of data are cached. Omitting a field results in
+// an empty string, corresponding to NoCaching.
+type CachePolicy string
+
+const (
+	// NoCaching indicates that objects should not be cached.
+	NoCaching CachePolicy = ""
+	// DatastoreCaching indicates that object should be cached using datastore.
+	DatastoreCaching CachePolicy = "datastore"
+	// MemcacheCaching indicates that objects should be cached using memcache.
+	// This is experimental and likely to be buggy.
+	MemcacheCaching CachePolicy = "memcache"
+)
+
 // ServerConfig holds the App Engine server's configuration.
 type ServerConfig struct {
 	// GoogleUsers contains email addresses of Google accounts allowed to access
@@ -144,17 +159,13 @@ type ServerConfig struct {
 	// Exactly one of CoverBucket and CoverBaseURL must be set.
 	CoverBaseURL string `json:"coverBaseUrl"`
 
-	// CacheSongs controls whether Song database objects are cached to reduce datastore operations.
-	// This option is experimental and is only applicable if UseMemcache is true.
-	CacheSongs bool `json:"cacheSongs"`
-	// CacheQueries controls whether queries are cached to reduce datastore operations.
-	CacheQueries bool `json:"cacheQueries"`
-	// CacheTags controls whether the list of in-use tags is cached to reduce datastore operations.
-	CacheTags bool `json:"cacheTags"`
-
-	// Should memcache (rather than datastore) be used for caching database objects?
-	// This option is experimental and requires additional configuration in GCP.
-	UseMemcache bool `json:"useMemcache"`
+	// CacheSongs controls how Song datastore objects are cached.
+	// DatastoreCache cannot be used since songs are already stored there.
+	CacheSongs CachePolicy `json:"cacheSongs"`
+	// CacheQueries controls how query results are cached.
+	CacheQueries CachePolicy `json:"cacheQueries"`
+	// CacheTags controls how the list of in-use tags is cached.
+	CacheTags CachePolicy `json:"cacheTags"`
 
 	// ForceUpdateFailures is set by tests to indicate that failure be reported
 	// for all user data updates (ratings, tags, plays). Ignored for non-development servers.

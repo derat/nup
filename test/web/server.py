@@ -24,9 +24,6 @@ class Server:
         self.send('POST', '/config', json.dumps({
             'songBaseUrl': 'http://%s:%d/' % self.music_host_port,
             'coverBaseUrl': '',
-            'cacheSongs': False,
-            'cacheQueries': False,
-            'cacheTags': False,
             'forceUpdateFailures': force_update_failures,
         }))
 

@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -70,11 +71,12 @@ func computeQueryHash(q *songQuery) (string, error) {
 
 func getAllCachedQueries(ctx context.Context) (cachedQueries, error) {
 	queries := make(cachedQueries)
-	if getConfig(ctx).UseMemcache {
+	switch getConfig(ctx).CacheQueries {
+	case types.MemcacheCaching:
 		if _, err := jsonCodec.Get(ctx, queriesCacheKey, &queries); err != nil && err != memcache.ErrCacheMiss {
 			return nil, err
 		}
-	} else {
+	case types.DatastoreCaching:
 		eq := encodedCachedQueries{}
 		if err := datastore.Get(ctx, getDatastoreCachedQueriesKey(ctx), &eq); err == nil {
 			if err := json.Unmarshal(eq.Data, &queries); err != nil {
@@ -118,15 +120,18 @@ func updateCachedQueries(ctx context.Context, f func(cachedQueries) error) error
 		return err
 	}
 
-	if getConfig(ctx).UseMemcache {
+	switch getConfig(ctx).CacheQueries {
+	case types.MemcacheCaching:
 		return jsonCodec.Set(ctx, &memcache.Item{Key: queriesCacheKey, Object: &queries})
-	} else {
+	case types.DatastoreCaching:
 		b, err := json.Marshal(queries)
 		if err != nil {
 			return err
 		}
 		_, err = datastore.Put(ctx, getDatastoreCachedQueriesKey(ctx), &encodedCachedQueries{b})
 		return err
+	default:
+		return errors.New("query caching is disabled")
 	}
 }
 
@@ -181,11 +186,12 @@ func getDatastoreCachedTagsKey(ctx context.Context) *datastore.Key {
 
 func getTagsFromCache(ctx context.Context) ([]string, error) {
 	t := cachedTags{}
-	if getConfig(ctx).UseMemcache {
+	switch getConfig(ctx).CacheTags {
+	case types.MemcacheCaching:
 		if _, err := jsonCodec.Get(ctx, tagsCacheKey, &t); err != nil && err != memcache.ErrCacheMiss {
 			return nil, err
 		}
-	} else {
+	case types.DatastoreCaching:
 		if err := datastore.Get(ctx, getDatastoreCachedTagsKey(ctx), &t); err == datastore.ErrNoSuchEntity {
 			return nil, nil
 		} else if err != nil {
@@ -197,20 +203,24 @@ func getTagsFromCache(ctx context.Context) ([]string, error) {
 
 func writeTagsToCache(ctx context.Context, tags []string) error {
 	t := cachedTags{tags}
-	if getConfig(ctx).UseMemcache {
+	switch getConfig(ctx).CacheTags {
+	case types.MemcacheCaching:
 		return jsonCodec.Set(ctx, &memcache.Item{Key: tagsCacheKey, Object: &t})
-	} else {
+	case types.DatastoreCaching:
 		_, err := datastore.Put(ctx, getDatastoreCachedTagsKey(ctx), &t)
 		return err
+	default:
+		return errors.New("tag caching is disabled")
 	}
 }
 
 func flushTagsFromCache(ctx context.Context) error {
-	if getConfig(ctx).UseMemcache {
+	switch getConfig(ctx).CacheTags {
+	case types.MemcacheCaching:
 		if err := memcache.Delete(ctx, tagsCacheKey); err != nil && err != memcache.ErrCacheMiss {
 			return err
 		}
-	} else {
+	case types.DatastoreCaching:
 		if err := datastore.Delete(ctx, getDatastoreCachedTagsKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
 			return err
 		}

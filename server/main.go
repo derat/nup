@@ -326,7 +326,7 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 	var err error
 	if r.FormValue("cache") == "1" {
 		var songs map[int64]types.Song
-		if !getConfig(ctx).CacheSongs {
+		if getConfig(ctx).CacheSongs != types.MemcacheCaching {
 			err = errors.New("song caching is disabled")
 		} else {
 			if songs, err = getSongsFromMemcache(ctx, []int64{id}); err == nil {

@@ -74,7 +74,7 @@ func (a songArray) Less(i, j int) bool {
 
 func getTags(ctx context.Context) (tags []string, err error) {
 	cfg := getConfig(ctx)
-	if cfg.CacheTags {
+	if cfg.CacheTags != types.NoCaching {
 		startTime := time.Now()
 		if tags, err = getTagsFromCache(ctx); err != nil {
 			log.Errorf(ctx, "Got error while getting cached tags: %v", err)
@@ -108,7 +108,7 @@ func getTags(ctx context.Context) (tags []string, err error) {
 	sort.Strings(tags)
 	log.Debugf(ctx, "Got %v tag(s) from datastore in %v ms", len(tags), getMsecSinceTime(startTime))
 
-	if cfg.CacheTags {
+	if cfg.CacheTags != types.NoCaching {
 		startTime = time.Now()
 		if err = writeTagsToCache(ctx, tags); err != nil {
 			log.Errorf(ctx, "Got error while writing tags to cache: %v", err)
@@ -279,7 +279,7 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 	var err error
 
 	cfg := getConfig(ctx)
-	if cfg.CacheQueries {
+	if cfg.CacheQueries != types.NoCaching {
 		startTime := time.Now()
 		ids, err = getCachedQueryResults(ctx, query)
 		if err != nil {
@@ -296,7 +296,7 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 			if ids, err = performQueryAgainstDatastore(ctx, query); err != nil {
 				return nil, err
 			}
-			if cfg.CacheQueries && shouldCacheQuery(query) {
+			if cfg.CacheQueries != types.NoCaching && shouldCacheQuery(query) {
 				startTime := time.Now()
 				if err = writeQueryResultsToCache(ctx, query, ids); err != nil {
 					log.Errorf(ctx, "Got error while writing query results to cache: %v", err)
@@ -328,7 +328,7 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 	storedSongs := make([]types.Song, 0)
 
 	// Get whatever we can from memcache.
-	if cfg.CacheSongs {
+	if cfg.CacheSongs == types.MemcacheCaching {
 		startTime := time.Now()
 		if hits, err := getSongsFromMemcache(ctx, ids); err != nil {
 			log.Errorf(ctx, "Got error while getting cached songs: %v", err)
@@ -356,7 +356,7 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 		}
 		log.Debugf(ctx, "Fetched %v song(s) from datastore in %v ms", len(storedSongs), getMsecSinceTime(startTime))
 
-		if cfg.CacheSongs {
+		if cfg.CacheSongs == types.MemcacheCaching {
 			startTime = time.Now()
 			if err := writeSongsToMemcache(ctx, storedIds, storedSongs, false); err != nil {
 				log.Errorf(ctx, "Failed to write just-fetched song(s) to cache: %v", err)

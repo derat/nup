@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
@@ -19,7 +20,7 @@ const (
 	configKeyId = "config"
 )
 
-var baseConfig *types.ServerConfig
+var baseCfg *types.ServerConfig
 
 func addTestUserToConfig(cfg *types.ServerConfig) {
 	cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, types.BasicAuthInfo{
@@ -37,31 +38,40 @@ func cleanBaseURL(u *string) {
 }
 
 func loadBaseConfig() {
-	baseConfig = &types.ServerConfig{}
-	if err := cloudutil.ReadJSON(configPath, baseConfig); err != nil {
+	baseCfg = &types.ServerConfig{}
+	if err := cloudutil.ReadJSON(configPath, baseCfg); err != nil {
 		panic(err)
 	}
 
-	cleanBaseURL(&baseConfig.SongBaseURL)
-	haveSongBucket := len(baseConfig.SongBucket) > 0
-	haveSongURL := len(baseConfig.SongBaseURL) > 0
+	cleanBaseURL(&baseCfg.SongBaseURL)
+	haveSongBucket := len(baseCfg.SongBucket) > 0
+	haveSongURL := len(baseCfg.SongBaseURL) > 0
 	if (haveSongBucket && haveSongURL) || !(haveSongBucket || haveSongURL) {
 		panic("Exactly one of SongBucket and SongBaseURL must be set")
 	}
 
-	cleanBaseURL(&baseConfig.CoverBaseURL)
-	haveCoverBucket := len(baseConfig.CoverBucket) > 0
-	haveCoverURL := len(baseConfig.CoverBaseURL) > 0
+	cleanBaseURL(&baseCfg.CoverBaseURL)
+	haveCoverBucket := len(baseCfg.CoverBucket) > 0
+	haveCoverURL := len(baseCfg.CoverBaseURL) > 0
 	if (haveCoverBucket && haveCoverURL) || !(haveCoverBucket || haveCoverURL) {
 		panic("Exactly one of CoverBucket and CoverBaseURL must be set")
 	}
 
-	if baseConfig.CacheSongs && !baseConfig.UseMemcache {
-		panic("CacheSongs requires UseMemcache to be true")
+	validCachePolicy := func(v types.CachePolicy) bool {
+		return v == types.NoCaching || v == types.DatastoreCaching || v == types.MemcacheCaching
+	}
+	if !validCachePolicy(baseCfg.CacheQueries) {
+		panic(fmt.Sprintf("Invalid query caching policy %q", baseCfg.CacheQueries))
+	}
+	if !validCachePolicy(baseCfg.CacheTags) {
+		panic(fmt.Sprintf("Invalid tag caching policy %q", baseCfg.CacheTags))
+	}
+	if !validCachePolicy(baseCfg.CacheSongs) || baseCfg.CacheSongs == types.DatastoreCaching {
+		panic(fmt.Sprintf("Invalid song caching policy %q", baseCfg.CacheSongs))
 	}
 
 	if appengine.IsDevAppServer() {
-		addTestUserToConfig(baseConfig)
+		addTestUserToConfig(baseCfg)
 	}
 }
 
@@ -79,10 +89,10 @@ func getConfig(ctx context.Context) *types.ServerConfig {
 		}
 	}
 
-	if baseConfig == nil {
+	if baseCfg == nil {
 		panic("loadBaseConfig() not called")
 	}
-	return baseConfig
+	return baseCfg
 }
 
 func saveTestConfig(ctx context.Context, cfg *types.ServerConfig) {
