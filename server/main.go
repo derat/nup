@@ -29,7 +29,8 @@ const (
 	defaultDumpBatchSize = 100  // default size of batch of dumped entities
 	maxDumpBatchSize     = 5000 // max size of batch of dumped entities
 
-	maxCoverSize = 800 // max size permitted in /cover requests
+	maxCoverSize     = 800 // max size permitted in /cover requests
+	coverJPEGQuality = 90  // quality to use when encoding /cover replies
 )
 
 // TODO: This is swiped from https://code.google.com/p/go/source/detail?r=5e03333d2dcf.
@@ -266,6 +267,7 @@ func handleCover(w http.ResponseWriter, r *http.Request) {
 	if fn == "" {
 		log.Errorf(ctx, "Missing filename in cover request")
 		http.Error(w, "Missing filename", http.StatusBadRequest)
+		return
 	}
 	var size int64 = 140
 	if r.FormValue("size") != "" {
@@ -284,9 +286,10 @@ func handleCover(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=86400, immutable")
 
 	w.Header().Set("Content-Type", "image/jpeg")
-	if err := scaleCover(ctx, fn, int(size), w); err != nil {
+	if err := scaleCover(ctx, fn, int(size), coverJPEGQuality, w); err != nil {
 		log.Errorf(ctx, "Failed to scale cover: %v", err)
 		http.Error(w, "Scaling failed", http.StatusInternalServerError)
+		return
 	}
 }
 

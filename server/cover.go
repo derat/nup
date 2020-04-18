@@ -12,16 +12,17 @@ import (
 	"cloud.google.com/go/storage"
 
 	"golang.org/x/image/draw"
-)
 
-const coverJPEGQuality = 95
+	"google.golang.org/appengine/log"
+)
 
 // scaleCover reads the cover image at fn (corresponding to Song.CoverFilename),
 // scales and crops it to be a square image with the supplied width and height
 // size, and writes it in JPEG format to w.
 //
 // TODO: The source and/or dest images should probably be cached.
-func scaleCover(ctx context.Context, fn string, size int, w io.Writer) error {
+func scaleCover(ctx context.Context, fn string, size, quality int, w io.Writer) error {
+	log.Debugf(ctx, "Opening cover file %q", fn)
 	var r io.ReadCloser
 	if cfg := getConfig(ctx); cfg.CoverBucket != "" {
 		client, err := storage.NewClient(ctx)
@@ -43,6 +44,7 @@ func scaleCover(ctx context.Context, fn string, size int, w io.Writer) error {
 	}
 	defer r.Close()
 
+	log.Debugf(ctx, "Decoding cover image")
 	src, _, err := image.Decode(r)
 	if err != nil {
 		return err
@@ -58,8 +60,16 @@ func scaleCover(ctx context.Context, fn string, size int, w io.Writer) error {
 		sr.Max.Y = sr.Dx()
 	}
 
+	// TODO: Would it be best to never upscale?
+
+	log.Debugf(ctx, "Scaling cover image from %vx%v to %vx%v",
+		sr.Dx(), sr.Dy(), size, size)
 	dr := image.Rect(0, 0, size, size)
 	dst := image.NewRGBA(dr)
-	draw.CatmullRom.Scale(dst, dr, src, sr, draw.Src, nil)
-	return jpeg.Encode(w, dst, &jpeg.Options{Quality: coverJPEGQuality})
+	// draw.CatmullRom seems to be very slow. I've seen a Scale call from
+	// 1200x1200 to 512x512 take 908 ms on AppEngine.
+	draw.ApproxBiLinear.Scale(dst, dr, src, sr, draw.Src, nil)
+
+	log.Debugf(ctx, "Encoding cover image to JPEG")
+	return jpeg.Encode(w, dst, &jpeg.Options{Quality: quality})
 }
