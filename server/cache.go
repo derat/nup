@@ -60,10 +60,6 @@ func getDatastoreCachedQueriesKey(ctx context.Context) *datastore.Key {
 	return datastore.NewKey(ctx, cachedQueriesKind, queriesCacheKey, 0, nil)
 }
 
-func shouldCacheQuery(q *songQuery) bool {
-	return !q.HasMaxPlays && q.MinFirstStartTime.IsZero() && q.MaxLastStartTime.IsZero()
-}
-
 func computeQueryHash(q *songQuery) (string, error) {
 	b, err := json.Marshal(q)
 	if err != nil {

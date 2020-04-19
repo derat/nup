@@ -14,10 +14,7 @@ import (
 	"google.golang.org/appengine/log"
 )
 
-const (
-	// Maximum number of results to return for a search.
-	maxQueryResults = 100
-)
+const maxQueryResults = 100 // max songs to return for query
 
 type songQuery struct {
 	Artist, Title, Album string
@@ -42,34 +39,8 @@ type songQuery struct {
 	Shuffle bool
 }
 
-// From https://groups.google.com/forum/#!topic/golang-nuts/tyDC4S62nPo.
-type int64Array []int64
-
-func (a int64Array) Len() int           { return len(a) }
-func (a int64Array) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a int64Array) Less(i, j int) bool { return a[i] < a[j] }
-
-type songArray []types.Song
-
-func (a songArray) Len() int      { return len(a) }
-func (a songArray) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a songArray) Less(i, j int) bool {
-	if a[i].AlbumLower < a[j].AlbumLower {
-		return true
-	} else if a[i].AlbumLower > a[j].AlbumLower {
-		return false
-	}
-	if a[i].AlbumID < a[j].AlbumID {
-		return true
-	} else if a[i].AlbumID > a[j].AlbumID {
-		return false
-	}
-	if a[i].Disc < a[j].Disc {
-		return true
-	} else if a[i].Disc > a[j].Disc {
-		return false
-	}
-	return a[i].Track < a[j].Track
+func (q *songQuery) canCache() bool {
+	return !q.HasMaxPlays && q.MinFirstStartTime.IsZero() && q.MaxLastStartTime.IsZero()
 }
 
 func getTags(ctx context.Context) (tags []string, err error) {
@@ -142,7 +113,7 @@ func runQueriesAndGetIds(ctx context.Context, qs []*datastore.Query) ([][]int64,
 					return
 				}
 			}
-			sort.Sort(int64Array(ids))
+			sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 			ch <- queryResult{index, ids, nil}
 		}(i, q)
 	}
@@ -285,7 +256,8 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 		if err != nil {
 			log.Errorf(ctx, "Got error while getting cached query: %v", err)
 		} else if ids != nil {
-			log.Debugf(ctx, "Got query result with %v song(s) from cache in %v ms", len(ids), getMsecSinceTime(startTime))
+			log.Debugf(ctx, "Got query result with %v song(s) from cache in %v ms",
+				len(ids), getMsecSinceTime(startTime))
 		}
 	}
 
@@ -296,18 +268,18 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 			if ids, err = performQueryAgainstDatastore(ctx, query); err != nil {
 				return nil, err
 			}
-			if cfg.CacheQueries != types.NoCaching && shouldCacheQuery(query) {
+			if cfg.CacheQueries != types.NoCaching && query.canCache() {
 				startTime := time.Now()
 				if err = writeQueryResultsToCache(ctx, query, ids); err != nil {
 					log.Errorf(ctx, "Got error while writing query results to cache: %v", err)
 				} else {
-					log.Debugf(ctx, "Wrote query result with %v song(s) to cache in %v ms", len(ids), getMsecSinceTime(startTime))
+					log.Debugf(ctx, "Wrote query result with %v song(s) to cache in %v ms", len(ids),
+						getMsecSinceTime(startTime))
 				}
 			}
 		}
 	}
 
-	// Oh, for generics...
 	numResults := len(ids)
 	if numResults > maxQueryResults {
 		numResults = maxQueryResults
@@ -333,7 +305,8 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 		if hits, err := getSongsFromMemcache(ctx, ids); err != nil {
 			log.Errorf(ctx, "Got error while getting cached songs: %v", err)
 		} else {
-			log.Debugf(ctx, "Got %v of %v song(s) from cache in %v ms", len(hits), len(ids), getMsecSinceTime(startTime))
+			log.Debugf(ctx, "Got %v of %v song(s) from cache in %v ms",
+				len(hits), len(ids), getMsecSinceTime(startTime))
 			cachedSongs = hits
 		}
 	}
@@ -354,14 +327,16 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 		if err = datastore.GetMulti(ctx, keys, storedSongs); err != nil {
 			return nil, err
 		}
-		log.Debugf(ctx, "Fetched %v song(s) from datastore in %v ms", len(storedSongs), getMsecSinceTime(startTime))
+		log.Debugf(ctx, "Fetched %v song(s) from datastore in %v ms",
+			len(storedSongs), getMsecSinceTime(startTime))
 
 		if cfg.CacheSongs == types.MemcacheCaching {
 			startTime = time.Now()
 			if err := writeSongsToMemcache(ctx, storedIds, storedSongs, false); err != nil {
 				log.Errorf(ctx, "Failed to write just-fetched song(s) to cache: %v", err)
 			} else {
-				log.Debugf(ctx, "Wrote %v song(s) to cache in %v ms", len(storedSongs), getMsecSinceTime(startTime))
+				log.Debugf(ctx, "Wrote %v song(s) to cache in %v ms",
+					len(storedSongs), getMsecSinceTime(startTime))
 			}
 		}
 	}
@@ -378,7 +353,26 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 	}
 
 	if !query.Shuffle {
-		sort.Sort(songArray(songs))
+		sort.Slice(songs, func(i, j int) bool {
+			si := songs[i]
+			sj := songs[j]
+			if si.AlbumLower < sj.AlbumLower {
+				return true
+			} else if si.AlbumLower > sj.AlbumLower {
+				return false
+			}
+			if si.AlbumID < sj.AlbumID {
+				return true
+			} else if si.AlbumID > sj.AlbumID {
+				return false
+			}
+			if si.Disc < sj.Disc {
+				return true
+			} else if si.Disc > sj.Disc {
+				return false
+			}
+			return si.Track < sj.Track
+		})
 	}
 	return songs, nil
 }
