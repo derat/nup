@@ -162,9 +162,6 @@ type ServerConfig struct {
 	// CacheCovers controls how cover images are cached.
 	// DatastoreCache cannot be used.
 	CacheCovers CachePolicy `json:"cacheCovers"`
-	// CacheSongs controls how Song datastore objects are cached.
-	// DatastoreCache cannot be used since songs are already stored there.
-	CacheSongs CachePolicy `json:"cacheSongs"`
 
 	// ForceUpdateFailures is set by tests to indicate that failure be reported
 	// for all user data updates (ratings, tags, plays). Ignored for non-development servers.

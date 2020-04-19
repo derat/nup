@@ -113,13 +113,6 @@ func replacePlays(ctx context.Context, songKey *datastore.Key, plays []types.Pla
 
 func updateExistingSong(ctx context.Context, id int64,
 	f func(context.Context, *types.Song) error, updateDelay time.Duration) error {
-	cfg := getConfig(ctx)
-	if cfg.CacheSongs == types.MemcacheCaching {
-		if err := flushSongFromMemcache(ctx, id); err != nil {
-			return fmt.Errorf("not updating song %v due to cache eviction error: %v", id, err)
-		}
-	}
-
 	if updateDelay > 0 {
 		time.Sleep(updateDelay)
 	}
@@ -141,12 +134,6 @@ func updateExistingSong(ctx context.Context, id int64,
 			return err
 		}
 		log.Debugf(ctx, "Updated song %v", id)
-
-		if cfg.CacheSongs == types.MemcacheCaching {
-			if err := writeSongsToMemcache(ctx, []int64{id}, []types.Song{*song}, true); err != nil {
-				return err
-			}
-		}
 		return nil
 	}, nil)
 }
@@ -235,19 +222,12 @@ func updateOrInsertSong(ctx context.Context, updatedSong *types.Song, replaceUse
 		return fmt.Errorf("found %v songs with SHA1 %v; expected 0 or 1", len(queryKeys), sha1)
 	}
 
-	cfg := getConfig(ctx)
-
 	return datastore.RunInTransaction(ctx, func(ctx context.Context) error {
 		var key *datastore.Key
 		song := &types.Song{}
 		if len(queryKeys) == 1 {
 			log.Debugf(ctx, "Updating %v with SHA1 %v", updatedSong.Filename, sha1)
 			key = queryKeys[0]
-			if cfg.CacheSongs == types.MemcacheCaching {
-				if err := flushSongFromMemcache(ctx, key.IntID()); err != nil {
-					return fmt.Errorf("not updating song %v due to cache eviction error: %v", key.IntID(), err)
-				}
-			}
 			if !replaceUserData {
 				if err := datastore.Get(ctx, key, song); err != nil {
 					return fmt.Errorf("getting %v with key %v failed: %v", sha1, key.IntID(), err)
@@ -280,23 +260,12 @@ func updateOrInsertSong(ctx context.Context, updatedSong *types.Song, replaceUse
 				return err
 			}
 		}
-		if cfg.CacheSongs == types.MemcacheCaching {
-			if err := writeSongsToMemcache(ctx, []int64{key.IntID()}, []types.Song{*song}, true); err != nil {
-				return err
-			}
-		}
 		return nil
 	}, nil)
 }
 
 func deleteSong(ctx context.Context, id int64) error {
-	if getConfig(ctx).CacheSongs == types.MemcacheCaching {
-		if err := flushSongFromMemcache(ctx, id); err != nil {
-			return fmt.Errorf("not deleting song %v due to cache eviction error: %v", id, err)
-		}
-	}
-
-	err := datastore.RunInTransaction(ctx, func(ctx context.Context) error {
+	if err := datastore.RunInTransaction(ctx, func(ctx context.Context) error {
 		songKey := datastore.NewKey(ctx, songKind, "", id, nil)
 		song := types.Song{}
 		if err := datastore.Get(ctx, songKey, &song); err != nil {
@@ -331,8 +300,7 @@ func deleteSong(ctx context.Context, id int64) error {
 		}
 
 		return nil
-	}, &datastore.TransactionOptions{XG: true})
-	if err != nil {
+	}, &datastore.TransactionOptions{XG: true}); err != nil {
 		return err
 	}
 

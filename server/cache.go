@@ -4,13 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
-	"github.com/derat/nup/types"
-
-	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/memcache"
@@ -25,8 +20,7 @@ const (
 	queriesCacheKey = "queries"
 	tagsCacheKey    = "tags"
 
-	// Memcache key prefix for cached songs and cover images.
-	songCachePrefix  = "song-"
+	// Memcache key prefix for cached cover images.
 	coverCachePrefix = "cover-"
 
 	coverExpiration = 24 * time.Hour
@@ -197,82 +191,6 @@ func flushCachedTags(ctx context.Context) error {
 		deleteFromMemcache(ctx, tagsCacheKey),
 		deleteFromDatastoreCache(ctx, datastoreCachedTagsKey(ctx)),
 	})
-}
-
-// TODO: I should probably just delete the song-caching code, since I don't
-// really trust it enough to use it.
-func songCacheKey(id int64) string {
-	return songCachePrefix + strconv.FormatInt(id, 10)
-}
-
-func flushSongFromMemcache(ctx context.Context, id int64) error {
-	return deleteFromMemcache(ctx, songCacheKey(id))
-}
-
-func getSongsFromMemcache(ctx context.Context, ids []int64) (songs map[int64]types.Song, err error) {
-	keys := make([]string, len(ids))
-	for i, id := range ids {
-		keys[i] = songCacheKey(id)
-	}
-
-	// Uh, no memcache.Codec.GetMulti()?
-	songs = make(map[int64]types.Song)
-	items, err := memcache.GetMulti(ctx, keys)
-	if err != nil {
-		return nil, err
-	}
-
-	for idStr, item := range items {
-		if !strings.HasPrefix(idStr, songCachePrefix) {
-			return nil, fmt.Errorf("got unexpected key %q from cache", idStr)
-		}
-		id, err := strconv.ParseInt(idStr[len(songCachePrefix):], 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse key %q: %v", idStr, err)
-		}
-		s := types.Song{}
-		if err = json.Unmarshal(item.Value, &s); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal cached song %v: %v", id, err)
-		}
-		songs[id] = s
-	}
-	return songs, nil
-}
-
-func flushSongsFromMemcacheAfterMultiError(ctx context.Context, ids []int64, me appengine.MultiError) error {
-	for i, err := range me {
-		id := ids[i]
-		if err == memcache.ErrNotStored {
-			log.Debugf(ctx, "Song %v already present in cache; flushing", id)
-			if err := flushSongFromMemcache(ctx, id); err != nil {
-				return err
-			}
-		} else if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func writeSongsToMemcache(ctx context.Context, ids []int64, songs []types.Song, flushIfAlreadyPresent bool) error {
-	if len(ids) != len(songs) {
-		return fmt.Errorf("got request to write %v ID(s) with %v song(s) to cache", len(ids), len(songs))
-	}
-
-	items := make([]*memcache.Item, len(songs))
-	for i, id := range ids {
-		items[i] = &memcache.Item{Key: songCacheKey(id), Object: &songs[i]}
-	}
-	if err := jsonCodec.AddMulti(ctx, items); err != nil {
-		// Some of the songs might've been cached in response to a query in the meantime.
-		// memcache.Delete() is missing a lock duration (https://code.google.com/p/googleappengine/issues/detail?id=10983),
-		// so just do the best we can and try to delete the possibly-stale cached values.
-		if me, ok := err.(appengine.MultiError); ok && flushIfAlreadyPresent {
-			return flushSongsFromMemcacheAfterMultiError(ctx, ids, me)
-		}
-		return err
-	}
-	return nil
 }
 
 // coverCacheKey returns the memcache key that should be used for caching a

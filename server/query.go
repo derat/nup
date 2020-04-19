@@ -333,18 +333,6 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 	cachedSongs := make(map[int64]types.Song)
 	storedSongs := make([]types.Song, 0)
 
-	// Get whatever we can from memcache.
-	if cfg.CacheSongs == types.MemcacheCaching {
-		startTime := time.Now()
-		if hits, err := getSongsFromMemcache(ctx, ids); err != nil {
-			log.Errorf(ctx, "Got error while getting cached songs: %v", err)
-		} else {
-			log.Debugf(ctx, "Got %v of %v song(s) from cache in %v ms",
-				len(hits), len(ids), getMsecSinceTime(startTime))
-			cachedSongs = hits
-		}
-	}
-
 	// Get the remaining songs from datastore and write them back to memcache.
 	if len(cachedSongs) < numResults {
 		startTime := time.Now()
@@ -363,16 +351,6 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 		}
 		log.Debugf(ctx, "Fetched %v song(s) from datastore in %v ms",
 			len(storedSongs), getMsecSinceTime(startTime))
-
-		if cfg.CacheSongs == types.MemcacheCaching {
-			startTime = time.Now()
-			if err := writeSongsToMemcache(ctx, storedIds, storedSongs, false); err != nil {
-				log.Errorf(ctx, "Failed to write just-fetched song(s) to cache: %v", err)
-			} else {
-				log.Debugf(ctx, "Wrote %v song(s) to cache in %v ms",
-					len(storedSongs), getMsecSinceTime(startTime))
-			}
-		}
 	}
 
 	storedIndex := 0

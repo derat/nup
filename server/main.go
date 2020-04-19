@@ -5,8 +5,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -327,26 +325,7 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var s *types.Song
-	var err error
-	if r.FormValue("cache") == "1" {
-		var songs map[int64]types.Song
-		if getConfig(ctx).CacheSongs != types.MemcacheCaching {
-			err = errors.New("song caching is disabled")
-		} else {
-			if songs, err = getSongsFromMemcache(ctx, []int64{id}); err == nil {
-				if song, ok := songs[id]; ok {
-					s = &song
-					s.SongID = strconv.FormatInt(id, 10)
-				} else {
-					err = fmt.Errorf("song %v not cached", id)
-				}
-			}
-		}
-	} else {
-		s, err = dumpSingleSong(ctx, id)
-	}
-
+	s, err := dumpSingleSong(ctx, id)
 	if err != nil {
 		log.Errorf(ctx, "Dumping song %v failed: %v", id, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

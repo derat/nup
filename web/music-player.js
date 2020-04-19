@@ -176,7 +176,6 @@ const template = createTemplate(`
   <div id="rating-container">
     Rating: <span id="rating" tabindex="0"></span>
     <a id="dump-song" class="debug-link" target="_blank">[d]</a>
-    <a id="dump-song-cache" class="debug-link" target="_blank">[c]</a>
   </div>
   <tag-suggester id="edit-tags-suggester">
     <textarea id="edit-tags" slot="text"></textarea>
@@ -286,7 +285,6 @@ customElements.define(
         this.handleRatingSpanKeyDown_(e),
       );
       this.dumpSongLink_ = get('dump-song');
-      this.dumpSongCacheLink_ = get('dump-song-cache');
       this.tagsTextarea_ = get('edit-tags');
       this.tagSuggester_ = get('edit-tags-suggester');
 
@@ -707,8 +705,7 @@ customElements.define(
       if (this.updateSong_) return true;
 
       this.setRating_(song.rating);
-      this.dumpSongLink_.href = getDumpSongUrl(song, false);
-      this.dumpSongCacheLink_.href = getDumpSongUrl(song, true);
+      this.dumpSongLink_.href = `/dump_song?id=${song.songId}`;
       this.tagsTextarea_.value = song.tags.length
         ? song.tags.sort().join(' ') + ' ' // append space to ease editing
         : '';
@@ -903,8 +900,4 @@ function getRatingString(rating, withLabel, includeEmpty) {
     else break;
   }
   return ratingString;
-}
-
-function getDumpSongUrl(song, cache) {
-  return 'dump_song?id=' + song.songId + (cache ? '&cache=1' : '');
 }

@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -28,15 +27,7 @@ const (
 
 var binDir string = filepath.Join(os.Getenv("GOPATH"), "bin")
 
-type cachePolicy int
-
-const (
-	noCaching cachePolicy = iota
-	useMemcache
-	useDatastoreCache
-)
-
-func setUpTest(cp cachePolicy) *Tester {
+func setUpTest() *Tester {
 	t := newTester(server, binDir)
 	if err := t.PingServer(); err != nil {
 		log.Printf("Unable to connect to server: %v\n", err)
@@ -47,15 +38,9 @@ func setUpTest(cp cachePolicy) *Tester {
 	t.DoPost("clear", nil)
 	t.DoPost("flush_cache", nil)
 
-	var cacheSongs types.CachePolicy
-	if cp == useMemcache {
-		cacheSongs = types.MemcacheCaching
-	}
-
 	b, err := json.Marshal(types.ServerConfig{
 		SongBucket:  songBucket,
 		CoverBucket: coverBucket,
-		CacheSongs:  cacheSongs,
 	})
 	if err != nil {
 		panic(err)
@@ -159,7 +144,7 @@ func doPlayTimeQueries(tt *testing.T, t *Tester, s *types.Song, queryPrefix stri
 }
 
 func TestUpdate(tt *testing.T) {
-	t := setUpTest(noCaching)
+	t := setUpTest()
 	defer cleanUpTest(t)
 
 	log.Print("importing songs from music dir")
@@ -186,7 +171,7 @@ func TestUpdate(tt *testing.T) {
 }
 
 func TestUserData(tt *testing.T) {
-	t := setUpTest(noCaching)
+	t := setUpTest()
 	defer cleanUpTest(t)
 
 	log.Print("importing a song")
@@ -261,7 +246,7 @@ func TestUserData(tt *testing.T) {
 }
 
 func TestQueries(tt *testing.T) {
-	t := setUpTest(noCaching)
+	t := setUpTest()
 	defer cleanUpTest(t)
 
 	log.Print("posting some songs")
@@ -294,30 +279,12 @@ func TestQueries(tt *testing.T) {
 	}
 }
 
-func TestCachingMemcache(t *testing.T) {
-	testCaching(t, useMemcache)
-}
-
-func TestCachingDatastore(t *testing.T) {
-	testCaching(t, useDatastoreCache)
-}
-
-func testCaching(tt *testing.T, cp cachePolicy) {
-	t := setUpTest(cp)
+func testCaching(tt *testing.T) {
+	t := setUpTest()
 	defer cleanUpTest(t)
 
-	var desc string
-	switch cp {
-	case useMemcache:
-		desc = "memcache caching"
-	case useDatastoreCache:
-		desc = "datastore caching"
-	default:
-		tt.Fatal("invalid cache policy ", cp)
-	}
-
-	log.Print("posting and querying a song using " + desc)
-	cacheParam := "cacheOnly=1"
+	log.Print("posting and querying a song")
+	const cacheParam = "cacheOnly=1"
 	s1 := LegacySong1
 	t.PostSongs([]types.Song{s1}, replaceUserData, 0)
 	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
@@ -325,7 +292,7 @@ func testCaching(tt *testing.T, cp cachePolicy) {
 	}
 
 	// After rating the song, the query results should still be served from the cache.
-	log.Print("rating and re-querying using " + desc)
+	log.Print("rating and re-querying")
 	id1 := t.SongID(s1.SHA1)
 	s1.Rating = 1.0
 	t.DoPost("rate_and_tag?songId="+id1+"&rating=1.0", nil)
@@ -333,14 +300,14 @@ func testCaching(tt *testing.T, cp cachePolicy) {
 		tt.Error(err)
 	}
 
-	log.Print("updating and re-querying using " + desc)
+	log.Print("updating and re-querying")
 	s1.Artist = "The Artist Formerly Known As " + s1.Artist
 	t.PostSongs([]types.Song{s1}, keepUserData, 0)
 	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 
-	log.Print("checking that time-based queries aren't cached using " + desc)
+	log.Print("checking that time-based queries aren't cached")
 	timeParam := fmt.Sprintf("maxLastPlayed=%d", s1.Plays[1].StartTime.Unix()+1)
 	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(timeParam), IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
@@ -349,7 +316,7 @@ func testCaching(tt *testing.T, cp cachePolicy) {
 		tt.Error(err)
 	}
 
-	log.Print("checking that play-count-based queries aren't cached using " + desc)
+	log.Print("checking that play-count-based queries aren't cached")
 	playParam := "maxPlays=10"
 	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(playParam), IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
@@ -358,14 +325,14 @@ func testCaching(tt *testing.T, cp cachePolicy) {
 		tt.Error(err)
 	}
 
-	log.Print("posting another song and querying using " + desc)
+	log.Print("posting another song and querying")
 	s2 := LegacySong2
 	t.PostSongs([]types.Song{s2}, replaceUserData, 0)
 	if err := compareQueryResults([]types.Song{s1, s2}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 
-	log.Print("checking that deleting a song drops cached queries using " + desc)
+	log.Print("checking that deleting a song drops cached queries")
 	if err := compareQueryResults([]types.Song{s2}, t.QuerySongs("album="+url.QueryEscape(s2.Album)), IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
@@ -376,70 +343,8 @@ func testCaching(tt *testing.T, cp cachePolicy) {
 	}
 }
 
-func TestCacheRace(tt *testing.T) {
-	t := setUpTest(useMemcache)
-	defer cleanUpTest(t)
-
-	log.Print("posting a song")
-	t.PostSongs([]types.Song{LegacySong1}, replaceUserData, 0)
-
-	// Start a goroutine that posts a request that should:
-	// a) Drop the song from the cache.
-	// b) Sleep for one second.
-	// c) Update the song.
-	// d) See that the song has been re-added to the cache by the subsequent query and drop it again.
-	log.Print("starting slow background update")
-	id := t.SongID(LegacySong1.SHA1)
-	s := LegacySong1
-	s.Rating = 1.0
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		t.DoPost("rate_and_tag?songId="+id+"&rating=1.0&updateDelayNsec=1000000000", nil)
-		wg.Done()
-	}()
-
-	// Meanwhile, sleep half a second and do a query. This should execute between b) and c) above (i.e.
-	// the original song should be returned), and it should also result in the original song being re-cached.
-	log.Print("querying for pre-update song")
-	time.Sleep(time.Duration(500) * time.Millisecond)
-	if err := compareQueryResults([]types.Song{LegacySong1}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
-		tt.Error(err)
-	}
-
-	// After the update finally runs, the server should see that the song got re-cached in the meantime
-	// and drop it from the cache to ensure that stale data won't be served.
-	log.Print("waiting for update to finish and querying for post-update song")
-	wg.Wait()
-	if err := compareQueryResults([]types.Song{s}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
-		tt.Error(err)
-	}
-
-	// Do the same thing with an import.
-	log.Print("starting slow background import")
-	s2 := s
-	s2.Artist = "Some Other Artist"
-	wg.Add(1)
-	go func() {
-		t.PostSongs([]types.Song{s2}, keepUserData, time.Second)
-		wg.Done()
-	}()
-
-	log.Print("querying for pre-import song")
-	time.Sleep(time.Duration(500) * time.Millisecond)
-	if err := compareQueryResults([]types.Song{s}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
-		tt.Error(err)
-	}
-
-	log.Print("waiting for import to finish and querying for post-import song")
-	wg.Wait()
-	if err := compareQueryResults([]types.Song{s2}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
-		tt.Error(err)
-	}
-}
-
 func TestAndroid(tt *testing.T) {
-	t := setUpTest(noCaching)
+	t := setUpTest()
 	defer cleanUpTest(t)
 
 	log.Print("posting songs")
@@ -477,7 +382,7 @@ func TestAndroid(tt *testing.T) {
 }
 
 func TestTags(tt *testing.T) {
-	t := setUpTest(useMemcache)
+	t := setUpTest()
 	defer cleanUpTest(t)
 
 	log.Print("getting hopefully-empty tag list")
@@ -506,7 +411,7 @@ func TestTags(tt *testing.T) {
 }
 
 func TestCovers(tt *testing.T) {
-	t := setUpTest(useMemcache)
+	t := setUpTest()
 	defer cleanUpTest(t)
 
 	createCover := func(fn string) {
@@ -562,7 +467,7 @@ func TestCovers(tt *testing.T) {
 }
 
 func TestJSONImport(tt *testing.T) {
-	t := setUpTest(noCaching)
+	t := setUpTest()
 	defer cleanUpTest(t)
 
 	log.Print("importing songs from json file")
@@ -608,7 +513,7 @@ func TestJSONImport(tt *testing.T) {
 }
 
 func TestSorting(tt *testing.T) {
-	t := setUpTest(noCaching)
+	t := setUpTest()
 	defer cleanUpTest(t)
 
 	songs := make([]types.Song, 0)
@@ -651,7 +556,7 @@ func TestSorting(tt *testing.T) {
 }
 
 func TestDeleteSong(tt *testing.T) {
-	t := setUpTest(noCaching)
+	t := setUpTest()
 	defer cleanUpTest(t)
 
 	log.Print("posting songs and deleting first song")
