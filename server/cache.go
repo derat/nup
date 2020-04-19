@@ -42,12 +42,12 @@ var jsonCodec = memcache.Codec{
 
 type cachedQuery struct {
 	Query songQuery
-	Ids   []int64
+	Ids   []int64 // song IDs
 }
 
-type cachedQueries map[string]cachedQuery
+type cachedQueries map[string]cachedQuery // keys are from computeQueryHash
 
-// Ugh.
+// Wraps cachedQueries so it's in a marshalable field.
 type encodedCachedQueries struct {
 	Data []byte
 }
@@ -56,10 +56,12 @@ type cachedTags struct {
 	Tags []string
 }
 
-func getDatastoreCachedQueriesKey(ctx context.Context) *datastore.Key {
+// datastoreCachedQueriesKey returns the datastore key for caching queries.
+func datastoreCachedQueriesKey(ctx context.Context) *datastore.Key {
 	return datastore.NewKey(ctx, cachedQueriesKind, queriesCacheKey, 0, nil)
 }
 
+// computeQueryHash returns a hash identifying q.
 func computeQueryHash(q *songQuery) (string, error) {
 	b, err := json.Marshal(q)
 	if err != nil {
@@ -69,112 +71,133 @@ func computeQueryHash(q *songQuery) (string, error) {
 	return hex.EncodeToString(s[:]), nil
 }
 
+// getAllCachedQueries returns all cached queries. It attempts to read queries
+// from memcache first before falling back to datastore.
 func getAllCachedQueries(ctx context.Context) (cachedQueries, error) {
-	queries := make(cachedQueries)
-	switch getConfig(ctx).CacheQueries {
-	case types.MemcacheCaching:
-		if _, err := jsonCodec.Get(ctx, queriesCacheKey, &queries); err != nil && err != memcache.ErrCacheMiss {
-			return nil, err
-		}
-	case types.DatastoreCaching:
-		eq := encodedCachedQueries{}
-		if err := datastore.Get(ctx, getDatastoreCachedQueriesKey(ctx), &eq); err == nil {
-			if err := json.Unmarshal(eq.Data, &queries); err != nil {
-				return nil, err
-			}
-		} else if err != datastore.ErrNoSuchEntity {
-			return nil, err
-		}
+	qs := make(cachedQueries)
+	if _, err := jsonCodec.Get(ctx, queriesCacheKey, &qs); err == nil {
+		return qs, nil
+	} else if err != nil && err != memcache.ErrCacheMiss {
+		log.Errorf(ctx, "Getting cached queries from memcache failed: %v", err) // ignore
 	}
-	return queries, nil
+
+	var eqs encodedCachedQueries
+	if err := datastore.Get(ctx, datastoreCachedQueriesKey(ctx), &eqs); err == nil {
+		if err := json.Unmarshal(eqs.Data, &qs); err != nil {
+			return nil, err
+		}
+	} else if err != datastore.ErrNoSuchEntity {
+		return nil, err
+	}
+	return qs, nil
 }
 
-func getCachedQueryResults(ctx context.Context, query *songQuery) ([]int64, error) {
-	queries, err := getAllCachedQueries(ctx)
+// getCachedQueryResults returns cached results for q.
+// If the query isn't cached, then a nil slice is returned.
+func getCachedQueryResults(ctx context.Context, q *songQuery) ([]int64, error) {
+	qs, err := getAllCachedQueries(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if len(queries) == 0 {
+	if len(qs) == 0 {
 		return nil, nil
 	}
 
-	queryHash, err := computeQueryHash(query)
+	qh, err := computeQueryHash(q)
 	if err != nil {
 		return nil, err
 	}
-	if q, ok := queries[queryHash]; ok {
+	if q, ok := qs[qh]; ok {
 		return q.Ids, nil
 	}
 	return nil, nil
 }
 
+// updateCachedQueries loads all cached queries, passes them to f, and saves the
+// updated queries to both memcache and datastore.
+// If f returns errUnmodified, the queries won't be re-cached.
 func updateCachedQueries(ctx context.Context, f func(cachedQueries) error) error {
-	queries, err := getAllCachedQueries(ctx)
+	qs, err := getAllCachedQueries(ctx)
 	if err != nil {
 		return err
 	}
 
-	if err := f(queries); err == errUnmodified {
+	if err := f(qs); err == errUnmodified {
 		return nil
 	} else if err != nil {
 		return err
 	}
 
-	switch getConfig(ctx).CacheQueries {
-	case types.MemcacheCaching:
-		return jsonCodec.Set(ctx, &memcache.Item{Key: queriesCacheKey, Object: &queries})
-	case types.DatastoreCaching:
-		b, err := json.Marshal(queries)
-		if err != nil {
-			return err
+	// Update memcache.
+	if err := jsonCodec.Set(ctx, &memcache.Item{
+		Key:    queriesCacheKey,
+		Object: &qs,
+	}); err != nil {
+		// Delete stale data if the update failed.
+		log.Errorf(ctx, "Updating cached queries in memcache failed: %v", err)
+		if err := memcache.Delete(ctx, queriesCacheKey); err != nil && err != memcache.ErrCacheMiss {
+			log.Errorf(ctx, "Deleting cached queries in memcache failed: %v", err)
 		}
-		_, err = datastore.Put(ctx, getDatastoreCachedQueriesKey(ctx), &encodedCachedQueries{b})
-		return err
-	default:
-		return errors.New("query caching is disabled")
 	}
+
+	// Update datastore.
+	key := datastoreCachedQueriesKey(ctx)
+	b, err := json.Marshal(qs)
+	if err == nil {
+		_, err = datastore.Put(ctx, key, &encodedCachedQueries{b})
+	}
+	if err != nil {
+		// Delete stale data if the update failed.
+		if derr := datastore.Delete(ctx, key); derr != nil && derr != datastore.ErrNoSuchEntity {
+			log.Errorf(ctx, "Deleting cached queries in datastore failed: %v", derr)
+		}
+	}
+	return err
 }
 
-func writeQueryResultsToCache(ctx context.Context, query *songQuery, ids []int64) error {
-	return updateCachedQueries(ctx, func(queries cachedQueries) error {
-		queryHash, err := computeQueryHash(query)
+// writeQueryResultsToCache caches ids as results for query.
+func writeQueryResultsToCache(ctx context.Context, q *songQuery, ids []int64) error {
+	return updateCachedQueries(ctx, func(qs cachedQueries) error {
+		qh, err := computeQueryHash(q)
 		if err != nil {
 			return err
 		}
-		queries[queryHash] = cachedQuery{*query, ids}
+		qs[qh] = cachedQuery{*q, ids}
 		return nil
 	})
 }
 
-func flushDataFromCacheForUpdate(ctx context.Context, updateType uint) error {
-	numFlushed := 0
-	if err := updateCachedQueries(ctx, func(queries cachedQueries) error {
-		for k, cq := range queries {
+// flushCacheForUpdate deletes the appropriate cached data for an update of the
+// supplied types.
+func flushCacheForUpdate(ctx context.Context, ut updateTypes) error {
+	flushed := 0
+	if err := updateCachedQueries(ctx, func(qs cachedQueries) error {
+		for k, cq := range qs {
 			q := cq.Query
-			if (updateType&metadataUpdate) != 0 ||
-				((updateType&ratingUpdate) != 0 && (q.HasMinRating || q.Unrated)) ||
-				((updateType&tagsUpdate) != 0 && (len(q.Tags) > 0 || len(q.NotTags) > 0)) ||
-				((updateType&playUpdate) != 0 && (q.HasMaxPlays || !q.MinFirstStartTime.IsZero() || !q.MaxLastStartTime.IsZero())) {
-				delete(queries, k)
-				numFlushed++
+			if (ut&metadataUpdate) != 0 ||
+				((ut&ratingUpdate) != 0 && (q.HasMinRating || q.Unrated)) ||
+				((ut&tagsUpdate) != 0 && (len(q.Tags) > 0 || len(q.NotTags) > 0)) ||
+				((ut&playUpdate) != 0 && (q.HasMaxPlays || !q.MinFirstStartTime.IsZero() || !q.MaxLastStartTime.IsZero())) {
+				delete(qs, k)
+				flushed++
 			}
 		}
-		if numFlushed == 0 {
+		if flushed == 0 {
 			return errUnmodified
 		}
 		return nil
 	}); err != nil {
 		return err
 	}
-	if numFlushed > 0 {
-		log.Debugf(ctx, "Flushed %v cached query(s) in response to update of type %v", numFlushed, updateType)
+	if flushed > 0 {
+		log.Debugf(ctx, "Flushed %v cached query(s) in response to update of type %v", flushed, ut)
 	}
 
-	if updateType&tagsUpdate != 0 || updateType&metadataUpdate != 0 {
+	if ut&tagsUpdate != 0 || ut&metadataUpdate != 0 {
 		if err := flushTagsFromCache(ctx); err != nil {
 			return err
 		}
-		log.Debugf(ctx, "Flushed cached tags in response to update of type %v", updateType)
+		log.Debugf(ctx, "Flushed cached tags in response to update of type %v", ut)
 	}
 
 	return nil
@@ -343,7 +366,7 @@ func flushCache(ctx context.Context) error {
 	if err := memcache.Flush(ctx); err != nil {
 		return err
 	}
-	if err := datastore.Delete(ctx, getDatastoreCachedQueriesKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
+	if err := datastore.Delete(ctx, datastoreCachedQueriesKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
 		return err
 	}
 	return nil

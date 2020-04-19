@@ -250,15 +250,13 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 	var err error
 
 	cfg := getConfig(ctx)
-	if cfg.CacheQueries != types.NoCaching {
-		startTime := time.Now()
-		ids, err = getCachedQueryResults(ctx, query)
-		if err != nil {
-			log.Errorf(ctx, "Got error while getting cached query: %v", err)
-		} else if ids != nil {
-			log.Debugf(ctx, "Got query result with %v song(s) from cache in %v ms",
-				len(ids), getMsecSinceTime(startTime))
-		}
+	startTime := time.Now()
+	ids, err = getCachedQueryResults(ctx, query)
+	if err != nil {
+		log.Errorf(ctx, "Got error while getting cached query: %v", err)
+	} else if ids != nil {
+		log.Debugf(ctx, "Got query result with %v song(s) from cache in %v ms",
+			len(ids), getMsecSinceTime(startTime))
 	}
 
 	if ids == nil {
@@ -268,7 +266,7 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 			if ids, err = performQueryAgainstDatastore(ctx, query); err != nil {
 				return nil, err
 			}
-			if cfg.CacheQueries != types.NoCaching && query.canCache() {
+			if query.canCache() {
 				startTime := time.Now()
 				if err = writeQueryResultsToCache(ctx, query, ids); err != nil {
 					log.Errorf(ctx, "Got error while writing query results to cache: %v", err)

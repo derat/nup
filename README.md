@@ -22,7 +22,6 @@ to the `ServerConfig` struct in [types/types.go](./types/types.go):
   ],
   "songBucket": "my-songs",
   "coverBucket": "my-covers",
-  "cacheQueries": "datastore",
   "cacheTags": "datastore"
 }
 ```

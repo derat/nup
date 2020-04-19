@@ -47,23 +47,20 @@ func setUpTest(cp cachePolicy) *Tester {
 	t.DoPost("clear", nil)
 	t.DoPost("flush_cache", nil)
 
-	var cacheSongs, cacheQueries, cacheTags types.CachePolicy
+	var cacheSongs, cacheTags types.CachePolicy
 	if cp == useMemcache {
 		cacheSongs = types.MemcacheCaching
-		cacheQueries = types.MemcacheCaching
 		cacheTags = types.MemcacheCaching
 	} else if cp == useDatastoreCache {
 		// Songs are already stored in datastore.
-		cacheQueries = types.DatastoreCaching
 		cacheTags = types.DatastoreCaching
 	}
 
 	b, err := json.Marshal(types.ServerConfig{
-		SongBucket:   songBucket,
-		CoverBucket:  coverBucket,
-		CacheSongs:   cacheSongs,
-		CacheQueries: cacheQueries,
-		CacheTags:    cacheTags,
+		SongBucket:  songBucket,
+		CoverBucket: coverBucket,
+		CacheSongs:  cacheSongs,
+		CacheTags:   cacheTags,
 	})
 	if err != nil {
 		panic(err)

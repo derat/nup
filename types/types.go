@@ -159,11 +159,9 @@ type ServerConfig struct {
 	// Exactly one of CoverBucket and CoverBaseURL must be set.
 	CoverBaseURL string `json:"coverBaseUrl"`
 
-	// CacheQueries controls how cover images are cached.
+	// CacheCovers controls how cover images are cached.
 	// DatastoreCache cannot be used.
 	CacheCovers CachePolicy `json:"cacheCovers"`
-	// CacheQueries controls how query results are cached.
-	CacheQueries CachePolicy `json:"cacheQueries"`
 	// CacheSongs controls how Song datastore objects are cached.
 	// DatastoreCache cannot be used since songs are already stored there.
 	CacheSongs CachePolicy `json:"cacheSongs"`

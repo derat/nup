@@ -16,11 +16,13 @@ import (
 	"google.golang.org/appengine/log"
 )
 
+type updateTypes uint8
+
 const (
-	metadataUpdate = 1
-	ratingUpdate   = 2
-	tagsUpdate     = 4
-	playUpdate     = 8
+	metadataUpdate updateTypes = 1 << iota // song metadata
+	ratingUpdate
+	tagsUpdate
+	playUpdate
 )
 
 func sortedStringSlicesMatch(a, b []string) bool {
@@ -180,15 +182,16 @@ func addPlay(ctx context.Context, id int64, startTime time.Time, ip string) erro
 	if err != nil {
 		return err
 	}
-	return flushDataFromCacheForUpdate(ctx, playUpdate)
+	return flushCacheForUpdate(ctx, playUpdate)
 }
 
-func updateRatingAndTags(ctx context.Context, id int64, hasRating bool, rating float64, tags []string, updateDelay time.Duration) error {
-	var updateType uint
+func updateRatingAndTags(ctx context.Context, id int64, hasRating bool, rating float64,
+	tags []string, updateDelay time.Duration) error {
+	var ut updateTypes
 	err := updateExistingSong(ctx, id, func(ctx context.Context, s *types.Song) error {
 		if hasRating && rating != s.Rating {
 			s.Rating = rating
-			updateType |= ratingUpdate
+			ut |= ratingUpdate
 		}
 		if tags != nil {
 			sort.Strings(tags)
@@ -202,10 +205,10 @@ func updateRatingAndTags(ctx context.Context, id int64, hasRating bool, rating f
 			}
 			if !sortedStringSlicesMatch(uniqueTags, s.Tags) {
 				s.Tags = uniqueTags
-				updateType |= tagsUpdate
+				ut |= tagsUpdate
 			}
 		}
-		if updateType != 0 {
+		if ut != 0 {
 			s.LastModifiedTime = time.Now()
 			return nil
 		} else {
@@ -216,8 +219,8 @@ func updateRatingAndTags(ctx context.Context, id int64, hasRating bool, rating f
 	if err != nil {
 		return err
 	}
-	if updateType != 0 {
-		return flushDataFromCacheForUpdate(ctx, updateType)
+	if ut != 0 {
+		return flushCacheForUpdate(ctx, ut)
 	}
 	return nil
 }
@@ -333,7 +336,7 @@ func deleteSong(ctx context.Context, id int64) error {
 		return err
 	}
 
-	return flushDataFromCacheForUpdate(ctx, metadataUpdate)
+	return flushCacheForUpdate(ctx, metadataUpdate)
 }
 
 func clearData(ctx context.Context) error {

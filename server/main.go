@@ -515,7 +515,7 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 		}
 		numSongs++
 	}
-	if err := flushDataFromCacheForUpdate(ctx, metadataUpdate); err != nil {
+	if err := flushCacheForUpdate(ctx, metadataUpdate); err != nil {
 		log.Errorf(ctx, "Failed to flush cached queries: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
