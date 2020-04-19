@@ -108,7 +108,7 @@ func (a PlayArray) Less(i, j int) bool { return a[i].StartTime.Before(a[j].Start
 
 // ClientConfig holds configuration details shared across client binaries.
 type ClientConfig struct {
-	// ServerURL contains the AppEngine server URL.
+	// ServerURL contains the App Engine server URL.
 	ServerURL string `json:"serverUrl"`
 	// Username contains an HTTP basic auth username.
 	Username string `json:"username"`

@@ -38,7 +38,7 @@ All other fields are documented in the Go file linked above.
 program being present and `projectId` being set in `config.json` as described
 above.)
 
-To deploy the AppEngine app, run the `deploy.sh` script.
+To deploy the App Engine app, run the `deploy.sh` script.
 
 To delete old, non-serving versions of the app, run `delete_old_versions.sh`.
 

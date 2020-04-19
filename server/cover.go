@@ -78,7 +78,7 @@ func scaleCover(ctx context.Context, fn string, size, quality int, w io.Writer) 
 	dr := image.Rect(0, 0, size, size)
 	dst := image.NewRGBA(dr)
 	// draw.CatmullRom seems to be very slow. I've seen a Scale call from
-	// 1200x1200 to 512x512 take 908 ms on AppEngine.
+	// 1200x1200 to 512x512 take 908 ms on App Engine.
 	draw.ApproxBiLinear.Scale(dst, dr, src, sr, draw.Src, nil)
 
 	var b bytes.Buffer
