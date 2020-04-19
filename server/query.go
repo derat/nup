@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"math/rand"
 	"sort"
 	"strings"
@@ -39,6 +43,16 @@ type songQuery struct {
 	Shuffle bool
 }
 
+// hash returns a unique string identifying q.
+func (q *songQuery) hash() string {
+	b, err := json.Marshal(q)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to marshal query: %v", err))
+	}
+	s := sha1.Sum(b)
+	return hex.EncodeToString(s[:])
+}
+
 func (q *songQuery) canCache() bool {
 	return !q.HasMaxPlays && q.MinFirstStartTime.IsZero() && q.MaxLastStartTime.IsZero()
 }
@@ -50,7 +64,7 @@ func getTags(ctx context.Context) (tags []string, err error) {
 		if tags, err = getTagsFromCache(ctx); err != nil {
 			log.Errorf(ctx, "Got error while getting cached tags: %v", err)
 		} else if tags != nil {
-			log.Debugf(ctx, "Got %v tag(s) from cache in %v ms", len(tags), getMsecSinceTime(startTime))
+			log.Debugf(ctx, "Got %v cached tag(s) in %v ms", len(tags), getMsecSinceTime(startTime))
 			return tags, nil
 		}
 	}
@@ -82,9 +96,9 @@ func getTags(ctx context.Context) (tags []string, err error) {
 	if cfg.CacheTags != types.NoCaching {
 		startTime = time.Now()
 		if err = writeTagsToCache(ctx, tags); err != nil {
-			log.Errorf(ctx, "Got error while writing tags to cache: %v", err)
+			log.Errorf(ctx, "Got error while caching tags: %v", err)
 		} else {
-			log.Debugf(ctx, "Wrote %v tag(s) to cache in %v ms", len(tags), getMsecSinceTime(startTime))
+			log.Debugf(ctx, "Cached %v tag(s) in %v ms", len(tags), getMsecSinceTime(startTime))
 		}
 	}
 
@@ -255,7 +269,7 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 	if err != nil {
 		log.Errorf(ctx, "Got error while getting cached query: %v", err)
 	} else if ids != nil {
-		log.Debugf(ctx, "Got query result with %v song(s) from cache in %v ms",
+		log.Debugf(ctx, "Got cached query result with %v song(s) in %v ms",
 			len(ids), getMsecSinceTime(startTime))
 	}
 
@@ -269,9 +283,9 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 			if query.canCache() {
 				startTime := time.Now()
 				if err = writeQueryResultsToCache(ctx, query, ids); err != nil {
-					log.Errorf(ctx, "Got error while writing query results to cache: %v", err)
+					log.Errorf(ctx, "Got error while caching query result: %v", err)
 				} else {
-					log.Debugf(ctx, "Wrote query result with %v song(s) to cache in %v ms", len(ids),
+					log.Debugf(ctx, "Cached query result with %v song(s) in %v ms", len(ids),
 						getMsecSinceTime(startTime))
 				}
 			}

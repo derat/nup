@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/sha1"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -45,9 +43,9 @@ type cachedQuery struct {
 	Ids   []int64 // song IDs
 }
 
-type cachedQueries map[string]cachedQuery // keys are from computeQueryHash
+type cachedQueries map[string]cachedQuery // keys are from songQuery.hash()
 
-// Wraps cachedQueries so it's in a marshalable field.
+// Wraps a JSON-encoded cachedQueries.
 type encodedCachedQueries struct {
 	Data []byte
 }
@@ -59,16 +57,6 @@ type cachedTags struct {
 // datastoreCachedQueriesKey returns the datastore key for caching queries.
 func datastoreCachedQueriesKey(ctx context.Context) *datastore.Key {
 	return datastore.NewKey(ctx, cachedQueriesKind, queriesCacheKey, 0, nil)
-}
-
-// computeQueryHash returns a hash identifying q.
-func computeQueryHash(q *songQuery) (string, error) {
-	b, err := json.Marshal(q)
-	if err != nil {
-		return "", err
-	}
-	s := sha1.Sum(b)
-	return hex.EncodeToString(s[:]), nil
 }
 
 // getAllCachedQueries returns all cached queries. It attempts to read queries
@@ -103,11 +91,7 @@ func getCachedQueryResults(ctx context.Context, q *songQuery) ([]int64, error) {
 		return nil, nil
 	}
 
-	qh, err := computeQueryHash(q)
-	if err != nil {
-		return nil, err
-	}
-	if q, ok := qs[qh]; ok {
+	if q, ok := qs[q.hash()]; ok {
 		return q.Ids, nil
 	}
 	return nil, nil
@@ -158,11 +142,7 @@ func updateCachedQueries(ctx context.Context, f func(cachedQueries) error) error
 // writeQueryResultsToCache caches ids as results for query.
 func writeQueryResultsToCache(ctx context.Context, q *songQuery, ids []int64) error {
 	return updateCachedQueries(ctx, func(qs cachedQueries) error {
-		qh, err := computeQueryHash(q)
-		if err != nil {
-			return err
-		}
-		qs[qh] = cachedQuery{*q, ids}
+		qs[q.hash()] = cachedQuery{*q, ids}
 		return nil
 	})
 }
@@ -203,7 +183,7 @@ func flushCacheForUpdate(ctx context.Context, ut updateTypes) error {
 	return nil
 }
 
-func getDatastoreCachedTagsKey(ctx context.Context) *datastore.Key {
+func datastoreCachedTagsKey(ctx context.Context) *datastore.Key {
 	return datastore.NewKey(ctx, cachedTagsKind, tagsCacheKey, 0, nil)
 }
 
@@ -215,7 +195,7 @@ func getTagsFromCache(ctx context.Context) ([]string, error) {
 			return nil, err
 		}
 	case types.DatastoreCaching:
-		if err := datastore.Get(ctx, getDatastoreCachedTagsKey(ctx), &t); err == datastore.ErrNoSuchEntity {
+		if err := datastore.Get(ctx, datastoreCachedTagsKey(ctx), &t); err == datastore.ErrNoSuchEntity {
 			return nil, nil
 		} else if err != nil {
 			return nil, err
@@ -230,7 +210,7 @@ func writeTagsToCache(ctx context.Context, tags []string) error {
 	case types.MemcacheCaching:
 		return jsonCodec.Set(ctx, &memcache.Item{Key: tagsCacheKey, Object: &t})
 	case types.DatastoreCaching:
-		_, err := datastore.Put(ctx, getDatastoreCachedTagsKey(ctx), &t)
+		_, err := datastore.Put(ctx, datastoreCachedTagsKey(ctx), &t)
 		return err
 	default:
 		return errors.New("tag caching is disabled")
@@ -244,7 +224,7 @@ func flushTagsFromCache(ctx context.Context) error {
 			return err
 		}
 	case types.DatastoreCaching:
-		if err := datastore.Delete(ctx, getDatastoreCachedTagsKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
+		if err := datastore.Delete(ctx, datastoreCachedTagsKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
 			return err
 		}
 	}
