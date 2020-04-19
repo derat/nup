@@ -1,7 +1,7 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-import {$} from './common.js';
+import {$, scaledCoverSize} from './common.js';
 
 const dialogManager = document.querySelector('dialog-manager');
 const musicPlayer = document.querySelector('music-player');
@@ -25,7 +25,7 @@ musicPlayer.addEventListener('cover', e => {
   if (e.detail.url) {
     favicon.href = e.detail.url;
     favicon.type = 'image/jpeg';
-    favicon.sizes = null; // we don't know the actual size
+    favicon.sizes = `${scaledCoverSize}x${scaledCoverSize}`;
   } else {
     favicon.href = 'favicon.ico';
     favicon.type = 'image/png';

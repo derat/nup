@@ -201,7 +201,8 @@ const template = createTemplate(`
 //
 // When the current cover art changes due to a song change, a 'cover'
 // CustomEvent is emitted with a 'detail.url' string property corresponding to a
-// URL to the scaled image. This property is null if no cover art is available.
+// URL to the scaled JPEG image. This property is null if no cover art is
+// available.
 customElements.define(
   'music-player',
   class extends HTMLElement {

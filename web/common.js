@@ -9,20 +9,23 @@ export const emptyImg =
 // down on extra work in the server and make it easier to preload images, this
 // should be the max of all of the sizes needed by the app:
 //
-// Notifications use 192x192 per
-// https://developers.google.com/web/fundamentals/push-notifications/display-a-notification:
-// "Sadly there aren't any solid guidelines for what size image to use for an
-// icon. Android seems to want a 64dp image (which is 64px multiples by the
-// device pixel ratio). If we assume the highest pixel ratio for a device will
-// be 3, an icon size of 192px or more is a safe bet."
-//
-// mediaSession on Chrome for Android uses 512x512 per
-// https://developers.google.com/web/updates/2017/02/media-session. The image
-// looks like it's substantially smaller on Chrome OS.
-//
-// <music-player> uses 70x70 CSS pixels, and <presentation-layer> uses 80x80.
-//
-// Favicons are usually 48x48.
+// - Notifications use 192x192 per
+//   https://developers.google.com/web/fundamentals/push-notifications/display-a-notification:
+//   "Sadly there aren't any solid guidelines for what size image to use for an
+//   icon. Android seems to want a 64dp image (which is 64px multiples by the
+//   device pixel ratio). If we assume the highest pixel ratio for a device will
+//   be 3, an icon size of 192px or more is a safe bet."
+// - mediaSession on Chrome for Android uses 512x512 per
+//   https://developers.google.com/web/updates/2017/02/media-session. Chrome OS
+//   media notifications display album art at a substantially smaller size,
+//   maybe around 230x230, and unfortunately use nearest-neighbor downsampling.
+//   The code still specifies that 512x512 is the desired size, though -- see
+//   kMediaSessionNotificationArtworkDesiredSize in
+//   components/media_message_center/media_notification_constants.h.
+// - <music-player> uses 70x70 CSS pixels for the current song's cover.
+// - <presentation-layer> uses 80x80 CSS pixels for the next song's cover.
+// - Favicons allegedly take a wide variety of sizes:
+//   https://stackoverflow.com/a/26807004
 export const scaledCoverSize = 512;
 
 export function $(id, root) {
