@@ -31,6 +31,8 @@ const (
 	// Memcache key prefix for cached songs and cover images.
 	songCachePrefix  = "song-"
 	coverCachePrefix = "cover-"
+
+	coverExpiration = 24 * time.Hour
 )
 
 var jsonCodec = memcache.Codec{
@@ -322,7 +324,7 @@ func writeCoverToMemcache(ctx context.Context, fn string, size int, data []byte)
 	return memcache.Set(ctx, &memcache.Item{
 		Key:        coverCacheKey(fn, size),
 		Value:      data,
-		Expiration: 24 * time.Hour,
+		Expiration: coverExpiration,
 	})
 }
 
