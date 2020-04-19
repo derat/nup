@@ -8,6 +8,7 @@ import {
   emptyImg,
   formatTime,
   getCurrentTimeSec,
+  getScaledCoverUrl,
   updateTitleAttributeForTruncation,
 } from './common.js';
 import Config from './config.js';
@@ -343,9 +344,7 @@ customElements.define(
     }
 
     get currentSong_() {
-      return this.currentIndex_ >= 0 && this.currentIndex_ < this.songs_.length
-        ? this.songs_[this.currentIndex_]
-        : null;
+      return this.songs_[this.currentIndex_] || null;
     }
 
     resetForTesting() {
@@ -438,15 +437,25 @@ customElements.define(
       updateTitleAttributeForTruncation(this.titleDiv_, song ? song.title : '');
       updateTitleAttributeForTruncation(this.albumDiv_, song ? song.album : '');
 
-      if (song && song.coverUrl) {
-        this.coverImage_.src = song.coverUrl;
+      if (song && song.coverFilename) {
+        const url = getScaledCoverUrl(song.coverFilename);
+        this.coverImage_.src = url;
         this.coverDiv_.classList.remove('empty');
-        this.emitCoverEvent_(song.coverUrl);
+        this.emitCoverEvent_(url);
       } else {
         this.coverImage_.src = emptyImg;
         this.coverDiv_.classList.add('empty');
         this.emitCoverEvent_(null);
       }
+
+      // Cache the scaled cover images for the next song and the one after it.
+      // This prevents ugly laggy updates here and in <presentation-layer>.
+      const precacheCover = s => {
+        if (!s || !s.coverFilename) return;
+        new Image().src = getScaledCoverUrl(s.coverFilename);
+      };
+      precacheCover(this.songs_[this.currentIndex_ + 1]);
+      precacheCover(this.songs_[this.currentIndex_ + 2]);
 
       this.updateCoverTitleAttribute_();
       this.updateRatingOverlay_();
@@ -502,15 +511,10 @@ customElements.define(
     }
 
     updatePresentationLayerSongs_() {
-      let nextSong = null;
-      if (
-        this.currentIndex_ >= 0 &&
-        this.currentIndex_ + 1 < this.songs_.length
-      ) {
-        nextSong = this.songs_[this.currentIndex_ + 1];
-      }
-
-      this.presentationLayer_.updateSongs(this.currentSong_, nextSong);
+      this.presentationLayer_.updateSongs(
+        this.currentSong_,
+        this.songs_[this.currentIndex_ + 1] || null,
+      );
     }
 
     showNotification_() {
@@ -533,7 +537,7 @@ customElements.define(
 
       this.notification_ = new Notification(`${song.artist}\n${song.title}`, {
         body: `${song.album}\n${formatTime(song.length)}`,
-        icon: song.coverUrl,
+        icon: song.coverFilename ? getScaledCoverUrl(song.coverFilename) : null,
       });
       this.closeNotificationTimeoutId_ = window.setTimeout(
         () => this.closeNotification_(),

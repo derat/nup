@@ -49,7 +49,7 @@ func scaleCover(ctx context.Context, fn string, size, quality int, w io.Writer) 
 			return fmt.Errorf("failed to read cover: %v", err)
 		}
 		if useCache {
-			log.Errorf(ctx, "Caching %v-byte original cover", len(data))
+			log.Debugf(ctx, "Caching %v-byte original cover", len(data))
 			if err = writeCoverToMemcache(ctx, fn, 0, data); err != nil {
 				log.Errorf(ctx, "Cache write failed: %v", err) // swallow error
 			}

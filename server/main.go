@@ -283,7 +283,12 @@ func handleCover(w http.ResponseWriter, r *http.Request) {
 
 	// This handler is expensive, so try to minimize duplicate requests:
 	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
-	w.Header().Set("Cache-Control", "public, max-age=86400, immutable")
+	//
+	// Note that Cache-Control is "helpfully" rewritten to "no-cache,
+	// must-revalidate" in response to requests from admin users:
+	// https://cloud.google.com/appengine/docs/standard/go111/reference/request-response-headers#headers_added_or_replaced
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Header().Set("Expires", time.Now().UTC().Add(24*time.Hour).Format(time.RFC1123))
 
 	w.Header().Set("Content-Type", "image/jpeg")
 	if err := scaleCover(ctx, fn, int(size), coverJPEGQuality, w); err != nil {

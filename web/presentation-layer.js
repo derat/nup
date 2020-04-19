@@ -7,6 +7,7 @@ import {
   createTemplate,
   emptyImg,
   formatTime,
+  getScaledCoverUrl,
 } from './common.js';
 
 const template = createTemplate(`
@@ -220,6 +221,7 @@ customElements.define(
         this.durationDiv_.innerText = formatTime(currentSong.length);
         this.duration_ = currentSong.length;
       }
+      // Use the full-resolution cover image.
       updateImg(this.currentCover_, currentSong ? currentSong.coverUrl : '');
 
       if (!nextSong) {
@@ -230,7 +232,15 @@ customElements.define(
         this.nextTitle_.innerText = nextSong.title;
         this.nextAlbum_.innerText = nextSong.album;
       }
-      updateImg(this.nextCover_, nextSong ? nextSong.coverUrl : '');
+      updateImg(
+        this.nextCover_,
+        nextSong ? getScaledCoverUrl(nextSong.coverFilename) : '',
+      );
+
+      // Preload the next track's full-resolution cover.
+      if (this.visible && nextSong && nextSong.coverUrl) {
+        new Image().src = nextSong.coverUrl;
+      }
     }
 
     updatePosition(sec) {

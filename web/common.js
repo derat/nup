@@ -5,6 +5,26 @@
 export const emptyImg =
   'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
+// Width/height in pixels of the image returned by getScaledCoverUrl(). To cut
+// down on extra work in the server and make it easier to preload images, this
+// should be the max of all of the sizes needed by the app:
+//
+// Notifications use 192x192 per
+// https://developers.google.com/web/fundamentals/push-notifications/display-a-notification:
+// "Sadly there aren't any solid guidelines for what size image to use for an
+// icon. Android seems to want a 64dp image (which is 64px multiples by the
+// device pixel ratio). If we assume the highest pixel ratio for a device will
+// be 3, an icon size of 192px or more is a safe bet."
+//
+// mediaSession on Chrome for Android uses 512x512 per
+// https://developers.google.com/web/updates/2017/02/media-session. The image
+// looks like it's substantially smaller on Chrome OS.
+//
+// <music-player> uses 70x70 CSS pixels, and <presentation-layer> uses 80x80.
+//
+// Favicons are usually 48x48.
+export const scaledCoverSize = 512;
+
 export function $(id, root) {
   return (root || document).getElementById(id);
 }
@@ -57,4 +77,14 @@ export function createStyle(text) {
   style.type = 'text/css';
   style.innerText = text;
   return style;
+}
+
+// Returns a URL for a scaled, square version of the cover image identified by
+// |filename| (corresponding to a song's |coverFilename| property). If
+// |filename| is empty, an empty string is returned.
+export function getScaledCoverUrl(filename) {
+  if (!filename) return '';
+  return `/cover?filename=${encodeURIComponent(
+    filename,
+  )}&size=${scaledCoverSize}`;
 }
