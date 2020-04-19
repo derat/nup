@@ -66,9 +66,6 @@ func loadBaseConfig() {
 	if !validCachePolicy(baseCfg.CacheSongs) || baseCfg.CacheSongs == types.DatastoreCaching {
 		panic(fmt.Sprintf("Invalid song caching policy %q", baseCfg.CacheSongs))
 	}
-	if !validCachePolicy(baseCfg.CacheTags) {
-		panic(fmt.Sprintf("Invalid tag caching policy %q", baseCfg.CacheTags))
-	}
 
 	if appengine.IsDevAppServer() {
 		addTestUserToConfig(baseCfg)

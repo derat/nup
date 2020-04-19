@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -60,7 +59,8 @@ func datastoreCachedQueriesKey(ctx context.Context) *datastore.Key {
 }
 
 // getAllCachedQueries returns all cached queries. It attempts to read queries
-// from memcache first before falling back to datastore.
+// from memcache first before falling back to datastore. If datastore fails, an
+// error is returned.
 func getAllCachedQueries(ctx context.Context) (cachedQueries, error) {
 	qs := make(cachedQueries)
 	if _, err := jsonCodec.Get(ctx, queriesCacheKey, &qs); err == nil {
@@ -70,14 +70,13 @@ func getAllCachedQueries(ctx context.Context) (cachedQueries, error) {
 	}
 
 	var eqs encodedCachedQueries
-	if err := datastore.Get(ctx, datastoreCachedQueriesKey(ctx), &eqs); err == nil {
-		if err := json.Unmarshal(eqs.Data, &qs); err != nil {
-			return nil, err
-		}
-	} else if err != datastore.ErrNoSuchEntity {
+	if err := datastore.Get(ctx, datastoreCachedQueriesKey(ctx), &eqs); err == datastore.ErrNoSuchEntity {
+		return qs, nil
+	} else if err != nil {
 		return nil, err
 	}
-	return qs, nil
+	err := json.Unmarshal(eqs.Data, &qs)
+	return qs, err
 }
 
 // getCachedQueryResults returns cached results for q.
@@ -112,35 +111,18 @@ func updateCachedQueries(ctx context.Context, f func(cachedQueries) error) error
 		return err
 	}
 
-	// Update memcache.
-	if err := jsonCodec.Set(ctx, &memcache.Item{
-		Key:    queriesCacheKey,
-		Object: &qs,
-	}); err != nil {
-		// Delete stale data if the update failed.
-		log.Errorf(ctx, "Updating cached queries in memcache failed: %v", err)
-		if err := memcache.Delete(ctx, queriesCacheKey); err != nil && err != memcache.ErrCacheMiss {
-			log.Errorf(ctx, "Deleting cached queries in memcache failed: %v", err)
-		}
+	var errs []error
+	errs = append(errs, writeToMemcache(ctx, queriesCacheKey, &qs))
+	if b, err := json.Marshal(qs); err != nil {
+		errs = append(errs, err)
+	} else {
+		errs = append(errs, writeToDatastoreCache(ctx, datastoreCachedQueriesKey(ctx), &encodedCachedQueries{b}))
 	}
-
-	// Update datastore.
-	key := datastoreCachedQueriesKey(ctx)
-	b, err := json.Marshal(qs)
-	if err == nil {
-		_, err = datastore.Put(ctx, key, &encodedCachedQueries{b})
-	}
-	if err != nil {
-		// Delete stale data if the update failed.
-		if derr := datastore.Delete(ctx, key); derr != nil && derr != datastore.ErrNoSuchEntity {
-			log.Errorf(ctx, "Deleting cached queries in datastore failed: %v", derr)
-		}
-	}
-	return err
+	return joinErrors(errs)
 }
 
-// writeQueryResultsToCache caches ids as results for query.
-func writeQueryResultsToCache(ctx context.Context, q *songQuery, ids []int64) error {
+// writeCachedQuery caches ids as results for query.
+func writeCachedQuery(ctx context.Context, q *songQuery, ids []int64) error {
 	return updateCachedQueries(ctx, func(qs cachedQueries) error {
 		qs[q.hash()] = cachedQuery{*q, ids}
 		return nil
@@ -150,96 +132,81 @@ func writeQueryResultsToCache(ctx context.Context, q *songQuery, ids []int64) er
 // flushCacheForUpdate deletes the appropriate cached data for an update of the
 // supplied types.
 func flushCacheForUpdate(ctx context.Context, ut updateTypes) error {
-	flushed := 0
-	if err := updateCachedQueries(ctx, func(qs cachedQueries) error {
-		for k, cq := range qs {
-			q := cq.Query
-			if (ut&metadataUpdate) != 0 ||
-				((ut&ratingUpdate) != 0 && (q.HasMinRating || q.Unrated)) ||
-				((ut&tagsUpdate) != 0 && (len(q.Tags) > 0 || len(q.NotTags) > 0)) ||
-				((ut&playUpdate) != 0 && (q.HasMaxPlays || !q.MinFirstStartTime.IsZero() || !q.MaxLastStartTime.IsZero())) {
-				delete(qs, k)
+	var errs []error
+
+	errs = append(errs, updateCachedQueries(ctx, func(qs cachedQueries) error {
+		flushed := 0
+		for i, q := range qs {
+			if q.Query.resultsInvalidated(ut) {
+				delete(qs, i)
 				flushed++
 			}
 		}
 		if flushed == 0 {
 			return errUnmodified
 		}
+		log.Debugf(ctx, "Flushing %v cached query(s) in response to update of type %v", flushed, ut)
 		return nil
-	}); err != nil {
-		return err
-	}
-	if flushed > 0 {
-		log.Debugf(ctx, "Flushed %v cached query(s) in response to update of type %v", flushed, ut)
-	}
+	}))
 
 	if ut&tagsUpdate != 0 || ut&metadataUpdate != 0 {
-		if err := flushTagsFromCache(ctx); err != nil {
-			return err
-		}
-		log.Debugf(ctx, "Flushed cached tags in response to update of type %v", ut)
+		log.Debugf(ctx, "Flushing cached tags in response to update of type %v", ut)
+		errs = append(errs, flushCachedTags(ctx))
 	}
 
-	return nil
+	return joinErrors(errs)
 }
 
+// datastoreCachedTagsKey returns the datastore key for caching tags.
 func datastoreCachedTagsKey(ctx context.Context) *datastore.Key {
 	return datastore.NewKey(ctx, cachedTagsKind, tagsCacheKey, 0, nil)
 }
 
-func getTagsFromCache(ctx context.Context) ([]string, error) {
-	t := cachedTags{}
-	switch getConfig(ctx).CacheTags {
-	case types.MemcacheCaching:
-		if _, err := jsonCodec.Get(ctx, tagsCacheKey, &t); err != nil && err != memcache.ErrCacheMiss {
-			return nil, err
-		}
-	case types.DatastoreCaching:
-		if err := datastore.Get(ctx, datastoreCachedTagsKey(ctx), &t); err == datastore.ErrNoSuchEntity {
-			return nil, nil
-		} else if err != nil {
-			return nil, err
-		}
+// getCachedTags returns the list of cached tags. It attempts to read them from
+// memcache before falling back to datastore. If datastore fails, an error is
+// returned.
+func getCachedTags(ctx context.Context) ([]string, error) {
+	var t cachedTags
+	if _, err := jsonCodec.Get(ctx, tagsCacheKey, &t); err == nil {
+		return t.Tags, nil
+	} else if err != memcache.ErrCacheMiss {
+		log.Errorf(ctx, "Getting cached tags from memcache failed: %v", err) // ignore
+	}
+
+	if err := datastore.Get(ctx, datastoreCachedTagsKey(ctx), &t); err == datastore.ErrNoSuchEntity {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
 	}
 	return t.Tags, nil
 }
 
-func writeTagsToCache(ctx context.Context, tags []string) error {
+// writeCachedTags writes tags to memcache and datastore.
+func writeCachedTags(ctx context.Context, tags []string) error {
 	t := cachedTags{tags}
-	switch getConfig(ctx).CacheTags {
-	case types.MemcacheCaching:
-		return jsonCodec.Set(ctx, &memcache.Item{Key: tagsCacheKey, Object: &t})
-	case types.DatastoreCaching:
-		_, err := datastore.Put(ctx, datastoreCachedTagsKey(ctx), &t)
-		return err
-	default:
-		return errors.New("tag caching is disabled")
-	}
+	return joinErrors([]error{
+		writeToMemcache(ctx, tagsCacheKey, &t),
+		writeToDatastoreCache(ctx, datastoreCachedTagsKey(ctx), &t),
+	})
 }
 
-func flushTagsFromCache(ctx context.Context) error {
-	switch getConfig(ctx).CacheTags {
-	case types.MemcacheCaching:
-		if err := memcache.Delete(ctx, tagsCacheKey); err != nil && err != memcache.ErrCacheMiss {
-			return err
-		}
-	case types.DatastoreCaching:
-		if err := datastore.Delete(ctx, datastoreCachedTagsKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
-			return err
-		}
-	}
-	return nil
+// flushCachedTags deletes cached tags from memcache and datastore. Memcache
+// errors are logged, while datastore errors are returned.
+func flushCachedTags(ctx context.Context) error {
+	return joinErrors([]error{
+		deleteFromMemcache(ctx, tagsCacheKey),
+		deleteFromDatastoreCache(ctx, datastoreCachedTagsKey(ctx)),
+	})
 }
 
+// TODO: I should probably just delete the song-caching code, since I don't
+// really trust it enough to use it.
 func songCacheKey(id int64) string {
 	return songCachePrefix + strconv.FormatInt(id, 10)
 }
 
 func flushSongFromMemcache(ctx context.Context, id int64) error {
-	if err := memcache.Delete(ctx, songCacheKey(id)); err != nil && err != memcache.ErrCacheMiss {
-		return err
-	}
-	return nil
+	return deleteFromMemcache(ctx, songCacheKey(id))
 }
 
 func getSongsFromMemcache(ctx context.Context, ids []int64) (songs map[int64]types.Song, err error) {
@@ -340,13 +307,71 @@ func getCoverFromMemcache(ctx context.Context, fn string, size int) ([]byte, err
 	return item.Value, nil
 }
 
+// flushCache deletes all cached objects. This is only used by tests.
 func flushCache(ctx context.Context) error {
-	// This is only used by tests, so we flush both memcache and datastore
-	// regardless of what the config says.
-	if err := memcache.Flush(ctx); err != nil {
+	var errs []error
+	errs = append(errs, memcache.Flush(ctx))
+	errs = append(errs, deleteFromDatastoreCache(ctx, datastoreCachedQueriesKey(ctx)))
+	errs = append(errs, flushCachedTags(ctx)) // also deletes from memcache
+	return joinErrors(errs)
+}
+
+// joinErrors returns a new error all messages from any non-nil errors in errs.
+// If no non-nil errors are present, nil is returned.
+func joinErrors(errs []error) error {
+	var all error
+	for _, err := range errs {
+		if err == nil {
+			continue
+		}
+		if all == nil {
+			all = err
+		} else {
+			all = fmt.Errorf("%v; %v", all.Error(), err.Error())
+		}
+	}
+	return all
+}
+
+// writeToMemcache saves obj at key in memcache.
+// If the update fails, the stale object (if present) is deleted.
+func writeToMemcache(ctx context.Context, key string, obj interface{}) error {
+	var errs []error
+	if err := jsonCodec.Set(ctx, &memcache.Item{Key: key, Object: obj}); err != nil {
+		errs = append(errs, fmt.Errorf("memcache set failed: %v", err))
+		if err := deleteFromMemcache(ctx, key); err != nil {
+			errs = append(errs, fmt.Errorf("memcache delete failed: %v", err))
+		}
+	}
+	return joinErrors(errs)
+}
+
+// writeToDatastoreCache saves obj at key in datastore.
+// If the update fails, the stale object (if present) is deleted.
+func writeToDatastoreCache(ctx context.Context, key *datastore.Key, obj interface{}) error {
+	var errs []error
+	if _, err := datastore.Put(ctx, key, obj); err != nil {
+		errs = append(errs, fmt.Errorf("datastore put failed: %v", err))
+		if err := deleteFromDatastoreCache(ctx, key); err != nil {
+			errs = append(errs, fmt.Errorf("datastore delete failed: %v", err))
+		}
+	}
+	return joinErrors(errs)
+}
+
+// deleteFromMemcache deletes key from memcache.
+// nil is returned if the key isn't present.
+func deleteFromMemcache(ctx context.Context, key string) error {
+	if err := memcache.Delete(ctx, key); err != nil && err != memcache.ErrCacheMiss {
 		return err
 	}
-	if err := datastore.Delete(ctx, datastoreCachedQueriesKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
+	return nil
+}
+
+// deleteFromDatastoreCache deletes key from datastore.
+// nil is returned if the key isn't present.
+func deleteFromDatastoreCache(ctx context.Context, key *datastore.Key) error {
+	if err := datastore.Delete(ctx, key); err != nil && err != datastore.ErrNoSuchEntity {
 		return err
 	}
 	return nil

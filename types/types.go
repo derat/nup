@@ -165,8 +165,6 @@ type ServerConfig struct {
 	// CacheSongs controls how Song datastore objects are cached.
 	// DatastoreCache cannot be used since songs are already stored there.
 	CacheSongs CachePolicy `json:"cacheSongs"`
-	// CacheTags controls how the list of in-use tags is cached.
-	CacheTags CachePolicy `json:"cacheTags"`
 
 	// ForceUpdateFailures is set by tests to indicate that failure be reported
 	// for all user data updates (ratings, tags, plays). Ignored for non-development servers.

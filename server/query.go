@@ -20,27 +20,31 @@ import (
 
 const maxQueryResults = 100 // max songs to return for query
 
+// songQuery describes a query returning a list of Songs.
 type songQuery struct {
-	Artist, Title, Album string
+	Artist string // Song.Artist
+	Title  string // Song.Title
+	Album  string // Song.Album
 
-	Keywords []string
+	Keywords []string // Song.Keywords
 
-	MinRating    float64
-	HasMinRating bool
-	Unrated      bool
+	MinRating    float64 // Song.Rating
+	HasMinRating bool    // MinRating is set
+	Unrated      bool    // Song.Rating is -1
 
-	MaxPlays    int64
-	HasMaxPlays bool
+	MaxPlays    int64 // Song.NumPlays
+	HasMaxPlays bool  // MaxPlays is set
 
-	MinFirstStartTime time.Time
-	MaxLastStartTime  time.Time
+	MinFirstStartTime time.Time // Song.FirstStartTime
+	MaxLastStartTime  time.Time // Song.LastStartTime
 
-	Track, Disc int64
+	Track int64 // Song.Track
+	Disc  int64 // Song.Disc
 
-	Tags    []string
-	NotTags []string
+	Tags    []string // present in Song.Tags
+	NotTags []string // not present in Song.Tags
 
-	Shuffle bool
+	Shuffle bool // randomize results set/order
 }
 
 // hash returns a unique string identifying q.
@@ -53,23 +57,43 @@ func (q *songQuery) hash() string {
 	return hex.EncodeToString(s[:])
 }
 
+// canCache returns true if the query's results can be safely cached.
 func (q *songQuery) canCache() bool {
 	return !q.HasMaxPlays && q.MinFirstStartTime.IsZero() && q.MaxLastStartTime.IsZero()
 }
 
+// resultsInvalidated returns true if the updates described by ut would
+// invalidate q's cached results.
+func (q *songQuery) resultsInvalidated(ut updateTypes) bool {
+	if (ut & metadataUpdate) != 0 {
+		return true
+	}
+	if (ut&ratingUpdate) != 0 && (q.HasMinRating || q.Unrated) {
+		return true
+	}
+	if (ut&tagsUpdate) != 0 && (len(q.Tags) > 0 || len(q.NotTags) > 0) {
+		return true
+	}
+	if (ut&playUpdate) != 0 &&
+		(q.HasMaxPlays || !q.MinFirstStartTime.IsZero() || !q.MaxLastStartTime.IsZero()) {
+		return true
+	}
+	return false
+}
+
+// getTags returns the full set of tags present in songs.
+// It attempts to return cached data before falling back to scanning all songs.
+// If songs are scanned, the resulting tags are cached.
 func getTags(ctx context.Context) (tags []string, err error) {
-	cfg := getConfig(ctx)
-	if cfg.CacheTags != types.NoCaching {
-		startTime := time.Now()
-		if tags, err = getTagsFromCache(ctx); err != nil {
-			log.Errorf(ctx, "Got error while getting cached tags: %v", err)
-		} else if tags != nil {
-			log.Debugf(ctx, "Got %v cached tag(s) in %v ms", len(tags), getMsecSinceTime(startTime))
-			return tags, nil
-		}
+	startTime := time.Now()
+	if tags, err = getCachedTags(ctx); err != nil {
+		log.Errorf(ctx, "Got error while getting cached tags: %v", err)
+	} else if tags != nil {
+		log.Debugf(ctx, "Got %v cached tag(s) in %v ms", len(tags), getMsecSinceTime(startTime))
+		return tags, nil
 	}
 
-	startTime := time.Now()
+	startTime = time.Now()
 	tagMap := make(map[string]bool)
 	it := datastore.NewQuery(songKind).Project("Tags").Distinct().Run(ctx)
 	for {
@@ -93,13 +117,11 @@ func getTags(ctx context.Context) (tags []string, err error) {
 	sort.Strings(tags)
 	log.Debugf(ctx, "Got %v tag(s) from datastore in %v ms", len(tags), getMsecSinceTime(startTime))
 
-	if cfg.CacheTags != types.NoCaching {
-		startTime = time.Now()
-		if err = writeTagsToCache(ctx, tags); err != nil {
-			log.Errorf(ctx, "Got error while caching tags: %v", err)
-		} else {
-			log.Debugf(ctx, "Cached %v tag(s) in %v ms", len(tags), getMsecSinceTime(startTime))
-		}
+	startTime = time.Now()
+	if err = writeCachedTags(ctx, tags); err != nil {
+		log.Errorf(ctx, "Got error while caching tags: %v", err)
+	} else {
+		log.Debugf(ctx, "Cached %v tag(s) in %v ms", len(tags), getMsecSinceTime(startTime))
 	}
 
 	return tags, nil
@@ -282,7 +304,7 @@ func getSongsForQuery(ctx context.Context, query *songQuery, cacheOnly bool) ([]
 			}
 			if query.canCache() {
 				startTime := time.Now()
-				if err = writeQueryResultsToCache(ctx, query, ids); err != nil {
+				if err = writeCachedQuery(ctx, query, ids); err != nil {
 					log.Errorf(ctx, "Got error while caching query result: %v", err)
 				} else {
 					log.Debugf(ctx, "Cached query result with %v song(s) in %v ms", len(ids),
