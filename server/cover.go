@@ -13,7 +13,6 @@ import (
 	"net/http"
 
 	"cloud.google.com/go/storage"
-	"github.com/derat/nup/types"
 
 	"golang.org/x/image/draw"
 
@@ -27,20 +26,17 @@ func scaleCover(ctx context.Context, fn string, size, quality int, w io.Writer) 
 	var data []byte
 	var err error
 
-	useCache := getConfig(ctx).CacheCovers == types.MemcacheCaching
-	if useCache {
-		log.Debugf(ctx, "Checking cache for scaled cover")
-		if data, err = getCoverFromMemcache(ctx, fn, size); len(data) > 0 {
-			log.Debugf(ctx, "Writing %d-byte cached scaled cover", len(data))
-			_, err = w.Write(data)
-			return err
-		}
-		log.Debugf(ctx, "Checking cache for original cover")
-		if data, err = getCoverFromMemcache(ctx, fn, 0); len(data) > 0 {
-			log.Debugf(ctx, "Got %d-byte cached original cover", len(data))
-		} else if err != nil {
-			log.Errorf(ctx, "Cache lookup failed: %v", err) // swallow error
-		}
+	log.Debugf(ctx, "Checking cache for scaled cover")
+	if data, err = getCoverFromMemcache(ctx, fn, size); len(data) > 0 {
+		log.Debugf(ctx, "Writing %d-byte cached scaled cover", len(data))
+		_, err = w.Write(data)
+		return err
+	}
+	log.Debugf(ctx, "Checking cache for original cover")
+	if data, err = getCoverFromMemcache(ctx, fn, 0); len(data) > 0 {
+		log.Debugf(ctx, "Got %d-byte cached original cover", len(data))
+	} else if err != nil {
+		log.Errorf(ctx, "Cache lookup failed: %v", err) // swallow error
 	}
 
 	if len(data) == 0 {
@@ -48,11 +44,9 @@ func scaleCover(ctx context.Context, fn string, size, quality int, w io.Writer) 
 		if data, err = loadCover(ctx, fn); err != nil {
 			return fmt.Errorf("failed to read cover: %v", err)
 		}
-		if useCache {
-			log.Debugf(ctx, "Caching %v-byte original cover", len(data))
-			if err = writeCoverToMemcache(ctx, fn, 0, data); err != nil {
-				log.Errorf(ctx, "Cache write failed: %v", err) // swallow error
-			}
+		log.Debugf(ctx, "Caching %v-byte original cover", len(data))
+		if err = writeCoverToMemcache(ctx, fn, 0, data); err != nil {
+			log.Errorf(ctx, "Cache write failed: %v", err) // swallow error
 		}
 	}
 	log.Debugf(ctx, "Decoding %v bytes", len(data))
@@ -81,19 +75,15 @@ func scaleCover(ctx context.Context, fn string, size, quality int, w io.Writer) 
 	// 1200x1200 to 512x512 take 908 ms on App Engine.
 	draw.ApproxBiLinear.Scale(dst, dr, src, sr, draw.Src, nil)
 
-	var b bytes.Buffer
-	if useCache {
-		w = io.MultiWriter(w, &b)
-	}
 	log.Debugf(ctx, "JPEG-encoding scaled image")
+	var b bytes.Buffer
+	w = io.MultiWriter(w, &b)
 	if err := jpeg.Encode(w, dst, &jpeg.Options{Quality: quality}); err != nil {
 		return err
 	}
-	if useCache {
-		log.Debugf(ctx, "Caching %v-byte scaled cover", b.Len())
-		if err = writeCoverToMemcache(ctx, fn, size, b.Bytes()); err != nil {
-			log.Errorf(ctx, "Cache write failed: %v", err) // swallow error
-		}
+	log.Debugf(ctx, "Caching %v-byte scaled cover", b.Len())
+	if err := writeCoverToMemcache(ctx, fn, size, b.Bytes()); err != nil {
+		log.Errorf(ctx, "Cache write failed: %v", err) // swallow error
 	}
 	return nil
 }

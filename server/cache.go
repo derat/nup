@@ -20,10 +20,9 @@ const (
 	queriesCacheKey = "queries"
 	tagsCacheKey    = "tags"
 
-	// Memcache key prefix for cached cover images.
+	// Memcache key prefix and expiration for cached cover images.
 	coverCachePrefix = "cover-"
-
-	coverExpiration = 24 * time.Hour
+	coverExpiration  = 24 * time.Hour
 )
 
 var jsonCodec = memcache.Codec{

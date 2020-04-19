@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
@@ -55,13 +54,6 @@ func loadBaseConfig() {
 	haveCoverURL := len(baseCfg.CoverBaseURL) > 0
 	if (haveCoverBucket && haveCoverURL) || !(haveCoverBucket || haveCoverURL) {
 		panic("Exactly one of CoverBucket and CoverBaseURL must be set")
-	}
-
-	validCachePolicy := func(v types.CachePolicy) bool {
-		return v == types.NoCaching || v == types.DatastoreCaching || v == types.MemcacheCaching
-	}
-	if !validCachePolicy(baseCfg.CacheCovers) || baseCfg.CacheCovers == types.DatastoreCaching {
-		panic(fmt.Sprintf("Invalid cover caching policy %q", baseCfg.CacheCovers))
 	}
 
 	if appengine.IsDevAppServer() {
