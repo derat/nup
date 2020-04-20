@@ -38,11 +38,6 @@ func (t Type) String() string {
 	}
 }
 
-var jsonCodec = memcache.Codec{
-	Marshal:   json.Marshal,
-	Unmarshal: json.Unmarshal,
-}
-
 const (
 	queryMapKind = "CachedQueries" // datastore kind for cached query results
 	queryMapKey  = "queries"       // memcache key and datastore ID for cached query results
@@ -70,52 +65,63 @@ func (m *queryMap) Save() ([]datastore.Property, error) {
 	return saveJSONProp(m)
 }
 
-// getQueryMapMemcache returns the queryMap object from memcache.
+// loadQueryMap returns the queryMap object from t.
 // If the object isn't present, both returned values are nil.
-func getQueryMapMemcache(ctx context.Context) (queryMap, error) {
+func loadQueryMap(ctx context.Context, t Type) (queryMap, error) {
 	var m queryMap
-	if _, err := jsonCodec.Get(ctx, queryMapKey, &m); err == memcache.ErrCacheMiss {
-		return nil, nil
-	} else if err != nil {
+	var ok bool
+	var err error
+	switch t {
+	case Memcache:
+		ok, err = getMemcache(ctx, queryMapKey, &m)
+	case Datastore:
+		ok, err = getDatastore(ctx, queryMapDatastoreKey(ctx), &m)
+	}
+	if !ok {
 		return nil, err
 	}
 	return m, nil
 }
 
-// getQueryMapDatastore returns the queryMap object from datastore.
-// If the object isn't present, both returned values are nil.
-func getQueryMapDatastore(ctx context.Context) (queryMap, error) {
-	var m queryMap
-	if err := datastore.Get(ctx, queryMapDatastoreKey(ctx), &m); err == datastore.ErrNoSuchEntity {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
+// updateQueryMap loads queryMap from t, passes them to f, and saves
+// the updated queries back to t. If f returns common.ErrUnmodified, the queries
+// won't be saved.
+func updateQueryMap(ctx context.Context, f func(queryMap) error, t Type) error {
+	m, err := loadQueryMap(ctx, t)
+	if err != nil {
+		return err
 	}
-	return m, nil
+
+	if m == nil { // cache miss
+		m = make(queryMap)
+	}
+	if err := f(m); err == common.ErrUnmodified {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	switch t {
+	case Memcache:
+		return setMemcache(ctx, queryMapKey, m)
+	case Datastore:
+		return setDatastore(ctx, queryMapDatastoreKey(ctx), &m)
+	default:
+		return fmt.Errorf("invalid type %v", t)
+	}
 }
 
 // GetQuery returns cached results for q from t.
 // If the query isn't cached, then a nil slice is returned.
 func GetQuery(ctx context.Context, q *common.SongQuery, t Type) ([]int64, error) {
-	var m queryMap
-	var err error
-	switch t {
-	case Memcache:
-		m, err = getQueryMapMemcache(ctx)
-	case Datastore:
-		m, err = getQueryMapDatastore(ctx)
-	}
-
-	if err != nil {
+	if m, err := loadQueryMap(ctx, t); err != nil {
 		return nil, err
-	}
-	if m == nil {
+	} else if m == nil { // cache miss
 		return nil, nil
-	}
-	if q, ok := m[q.Hash()]; ok {
+	} else if q, ok := m[q.Hash()]; ok { // query among cached queries
 		return q.IDs, nil
 	}
-	return nil, nil
+	return nil, nil // query not among cached queries
 }
 
 // SetQuery caches ids as results for query in t.
@@ -157,43 +163,6 @@ func FlushForUpdate(ctx context.Context, ut common.UpdateTypes) error {
 	return joinErrors(errs)
 }
 
-// updateQueryMap loads queryMap from t, passes them to f, and saves
-// the updated queries back to t. If f returns common.ErrUnmodified, the queries
-// won't be saved.
-func updateQueryMap(ctx context.Context, f func(queryMap) error, t Type) error {
-	var m queryMap
-	var err error
-	switch t {
-	case Memcache:
-		m, err = getQueryMapMemcache(ctx)
-	case Datastore:
-		m, err = getQueryMapDatastore(ctx)
-	}
-	if err != nil {
-		return err
-	}
-
-	// Handle cache miss.
-	if m == nil {
-		m = make(queryMap)
-	}
-
-	if err := f(m); err == common.ErrUnmodified {
-		return nil
-	} else if err != nil {
-		return err
-	}
-
-	switch t {
-	case Memcache:
-		return setMemcache(ctx, queryMapKey, m)
-	case Datastore:
-		return setDatastore(ctx, queryMapDatastoreKey(ctx), &m)
-	default:
-		return fmt.Errorf("invalid type %v", t)
-	}
-}
-
 const (
 	tagListKey  = "tags"       // memcache key and datastore ID for cached tags
 	tagListKind = "CachedTags" // datastore kind for cached tags
@@ -218,26 +187,19 @@ func (t *tagList) Save() ([]datastore.Property, error) {
 // GetTags attempts to get the list of in-use tags from t.
 // On a cache miss, both returned values are nil.
 func GetTags(ctx context.Context, t Type) ([]string, error) {
+	var tags tagList
+	var ok bool
+	var err error
 	switch t {
 	case Memcache:
-		var tags []string
-		if _, err := jsonCodec.Get(ctx, tagListKey, &tags); err == memcache.ErrCacheMiss {
-			return nil, nil
-		} else if err != nil {
-			return nil, err
-		}
-		return tags, nil
+		ok, err = getMemcache(ctx, tagListKey, &tags)
 	case Datastore:
-		var tags tagList
-		if err := datastore.Get(ctx, tagListDatastoreKey(ctx), &tags); err == datastore.ErrNoSuchEntity {
-			return nil, nil
-		} else if err != nil {
-			return nil, err
-		}
-		return tags, nil
-	default:
-		return nil, fmt.Errorf("invalid type %v", t)
+		ok, err = getDatastore(ctx, tagListDatastoreKey(ctx), &tags)
 	}
+	if !ok {
+		return nil, err
+	}
+	return tags, nil
 }
 
 // SetTags saves the list of in-use tags to t.
@@ -304,26 +266,30 @@ func Flush(ctx context.Context, t Type) error {
 	}
 }
 
-// setMemcache saves obj at key in memcache.
-// If the update fails, the stale object (if present) is deleted.
-func setMemcache(ctx context.Context, key string, obj interface{}) error {
-	var errs []error
-	if err := jsonCodec.Set(ctx, &memcache.Item{Key: key, Object: obj}); err != nil {
-		errs = append(errs, fmt.Errorf("set failed: %v", err))
-		if err := deleteMemcache(ctx, key); err != nil {
-			errs = append(errs, fmt.Errorf("delete failed: %v", err))
-		}
-	}
-	return joinErrors(errs)
+// jsonCodec marshals and unmarshals objects for memcache.
+var jsonCodec = memcache.Codec{
+	Marshal:   json.Marshal,
+	Unmarshal: json.Unmarshal,
 }
 
-// setDatastore saves obj at key in datastore.
+// getMemcache fetches an object from memcache and saves it to dst.
+// If the object isn't present, ok is false and err is nil.
+func getMemcache(ctx context.Context, key string, dst interface{}) (ok bool, err error) {
+	if _, err := jsonCodec.Get(ctx, key, dst); err == memcache.ErrCacheMiss {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// setMemcache saves src at key in memcache.
 // If the update fails, the stale object (if present) is deleted.
-func setDatastore(ctx context.Context, key *datastore.Key, obj interface{}) error {
+func setMemcache(ctx context.Context, key string, src interface{}) error {
 	var errs []error
-	if _, err := datastore.Put(ctx, key, obj); err != nil {
-		errs = append(errs, fmt.Errorf("put failed: %v", err))
-		if err := deleteDatastore(ctx, key); err != nil {
+	if err := jsonCodec.Set(ctx, &memcache.Item{Key: key, Object: src}); err != nil {
+		errs = append(errs, fmt.Errorf("set failed: %v", err))
+		if err := deleteMemcache(ctx, key); err != nil {
 			errs = append(errs, fmt.Errorf("delete failed: %v", err))
 		}
 	}
@@ -337,6 +303,30 @@ func deleteMemcache(ctx context.Context, key string) error {
 		return err
 	}
 	return nil
+}
+
+// getDatastore fetches an object from datastore and saves it to dst.
+// If the object isn't present, ok is false and err is nil.
+func getDatastore(ctx context.Context, key *datastore.Key, dst interface{}) (ok bool, err error) {
+	if err := datastore.Get(ctx, key, dst); err == datastore.ErrNoSuchEntity {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// setDatastore saves src at key in datastore.
+// If the update fails, the stale object (if present) is deleted.
+func setDatastore(ctx context.Context, key *datastore.Key, src interface{}) error {
+	var errs []error
+	if _, err := datastore.Put(ctx, key, src); err != nil {
+		errs = append(errs, fmt.Errorf("put failed: %v", err))
+		if err := deleteDatastore(ctx, key); err != nil {
+			errs = append(errs, fmt.Errorf("delete failed: %v", err))
+		}
+	}
+	return joinErrors(errs)
 }
 
 // deleteDatastore deletes key from datastore.
