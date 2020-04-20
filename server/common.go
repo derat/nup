@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -51,4 +52,21 @@ func prepareSongForClient(s *types.Song, id int64, cfg *types.ServerConfig, clie
 
 func getMsecSinceTime(t time.Time) int64 {
 	return time.Now().Sub(t).Nanoseconds() / int64(time.Millisecond/time.Nanosecond)
+}
+
+// joinErrors returns a new error all messages from any non-nil errors in errs.
+// If no non-nil errors are present, nil is returned.
+func joinErrors(errs []error) error {
+	var all error
+	for _, err := range errs {
+		if err == nil {
+			continue
+		}
+		if all == nil {
+			all = err
+		} else {
+			all = fmt.Errorf("%v; %v", all.Error(), err.Error())
+		}
+	}
+	return all
 }

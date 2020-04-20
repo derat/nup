@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -84,7 +85,8 @@ func (q *songQuery) resultsInvalidated(ut updateTypes) bool {
 // getTags returns the full set of tags present in songs.
 // It attempts to return cached data before falling back to scanning all songs.
 // If songs are scanned, the resulting tags are cached.
-func getTags(ctx context.Context) (tags []string, err error) {
+// If onlyCached is true, an error is returned if tags aren't cached.
+func getTags(ctx context.Context, onlyCached bool) (tags []string, err error) {
 	// Check memcache first.
 	startTime := time.Now()
 	if tags, err = readCachedTagsFromMemcache(ctx); err != nil {
@@ -121,6 +123,10 @@ func getTags(ctx context.Context) (tags []string, err error) {
 			len(tags), getMsecSinceTime(startTime))
 		saveToMemcache = true
 		return tags, nil
+	}
+
+	if onlyCached {
+		return nil, errors.New("tags not cached")
 	}
 
 	// Fall back to running a slow query across all songs.

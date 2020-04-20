@@ -260,8 +260,8 @@ func (t *Tester) PostSongs(songs []types.Song, userData userDataPolicy, updateDe
 	t.DoPost(path, &buf)
 }
 
-func (t *Tester) QuerySongs(params string) []types.Song {
-	resp := t.SendRequest(t.NewRequest("GET", "query?"+params, nil))
+func (t *Tester) QuerySongs(params ...string) []types.Song {
+	resp := t.SendRequest(t.NewRequest("GET", "query?"+strings.Join(params, "&"), nil))
 	defer resp.Body.Close()
 
 	songs := make([]types.Song, 0)
@@ -272,8 +272,12 @@ func (t *Tester) QuerySongs(params string) []types.Song {
 	return songs
 }
 
-func (t *Tester) GetTags() string {
-	resp := t.SendRequest(t.NewRequest("GET", "list_tags", nil))
+func (t *Tester) GetTags(onlyCached bool) string {
+	path := "list_tags"
+	if onlyCached {
+		path += "?onlyCached=1"
+	}
+	resp := t.SendRequest(t.NewRequest("GET", path, nil))
 	defer resp.Body.Close()
 
 	tags := make([]string, 0)

@@ -110,39 +110,6 @@ func timeToSeconds(t time.Time) float64 {
 	return float64(t.UnixNano()) / float64(time.Second/time.Nanosecond)
 }
 
-func doPlayTimeQueries(tt *testing.T, t *Tester, s *types.Song, queryPrefix string) {
-	if s.Plays == nil || len(s.Plays) == 0 {
-		panic("song has no plays")
-	}
-
-	plays := s.Plays
-	sort.Sort(types.PlayArray(plays))
-
-	firstPlaySec := timeToSeconds(plays[0].StartTime)
-	beforeFirstPlay := strconv.FormatFloat(firstPlaySec-10, 'f', -1, 64)
-	songs := t.QuerySongs(queryPrefix + "minFirstPlayed=" + beforeFirstPlay)
-	if err := compareQueryResults([]types.Song{*s}, songs, IgnoreOrder, cloudutil.WebClient); err != nil {
-		tt.Error(err)
-	}
-	afterFirstPlay := strconv.FormatFloat(firstPlaySec+10, 'f', -1, 64)
-	songs = t.QuerySongs(queryPrefix + "minFirstPlayed=" + afterFirstPlay)
-	if err := compareQueryResults([]types.Song{}, songs, IgnoreOrder, cloudutil.WebClient); err != nil {
-		tt.Error(err)
-	}
-
-	lastPlaySec := timeToSeconds(plays[len(plays)-1].StartTime)
-	beforeLastPlay := strconv.FormatFloat(lastPlaySec-10, 'f', -1, 64)
-	songs = t.QuerySongs(queryPrefix + "maxLastPlayed=" + beforeLastPlay)
-	if err := compareQueryResults([]types.Song{}, songs, IgnoreOrder, cloudutil.WebClient); err != nil {
-		tt.Error(err)
-	}
-	afterLastPlay := strconv.FormatFloat(lastPlaySec+10, 'f', -1, 64)
-	songs = t.QuerySongs(queryPrefix + "maxLastPlayed=" + afterLastPlay)
-	if err := compareQueryResults([]types.Song{*s}, songs, IgnoreOrder, cloudutil.WebClient); err != nil {
-		tt.Error(err)
-	}
-}
-
 func TestUpdate(tt *testing.T) {
 	t := setUpTest()
 	defer cleanUpTest(t)
@@ -233,14 +200,44 @@ func TestUserData(tt *testing.T) {
 		tt.Fatal(err)
 	}
 
+	plays := us.Plays
+	sort.Sort(types.PlayArray(plays))
+
+	log.Print("checking first-played queries")
+	firstPlaySec := timeToSeconds(plays[0].StartTime)
+	if err := compareQueryResults([]types.Song{us},
+		t.QuerySongs(fmt.Sprintf("minFirstPlayed=%.1f", firstPlaySec-10)),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
+		tt.Error(err)
+	}
+	if err := compareQueryResults([]types.Song{},
+		t.QuerySongs(fmt.Sprintf("minFirstPlayed=%.1f", firstPlaySec+10)),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
+		tt.Error(err)
+	}
+
+	log.Print("checking last-played queries")
+	lastPlaySec := timeToSeconds(plays[len(plays)-1].StartTime)
+	if err := compareQueryResults([]types.Song{},
+		t.QuerySongs(fmt.Sprintf("maxLastPlayed=%.1f", lastPlaySec-10)),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
+		tt.Error(err)
+	}
+	if err := compareQueryResults([]types.Song{us},
+		t.QuerySongs(fmt.Sprintf("maxLastPlayed=%.1f", lastPlaySec+10)),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
+		tt.Error(err)
+	}
+
 	log.Print("checking that play stats were updated")
-	doPlayTimeQueries(tt, t, &us, "")
 	for i := 0; i < 3; i++ {
-		if err := compareQueryResults([]types.Song{}, t.QuerySongs("maxPlays="+strconv.Itoa(i)), IgnoreOrder, cloudutil.WebClient); err != nil {
+		if err := compareQueryResults([]types.Song{}, t.QuerySongs("maxPlays="+strconv.Itoa(i)),
+			IgnoreOrder, cloudutil.WebClient); err != nil {
 			tt.Error(err)
 		}
 	}
-	if err := compareQueryResults([]types.Song{us}, t.QuerySongs("maxPlays=3"), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{us}, t.QuerySongs("maxPlays=3"),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 }
@@ -255,31 +252,32 @@ func TestQueries(tt *testing.T) {
 
 	log.Print("doing a bunch of queries")
 	for _, q := range []struct {
-		Query         string
-		ExpectedSongs []types.Song
+		params []string
+		exp    []types.Song
 	}{
-		{"artist=AROVANE", []types.Song{LegacySong1}},
-		{"title=thaem+nue", []types.Song{LegacySong1}},
-		{"album=ATOL+scrap", []types.Song{LegacySong1}},
-		{"keywords=arovane+thaem+atol", []types.Song{LegacySong1}},
-		{"keywords=arovane+foo", []types.Song{}},
-		{"minRating=1.0", []types.Song{}},
-		{"minRating=0.75", []types.Song{LegacySong1}},
-		{"minRating=0.5", []types.Song{LegacySong2, LegacySong1}},
-		{"minRating=0.0", []types.Song{LegacySong2, LegacySong1}},
-		{"unrated=1", []types.Song{Song0s}},
-		{"tags=instrumental", []types.Song{LegacySong2, LegacySong1}},
-		{"tags=electronic+instrumental", []types.Song{LegacySong1}},
-		{"tags=-electronic+instrumental", []types.Song{LegacySong2}},
-		{"tags=instrumental&minRating=0.75", []types.Song{LegacySong1}},
+		{[]string{"artist=AROVANE"}, []types.Song{LegacySong1}},
+		{[]string{"title=thaem+nue"}, []types.Song{LegacySong1}},
+		{[]string{"album=ATOL+scrap"}, []types.Song{LegacySong1}},
+		{[]string{"keywords=arovane+thaem+atol"}, []types.Song{LegacySong1}},
+		{[]string{"keywords=arovane+foo"}, []types.Song{}},
+		{[]string{"minRating=1.0"}, []types.Song{}},
+		{[]string{"minRating=0.75"}, []types.Song{LegacySong1}},
+		{[]string{"minRating=0.5"}, []types.Song{LegacySong2, LegacySong1}},
+		{[]string{"minRating=0.0"}, []types.Song{LegacySong2, LegacySong1}},
+		{[]string{"unrated=1"}, []types.Song{Song0s}},
+		{[]string{"tags=instrumental"}, []types.Song{LegacySong2, LegacySong1}},
+		{[]string{"tags=electronic+instrumental"}, []types.Song{LegacySong1}},
+		{[]string{"tags=-electronic+instrumental"}, []types.Song{LegacySong2}},
+		{[]string{"tags=instrumental", "minRating=0.75"}, []types.Song{LegacySong1}},
 	} {
-		if err := compareQueryResults(q.ExpectedSongs, t.QuerySongs(q.Query), CompareOrder, cloudutil.WebClient); err != nil {
-			tt.Errorf("%v: %v", q.Query, err)
+		if err := compareQueryResults(q.exp, t.QuerySongs(q.params...),
+			CompareOrder, cloudutil.WebClient); err != nil {
+			tt.Errorf("%v: %v", q.params, err)
 		}
 	}
 }
 
-func testCaching(tt *testing.T) {
+func TestCaching(tt *testing.T) {
 	t := setUpTest()
 	defer cleanUpTest(t)
 
@@ -287,7 +285,8 @@ func testCaching(tt *testing.T) {
 	const cacheParam = "cacheOnly=1"
 	s1 := LegacySong1
 	t.PostSongs([]types.Song{s1}, replaceUserData, 0)
-	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 
@@ -296,49 +295,71 @@ func testCaching(tt *testing.T) {
 	id1 := t.SongID(s1.SHA1)
 	s1.Rating = 1.0
 	t.DoPost("rate_and_tag?songId="+id1+"&rating=1.0", nil)
-	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(cacheParam), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(cacheParam),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 
+	// After updating metadata, the updated song should be returned (indicating
+	// that the cached results were dropped).
 	log.Print("updating and re-querying")
 	s1.Artist = "The Artist Formerly Known As " + s1.Artist
 	t.PostSongs([]types.Song{s1}, keepUserData, 0)
-	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that time-based queries aren't cached")
 	timeParam := fmt.Sprintf("maxLastPlayed=%d", s1.Plays[1].StartTime.Unix()+1)
-	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(timeParam), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(timeParam),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]types.Song{}, t.QuerySongs(timeParam+"&"+cacheParam), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{}, t.QuerySongs(timeParam, cacheParam),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that play-count-based queries aren't cached")
 	playParam := "maxPlays=10"
-	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(playParam), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(playParam),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]types.Song{}, t.QuerySongs(playParam+"&"+cacheParam), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{}, t.QuerySongs(playParam, cacheParam),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 
-	log.Print("posting another song and querying")
+	log.Print("checking that datastore cache is used after memcache miss")
+	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
+		tt.Error(err)
+	}
+	t.DoPost("flush_cache?onlyMemcache=1", nil)
+	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(cacheParam),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
+		tt.Error(err)
+	}
+
+	log.Print("checking that posting a song drops cached queries")
 	s2 := LegacySong2
 	t.PostSongs([]types.Song{s2}, replaceUserData, 0)
-	if err := compareQueryResults([]types.Song{s1, s2}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s1, s2}, t.QuerySongs(),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that deleting a song drops cached queries")
-	if err := compareQueryResults([]types.Song{s2}, t.QuerySongs("album="+url.QueryEscape(s2.Album)), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s2}, t.QuerySongs("album="+url.QueryEscape(s2.Album)),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 	id2 := t.SongID(s2.SHA1)
 	t.DeleteSong(id2)
-	if err := compareQueryResults([]types.Song{}, t.QuerySongs("album="+url.QueryEscape(s2.Album)), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{}, t.QuerySongs("album="+url.QueryEscape(s2.Album)),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 }
@@ -386,26 +407,37 @@ func TestTags(tt *testing.T) {
 	defer cleanUpTest(t)
 
 	log.Print("getting hopefully-empty tag list")
-	if tags := t.GetTags(); len(tags) > 0 {
+	if tags := t.GetTags(false); len(tags) > 0 {
 		tt.Errorf("got unexpected tags %q", tags)
 	}
 
 	log.Print("posting song and getting tags")
 	t.PostSongs([]types.Song{LegacySong1}, replaceUserData, 0)
-	if tags := t.GetTags(); tags != "electronic,instrumental" {
+	if tags := t.GetTags(false); tags != "electronic,instrumental" {
 		tt.Errorf("got tags %q", tags)
 	}
 
 	log.Print("posting another song and getting tags")
 	t.PostSongs([]types.Song{LegacySong2}, replaceUserData, 0)
-	if tags := t.GetTags(); tags != "electronic,instrumental,rock" {
+	if tags := t.GetTags(false); tags != "electronic,instrumental,rock" {
+		tt.Errorf("got tags %q", tags)
+	}
+
+	log.Print("checking that tags are cached")
+	if tags := t.GetTags(true); tags != "electronic,instrumental,rock" {
+		tt.Errorf("got tags %q", tags)
+	}
+
+	log.Print("checking that datastore cache is used after memcache miss")
+	t.DoPost("flush_cache?onlyMemcache=1", nil)
+	if tags := t.GetTags(true); tags != "electronic,instrumental,rock" {
 		tt.Errorf("got tags %q", tags)
 	}
 
 	log.Print("adding tags and checking that they're returned")
 	id := t.SongID(LegacySong1.SHA1)
 	t.DoPost("rate_and_tag?songId="+id+"&tags=electronic+instrumental+drums+idm", nil)
-	if tags := t.GetTags(); tags != "drums,electronic,idm,instrumental,rock" {
+	if tags := t.GetTags(false); tags != "drums,electronic,idm,instrumental,rock" {
 		tt.Errorf("got tags %q", tags)
 	}
 }
@@ -428,7 +460,7 @@ func TestCovers(tt *testing.T) {
 	s5.CoverFilename = fmt.Sprintf("%s.jpg", s5.AlbumID)
 	createCover(s5.CoverFilename)
 	t.UpdateSongs()
-	if err := compareQueryResults([]types.Song{Song0s, s5}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{Song0s, s5}, t.QuerySongs(), IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 
@@ -439,7 +471,7 @@ func TestCovers(tt *testing.T) {
 	s0.CoverFilename = fmt.Sprintf("%s.jpg", s0.AlbumID)
 	createCover(s0.CoverFilename)
 	t.UpdateSongs()
-	if err := compareQueryResults([]types.Song{s0, s5}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s0, s5}, t.QuerySongs(), IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 
@@ -450,7 +482,7 @@ func TestCovers(tt *testing.T) {
 	createCover(s1.CoverFilename)
 	RemoveFromTempDir(t.CoverDir, s0.CoverFilename)
 	t.UpdateSongs()
-	if err := compareQueryResults([]types.Song{s0, s1, s5}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s0, s1, s5}, t.QuerySongs(), IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 
@@ -550,7 +582,7 @@ func TestSorting(tt *testing.T) {
 
 	log.Print("importing songs and checking sort order")
 	t.ImportSongsFromJSONFile(WriteSongsToJSONFile(t.TempDir, songs), replaceUserData)
-	if err := compareQueryResults(songs, t.QuerySongs(""), CompareOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults(songs, t.QuerySongs(), CompareOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 }
@@ -566,7 +598,8 @@ func TestDeleteSong(tt *testing.T) {
 	t.DeleteSong(id1)
 
 	log.Print("checking non-deleted song")
-	if err := compareQueryResults([]types.Song{LegacySong2}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{LegacySong2}, t.QuerySongs(),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
 	if err := compareQueryResults([]types.Song{LegacySong2}, t.GetSongsForAndroid(time.Time{}, getRegularSongs), IgnoreOrder, cloudutil.AndroidClient); err != nil {
@@ -594,10 +627,12 @@ func TestDeleteSong(tt *testing.T) {
 	t.DeleteSong(id2)
 
 	log.Print("checking no non-deleted songs")
-	if err := compareQueryResults([]types.Song{}, t.QuerySongs(""), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{}, t.QuerySongs(),
+		IgnoreOrder, cloudutil.WebClient); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]types.Song{}, t.GetSongsForAndroid(time.Time{}, getRegularSongs), IgnoreOrder, cloudutil.AndroidClient); err != nil {
+	if err := compareQueryResults([]types.Song{}, t.GetSongsForAndroid(time.Time{}, getRegularSongs),
+		IgnoreOrder, cloudutil.AndroidClient); err != nil {
 		tt.Error(err)
 	}
 	if err := CompareSongs([]types.Song{}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {

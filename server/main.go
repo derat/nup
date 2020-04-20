@@ -428,9 +428,17 @@ func handleFlushCache(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only works on dev server", http.StatusBadRequest)
 		return
 	}
-	if err := flushCache(ctx); err != nil {
+	if err := flushMemcacheCache(ctx); err != nil {
+		log.Errorf(ctx, "Flushing memcache failed: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if r.FormValue("onlyMemcache") != "1" {
+		if err := flushDatastoreCache(ctx); err != nil {
+			log.Errorf(ctx, "Flushing datastore failed: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	writeTextResponse(w, "ok")
 }
@@ -507,7 +515,7 @@ func handleListTags(w http.ResponseWriter, r *http.Request) {
 	if !checkRequest(ctx, w, r, "GET", false) {
 		return
 	}
-	tags, err := getTags(ctx)
+	tags, err := getTags(ctx, r.FormValue("onlyCached") == "1")
 	if err != nil {
 		log.Errorf(ctx, "Unable to query tags: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
