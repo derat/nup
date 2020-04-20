@@ -705,7 +705,7 @@ customElements.define(
       if (this.updateSong_) return true;
 
       this.setRating_(song.rating);
-      this.dumpSongLink_.href = `/dump_song?id=${song.songId}`;
+      this.dumpSongLink_.href = getDumpSongUrl(song);
       this.tagsTextarea_.value = song.tags.length
         ? song.tags.sort().join(' ') + ' ' // append space to ease editing
         : '';
@@ -812,7 +812,7 @@ customElements.define(
 
       if (e.altKey && e.key == 'd') {
         const song = this.currentSong_;
-        if (song) window.open(getDumpSongUrl(song, false), '_blank');
+        if (song) window.open(getDumpSongUrl(song), '_blank');
         return true;
       } else if (e.altKey && e.key == 'n') {
         this.cycleTrack_(1);
@@ -900,4 +900,8 @@ function getRatingString(rating, withLabel, includeEmpty) {
     else break;
   }
   return ratingString;
+}
+
+function getDumpSongUrl(song) {
+  return `/dump_song?id=${song.songId}`;
 }
