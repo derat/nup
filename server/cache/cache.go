@@ -7,7 +7,9 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/derat/nup/server/common"
@@ -17,207 +19,268 @@ import (
 	"google.golang.org/appengine/memcache"
 )
 
+// Type describes a cache type.
+type Type int
+
 const (
-	// Datastore kind for cached queries and tags.
-	cachedQueriesKind = "CachedQueries"
-	cachedTagsKind    = "CachedTags"
-
-	// Memcache key (and also datastore ID) for cached queries and tags.
-	cachedQueriesKey = "queries"
-	cachedTagsKey    = "tags"
-
-	// Memcache key prefix and expiration for cached cover images.
-	coverCachePrefix = "cover-"
-	coverExpiration  = 24 * time.Hour
+	Memcache Type = iota
+	Datastore
 )
+
+func (t Type) String() string {
+	switch t {
+	case Memcache:
+		return "memcache"
+	case Datastore:
+		return "datastore"
+	default:
+		return strconv.Itoa(int(t))
+	}
+}
 
 var jsonCodec = memcache.Codec{
 	Marshal:   json.Marshal,
 	Unmarshal: json.Unmarshal,
 }
 
-type cachedQuery struct {
+const (
+	queryMapKind = "CachedQueries" // datastore kind for cached query results
+	queryMapKey  = "queries"       // memcache key and datastore ID for cached query results
+)
+
+// queryMapDatastoreKey returns the datastore key for caching queries.
+func queryMapDatastoreKey(ctx context.Context) *datastore.Key {
+	return datastore.NewKey(ctx, queryMapKind, queryMapKey, 0, nil)
+}
+
+// query holds an individual query and its cached results.
+type query struct {
 	Query common.SongQuery
-	Ids   []int64 // song IDs
+	IDs   []int64 // song IDs
 }
 
-type cachedQueries map[string]cachedQuery // keys are from SongQuery.Hash()
+// queryMap holds all cached queries keyed by SongQuery.Hash().
+// It implements datastore.PropertyLoadSaver.
+type queryMap map[string]query
 
-// Wraps a JSON-encoded cachedQueries.
-type encodedCachedQueries struct {
-	Data []byte
+func (m *queryMap) Load(props []datastore.Property) error {
+	return loadJSONProp(props, m)
+}
+func (m *queryMap) Save() ([]datastore.Property, error) {
+	return saveJSONProp(m)
 }
 
-type cachedTags struct {
-	Tags []string
-}
-
-// cachedQueriesDatastoreKey returns the datastore key for caching queries.
-func cachedQueriesDatastoreKey(ctx context.Context) *datastore.Key {
-	return datastore.NewKey(ctx, cachedQueriesKind, cachedQueriesKey, 0, nil)
-}
-
-// getAllCachedQueries returns all cached queries. It attempts to read queries
-// from memcache first before falling back to datastore. If datastore fails, an
-// error is returned.
-func getAllCachedQueries(ctx context.Context) (cachedQueries, error) {
-	qs := make(cachedQueries)
-	if _, err := jsonCodec.Get(ctx, cachedQueriesKey, &qs); err == nil {
-		return qs, nil
-	} else if err != nil && err != memcache.ErrCacheMiss {
-		log.Errorf(ctx, "Getting cached queries from memcache failed: %v", err) // ignore
-	}
-
-	var eqs encodedCachedQueries
-	if err := datastore.Get(ctx, cachedQueriesDatastoreKey(ctx), &eqs); err == datastore.ErrNoSuchEntity {
-		return qs, nil
+// getQueryMapMemcache returns the queryMap object from memcache.
+// If the object isn't present, both returned values are nil.
+func getQueryMapMemcache(ctx context.Context) (queryMap, error) {
+	var m queryMap
+	if _, err := jsonCodec.Get(ctx, queryMapKey, &m); err == memcache.ErrCacheMiss {
+		return nil, nil
 	} else if err != nil {
 		return nil, err
 	}
-	err := json.Unmarshal(eqs.Data, &qs)
-	return qs, err
+	return m, nil
 }
 
-// GetQueryResults returns cached results for q.
+// getQueryMapDatastore returns the queryMap object from datastore.
+// If the object isn't present, both returned values are nil.
+func getQueryMapDatastore(ctx context.Context) (queryMap, error) {
+	var m queryMap
+	if err := datastore.Get(ctx, queryMapDatastoreKey(ctx), &m); err == datastore.ErrNoSuchEntity {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// GetQuery returns cached results for q from t.
 // If the query isn't cached, then a nil slice is returned.
-// TODO: Split this into memcache vs. datastore.
-func GetQueryResults(ctx context.Context, q *common.SongQuery) ([]int64, error) {
-	qs, err := getAllCachedQueries(ctx)
+func GetQuery(ctx context.Context, q *common.SongQuery, t Type) ([]int64, error) {
+	var m queryMap
+	var err error
+	switch t {
+	case Memcache:
+		m, err = getQueryMapMemcache(ctx)
+	case Datastore:
+		m, err = getQueryMapDatastore(ctx)
+	}
+
 	if err != nil {
 		return nil, err
 	}
-	if len(qs) == 0 {
+	if m == nil {
 		return nil, nil
 	}
-
-	if q, ok := qs[q.Hash()]; ok {
-		return q.Ids, nil
+	if q, ok := m[q.Hash()]; ok {
+		return q.IDs, nil
 	}
 	return nil, nil
 }
 
-// updateCachedQueries loads all cached queries, passes them to f, and saves the
-// updated queries to both memcache and datastore.
-// If f returns common.ErrUnmodified, the queries won't be re-cached.
-func updateCachedQueries(ctx context.Context, f func(cachedQueries) error) error {
-	qs, err := getAllCachedQueries(ctx)
-	if err != nil {
-		return err
-	}
-
-	if err := f(qs); err == common.ErrUnmodified {
+// SetQuery caches ids as results for query in t.
+func SetQuery(ctx context.Context, q *common.SongQuery, ids []int64, t Type) error {
+	return updateQueryMap(ctx, func(m queryMap) error {
+		m[q.Hash()] = query{Query: *q, IDs: ids}
 		return nil
-	} else if err != nil {
-		return err
-	}
-
-	var errs []error
-	errs = append(errs, setMemcache(ctx, cachedQueriesKey, &qs))
-	if b, err := json.Marshal(qs); err != nil {
-		errs = append(errs, err)
-	} else {
-		errs = append(errs, setDatastore(ctx, cachedQueriesDatastoreKey(ctx), &encodedCachedQueries{b}))
-	}
-	return joinErrors(errs)
-}
-
-// SetQueryResults caches ids as results for query.
-func SetQueryResults(ctx context.Context, q *common.SongQuery, ids []int64) error {
-	return updateCachedQueries(ctx, func(qs cachedQueries) error {
-		qs[q.Hash()] = cachedQuery{*q, ids}
-		return nil
-	})
+	}, t)
 }
 
 // FlushForUpdate deletes the appropriate cached data for an update of the supplied types.
 func FlushForUpdate(ctx context.Context, ut common.UpdateTypes) error {
 	var errs []error
 
-	errs = append(errs, updateCachedQueries(ctx, func(qs cachedQueries) error {
-		flushed := 0
-		for i, q := range qs {
-			if q.Query.ResultsInvalidated(ut) {
-				delete(qs, i)
-				flushed++
+	for _, t := range []Type{Memcache, Datastore} {
+		errs = append(errs, updateQueryMap(ctx, func(m queryMap) error {
+			flushed := 0
+			for h, q := range m {
+				if q.Query.ResultsInvalidated(ut) {
+					delete(m, h)
+					flushed++
+				}
 			}
-		}
-		if flushed == 0 {
-			return common.ErrUnmodified
-		}
-		log.Debugf(ctx, "Flushing %v cached query(s) in response to update of type %v", flushed, ut)
-		return nil
-	}))
+			if flushed == 0 {
+				return common.ErrUnmodified
+			}
+			log.Debugf(ctx, "Flushing %v cached query(s) from %v in response to update of type %v",
+				flushed, t, ut)
+			return nil
+		}, t))
+	}
 
 	if ut&common.TagsUpdate != 0 || ut&common.MetadataUpdate != 0 {
 		log.Debugf(ctx, "Flushing cached tags in response to update of type %v", ut)
-		errs = append(errs, deleteMemcache(ctx, cachedTagsKey))
-		errs = append(errs, deleteDatastore(ctx, cachedTagsDatastoreKey(ctx)))
+		errs = append(errs, deleteMemcache(ctx, tagListKey))
+		errs = append(errs, deleteDatastore(ctx, tagListDatastoreKey(ctx)))
 	}
 
 	return joinErrors(errs)
 }
 
-// cachedTagsDatastoreKey returns the datastore key for caching tags.
-func cachedTagsDatastoreKey(ctx context.Context) *datastore.Key {
-	return datastore.NewKey(ctx, cachedTagsKind, cachedTagsKey, 0, nil)
-}
-
-// GetTagsMemcache attempts to get the list of in-use tags from memcache.
-// On a cache miss, both returned values are nil.
-func GetTagsMemcache(ctx context.Context) ([]string, error) {
-	var t cachedTags
-	if _, err := jsonCodec.Get(ctx, cachedTagsKey, &t); err == memcache.ErrCacheMiss {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
+// updateQueryMap loads queryMap from t, passes them to f, and saves
+// the updated queries back to t. If f returns common.ErrUnmodified, the queries
+// won't be saved.
+func updateQueryMap(ctx context.Context, f func(queryMap) error, t Type) error {
+	var m queryMap
+	var err error
+	switch t {
+	case Memcache:
+		m, err = getQueryMapMemcache(ctx)
+	case Datastore:
+		m, err = getQueryMapDatastore(ctx)
 	}
-	return t.Tags, nil
-}
-
-// GetTagsDatastore attempts to get the list of in-use tags from datastore.
-// On a cache miss, both returned values are nil.
-func GetTagsDatastore(ctx context.Context) ([]string, error) {
-	var t cachedTags
-	if err := datastore.Get(ctx, cachedTagsDatastoreKey(ctx), &t); err == datastore.ErrNoSuchEntity {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
+	if err != nil {
+		return err
 	}
-	return t.Tags, nil
+
+	// Handle cache miss.
+	if m == nil {
+		m = make(queryMap)
+	}
+
+	if err := f(m); err == common.ErrUnmodified {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	switch t {
+	case Memcache:
+		return setMemcache(ctx, queryMapKey, m)
+	case Datastore:
+		return setDatastore(ctx, queryMapDatastoreKey(ctx), &m)
+	default:
+		return fmt.Errorf("invalid type %v", t)
+	}
 }
 
-func SetTagsMemcache(ctx context.Context, tags []string) error {
-	return setMemcache(ctx, cachedTagsKey, &cachedTags{tags})
+const (
+	tagListKey  = "tags"       // memcache key and datastore ID for cached tags
+	tagListKind = "CachedTags" // datastore kind for cached tags
+)
+
+// tagListDatastoreKey returns the datastore key for caching tags.
+func tagListDatastoreKey(ctx context.Context) *datastore.Key {
+	return datastore.NewKey(ctx, tagListKind, tagListKey, 0, nil)
 }
 
-func SetTagsDatastore(ctx context.Context, tags []string) error {
-	return setDatastore(ctx, cachedTagsDatastoreKey(ctx), &cachedTags{tags})
+// tagList holds the list of tags currently in use.
+// It implements datastore.PropertyLoadSaver.
+type tagList []string
+
+func (t *tagList) Load(props []datastore.Property) error {
+	return loadJSONProp(props, t)
+}
+func (t *tagList) Save() ([]datastore.Property, error) {
+	return saveJSONProp(t)
 }
 
-// coverCacheKey returns the memcache key that should be used for caching a
+// GetTags attempts to get the list of in-use tags from t.
+// On a cache miss, both returned values are nil.
+func GetTags(ctx context.Context, t Type) ([]string, error) {
+	switch t {
+	case Memcache:
+		var tags []string
+		if _, err := jsonCodec.Get(ctx, tagListKey, &tags); err == memcache.ErrCacheMiss {
+			return nil, nil
+		} else if err != nil {
+			return nil, err
+		}
+		return tags, nil
+	case Datastore:
+		var tags tagList
+		if err := datastore.Get(ctx, tagListDatastoreKey(ctx), &tags); err == datastore.ErrNoSuchEntity {
+			return nil, nil
+		} else if err != nil {
+			return nil, err
+		}
+		return tags, nil
+	default:
+		return nil, fmt.Errorf("invalid type %v", t)
+	}
+}
+
+// SetTags saves the list of in-use tags to t.
+func SetTags(ctx context.Context, tags []string, t Type) error {
+	switch t {
+	case Memcache:
+		return setMemcache(ctx, tagListKey, tags)
+	case Datastore:
+		return setDatastore(ctx, tagListDatastoreKey(ctx), (*tagList)(&tags))
+	default:
+		return fmt.Errorf("invalid type %v", t)
+	}
+}
+
+const (
+	coverKeyPrefix  = "cover"        // memcache key prefix
+	coverExpiration = 24 * time.Hour // memcache expiration
+)
+
+// coverKey returns the memcache key that should be used for caching a
 // cover image with the supplied filename and size (i.e. width/height).
-func coverCacheKey(fn string, size int) string {
+func coverKey(fn string, size int) string {
 	// TODO: Hash the filename?
 	// https://godoc.org/google.golang.org/appengine/memcache#Get says that the
 	// key can be at most 250 bytes.
-	return fmt.Sprintf("%s-%s-%d", coverCachePrefix, size, fn)
+	return fmt.Sprintf("%s-%s-%d", coverKeyPrefix, size, fn)
 }
 
-// SetCoverMemcache caches a cover image with the supplied filename,
-// requested size, and raw data. size should be 0 when caching the original image.
-func SetCoverMemcache(ctx context.Context, fn string, size int, data []byte) error {
+// SetCover caches a cover image with the supplied filename, requested size, and
+// raw data. size should be 0 when caching the original image.
+func SetCover(ctx context.Context, fn string, size int, data []byte) error {
 	return memcache.Set(ctx, &memcache.Item{
-		Key:        coverCacheKey(fn, size),
+		Key:        coverKey(fn, size),
 		Value:      data,
 		Expiration: coverExpiration,
 	})
 }
 
-// GetCoverMemcache attempts to look up raw data for the cover image with
-// the supplied filename and size. If the image isn't present, both the returned
-// byte slice and the error are nil.
-func GetCoverMemcache(ctx context.Context, fn string, size int) ([]byte, error) {
-	item, err := memcache.Get(ctx, coverCacheKey(fn, size))
+// GetCover attempts to look up raw data for the cover image with the supplied
+// filename and size. If the image isn't present, both the returned byte slice
+// and the error are nil.
+func GetCover(ctx context.Context, fn string, size int) ([]byte, error) {
+	item, err := memcache.Get(ctx, coverKey(fn, size))
 	if err == memcache.ErrCacheMiss {
 		return nil, nil
 	} else if err != nil {
@@ -226,17 +289,19 @@ func GetCoverMemcache(ctx context.Context, fn string, size int) ([]byte, error) 
 	return item.Value, nil
 }
 
-// FlushMemcache deletes all cached objects from memcache.
-func FlushMemcache(ctx context.Context) error {
-	return memcache.Flush(ctx)
-}
-
-// FlushDatastore deletes all cached objects from datastore.
-func FlushDatastore(ctx context.Context) error {
-	var errs []error
-	errs = append(errs, deleteDatastore(ctx, cachedQueriesDatastoreKey(ctx)))
-	errs = append(errs, deleteDatastore(ctx, cachedTagsDatastoreKey(ctx)))
-	return joinErrors(errs)
+// Flush deletes all cached objects from t.
+func Flush(ctx context.Context, t Type) error {
+	switch t {
+	case Memcache:
+		return memcache.Flush(ctx)
+	case Datastore:
+		var errs []error
+		errs = append(errs, deleteDatastore(ctx, queryMapDatastoreKey(ctx)))
+		errs = append(errs, deleteDatastore(ctx, tagListDatastoreKey(ctx)))
+		return joinErrors(errs)
+	default:
+		return fmt.Errorf("invalid type %v", t)
+	}
 }
 
 // setMemcache saves obj at key in memcache.
@@ -285,7 +350,6 @@ func deleteDatastore(ctx context.Context, key *datastore.Key) error {
 
 // joinErrors returns a new error all messages from any non-nil errors in errs.
 // If no non-nil errors are present, nil is returned.
-// TODO: Delete this?
 func joinErrors(errs []error) error {
 	var all error
 	for _, err := range errs {
@@ -299,4 +363,35 @@ func joinErrors(errs []error) error {
 		}
 	}
 	return all
+}
+
+// Datastore property name used when serializing objects to JSON.
+const jsonPropName = "json"
+
+// loadJSONProp implements datastore.PropertyLoadSaver's Load method.
+func loadJSONProp(props []datastore.Property, dst interface{}) error {
+	if len(props) != 1 {
+		return fmt.Errorf("bad property count %v")
+	}
+	if props[0].Name != jsonPropName {
+		return fmt.Errorf("bad property name %q", props[0].Name)
+	}
+	b, ok := props[0].Value.([]byte)
+	if !ok {
+		return errors.New("property value is not byte array")
+	}
+	return json.Unmarshal(b, dst)
+}
+
+// saveJSONProp implements datastore.PropertyLoadSaver's Save method.
+func saveJSONProp(src interface{}) ([]datastore.Property, error) {
+	b, err := json.Marshal(src)
+	if err != nil {
+		return nil, err
+	}
+	return []datastore.Property{datastore.Property{
+		Name:    jsonPropName,
+		Value:   b,
+		NoIndex: true},
+	}, nil
 }

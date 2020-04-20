@@ -21,88 +21,81 @@ import (
 	"google.golang.org/appengine/log"
 )
 
-const maxQueryResults = 100 // max songs to return for query
+const maxResults = 100 // max songs to return for query
 
 // Tags returns the full set of tags present across all songs.
 // It attempts to return cached data before falling back to scanning all songs.
 // If songs are scanned, the resulting tags are cached.
 // If requireCache is true, an error is returned if tags aren't cached.
-func Tags(ctx context.Context, requireCache bool) (tags []string, err error) {
-	// Check memcache first.
-	startTime := time.Now()
-	if tags, err = cache.GetTagsMemcache(ctx); err != nil {
-		log.Errorf(ctx, "Got error while getting cached tags from memcache: %v", err)
-	} else if tags == nil {
-		log.Debugf(ctx, "Memcache cache miss took %v ms", msecSince(startTime))
-	} else {
-		log.Debugf(ctx, "Got %v cached tag(s) from memcache in %v ms",
-			len(tags), msecSince(startTime))
-		return tags, nil
-	}
+func Tags(ctx context.Context, requireCache bool) ([]string, error) {
+	var tags []string
+	var err error
 
-	// If memcache didn't have the tags, schedule writing them there on our way out.
-	saveToMemcache := false
-	defer func() {
-		if saveToMemcache {
-			startTime := time.Now()
-			if err := cache.SetTagsMemcache(ctx, tags); err != nil {
-				log.Errorf(ctx, "Failed to cache tags to memcache: %v", err)
-			} else {
-				log.Debugf(ctx, "Cached tags to memcache in %v ms", msecSince(startTime))
-			}
+	// Check memcache first and then datastore.
+	var cacheWriteTypes []cache.Type // caches to write to
+	for _, t := range []cache.Type{cache.Memcache, cache.Datastore} {
+		startTime := time.Now()
+		if tags, err = cache.GetTags(ctx, t); err != nil {
+			log.Errorf(ctx, "Got error while getting cached tags from %v: %v", t, err)
+		} else if tags == nil {
+			log.Debugf(ctx, "Cache miss from %v took %v ms", t, msecSince(startTime))
+			cacheWriteTypes = append(cacheWriteTypes, t)
+		} else {
+			log.Debugf(ctx, "Got %v cached tag(s) from %v in %v ms", len(tags), t, msecSince(startTime))
+			break
 		}
-	}()
-
-	// Try to get the cached tags from datastore.
-	startTime = time.Now()
-	if tags, err = cache.GetTagsDatastore(ctx); err != nil {
-		log.Errorf(ctx, "Got error while getting cached tags from datastore: %v", err)
-	} else if tags == nil {
-		log.Debugf(ctx, "Datastore cache miss took %v ms", msecSince(startTime))
-	} else {
-		log.Debugf(ctx, "Got %v cached tag(s) from datastore in %v ms",
-			len(tags), msecSince(startTime))
-		saveToMemcache = true
-		return tags, nil
 	}
-
-	if requireCache {
+	if tags == nil && requireCache {
 		return nil, errors.New("tags not cached")
 	}
 
-	// Fall back to running a slow query across all songs.
-	startTime = time.Now()
-	tagMap := make(map[string]struct{})
-	it := datastore.NewQuery(common.SongKind).Project("Tags").Distinct().Run(ctx)
-	for {
-		var song types.Song
-		if _, err := it.Next(&song); err == datastore.Done {
-			break
-		} else if err != nil {
-			return nil, err
+	// If tags weren't cached, fall back to running a slow query across all songs.
+	if tags == nil {
+		startTime := time.Now()
+		tagMap := make(map[string]struct{})
+		it := datastore.NewQuery(common.SongKind).Project("Tags").Distinct().Run(ctx)
+		for {
+			var song types.Song
+			if _, err := it.Next(&song); err == datastore.Done {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			for _, t := range song.Tags {
+				tagMap[t] = struct{}{}
+			}
 		}
-		for _, t := range song.Tags {
-			tagMap[t] = struct{}{}
+		tags = make([]string, len(tagMap))
+		i := 0
+		for t := range tagMap {
+			tags[i] = t
+			i++
 		}
+		sort.Strings(tags)
+		log.Debugf(ctx, "Queried %v tag(s) from datastore in %v ms", len(tags), msecSince(startTime))
 	}
-	tags = make([]string, len(tagMap))
-	i := 0
-	for t := range tagMap {
-		tags[i] = t
-		i++
-	}
-	sort.Strings(tags)
-	log.Debugf(ctx, "Queried %v tag(s) from datastore in %v ms",
-		len(tags), msecSince(startTime))
-	saveToMemcache = true
 
-	// This write can be slow and will block the HTTP response, but callers
-	// should be getting the tags asynchronously anyway.
-	startTime = time.Now()
-	if err := cache.SetTagsDatastore(ctx, tags); err != nil {
-		log.Errorf(ctx, "Failed to cache tags to datastore: %v", err)
-	} else {
-		log.Debugf(ctx, "Cached tags to datastore in %v ms", msecSince(startTime))
+	// Write the tags to any caches that didn't have them already.
+	// These writes can be slow and will block the HTTP response, but callers
+	// should be getting tags asynchronously anyway.
+	if len(cacheWriteTypes) > 0 {
+		cacheWriteDone := make(chan struct{}, len(cacheWriteTypes))
+		for _, t := range cacheWriteTypes {
+			go func(t cache.Type) {
+				startTime := time.Now()
+				if err := cache.SetTags(ctx, tags, t); err != nil {
+					log.Errorf(ctx, "Failed to cache tags to %v: %v", t, err)
+				} else {
+					log.Debugf(ctx, "Cached tags to %v in %v ms", t, msecSince(startTime))
+				}
+				cacheWriteDone <- struct{}{}
+			}(t)
+		}
+		startTime := time.Now()
+		for range cacheWriteTypes {
+			<-cacheWriteDone
+		}
+		log.Debugf(ctx, "Waited %v ms for cache write(s)", msecSince(startTime))
 	}
 
 	return tags, nil
@@ -115,117 +108,108 @@ func Songs(ctx context.Context, query *common.SongQuery, cacheOnly bool) ([]type
 	var ids []int64
 	var err error
 
-	cfg := common.Config(ctx)
-	startTime := time.Now()
-	ids, err = cache.GetQueryResults(ctx, query)
-	if err != nil {
-		log.Errorf(ctx, "Got error while getting cached query: %v", err)
-	} else if ids != nil {
-		log.Debugf(ctx, "Got cached query result with %v song(s) in %v ms",
-			len(ids), msecSince(startTime))
-	}
-
-	if ids == nil {
-		if cacheOnly {
-			ids = make([]int64, 0)
+	// Check memcache first and then datastore.
+	var cacheWriteTypes []cache.Type // caches to write to
+	for _, t := range []cache.Type{cache.Memcache, cache.Datastore} {
+		startTime := time.Now()
+		if ids, err = cache.GetQuery(ctx, query, t); err != nil {
+			log.Errorf(ctx, "Got error while getting cached results from %v: %v", t, err)
+		} else if ids == nil {
+			log.Debugf(ctx, "Cache miss from %v took %v ms", t, msecSince(startTime))
+			cacheWriteTypes = append(cacheWriteTypes, t)
 		} else {
-			if ids, err = runQuery(ctx, query); err != nil {
-				return nil, err
-			}
-			if query.CanCache() {
-				startTime := time.Now()
-				if err = cache.SetQueryResults(ctx, query, ids); err != nil {
-					log.Errorf(ctx, "Got error while caching query result: %v", err)
-				} else {
-					log.Debugf(ctx, "Cached query result with %v song(s) in %v ms", len(ids),
-						msecSince(startTime))
-				}
-			}
+			log.Debugf(ctx, "Got %v cached result(s) from %v in %v ms", len(ids), t, msecSince(startTime))
+			break
 		}
 	}
 
-	numResults := len(ids)
-	if numResults > maxQueryResults {
-		numResults = maxQueryResults
+	// If we were asked to only return cached results, create an empty result set.
+	if ids == nil && cacheOnly {
+		ids = make([]int64, 0)
+		cacheWriteTypes = nil // don't write empty results to cache
 	}
 
+	// If we still don't have results, actually run the query against datastore.
+	if ids == nil {
+		if ids, err = runQuery(ctx, query); err != nil {
+			return nil, err
+		}
+	}
+
+	// Asynchronously cache the results.
+	cacheWriteDone := make(chan struct{}, len(cacheWriteTypes))
+	if !query.CanCache() {
+		cacheWriteTypes = nil
+	} else {
+		for _, t := range cacheWriteTypes {
+			go func(t cache.Type, ids []int64) {
+				startTime := time.Now()
+				if err = cache.SetQuery(ctx, query, ids, t); err != nil {
+					log.Errorf(ctx, "Got error while caching results to %v: %v", t, err)
+				} else {
+					log.Debugf(ctx, "Cached results to %v in %v ms", t, msecSince(startTime))
+				}
+				cacheWriteDone <- struct{}{}
+			}(t, append([]int64{}, ids...)) // duplicate since mutated in main body
+		}
+	}
+
+	// Shuffle and truncate the results if needed.
+	numResults := len(ids)
+	if numResults > maxResults {
+		numResults = maxResults
+	}
 	if query.Shuffle {
 		shufflePartial(ids, numResults)
 	}
-
 	ids = ids[:numResults]
-	songs := make([]types.Song, numResults)
 
+	songs := make([]types.Song, numResults)
 	if numResults == 0 {
 		return songs, nil
 	}
 
-	cachedSongs := make(map[int64]types.Song)
-	storedSongs := make([]types.Song, 0)
-
-	// Get the remaining songs from datastore and write them back to memcache.
-	if len(cachedSongs) < numResults {
-		startTime := time.Now()
-		numStored := numResults - len(cachedSongs)
-		storedIds := make([]int64, 0, numStored)
-		keys := make([]*datastore.Key, 0, numStored)
-		for _, id := range ids {
-			if _, ok := cachedSongs[id]; !ok {
-				storedIds = append(storedIds, id)
-				keys = append(keys, datastore.NewKey(ctx, common.SongKind, "", id, nil))
-			}
-		}
-		storedSongs = make([]types.Song, len(keys))
-		if err = datastore.GetMulti(ctx, keys, storedSongs); err != nil {
-			return nil, err
-		}
-		log.Debugf(ctx, "Fetched %v song(s) from datastore in %v ms",
-			len(storedSongs), msecSince(startTime))
+	// Get the songs from datastore.
+	startTime := time.Now()
+	keys := make([]*datastore.Key, 0, len(songs))
+	for _, id := range ids {
+		keys = append(keys, datastore.NewKey(ctx, common.SongKind, "", id, nil))
 	}
+	if err = datastore.GetMulti(ctx, keys, songs); err != nil {
+		return nil, err
+	}
+	log.Debugf(ctx, "Fetched %v song(s) from datastore in %v ms", len(songs), msecSince(startTime))
 
-	storedIndex := 0
+	// Prepare the results for the client.
+	cfg := common.Config(ctx)
 	for i, id := range ids {
-		if s, ok := cachedSongs[id]; ok {
-			songs[i] = s
-		} else {
-			songs[i] = storedSongs[storedIndex]
-			storedIndex++
-		}
 		common.PrepareSongForClient(&songs[i], id, cfg, cloudutil.WebClient)
 	}
-
 	if !query.Shuffle {
-		sort.Slice(songs, func(i, j int) bool {
-			si := songs[i]
-			sj := songs[j]
-			if si.AlbumLower < sj.AlbumLower {
-				return true
-			} else if si.AlbumLower > sj.AlbumLower {
-				return false
-			}
-			if si.AlbumID < sj.AlbumID {
-				return true
-			} else if si.AlbumID > sj.AlbumID {
-				return false
-			}
-			if si.Disc < sj.Disc {
-				return true
-			} else if si.Disc > sj.Disc {
-				return false
-			}
-			return si.Track < sj.Track
-		})
+		sortSongs(songs)
 	}
+
+	// Wait for async cache writes to finish.
+	if len(cacheWriteTypes) > 0 {
+		startTime := time.Now()
+		for range cacheWriteTypes {
+			<-cacheWriteDone
+		}
+		log.Debugf(ctx, "Waited %v ms for cache write(s)", msecSince(startTime))
+	}
+
 	return songs, nil
 }
 
+// runQueriesAndGetIds runs the provided queries in parallel and returns the
+// results from each.
 func runQueriesAndGetIds(ctx context.Context, qs []*datastore.Query) ([][]int64, error) {
 	type queryResult struct {
 		Index int
 		Ids   []int64
 		Error error
 	}
-	ch := make(chan queryResult)
+	ch := make(chan queryResult, len(qs))
 
 	for i, q := range qs {
 		go func(index int, q *datastore.Query) {
@@ -373,7 +357,31 @@ func runQuery(ctx context.Context, query *common.SongQuery) ([]int64, error) {
 	return mergedIds, nil
 }
 
-// Returns the number of elapsed milliseconds since t.
+// sortSongs sorts songs appropriately for the client.
+func sortSongs(songs []types.Song) {
+	sort.Slice(songs, func(i, j int) bool {
+		si := songs[i]
+		sj := songs[j]
+		if si.AlbumLower < sj.AlbumLower {
+			return true
+		} else if si.AlbumLower > sj.AlbumLower {
+			return false
+		}
+		if si.AlbumID < sj.AlbumID {
+			return true
+		} else if si.AlbumID > sj.AlbumID {
+			return false
+		}
+		if si.Disc < sj.Disc {
+			return true
+		} else if si.Disc > sj.Disc {
+			return false
+		}
+		return si.Track < sj.Track
+	})
+}
+
+// msecSince returns the number of elapsed milliseconds since t.
 func msecSince(t time.Time) int64 {
 	return time.Now().Sub(t).Nanoseconds() / int64(time.Millisecond/time.Nanosecond)
 }

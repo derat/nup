@@ -34,13 +34,13 @@ func Scale(ctx context.Context, fn string, size, quality int, w io.Writer) error
 	var err error
 
 	log.Debugf(ctx, "Checking cache for scaled cover")
-	if data, err = cache.GetCoverMemcache(ctx, fn, size); len(data) > 0 {
+	if data, err = cache.GetCover(ctx, fn, size); len(data) > 0 {
 		log.Debugf(ctx, "Writing %d-byte cached scaled cover", len(data))
 		_, err = w.Write(data)
 		return err
 	}
 	log.Debugf(ctx, "Checking cache for original cover")
-	if data, err = cache.GetCoverMemcache(ctx, fn, 0); len(data) > 0 {
+	if data, err = cache.GetCover(ctx, fn, 0); len(data) > 0 {
 		log.Debugf(ctx, "Got %d-byte cached original cover", len(data))
 	} else if err != nil {
 		log.Errorf(ctx, "Cache lookup failed: %v", err) // swallow error
@@ -52,7 +52,7 @@ func Scale(ctx context.Context, fn string, size, quality int, w io.Writer) error
 			return fmt.Errorf("failed to read cover: %v", err)
 		}
 		log.Debugf(ctx, "Caching %v-byte original cover", len(data))
-		if err = cache.SetCoverMemcache(ctx, fn, 0, data); err != nil {
+		if err = cache.SetCover(ctx, fn, 0, data); err != nil {
 			log.Errorf(ctx, "Cache write failed: %v", err) // swallow error
 		}
 	}
@@ -89,7 +89,7 @@ func Scale(ctx context.Context, fn string, size, quality int, w io.Writer) error
 		return err
 	}
 	log.Debugf(ctx, "Caching %v-byte scaled cover", b.Len())
-	if err := cache.SetCoverMemcache(ctx, fn, size, b.Bytes()); err != nil {
+	if err := cache.SetCover(ctx, fn, size, b.Bytes()); err != nil {
 		log.Errorf(ctx, "Cache write failed: %v", err) // swallow error
 	}
 	return nil

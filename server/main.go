@@ -440,13 +440,13 @@ func handleFlushCache(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only works on dev server", http.StatusBadRequest)
 		return
 	}
-	if err := cache.FlushMemcache(ctx); err != nil {
+	if err := cache.Flush(ctx, cache.Memcache); err != nil {
 		log.Errorf(ctx, "Flushing memcache failed: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if r.FormValue("onlyMemcache") != "1" {
-		if err := cache.FlushDatastore(ctx); err != nil {
+		if err := cache.Flush(ctx, cache.Datastore); err != nil {
 			log.Errorf(ctx, "Flushing datastore failed: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
