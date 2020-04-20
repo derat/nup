@@ -731,11 +731,7 @@ customElements.define(
       const createdTags = [];
       for (let i = 0; i < newRawTags.length; ++i) {
         let tag = newRawTags[i].toLowerCase();
-        if (
-          !this.tags_.length ||
-          this.tags_.indexOf(tag) != -1 ||
-          song.tags.indexOf(tag) != -1
-        ) {
+        if (this.tags_.indexOf(tag) != -1 || song.tags.indexOf(tag) != -1) {
           newTags.push(tag);
         } else if (tag[0] == '+' && tag.length > 1) {
           tag = tag.substring(1);
@@ -745,6 +741,7 @@ customElements.define(
           console.log('Skipping unknown tag "' + tag + '"');
         }
       }
+      // Remove duplicates.
       newTags = newTags
         .sort()
         .filter((item, pos, self) => self.indexOf(item) == pos);
