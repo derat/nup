@@ -275,10 +275,10 @@ func (t *Tester) QuerySongs(params ...string) []types.Song {
 	return songs
 }
 
-func (t *Tester) GetTags(onlyCached bool) string {
+func (t *Tester) GetTags(requireCache bool) string {
 	path := "list_tags"
-	if onlyCached {
-		path += "?onlyCached=1"
+	if requireCache {
+		path += "?requireCache=1"
 	}
 	resp := t.SendRequest(t.NewRequest("GET", path, nil))
 	defer resp.Body.Close()

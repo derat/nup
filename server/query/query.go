@@ -23,11 +23,11 @@ import (
 
 const maxQueryResults = 100 // max songs to return for query
 
-// Tags returns the full set of tags present in songs.
+// Tags returns the full set of tags present across all songs.
 // It attempts to return cached data before falling back to scanning all songs.
 // If songs are scanned, the resulting tags are cached.
-// If onlyCached is true, an error is returned if tags aren't cached.
-func Tags(ctx context.Context, onlyCached bool) (tags []string, err error) {
+// If requireCache is true, an error is returned if tags aren't cached.
+func Tags(ctx context.Context, requireCache bool) (tags []string, err error) {
 	// Check memcache first.
 	startTime := time.Now()
 	if tags, err = cache.GetTagsMemcache(ctx); err != nil {
@@ -66,7 +66,7 @@ func Tags(ctx context.Context, onlyCached bool) (tags []string, err error) {
 		return tags, nil
 	}
 
-	if onlyCached {
+	if requireCache {
 		return nil, errors.New("tags not cached")
 	}
 
@@ -108,160 +108,9 @@ func Tags(ctx context.Context, onlyCached bool) (tags []string, err error) {
 	return tags, nil
 }
 
-func runQueriesAndGetIds(ctx context.Context, qs []*datastore.Query) ([][]int64, error) {
-	type queryResult struct {
-		Index int
-		Ids   []int64
-		Error error
-	}
-	ch := make(chan queryResult)
-
-	for i, q := range qs {
-		go func(index int, q *datastore.Query) {
-			ids := make([]int64, 0)
-			it := q.Run(ctx)
-			for {
-				if k, err := it.Next(nil); err == nil {
-					ids = append(ids, k.IntID())
-				} else if err == datastore.Done {
-					break
-				} else {
-					ch <- queryResult{index, nil, err}
-					return
-				}
-			}
-			sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-			ch <- queryResult{index, ids, nil}
-		}(i, q)
-	}
-
-	res := make([][]int64, len(qs))
-	for _ = range qs {
-		qr := <-ch
-		if qr.Error != nil {
-			return nil, qr.Error
-		}
-		res[qr.Index] = qr.Ids
-	}
-	return res, nil
-}
-
-// intersectSortedIds returns the intersection of two sorted arrays that don't have duplicate values.
-func intersectSortedIds(a, b []int64) []int64 {
-	m := make([]int64, 0)
-	var i, j int
-	for i < len(a) && j < len(b) {
-		if a[i] == b[j] {
-			m = append(m, a[i])
-			i++
-			j++
-		} else if a[i] < b[j] {
-			i++
-		} else {
-			j++
-		}
-	}
-	return m
-}
-
-// filterSortedIds returns values present in a but not in b (i.e. the intersection of a and !b).
-// Both arrays must be sorted.
-func filterSortedIds(a, b []int64) []int64 {
-	m := make([]int64, 0)
-	var i, j int
-	for i < len(a) {
-		for j < len(b) && a[i] > b[j] {
-			j++
-		}
-		if j >= len(b) || a[i] != b[j] {
-			m = append(m, a[i])
-		}
-		i++
-	}
-	return m
-}
-
-// shufflePartial randomly swaps into the first n positions using elements from the entire slice.
-func shufflePartial(a []int64, n int) {
-	for i := 0; i < n; i++ {
-		j := i + rand.Intn(len(a)-i)
-		a[i], a[j] = a[j], a[i]
-	}
-}
-
-func performQueryAgainstDatastore(ctx context.Context, query *common.SongQuery) ([]int64, error) {
-	// First, build a base query with all of the equality filters.
-	bq := datastore.NewQuery(common.SongKind).KeysOnly()
-	if len(query.Artist) > 0 {
-		bq = bq.Filter("ArtistLower =", strings.ToLower(query.Artist))
-	}
-	if len(query.Title) > 0 {
-		bq = bq.Filter("TitleLower =", strings.ToLower(query.Title))
-	}
-	if len(query.Album) > 0 {
-		bq = bq.Filter("AlbumLower =", strings.ToLower(query.Album))
-	}
-	for _, w := range query.Keywords {
-		bq = bq.Filter("Keywords =", strings.ToLower(w))
-	}
-	if query.Unrated && !query.HasMinRating {
-		bq = bq.Filter("Rating =", -1.0)
-	}
-	if query.Track > 0 {
-		bq = bq.Filter("Track =", query.Track)
-	}
-	if query.Disc > 0 {
-		bq = bq.Filter("Disc =", query.Disc)
-	}
-	for _, t := range query.Tags {
-		bq = bq.Filter("Tags =", t)
-	}
-
-	// Datastore doesn't allow multiple inequality filters on different properties.
-	// Run a separate query in parallel for each filter and then merge the results.
-	qs := make([]*datastore.Query, 0)
-	if query.HasMinRating {
-		qs = append(qs, bq.Filter("Rating >=", query.MinRating))
-	}
-	if query.HasMaxPlays {
-		qs = append(qs, bq.Filter("NumPlays <=", query.MaxPlays))
-	}
-	if !query.MinFirstStartTime.IsZero() {
-		qs = append(qs, bq.Filter("FirstStartTime >=", query.MinFirstStartTime))
-	}
-	if !query.MaxLastStartTime.IsZero() {
-		qs = append(qs, bq.Filter("LastStartTime <=", query.MaxLastStartTime))
-	}
-	if len(qs) == 0 {
-		qs = []*datastore.Query{bq}
-	}
-
-	// Also run queries for tags that shouldn't be present.
-	negativeQueryStart := len(qs)
-	for _, t := range query.NotTags {
-		qs = append(qs, bq.Filter("Tags =", t))
-	}
-
-	startTime := time.Now()
-	unmergedIds, err := runQueriesAndGetIds(ctx, qs)
-	if err != nil {
-		return nil, err
-	}
-	log.Debugf(ctx, "Ran %v query(s) in %v ms", len(qs), msecSince(startTime))
-
-	var mergedIds []int64
-	for i, a := range unmergedIds {
-		if i == 0 {
-			mergedIds = a
-		} else if i < negativeQueryStart {
-			mergedIds = intersectSortedIds(mergedIds, a)
-		} else {
-			mergedIds = filterSortedIds(mergedIds, a)
-		}
-	}
-	return mergedIds, nil
-}
-
+// Songs executes the supplied query and returns matching songs.
+// If cacheOnly is true, empty results are returned if the query's results
+// aren't cached.
 func Songs(ctx context.Context, query *common.SongQuery, cacheOnly bool) ([]types.Song, error) {
 	var ids []int64
 	var err error
@@ -280,7 +129,7 @@ func Songs(ctx context.Context, query *common.SongQuery, cacheOnly bool) ([]type
 		if cacheOnly {
 			ids = make([]int64, 0)
 		} else {
-			if ids, err = performQueryAgainstDatastore(ctx, query); err != nil {
+			if ids, err = runQuery(ctx, query); err != nil {
 				return nil, err
 			}
 			if query.CanCache() {
@@ -368,6 +217,160 @@ func Songs(ctx context.Context, query *common.SongQuery, cacheOnly bool) ([]type
 		})
 	}
 	return songs, nil
+}
+
+func runQueriesAndGetIds(ctx context.Context, qs []*datastore.Query) ([][]int64, error) {
+	type queryResult struct {
+		Index int
+		Ids   []int64
+		Error error
+	}
+	ch := make(chan queryResult)
+
+	for i, q := range qs {
+		go func(index int, q *datastore.Query) {
+			ids := make([]int64, 0)
+			it := q.Run(ctx)
+			for {
+				if k, err := it.Next(nil); err == nil {
+					ids = append(ids, k.IntID())
+				} else if err == datastore.Done {
+					break
+				} else {
+					ch <- queryResult{index, nil, err}
+					return
+				}
+			}
+			sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+			ch <- queryResult{index, ids, nil}
+		}(i, q)
+	}
+
+	res := make([][]int64, len(qs))
+	for _ = range qs {
+		qr := <-ch
+		if qr.Error != nil {
+			return nil, qr.Error
+		}
+		res[qr.Index] = qr.Ids
+	}
+	return res, nil
+}
+
+// intersectSortedIds returns the intersection of two sorted arrays that don't have duplicate values.
+func intersectSortedIds(a, b []int64) []int64 {
+	m := make([]int64, 0)
+	var i, j int
+	for i < len(a) && j < len(b) {
+		if a[i] == b[j] {
+			m = append(m, a[i])
+			i++
+			j++
+		} else if a[i] < b[j] {
+			i++
+		} else {
+			j++
+		}
+	}
+	return m
+}
+
+// filterSortedIds returns values present in a but not in b (i.e. the intersection of a and !b).
+// Both arrays must be sorted.
+func filterSortedIds(a, b []int64) []int64 {
+	m := make([]int64, 0)
+	var i, j int
+	for i < len(a) {
+		for j < len(b) && a[i] > b[j] {
+			j++
+		}
+		if j >= len(b) || a[i] != b[j] {
+			m = append(m, a[i])
+		}
+		i++
+	}
+	return m
+}
+
+// shufflePartial randomly swaps into the first n positions using elements from the entire slice.
+func shufflePartial(a []int64, n int) {
+	for i := 0; i < n; i++ {
+		j := i + rand.Intn(len(a)-i)
+		a[i], a[j] = a[j], a[i]
+	}
+}
+
+func runQuery(ctx context.Context, query *common.SongQuery) ([]int64, error) {
+	// First, build a base query with all of the equality filters.
+	bq := datastore.NewQuery(common.SongKind).KeysOnly()
+	if len(query.Artist) > 0 {
+		bq = bq.Filter("ArtistLower =", strings.ToLower(query.Artist))
+	}
+	if len(query.Title) > 0 {
+		bq = bq.Filter("TitleLower =", strings.ToLower(query.Title))
+	}
+	if len(query.Album) > 0 {
+		bq = bq.Filter("AlbumLower =", strings.ToLower(query.Album))
+	}
+	for _, w := range query.Keywords {
+		bq = bq.Filter("Keywords =", strings.ToLower(w))
+	}
+	if query.Unrated && !query.HasMinRating {
+		bq = bq.Filter("Rating =", -1.0)
+	}
+	if query.Track > 0 {
+		bq = bq.Filter("Track =", query.Track)
+	}
+	if query.Disc > 0 {
+		bq = bq.Filter("Disc =", query.Disc)
+	}
+	for _, t := range query.Tags {
+		bq = bq.Filter("Tags =", t)
+	}
+
+	// Datastore doesn't allow multiple inequality filters on different properties.
+	// Run a separate query in parallel for each filter and then merge the results.
+	qs := make([]*datastore.Query, 0)
+	if query.HasMinRating {
+		qs = append(qs, bq.Filter("Rating >=", query.MinRating))
+	}
+	if query.HasMaxPlays {
+		qs = append(qs, bq.Filter("NumPlays <=", query.MaxPlays))
+	}
+	if !query.MinFirstStartTime.IsZero() {
+		qs = append(qs, bq.Filter("FirstStartTime >=", query.MinFirstStartTime))
+	}
+	if !query.MaxLastStartTime.IsZero() {
+		qs = append(qs, bq.Filter("LastStartTime <=", query.MaxLastStartTime))
+	}
+	if len(qs) == 0 {
+		qs = []*datastore.Query{bq}
+	}
+
+	// Also run queries for tags that shouldn't be present.
+	negativeQueryStart := len(qs)
+	for _, t := range query.NotTags {
+		qs = append(qs, bq.Filter("Tags =", t))
+	}
+
+	startTime := time.Now()
+	unmergedIds, err := runQueriesAndGetIds(ctx, qs)
+	if err != nil {
+		return nil, err
+	}
+	log.Debugf(ctx, "Ran %v query(s) in %v ms", len(qs), msecSince(startTime))
+
+	var mergedIds []int64
+	for i, a := range unmergedIds {
+		if i == 0 {
+			mergedIds = a
+		} else if i < negativeQueryStart {
+			mergedIds = intersectSortedIds(mergedIds, a)
+		} else {
+			mergedIds = filterSortedIds(mergedIds, a)
+		}
+	}
+	return mergedIds, nil
 }
 
 // Returns the number of elapsed milliseconds since t.

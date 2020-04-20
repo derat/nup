@@ -25,6 +25,7 @@ const (
 	DeletedSongKind = "DeletedSong"
 )
 
+// UpdateTypes is a bitfield describing what was changed by an update.
 type UpdateTypes uint8
 
 const (
@@ -36,6 +37,7 @@ const (
 
 var ErrUnmodified = errors.New("object wasn't modified")
 
+// PrepareSongForClient sets and clears fields in s appropriately for client.
 func PrepareSongForClient(s *types.Song, id int64, cfg *types.ServerConfig, client cloudutil.ClientType) {
 	// Set fields that are only present in search results (i.e. not in Datastore).
 	s.SongID = strconv.FormatInt(id, 10)

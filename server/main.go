@@ -527,7 +527,7 @@ func handleListTags(w http.ResponseWriter, r *http.Request) {
 	if !checkRequest(ctx, w, r, "GET", false) {
 		return
 	}
-	tags, err := query.Tags(ctx, r.FormValue("onlyCached") == "1")
+	tags, err := query.Tags(ctx, r.FormValue("requireCache") == "1")
 	if err != nil {
 		log.Errorf(ctx, "Unable to query tags: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
