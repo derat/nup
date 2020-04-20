@@ -1,4 +1,8 @@
-package main
+// Copyright 2020 Daniel Erat.
+// All rights reserved.
+
+// Package dump loads data from datastore so it can be dumped to clients.
+package dump
 
 import (
 	"context"
@@ -8,6 +12,7 @@ import (
 	"time"
 
 	"github.com/derat/nup/cloudutil"
+	"github.com/derat/nup/server/common"
 	"github.com/derat/nup/types"
 
 	"google.golang.org/appengine/datastore"
@@ -19,7 +24,8 @@ const (
 	maxPlaysForSongDump = 256
 )
 
-func dumpEntities(ctx context.Context, q *datastore.Query, cursor string, entities []interface{}) (ids, parentIds []int64, nextCursor string, err error) {
+func getEntities(ctx context.Context, q *datastore.Query, cursor string, entities []interface{}) (
+	ids, parentIds []int64, nextCursor string, err error) {
 	q = q.KeysOnly()
 	if len(cursor) > 0 {
 		dc, err := datastore.DecodeCursor(cursor)
@@ -70,14 +76,16 @@ func dumpEntities(ctx context.Context, q *datastore.Query, cursor string, entiti
 	return ids, parentIds, nextCursor, nil
 }
 
-func dumpSongs(ctx context.Context, max int64, cursor string, includeCovers bool) (songs []types.Song, nextCursor string, err error) {
+func Songs(ctx context.Context, max int64, cursor string, includeCovers bool) (
+	songs []types.Song, nextCursor string, err error) {
 	songs = make([]types.Song, max)
 	songPtrs := make([]interface{}, max)
 	for i := range songs {
 		songPtrs[i] = &songs[i]
 	}
 
-	ids, _, nextCursor, err := dumpEntities(ctx, datastore.NewQuery(songKind).Order(keyProperty), cursor, songPtrs)
+	ids, _, nextCursor, err := getEntities(
+		ctx, datastore.NewQuery(common.SongKind).Order(keyProperty), cursor, songPtrs)
 	if err != nil {
 		return nil, "", err
 	}
@@ -93,14 +101,16 @@ func dumpSongs(ctx context.Context, max int64, cursor string, includeCovers bool
 	return songs, nextCursor, nil
 }
 
-func dumpPlays(ctx context.Context, max int64, cursor string) (plays []types.PlayDump, nextCursor string, err error) {
+func Plays(ctx context.Context, max int64, cursor string) (
+	plays []types.PlayDump, nextCursor string, err error) {
 	plays = make([]types.PlayDump, max)
 	playPtrs := make([]interface{}, max)
 	for i := range plays {
 		playPtrs[i] = &plays[i].Play
 	}
 
-	_, pids, nextCursor, err := dumpEntities(ctx, datastore.NewQuery(playKind).Order(keyProperty), cursor, playPtrs)
+	_, pids, nextCursor, err := getEntities(
+		ctx, datastore.NewQuery(common.PlayKind).Order(keyProperty), cursor, playPtrs)
 	if err != nil {
 		return nil, "", err
 	}
@@ -112,33 +122,35 @@ func dumpPlays(ctx context.Context, max int64, cursor string) (plays []types.Pla
 	return plays, nextCursor, nil
 }
 
-func dumpSongsForAndroid(ctx context.Context, minLastModified time.Time, deleted bool, max int64, cursor string) (songs []types.Song, nextCursor string, err error) {
+func SongsAndroid(ctx context.Context, minLastModified time.Time, deleted bool, max int64, cursor string) (
+	songs []types.Song, nextCursor string, err error) {
 	songs = make([]types.Song, max)
 	songPtrs := make([]interface{}, max)
 	for i := range songs {
 		songPtrs[i] = &songs[i]
 	}
 
-	kind := songKind
+	kind := common.SongKind
 	if deleted {
-		kind = deletedSongKind
+		kind = common.DeletedSongKind
 	}
 
-	ids, _, nextCursor, err := dumpEntities(ctx, datastore.NewQuery(kind).Filter("LastModifiedTime >= ", minLastModified), cursor, songPtrs)
+	ids, _, nextCursor, err := getEntities(ctx, datastore.NewQuery(kind).Filter(
+		"LastModifiedTime >= ", minLastModified), cursor, songPtrs)
 	if err != nil {
 		return nil, "", err
 	}
 
-	cfg := getConfig(ctx)
+	cfg := common.Config(ctx)
 	songs = songs[0:len(ids)]
 	for i, id := range ids {
-		prepareSongForClient(&songs[i], id, cfg, cloudutil.AndroidClient)
+		common.PrepareSongForClient(&songs[i], id, cfg, cloudutil.AndroidClient)
 	}
 	return songs, nextCursor, nil
 }
 
-func dumpSingleSong(ctx context.Context, id int64) (*types.Song, error) {
-	sk := datastore.NewKey(ctx, songKind, "", id, nil)
+func SingleSong(ctx context.Context, id int64) (*types.Song, error) {
+	sk := datastore.NewKey(ctx, common.SongKind, "", id, nil)
 	s := &types.Song{}
 	if err := datastore.Get(ctx, sk, s); err != nil {
 		return nil, err
@@ -150,7 +162,7 @@ func dumpSingleSong(ctx context.Context, id int64) (*types.Song, error) {
 	for i := range plays {
 		playPtrs[i] = &plays[i].Play
 	}
-	pids, _, _, err := dumpEntities(ctx, datastore.NewQuery(playKind).Ancestor(sk), "", playPtrs)
+	pids, _, _, err := getEntities(ctx, datastore.NewQuery(common.PlayKind).Ancestor(sk), "", playPtrs)
 	if err != nil {
 		return nil, err
 	}

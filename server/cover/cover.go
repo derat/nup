@@ -1,4 +1,8 @@
-package main
+// Copyright 2020 Daniel Erat.
+// All rights reserved.
+
+// Package cover loads and resizes album art cover images.
+package cover
 
 import (
 	"bytes"
@@ -14,26 +18,29 @@ import (
 
 	"cloud.google.com/go/storage"
 
+	"github.com/derat/nup/server/cache"
+	"github.com/derat/nup/server/common"
+
 	"golang.org/x/image/draw"
 
 	"google.golang.org/appengine/log"
 )
 
-// scaleCover reads the cover image at fn (corresponding to Song.CoverFilename),
+// Scale reads the cover image at fn (corresponding to Song.CoverFilename),
 // scales and crops it to be a square image with the supplied width and height
 // size, and writes it in JPEG format to w.
-func scaleCover(ctx context.Context, fn string, size, quality int, w io.Writer) error {
+func Scale(ctx context.Context, fn string, size, quality int, w io.Writer) error {
 	var data []byte
 	var err error
 
 	log.Debugf(ctx, "Checking cache for scaled cover")
-	if data, err = getCoverFromMemcache(ctx, fn, size); len(data) > 0 {
+	if data, err = cache.GetCoverMemcache(ctx, fn, size); len(data) > 0 {
 		log.Debugf(ctx, "Writing %d-byte cached scaled cover", len(data))
 		_, err = w.Write(data)
 		return err
 	}
 	log.Debugf(ctx, "Checking cache for original cover")
-	if data, err = getCoverFromMemcache(ctx, fn, 0); len(data) > 0 {
+	if data, err = cache.GetCoverMemcache(ctx, fn, 0); len(data) > 0 {
 		log.Debugf(ctx, "Got %d-byte cached original cover", len(data))
 	} else if err != nil {
 		log.Errorf(ctx, "Cache lookup failed: %v", err) // swallow error
@@ -41,11 +48,11 @@ func scaleCover(ctx context.Context, fn string, size, quality int, w io.Writer) 
 
 	if len(data) == 0 {
 		log.Debugf(ctx, "Loading original cover")
-		if data, err = loadCover(ctx, fn); err != nil {
+		if data, err = load(ctx, fn); err != nil {
 			return fmt.Errorf("failed to read cover: %v", err)
 		}
 		log.Debugf(ctx, "Caching %v-byte original cover", len(data))
-		if err = writeCoverToMemcache(ctx, fn, 0, data); err != nil {
+		if err = cache.SetCoverMemcache(ctx, fn, 0, data); err != nil {
 			log.Errorf(ctx, "Cache write failed: %v", err) // swallow error
 		}
 	}
@@ -82,17 +89,17 @@ func scaleCover(ctx context.Context, fn string, size, quality int, w io.Writer) 
 		return err
 	}
 	log.Debugf(ctx, "Caching %v-byte scaled cover", b.Len())
-	if err := writeCoverToMemcache(ctx, fn, size, b.Bytes()); err != nil {
+	if err := cache.SetCoverMemcache(ctx, fn, size, b.Bytes()); err != nil {
 		log.Errorf(ctx, "Cache write failed: %v", err) // swallow error
 	}
 	return nil
 }
 
-// loadCover loads and returns the cover image with the supplied original
+// load loads and returns the cover image with the supplied original
 // filename (see Song.CoverFilename).
-func loadCover(ctx context.Context, fn string) ([]byte, error) {
+func load(ctx context.Context, fn string) ([]byte, error) {
 	var r io.ReadCloser
-	if cfg := getConfig(ctx); cfg.CoverBucket != "" {
+	if cfg := common.Config(ctx); cfg.CoverBucket != "" {
 		log.Debugf(ctx, "Opening object %q from bucket %q", fn, cfg.CoverBucket)
 		client, err := storage.NewClient(ctx)
 		if err != nil {

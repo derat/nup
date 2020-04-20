@@ -1,10 +1,16 @@
-package main
+// Copyright 2020 Daniel Erat.
+// All rights reserved.
+
+// Package cache sets and gets data from memcache and datastore.
+package cache
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/derat/nup/server/common"
 
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
@@ -31,11 +37,11 @@ var jsonCodec = memcache.Codec{
 }
 
 type cachedQuery struct {
-	Query songQuery
+	Query common.SongQuery
 	Ids   []int64 // song IDs
 }
 
-type cachedQueries map[string]cachedQuery // keys are from songQuery.hash()
+type cachedQueries map[string]cachedQuery // keys are from SongQuery.Hash()
 
 // Wraps a JSON-encoded cachedQueries.
 type encodedCachedQueries struct {
@@ -72,9 +78,10 @@ func getAllCachedQueries(ctx context.Context) (cachedQueries, error) {
 	return qs, err
 }
 
-// getCachedQueryResults returns cached results for q.
+// GetQueryResults returns cached results for q.
 // If the query isn't cached, then a nil slice is returned.
-func getCachedQueryResults(ctx context.Context, q *songQuery) ([]int64, error) {
+// TODO: Split this into memcache vs. datastore.
+func GetQueryResults(ctx context.Context, q *common.SongQuery) ([]int64, error) {
 	qs, err := getAllCachedQueries(ctx)
 	if err != nil {
 		return nil, err
@@ -83,7 +90,7 @@ func getCachedQueryResults(ctx context.Context, q *songQuery) ([]int64, error) {
 		return nil, nil
 	}
 
-	if q, ok := qs[q.hash()]; ok {
+	if q, ok := qs[q.Hash()]; ok {
 		return q.Ids, nil
 	}
 	return nil, nil
@@ -91,61 +98,60 @@ func getCachedQueryResults(ctx context.Context, q *songQuery) ([]int64, error) {
 
 // updateCachedQueries loads all cached queries, passes them to f, and saves the
 // updated queries to both memcache and datastore.
-// If f returns errUnmodified, the queries won't be re-cached.
+// If f returns common.ErrUnmodified, the queries won't be re-cached.
 func updateCachedQueries(ctx context.Context, f func(cachedQueries) error) error {
 	qs, err := getAllCachedQueries(ctx)
 	if err != nil {
 		return err
 	}
 
-	if err := f(qs); err == errUnmodified {
+	if err := f(qs); err == common.ErrUnmodified {
 		return nil
 	} else if err != nil {
 		return err
 	}
 
 	var errs []error
-	errs = append(errs, writeToMemcache(ctx, cachedQueriesKey, &qs))
+	errs = append(errs, setMemcache(ctx, cachedQueriesKey, &qs))
 	if b, err := json.Marshal(qs); err != nil {
 		errs = append(errs, err)
 	} else {
-		errs = append(errs, writeToDatastoreCache(ctx, cachedQueriesDatastoreKey(ctx), &encodedCachedQueries{b}))
+		errs = append(errs, setDatastore(ctx, cachedQueriesDatastoreKey(ctx), &encodedCachedQueries{b}))
 	}
 	return joinErrors(errs)
 }
 
-// writeCachedQuery caches ids as results for query.
-func writeCachedQuery(ctx context.Context, q *songQuery, ids []int64) error {
+// SetQueryResults caches ids as results for query.
+func SetQueryResults(ctx context.Context, q *common.SongQuery, ids []int64) error {
 	return updateCachedQueries(ctx, func(qs cachedQueries) error {
-		qs[q.hash()] = cachedQuery{*q, ids}
+		qs[q.Hash()] = cachedQuery{*q, ids}
 		return nil
 	})
 }
 
-// flushCacheForUpdate deletes the appropriate cached data for an update of the
-// supplied types.
-func flushCacheForUpdate(ctx context.Context, ut updateTypes) error {
+// FlushForUpdate deletes the appropriate cached data for an update of the supplied types.
+func FlushForUpdate(ctx context.Context, ut common.UpdateTypes) error {
 	var errs []error
 
 	errs = append(errs, updateCachedQueries(ctx, func(qs cachedQueries) error {
 		flushed := 0
 		for i, q := range qs {
-			if q.Query.resultsInvalidated(ut) {
+			if q.Query.ResultsInvalidated(ut) {
 				delete(qs, i)
 				flushed++
 			}
 		}
 		if flushed == 0 {
-			return errUnmodified
+			return common.ErrUnmodified
 		}
 		log.Debugf(ctx, "Flushing %v cached query(s) in response to update of type %v", flushed, ut)
 		return nil
 	}))
 
-	if ut&tagsUpdate != 0 || ut&metadataUpdate != 0 {
+	if ut&common.TagsUpdate != 0 || ut&common.MetadataUpdate != 0 {
 		log.Debugf(ctx, "Flushing cached tags in response to update of type %v", ut)
-		errs = append(errs, deleteFromMemcache(ctx, cachedTagsKey))
-		errs = append(errs, deleteFromDatastoreCache(ctx, cachedTagsDatastoreKey(ctx)))
+		errs = append(errs, deleteMemcache(ctx, cachedTagsKey))
+		errs = append(errs, deleteDatastore(ctx, cachedTagsDatastoreKey(ctx)))
 	}
 
 	return joinErrors(errs)
@@ -156,9 +162,9 @@ func cachedTagsDatastoreKey(ctx context.Context) *datastore.Key {
 	return datastore.NewKey(ctx, cachedTagsKind, cachedTagsKey, 0, nil)
 }
 
-// readCachedTagsFromMemcache attempts to get the list of in-use tags from memcache.
+// GetTagsMemcache attempts to get the list of in-use tags from memcache.
 // On a cache miss, both returned values are nil.
-func readCachedTagsFromMemcache(ctx context.Context) ([]string, error) {
+func GetTagsMemcache(ctx context.Context) ([]string, error) {
 	var t cachedTags
 	if _, err := jsonCodec.Get(ctx, cachedTagsKey, &t); err == memcache.ErrCacheMiss {
 		return nil, nil
@@ -168,9 +174,9 @@ func readCachedTagsFromMemcache(ctx context.Context) ([]string, error) {
 	return t.Tags, nil
 }
 
-// readCachedTagsFromDatastore attempts to get the list of in-use tags from datastore.
+// GetTagsDatastore attempts to get the list of in-use tags from datastore.
 // On a cache miss, both returned values are nil.
-func readCachedTagsFromDatastore(ctx context.Context) ([]string, error) {
+func GetTagsDatastore(ctx context.Context) ([]string, error) {
 	var t cachedTags
 	if err := datastore.Get(ctx, cachedTagsDatastoreKey(ctx), &t); err == datastore.ErrNoSuchEntity {
 		return nil, nil
@@ -180,12 +186,12 @@ func readCachedTagsFromDatastore(ctx context.Context) ([]string, error) {
 	return t.Tags, nil
 }
 
-func writeCachedTagsToMemcache(ctx context.Context, tags []string) error {
-	return writeToMemcache(ctx, cachedTagsKey, &cachedTags{tags})
+func SetTagsMemcache(ctx context.Context, tags []string) error {
+	return setMemcache(ctx, cachedTagsKey, &cachedTags{tags})
 }
 
-func writeCachedTagsToDatastore(ctx context.Context, tags []string) error {
-	return writeToDatastoreCache(ctx, cachedTagsDatastoreKey(ctx), &cachedTags{tags})
+func SetTagsDatastore(ctx context.Context, tags []string) error {
+	return setDatastore(ctx, cachedTagsDatastoreKey(ctx), &cachedTags{tags})
 }
 
 // coverCacheKey returns the memcache key that should be used for caching a
@@ -197,9 +203,9 @@ func coverCacheKey(fn string, size int) string {
 	return fmt.Sprintf("%s-%s-%d", coverCachePrefix, size, fn)
 }
 
-// writeCoverToMemcache caches a cover image with the supplied filename,
+// SetCoverMemcache caches a cover image with the supplied filename,
 // requested size, and raw data. size should be 0 when caching the original image.
-func writeCoverToMemcache(ctx context.Context, fn string, size int, data []byte) error {
+func SetCoverMemcache(ctx context.Context, fn string, size int, data []byte) error {
 	return memcache.Set(ctx, &memcache.Item{
 		Key:        coverCacheKey(fn, size),
 		Value:      data,
@@ -207,10 +213,10 @@ func writeCoverToMemcache(ctx context.Context, fn string, size int, data []byte)
 	})
 }
 
-// getCoverFromMemcache attempts to look up raw data for the cover image with
+// GetCoverMemcache attempts to look up raw data for the cover image with
 // the supplied filename and size. If the image isn't present, both the returned
 // byte slice and the error are nil.
-func getCoverFromMemcache(ctx context.Context, fn string, size int) ([]byte, error) {
+func GetCoverMemcache(ctx context.Context, fn string, size int) ([]byte, error) {
 	item, err := memcache.Get(ctx, coverCacheKey(fn, size))
 	if err == memcache.ErrCacheMiss {
 		return nil, nil
@@ -220,59 +226,77 @@ func getCoverFromMemcache(ctx context.Context, fn string, size int) ([]byte, err
 	return item.Value, nil
 }
 
-// flushMemcacheCache deletes all cached objects from memcache.
-func flushMemcacheCache(ctx context.Context) error {
+// FlushMemcache deletes all cached objects from memcache.
+func FlushMemcache(ctx context.Context) error {
 	return memcache.Flush(ctx)
 }
 
-// flushDatastoreCache deletes all cached objects from datastore.
-func flushDatastoreCache(ctx context.Context) error {
+// FlushDatastore deletes all cached objects from datastore.
+func FlushDatastore(ctx context.Context) error {
 	var errs []error
-	errs = append(errs, deleteFromDatastoreCache(ctx, cachedQueriesDatastoreKey(ctx)))
-	errs = append(errs, deleteFromDatastoreCache(ctx, cachedTagsDatastoreKey(ctx)))
+	errs = append(errs, deleteDatastore(ctx, cachedQueriesDatastoreKey(ctx)))
+	errs = append(errs, deleteDatastore(ctx, cachedTagsDatastoreKey(ctx)))
 	return joinErrors(errs)
 }
 
-// writeToMemcache saves obj at key in memcache.
+// setMemcache saves obj at key in memcache.
 // If the update fails, the stale object (if present) is deleted.
-func writeToMemcache(ctx context.Context, key string, obj interface{}) error {
+func setMemcache(ctx context.Context, key string, obj interface{}) error {
 	var errs []error
 	if err := jsonCodec.Set(ctx, &memcache.Item{Key: key, Object: obj}); err != nil {
 		errs = append(errs, fmt.Errorf("set failed: %v", err))
-		if err := deleteFromMemcache(ctx, key); err != nil {
+		if err := deleteMemcache(ctx, key); err != nil {
 			errs = append(errs, fmt.Errorf("delete failed: %v", err))
 		}
 	}
 	return joinErrors(errs)
 }
 
-// writeToDatastoreCache saves obj at key in datastore.
+// setDatastore saves obj at key in datastore.
 // If the update fails, the stale object (if present) is deleted.
-func writeToDatastoreCache(ctx context.Context, key *datastore.Key, obj interface{}) error {
+func setDatastore(ctx context.Context, key *datastore.Key, obj interface{}) error {
 	var errs []error
 	if _, err := datastore.Put(ctx, key, obj); err != nil {
 		errs = append(errs, fmt.Errorf("put failed: %v", err))
-		if err := deleteFromDatastoreCache(ctx, key); err != nil {
+		if err := deleteDatastore(ctx, key); err != nil {
 			errs = append(errs, fmt.Errorf("delete failed: %v", err))
 		}
 	}
 	return joinErrors(errs)
 }
 
-// deleteFromMemcache deletes key from memcache.
+// deleteMemcache deletes key from memcache.
 // nil is returned if the key isn't present.
-func deleteFromMemcache(ctx context.Context, key string) error {
+func deleteMemcache(ctx context.Context, key string) error {
 	if err := memcache.Delete(ctx, key); err != nil && err != memcache.ErrCacheMiss {
 		return err
 	}
 	return nil
 }
 
-// deleteFromDatastoreCache deletes key from datastore.
+// deleteDatastore deletes key from datastore.
 // nil is returned if the key isn't present.
-func deleteFromDatastoreCache(ctx context.Context, key *datastore.Key) error {
+func deleteDatastore(ctx context.Context, key *datastore.Key) error {
 	if err := datastore.Delete(ctx, key); err != nil && err != datastore.ErrNoSuchEntity {
 		return err
 	}
 	return nil
+}
+
+// joinErrors returns a new error all messages from any non-nil errors in errs.
+// If no non-nil errors are present, nil is returned.
+// TODO: Delete this?
+func joinErrors(errs []error) error {
+	var all error
+	for _, err := range errs {
+		if err == nil {
+			continue
+		}
+		if all == nil {
+			all = err
+		} else {
+			all = fmt.Errorf("%v; %v", all.Error(), err.Error())
+		}
+	}
+	return all
 }

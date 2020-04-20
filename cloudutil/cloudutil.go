@@ -1,3 +1,6 @@
+// Copyright 2020 Daniel Erat.
+// All rights reserved.
+
 // Package cloudutil provides common server-related functionality.
 package cloudutil
 

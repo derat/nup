@@ -1,3 +1,6 @@
+// Copyright 2020 Daniel Erat.
+// All rights reserved.
+
 package main
 
 import (

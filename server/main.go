@@ -1,3 +1,6 @@
+// Copyright 2020 Daniel Erat.
+// All rights reserved.
+
 package main
 
 import (
@@ -5,6 +8,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -14,6 +18,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/derat/nup/server/cache"
+	"github.com/derat/nup/server/common"
+	"github.com/derat/nup/server/cover"
+	"github.com/derat/nup/server/dump"
+	"github.com/derat/nup/server/query"
+	"github.com/derat/nup/server/update"
 	"github.com/derat/nup/types"
 
 	"google.golang.org/appengine"
@@ -123,7 +133,7 @@ func hasWebDriverCookie(r *http.Request) bool {
 // is redirected to the login screen.
 func checkRequest(ctx context.Context, w http.ResponseWriter, r *http.Request,
 	method string, redirectToLogin bool) bool {
-	cfg := getConfig(ctx)
+	cfg := common.Config(ctx)
 	username, allowed := hasAllowedGoogleAuth(ctx, cfg)
 	if !allowed && len(username) == 0 {
 		username, allowed = hasAllowedBasicAuth(r, cfg)
@@ -190,7 +200,9 @@ func secondsToTime(s float64) time.Time {
 }
 
 func main() {
-	loadBaseConfig()
+	if err := common.LoadConfig(); err != nil {
+		panic(fmt.Sprintf("Loading config failed: %v", err))
+	}
 	rand.Seed(time.Now().UnixNano())
 
 	http.HandleFunc("/", handleIndex)
@@ -223,7 +235,7 @@ func handleClear(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only works on dev server", http.StatusBadRequest)
 		return
 	}
-	if err := clearData(ctx); err != nil {
+	if err := update.ClearData(ctx); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -242,10 +254,10 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 
 	cfg := types.ServerConfig{}
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err == nil {
-		addTestUserToConfig(&cfg)
-		saveTestConfig(ctx, &cfg)
+		common.AddTestUserToConfig(&cfg)
+		common.SaveTestConfig(ctx, &cfg)
 	} else if err == io.EOF {
-		clearTestConfig(ctx)
+		common.ClearTestConfig(ctx)
 	} else {
 		log.Errorf(ctx, "Failed to decode config: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -289,7 +301,7 @@ func handleCover(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Expires", time.Now().UTC().Add(24*time.Hour).Format(time.RFC1123))
 
 	w.Header().Set("Content-Type", "image/jpeg")
-	if err := scaleCover(ctx, fn, int(size), coverJPEGQuality, w); err != nil {
+	if err := cover.Scale(ctx, fn, int(size), coverJPEGQuality, w); err != nil {
 		log.Errorf(ctx, "Failed to scale cover: %v", err)
 		http.Error(w, "Scaling failed", http.StatusInternalServerError)
 		return
@@ -307,7 +319,7 @@ func handleDeleteSong(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := deleteSong(ctx, id); err != nil {
+	if err := update.DeleteSong(ctx, id); err != nil {
 		log.Errorf(ctx, "Got error while deleting song: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -325,7 +337,7 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s, err := dumpSingleSong(ctx, id)
+	s, err := dump.SingleSong(ctx, id)
 	if err != nil {
 		log.Errorf(ctx, "Dumping song %v failed: %v", id, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -376,7 +388,7 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 	switch r.FormValue("type") {
 	case "song":
 		var songs []types.Song
-		songs, nextCursor, err = dumpSongs(ctx, max, r.FormValue("cursor"), includeCovers)
+		songs, nextCursor, err = dump.Songs(ctx, max, r.FormValue("cursor"), includeCovers)
 		if err != nil {
 			log.Errorf(ctx, "Dumping songs failed: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -388,7 +400,7 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 		}
 	case "play":
 		var plays []types.PlayDump
-		plays, nextCursor, err = dumpPlays(ctx, max, r.FormValue("cursor"))
+		plays, nextCursor, err = dump.Plays(ctx, max, r.FormValue("cursor"))
 		if err != nil {
 			log.Errorf(ctx, "Dumping plays failed: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -428,13 +440,13 @@ func handleFlushCache(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only works on dev server", http.StatusBadRequest)
 		return
 	}
-	if err := flushMemcacheCache(ctx); err != nil {
+	if err := cache.FlushMemcache(ctx); err != nil {
 		log.Errorf(ctx, "Flushing memcache failed: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if r.FormValue("onlyMemcache") != "1" {
-		if err := flushDatastoreCache(ctx); err != nil {
+		if err := cache.FlushDatastore(ctx); err != nil {
 			log.Errorf(ctx, "Flushing datastore failed: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -495,14 +507,14 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := updateOrInsertSong(ctx, s, replaceUserData, updateDelay); err != nil {
+		if err := update.UpdateOrInsertSong(ctx, s, replaceUserData, updateDelay); err != nil {
 			log.Errorf(ctx, "Failed to update song with SHA1 %v: %v", s.SHA1, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		numSongs++
 	}
-	if err := flushCacheForUpdate(ctx, metadataUpdate); err != nil {
+	if err := cache.FlushForUpdate(ctx, common.MetadataUpdate); err != nil {
 		log.Errorf(ctx, "Failed to flush cached queries: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -515,7 +527,7 @@ func handleListTags(w http.ResponseWriter, r *http.Request) {
 	if !checkRequest(ctx, w, r, "GET", false) {
 		return
 	}
-	tags, err := getTags(ctx, r.FormValue("onlyCached") == "1")
+	tags, err := query.Tags(ctx, r.FormValue("onlyCached") == "1")
 	if err != nil {
 		log.Errorf(ctx, "Unable to query tags: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -540,12 +552,13 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 
 	cacheOnly := r.FormValue("cacheOnly") == "1"
 
-	q := &songQuery{}
-	q.Artist = r.FormValue("artist")
-	q.Title = r.FormValue("title")
-	q.Album = r.FormValue("album")
-	q.Keywords = strings.Fields(r.FormValue("keywords"))
-	q.Shuffle = r.FormValue("shuffle") == "1"
+	q := common.SongQuery{
+		Artist:   r.FormValue("artist"),
+		Title:    r.FormValue("title"),
+		Album:    r.FormValue("album"),
+		Keywords: strings.Fields(r.FormValue("keywords")),
+		Shuffle:  r.FormValue("shuffle") == "1",
+	}
 
 	if r.FormValue("firstTrack") == "1" {
 		q.Track = 1
@@ -595,7 +608,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	songs, err := getSongsForQuery(ctx, q, cacheOnly)
+	songs, err := query.Songs(ctx, &q, cacheOnly)
 	if err != nil {
 		log.Errorf(ctx, "Unable to query songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -644,13 +657,13 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := getConfig(ctx)
+	cfg := common.Config(ctx)
 	if cfg.ForceUpdateFailures && appengine.IsDevAppServer() {
 		http.Error(w, "Returning an error, as requested", http.StatusInternalServerError)
 		return
 	}
 
-	if err := updateRatingAndTags(ctx, id, hasRating, rating, tags, updateDelay); err != nil {
+	if err := update.SetRatingAndTags(ctx, id, hasRating, rating, tags, updateDelay); err != nil {
 		log.Errorf(ctx, "Got error while rating/tagging song: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -676,7 +689,7 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 	}
 	startTime := secondsToTime(startTimeFloat)
 
-	cfg := getConfig(ctx)
+	cfg := common.Config(ctx)
 	if cfg.ForceUpdateFailures && appengine.IsDevAppServer() {
 		http.Error(w, "Returning an error, as requested", http.StatusInternalServerError)
 		return
@@ -685,7 +698,7 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 	// Drop the trailing colon and port number. We can't just split on ':' and
 	// take the first item since we may get an IPv6 address like "[::1]:12345".
 	ip := regexp.MustCompile(":\\d+$").ReplaceAllString(r.RemoteAddr, "")
-	if err := addPlay(ctx, id, startTime, ip); err != nil {
+	if err := update.AddPlay(ctx, id, startTime, ip); err != nil {
 		log.Errorf(ctx, "Got error while recording play: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -728,7 +741,7 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	songs, cursor, err := dumpSongsForAndroid(ctx, minLastModified, deleted != 0, max, r.FormValue("cursor"))
+	songs, cursor, err := dump.SongsAndroid(ctx, minLastModified, deleted != 0, max, r.FormValue("cursor"))
 	if err != nil {
 		log.Errorf(ctx, "Unable to get songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

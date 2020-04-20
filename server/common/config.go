@@ -1,7 +1,11 @@
-package main
+// Copyright 2020 Daniel Erat.
+// All rights reserved.
+
+package common
 
 import (
 	"context"
+	"errors"
 
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
@@ -21,7 +25,7 @@ const (
 
 var baseCfg *types.ServerConfig
 
-func addTestUserToConfig(cfg *types.ServerConfig) {
+func AddTestUserToConfig(cfg *types.ServerConfig) {
 	cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, types.BasicAuthInfo{
 		Username: cloudutil.TestUsername,
 		Password: cloudutil.TestPassword,
@@ -36,39 +40,40 @@ func cleanBaseURL(u *string) {
 	}
 }
 
-func loadBaseConfig() {
+func LoadConfig() error {
 	baseCfg = &types.ServerConfig{}
 	if err := cloudutil.ReadJSON(configPath, baseCfg); err != nil {
-		panic(err)
+		return err
 	}
 
 	cleanBaseURL(&baseCfg.SongBaseURL)
 	haveSongBucket := len(baseCfg.SongBucket) > 0
 	haveSongURL := len(baseCfg.SongBaseURL) > 0
 	if (haveSongBucket && haveSongURL) || !(haveSongBucket || haveSongURL) {
-		panic("Exactly one of SongBucket and SongBaseURL must be set")
+		return errors.New("exactly one of SongBucket and SongBaseURL must be set")
 	}
 
 	cleanBaseURL(&baseCfg.CoverBaseURL)
 	haveCoverBucket := len(baseCfg.CoverBucket) > 0
 	haveCoverURL := len(baseCfg.CoverBaseURL) > 0
 	if (haveCoverBucket && haveCoverURL) || !(haveCoverBucket || haveCoverURL) {
-		panic("Exactly one of CoverBucket and CoverBaseURL must be set")
+		return errors.New("exactly one of CoverBucket and CoverBaseURL must be set")
 	}
 
 	if appengine.IsDevAppServer() {
-		addTestUserToConfig(baseCfg)
+		AddTestUserToConfig(baseCfg)
 	}
+	return nil
 }
 
-func getTestConfigKey(ctx context.Context) *datastore.Key {
+func testConfigKey(ctx context.Context) *datastore.Key {
 	return datastore.NewKey(ctx, configKind, configKeyId, 0, nil)
 }
 
-func getConfig(ctx context.Context) *types.ServerConfig {
+func Config(ctx context.Context) *types.ServerConfig {
 	if appengine.IsDevAppServer() {
 		testConfig := types.ServerConfig{}
-		if err := datastore.Get(ctx, getTestConfigKey(ctx), &testConfig); err == nil {
+		if err := datastore.Get(ctx, testConfigKey(ctx), &testConfig); err == nil {
 			return &testConfig
 		} else if err != datastore.ErrNoSuchEntity {
 			panic(err)
@@ -81,14 +86,14 @@ func getConfig(ctx context.Context) *types.ServerConfig {
 	return baseCfg
 }
 
-func saveTestConfig(ctx context.Context, cfg *types.ServerConfig) {
-	if _, err := datastore.Put(ctx, getTestConfigKey(ctx), cfg); err != nil {
+func SaveTestConfig(ctx context.Context, cfg *types.ServerConfig) {
+	if _, err := datastore.Put(ctx, testConfigKey(ctx), cfg); err != nil {
 		panic(err)
 	}
 }
 
-func clearTestConfig(ctx context.Context) {
-	if err := datastore.Delete(ctx, getTestConfigKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
+func ClearTestConfig(ctx context.Context) {
+	if err := datastore.Delete(ctx, testConfigKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
 		panic(err)
 	}
 }
