@@ -155,17 +155,22 @@ func datastoreCachedTagsKey(ctx context.Context) *datastore.Key {
 	return datastore.NewKey(ctx, cachedTagsKind, tagsCacheKey, 0, nil)
 }
 
-// getCachedTags returns the list of cached tags. It attempts to read them from
-// memcache before falling back to datastore. If datastore fails, an error is
-// returned.
-func getCachedTags(ctx context.Context) ([]string, error) {
+// readCachedTagsFromMemcache attempts to get the list of in-use tags from memcache.
+// On a cache miss, both returned values are nil.
+func readCachedTagsFromMemcache(ctx context.Context) ([]string, error) {
 	var t cachedTags
-	if _, err := jsonCodec.Get(ctx, tagsCacheKey, &t); err == nil {
-		return t.Tags, nil
-	} else if err != memcache.ErrCacheMiss {
-		log.Errorf(ctx, "Getting cached tags from memcache failed: %v", err) // ignore
+	if _, err := jsonCodec.Get(ctx, tagsCacheKey, &t); err == memcache.ErrCacheMiss {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
 	}
+	return t.Tags, nil
+}
 
+// readCachedTagsFromDatastore attempts to get the list of in-use tags from datastore.
+// On a cache miss, both returned values are nil.
+func readCachedTagsFromDatastore(ctx context.Context) ([]string, error) {
+	var t cachedTags
 	if err := datastore.Get(ctx, datastoreCachedTagsKey(ctx), &t); err == datastore.ErrNoSuchEntity {
 		return nil, nil
 	} else if err != nil {
@@ -174,13 +179,12 @@ func getCachedTags(ctx context.Context) ([]string, error) {
 	return t.Tags, nil
 }
 
-// writeCachedTags writes tags to memcache and datastore.
-func writeCachedTags(ctx context.Context, tags []string) error {
-	t := cachedTags{tags}
-	return joinErrors([]error{
-		writeToMemcache(ctx, tagsCacheKey, &t),
-		writeToDatastoreCache(ctx, datastoreCachedTagsKey(ctx), &t),
-	})
+func writeCachedTagsToMemcache(ctx context.Context, tags []string) error {
+	return writeToMemcache(ctx, tagsCacheKey, &cachedTags{tags})
+}
+
+func writeCachedTagsToDatastore(ctx context.Context, tags []string) error {
+	return writeToDatastoreCache(ctx, datastoreCachedTagsKey(ctx), &cachedTags{tags})
 }
 
 // flushCachedTags deletes cached tags from memcache and datastore. Memcache
@@ -255,9 +259,9 @@ func joinErrors(errs []error) error {
 func writeToMemcache(ctx context.Context, key string, obj interface{}) error {
 	var errs []error
 	if err := jsonCodec.Set(ctx, &memcache.Item{Key: key, Object: obj}); err != nil {
-		errs = append(errs, fmt.Errorf("memcache set failed: %v", err))
+		errs = append(errs, fmt.Errorf("set failed: %v", err))
 		if err := deleteFromMemcache(ctx, key); err != nil {
-			errs = append(errs, fmt.Errorf("memcache delete failed: %v", err))
+			errs = append(errs, fmt.Errorf("delete failed: %v", err))
 		}
 	}
 	return joinErrors(errs)
@@ -268,9 +272,9 @@ func writeToMemcache(ctx context.Context, key string, obj interface{}) error {
 func writeToDatastoreCache(ctx context.Context, key *datastore.Key, obj interface{}) error {
 	var errs []error
 	if _, err := datastore.Put(ctx, key, obj); err != nil {
-		errs = append(errs, fmt.Errorf("datastore put failed: %v", err))
+		errs = append(errs, fmt.Errorf("put failed: %v", err))
 		if err := deleteFromDatastoreCache(ctx, key); err != nil {
-			errs = append(errs, fmt.Errorf("datastore delete failed: %v", err))
+			errs = append(errs, fmt.Errorf("delete failed: %v", err))
 		}
 	}
 	return joinErrors(errs)

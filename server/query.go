@@ -85,27 +85,57 @@ func (q *songQuery) resultsInvalidated(ut updateTypes) bool {
 // It attempts to return cached data before falling back to scanning all songs.
 // If songs are scanned, the resulting tags are cached.
 func getTags(ctx context.Context) (tags []string, err error) {
+	// Check memcache first.
 	startTime := time.Now()
-	if tags, err = getCachedTags(ctx); err != nil {
-		log.Errorf(ctx, "Got error while getting cached tags: %v", err)
-	} else if tags != nil {
-		log.Debugf(ctx, "Got %v cached tag(s) in %v ms", len(tags), getMsecSinceTime(startTime))
+	if tags, err = readCachedTagsFromMemcache(ctx); err != nil {
+		log.Errorf(ctx, "Got error while getting cached tags from memcache: %v", err)
+	} else if tags == nil {
+		log.Debugf(ctx, "Memcache cache miss took %v ms", getMsecSinceTime(startTime))
+	} else {
+		log.Debugf(ctx, "Got %v cached tag(s) from memcache in %v ms",
+			len(tags), getMsecSinceTime(startTime))
 		return tags, nil
 	}
 
+	// If memcache didn't have the tags, schedule writing them there on our way out.
+	saveToMemcache := false
+	defer func() {
+		if saveToMemcache {
+			startTime := time.Now()
+			if err := writeCachedTagsToMemcache(ctx, tags); err != nil {
+				log.Errorf(ctx, "Failed to cache tags to memcache: %v", err)
+			} else {
+				log.Debugf(ctx, "Cached tags to memcache in %v ms", getMsecSinceTime(startTime))
+			}
+		}
+	}()
+
+	// Try to get the cached tags from datastore.
 	startTime = time.Now()
-	tagMap := make(map[string]bool)
+	if tags, err = readCachedTagsFromDatastore(ctx); err != nil {
+		log.Errorf(ctx, "Got error while getting cached tags from datastore: %v", err)
+	} else if tags == nil {
+		log.Debugf(ctx, "Datastore cache miss took %v ms", getMsecSinceTime(startTime))
+	} else {
+		log.Debugf(ctx, "Got %v cached tag(s) from datastore in %v ms",
+			len(tags), getMsecSinceTime(startTime))
+		saveToMemcache = true
+		return tags, nil
+	}
+
+	// Fall back to running a slow query across all songs.
+	startTime = time.Now()
+	tagMap := make(map[string]struct{})
 	it := datastore.NewQuery(songKind).Project("Tags").Distinct().Run(ctx)
 	for {
-		song := &types.Song{}
-		if _, err := it.Next(song); err == nil {
-			for _, t := range song.Tags {
-				tagMap[t] = true
-			}
-		} else if err == datastore.Done {
+		var song types.Song
+		if _, err := it.Next(&song); err == datastore.Done {
 			break
-		} else {
+		} else if err != nil {
 			return nil, err
+		}
+		for _, t := range song.Tags {
+			tagMap[t] = struct{}{}
 		}
 	}
 	tags = make([]string, len(tagMap))
@@ -115,13 +145,17 @@ func getTags(ctx context.Context) (tags []string, err error) {
 		i++
 	}
 	sort.Strings(tags)
-	log.Debugf(ctx, "Got %v tag(s) from datastore in %v ms", len(tags), getMsecSinceTime(startTime))
+	log.Debugf(ctx, "Queried %v tag(s) from datastore in %v ms",
+		len(tags), getMsecSinceTime(startTime))
+	saveToMemcache = true
 
+	// This write can be slow and will block the HTTP response, but callers
+	// should be getting the tags asynchronously anyway.
 	startTime = time.Now()
-	if err = writeCachedTags(ctx, tags); err != nil {
-		log.Errorf(ctx, "Got error while caching tags: %v", err)
+	if err := writeCachedTagsToDatastore(ctx, tags); err != nil {
+		log.Errorf(ctx, "Failed to cache tags to datastore: %v", err)
 	} else {
-		log.Debugf(ctx, "Cached %v tag(s) in %v ms", len(tags), getMsecSinceTime(startTime))
+		log.Debugf(ctx, "Cached tags to datastore in %v ms", getMsecSinceTime(startTime))
 	}
 
 	return tags, nil
