@@ -221,8 +221,42 @@ func main() {
 	http.HandleFunc("/report_played", handleReportPlayed)
 	http.HandleFunc("/songs", handleSongs)
 
-	// TODO: Update to use http.ListenAndServe():
-	// https://cloud.google.com/appengine/docs/standard/go111/go-differences#writing_a_main_package
+	// The google.golang.org/appengine packages are deprecated, and the official
+	// way forward is to use cloud.google.com/go and call http.ListenAndServe():
+	// https://cloud.google.com/appengine/docs/standard/go/go-differences
+	//
+	// However, the new approach seems strictly worse in terms of usability,
+	// functionality, and cost:
+	//
+	// Log messages written via the log package in the Go standard library don't
+	// have a severity associated with them and don't get grouped with requests.
+	// It looks like the cloud.google.com/go/logging package can be used to
+	// write structured entries, but associating them with requests seems to
+	// require parsing X-Cloud-Trace-Context headers from incoming requests:
+	// https://cloud.google.com/appengine/docs/standard/go/writing-application-logs
+	// There are apparently third-party packages that can make this easier.
+	//
+	// Memcache support is completely dropped. The suggestion is to use
+	// Memorystore for Redis instead, but there's no free tier or shared instance:
+	// https://cloud.google.com/appengine/docs/standard/go/using-memorystore
+	// As of April 2020, the minimum cost (for a 1 GB Basic tier M1
+	// instance) seems to be $0.049/hour, for about $35/month. I'm assuming that
+	// you can't get billed for a partial GB.
+	//
+	// Datastore seems to be pretty much the same, but it sounds like you need to
+	// run the datastore emulator now instead of using dev_appserver.py:
+	// https://cloud.google.com/datastore/docs/tools/datastore-emulator
+	// The emulator is still in beta, of course. You also need to explicitly
+	// initialize a client, which is a bit painful when you're dealing with
+	// individual requests and making datastore calls from different packages.
+	//
+	// The App Engine Mail and Blobstore APIs are apparently also getting killed
+	// off, but this app fortunately doesn't use them.
+	//
+	// Support for the appengine packages is dropped in the go112 runtime and
+	// later, so I guess I'll need to move over at some point. In the maintime,
+	// appengine.Main() needs to be called here so that appengine.NewContext()
+	// will work in the handlers.
 	appengine.Main()
 }
 
