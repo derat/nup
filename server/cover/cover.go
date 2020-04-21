@@ -15,6 +15,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"sync"
 
 	"cloud.google.com/go/storage"
 
@@ -23,8 +24,21 @@ import (
 
 	"golang.org/x/image/draw"
 
+	"google.golang.org/api/option"
 	"google.golang.org/appengine/log"
 )
+
+// A single storage.Client is initialized in response to the first load() call
+// that needs to read from Cloud Storage and then reused. I was initially seeing
+// very slow NewClient() and Object() calls in load(), sometimes taking close to
+// a second in total. When reusing a single client, I frequently see 90-160 ms,
+// but the numbers are noisy enough that I'm still not completely convinced
+// that this helps.
+var client *storage.Client
+var clientOnce sync.Once
+
+// More superstition: https://github.com/googleapis/google-cloud-go/issues/530
+const grpcPoolSize = 4
 
 // Scale reads the cover image at fn (corresponding to Song.CoverFilename),
 // scales and crops it to be a square image with the supplied width and height
@@ -100,12 +114,27 @@ func Scale(ctx context.Context, fn string, size, quality int, w io.Writer) error
 func load(ctx context.Context, fn string) ([]byte, error) {
 	var r io.ReadCloser
 	if cfg := common.Config(ctx); cfg.CoverBucket != "" {
-		log.Debugf(ctx, "Opening object %q from bucket %q", fn, cfg.CoverBucket)
-		client, err := storage.NewClient(ctx)
+		// It would seem more reasonable to call NewClient from an init()
+		// function instead, but that produces an error like the following:
+		//
+		//   dialing: google: could not find default credentials. See
+		//   https://developers.google.com/accounts/docs/application-default-credentials for more information.
+		//
+		// This happens regardless of whether I pass context.Background() or
+		// appengine.BackgroundContext(). It feels wrong to use the credentials
+		// from the first request for all later requests, but it seems to work.
+		// Requests are only accepted from a specific list of users and are all
+		// satisfied using the same GCS bucket, so hopefully there are no
+		// security implications from doing this.
+		var err error
+		clientOnce.Do(func() {
+			log.Debugf(ctx, "Initializing storage client")
+			client, err = storage.NewClient(ctx, option.WithGRPCConnectionPool(grpcPoolSize))
+		})
 		if err != nil {
 			return nil, err
 		}
-		defer client.Close()
+		log.Debugf(ctx, "Opening object %q from bucket %q", fn, cfg.CoverBucket)
 		if r, err = client.Bucket(cfg.CoverBucket).Object(fn).NewReader(ctx); err != nil {
 			return nil, err
 		}
