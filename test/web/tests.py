@@ -644,23 +644,20 @@ class Test(unittest.TestCase):
         textarea = page.get(page.EDIT_TAGS_TEXTAREA)
 
         def check_textarea(expected):
-            actual = textarea.get_attribute('value')
-            if actual != expected:
-                self.fail('Tag text was "%s"; expected "%s"' %
-                          (actual, expected))
+            utils.wait_equal(lambda: textarea.get_attribute('value'),
+                             expected,
+                             timeout_sec=3)
 
         def check_suggestions(expected):
-            actual = page.get_tag_suggestions(page.EDIT_TAGS_SUGGESTER)
-            if actual != expected:
-                self.fail('Tag suggestions were %s; expected %s' %
-                          (str(actual), str(expected)))
+            utils.wait_equal(
+                lambda: page.get_tag_suggestions(page.EDIT_TAGS_SUGGESTER),
+                expected,
+                timeout_sec=3)
 
         check_textarea('a0 a1 b ')
 
         TAB = u'\ue004'
         textarea.send_keys('d' + TAB)
-        # TODO: This check seems to be racy. I saw a failure once where the
-        # trailing space was missing.
         check_textarea('a0 a1 b d ')
 
         textarea.send_keys('c' + TAB)
