@@ -94,6 +94,15 @@ input[type='checkbox']:checked:before {
   position: absolute;
 }
 
+/* Make a minor tweak to the checkmark position for low-DPI displays.
+ * Chrome DevTools' rendering of this on a high-DPI display doesn't seem
+ * accurate when using an emulated device with a device pixel ratio of 1. */
+@media (-webkit-max-device-pixel-ratio: 1) {
+  input[type='checkbox']:checked:before {
+    margin-top: 1px;
+  }
+}
+
 input[type='checkbox'].small {
   height: 12px;
   width: 12px;
