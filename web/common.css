@@ -33,7 +33,7 @@ span.x-icon:hover {
   color: #666;
 }
 span.x-icon::before {
-  content: '×';
+  content: '\d7'; /* × */
 }
 
 button {
@@ -86,7 +86,7 @@ input[type='checkbox']:checked {
   color: #999;
 }
 input[type='checkbox']:checked:before {
-  content: '✓';
+  content: '\2713'; /* ✓ */
   font-family: var(--icon-font-family);
   font-size: 9px;
   margin-left: 2px;
@@ -115,7 +115,7 @@ input[type='checkbox'].small:checked:before {
   position: relative;
   top: 0;
   right: 21px;
-  content: '⌄';
+  content: '\2304'; /* ⌄ */
   pointer-events: none;
 }
 select {
