@@ -118,7 +118,7 @@ const template = createTemplate(`
 <form id="search-form">
   <div class="row">
     <div>
-      <input id="keywords-input" type="text" placeholder="Keywords" />
+      <input id="keywords-input" type="text" placeholder="Keywords">
       <span id="keywords-clear" class="x-icon" title="Clear text"></span>
     </div>
   </div>
@@ -126,7 +126,7 @@ const template = createTemplate(`
   <div class="row">
     <div id="tags-input-div">
       <tag-suggester id="tags-suggester" tab-advances-focus>
-        <input id="tags-input" slot="text" type="text" placeholder="Tags" />
+        <input id="tags-input" slot="text" type="text" placeholder="Tags">
       </tag-suggester>
       <span id="tags-clear" class="x-icon" title="Clear text"></span>
     </div>
@@ -134,22 +134,18 @@ const template = createTemplate(`
 
   <div class="row">
     <div class="checkbox-col">
-      <input id="shuffle-checkbox" type="checkbox" value="shuffle" />
+      <input id="shuffle-checkbox" type="checkbox" value="shuffle">
       <label for="shuffle-checkbox">Shuffle</label>
     </div>
     <div>
-      <input
-        id="first-track-checkbox"
-        type="checkbox"
-        value="firstTrack"
-      />
+      <input id="first-track-checkbox" type="checkbox" value="firstTrack">
       <label for="first-track-checkbox">First track</label>
     </div>
   </div>
 
   <div class="row">
     <div class="checkbox-col">
-      <input id="unrated-checkbox" type="checkbox" value="unrated" />
+      <input id="unrated-checkbox" type="checkbox" value="unrated">
       <label for="unrated-checkbox">Unrated</label>
     </div>
     <div class="select-wrapper">
@@ -167,7 +163,7 @@ const template = createTemplate(`
   <div class="row">
     <div>
       <label for="max-plays-input">Played</label>
-      <input id="max-plays-input" type="text" />
+      <input id="max-plays-input" type="text">
       <label for="max-plays-input">or fewer times</label>
     </div>
   </div>

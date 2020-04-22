@@ -64,7 +64,7 @@ const messageDialogTemplate = createTemplate(`
   }
 </style>
 <div id="title" class="title"></div>
-<hr class="title" />
+<hr class="title">
 <div id="message"></div>
 <div class="button-container">
   <button id="ok-button">OK</button>

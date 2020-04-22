@@ -15,10 +15,10 @@ const template = createTemplate(`
   }
 </style>
 <div class="title">Options</div>
-<hr class="title" />
+<hr class="title">
 <p>
   <label for="volume-range">Volume:</label>
-  <input id="volume-range" type="range" min="0.0" max="1.0" step="0.1" />
+  <input id="volume-range" type="range" min="0.0" max="1.0" step="0.1">
   <span id="volume-span"></span>
 </p>
 <div class="button-container">

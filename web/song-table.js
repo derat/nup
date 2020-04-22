@@ -81,9 +81,7 @@ const template = createTemplate(`
 <table>
   <thead>
     <tr>
-      <th class="checkbox">
-        <input type="checkbox" class="small" />
-      </th>
+      <th class="checkbox"><input type="checkbox" class="small"></th>
       <th class="artist">Artist</th>
       <th class="title">Title</th>
       <th class="album">Album</th>
@@ -105,9 +103,7 @@ const noCheckboxesTemplate = createTemplate(`
 
 const rowTemplate = createTemplate(`
 <tr>
-  <td class="checkbox">
-    <input type="checkbox" class="small" />
-  </td>
+  <td class="checkbox"><input type="checkbox" class="small"></td>
   <td class="artist"><a></a></td>
   <td class="title"></td>
   <td class="album"><a></a></td>

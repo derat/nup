@@ -130,7 +130,7 @@ const template = createTemplate(`
   }
 </style>
 
-<img id="current-cover" />
+<img id="current-cover">
 
 <div id="bottom">
   <div id="current-details">
@@ -149,7 +149,7 @@ const template = createTemplate(`
   <div id="next">
     <div id="next-heading">Next</div>
     <div id="next-body">
-      <img id="next-cover" />
+      <img id="next-cover">
       <div id="next-details">
         <div id="next-artist" class="artist"></div>
         <div id="next-title" class="title"></div>
