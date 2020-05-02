@@ -12,14 +12,13 @@ const template = createTemplate(`
   .heading {
     font-size: 15px;
     font-weight: bold;
+    margin-left: 2px;
+    margin-bottom: 8px;
     user-select: none;
-  }
-  #search-heading {
-    padding: 10px 0 4px 10px;
   }
   #search-form {
     display: block;
-    margin-top: 5px;
+    margin: var(--margin);
     white-space: nowrap;
   }
   #search-form input[type='checkbox'] {
@@ -28,8 +27,7 @@ const template = createTemplate(`
   #search-form .row {
     align-items: baseline;
     display: flex;
-    margin-bottom: 4px;
-    margin-left: 10px;
+    margin-bottom: 6px;
   }
   #search-form .row > .checkbox-col {
     width: 8em;
@@ -79,23 +77,18 @@ const template = createTemplate(`
     padding-top: 5px;
   }
   #search-buttons > *:not(:first-child) {
-    margin-left: 4px;
-  }
-  #results-heading {
-    padding-right: 10px;
+    margin-left: var(--button-spacing);
   }
   #results-controls {
     border-top: 1px solid #ddd;
-    margin-top: 10px;
-    padding-top: 10px;
-    padding-left: 10px;
+    padding: var(--margin) 0 var(--margin) var(--margin);
     user-select: none;
   }
-  #results-controls > *:not(:first-child) {
-    margin-left: 4px;
+  #results-controls .heading {
+    margin-right: 4px;
   }
-  #results-table {
-    margin-top: 10px;
+  #results-controls > *:not(:first-child) {
+    margin-left: var(--button-spacing);
   }
   #waiting {
     background-color: #a00;
@@ -105,17 +98,16 @@ const template = createTemplate(`
     font-size: 11px;
     padding: 5px;
     position: fixed;
-    right: 8px;
-    top: 8px;
+    right: var(--margin);
+    top: var(--margin);
   }
   #waiting.shown {
     display: block;
   }
 </style>
 
-<div id="search-heading" class="heading">Search</div>
-
 <form id="search-form">
+  <div class="heading">Search</div>
   <div class="row">
     <div>
       <input id="keywords-input" type="text" placeholder="Keywords">
@@ -241,7 +233,7 @@ const template = createTemplate(`
 </form>
 
 <div id="results-controls">
-  <span id="results-heading" class="heading">Results</span>
+  <span class="heading">Results</span>
   <button id="append-button" disabled>Append</button>
   <button id="insert-button" disabled>Insert</button>
   <button id="replace-button" disabled>Replace</button>

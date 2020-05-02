@@ -20,6 +20,9 @@
   --control-border-radius: 4px;
   --control-line-height: 16px;
 
+  --margin: 10px; /* margin around groups of elements */
+  --button-spacing: 6px; /* horizontal spacing between buttons */
+
   --icon-font-family: fontello, sans-serif;
 }
 

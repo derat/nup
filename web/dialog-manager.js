@@ -5,6 +5,8 @@ import {$, createElement, createShadow, createTemplate} from './common.js';
 
 const template = createTemplate(`
 <style>
+  @import 'common.css';
+
   :host {
     pointer-events: none;
   }
@@ -41,7 +43,7 @@ const template = createTemplate(`
     -moz-box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
     -webkit-box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
     display: inline-block;
-    padding: 10px;
+    padding: var(--margin);
     pointer-events: auto;
     text-align: left;
   }

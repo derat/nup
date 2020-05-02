@@ -23,7 +23,7 @@ const template = createTemplate(`
   }
   #song-info {
     display: flex;
-    margin: 8px;
+    margin: var(--margin);
   }
 
   #cover-div {
@@ -51,12 +51,12 @@ const template = createTemplate(`
     color: white;
     font-family: var(--icon-font-family);
     font-size: 12px;
-    left: 11px;
+    left: calc(var(--margin) + 2px);
     letter-spacing: 2px;
     pointer-events: none;
     position: absolute;
     text-shadow: 0 0 8px black;
-    top: 63px;
+    top: calc(var(--margin) + 55px);
     user-select: none;
   }
 
@@ -72,7 +72,7 @@ const template = createTemplate(`
     font-style: italic;
   }
   #controls {
-    margin: 8px;
+    margin: var(--margin);
     user-select: none;
   }
   #controls button {
@@ -81,17 +81,17 @@ const template = createTemplate(`
     width: 44px;
   }
   #controls > *:not(:first-child) {
-    margin-left: 4px;
+    margin-left: var(--button-spacing);
   }
   #update-container {
     background-color: white;
     border-radius: 4px;
     box-shadow: 0 1px 4px 1px rgba(0, 0, 0, 0.3);
     display: none;
-    left: 12px;
+    left: var(--margin);
     padding: 8px;
     position: absolute;
-    top: 12px;
+    top: var(--margin);
     z-index: 1;
   }
   #update-container.shown {
@@ -140,9 +140,6 @@ const template = createTemplate(`
     max-height: 26px;
     max-width: 210px;
     position: absolute;
-  }
-  #playlist {
-    margin-top: 2px;
   }
 </style>
 

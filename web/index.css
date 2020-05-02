@@ -19,21 +19,13 @@ body.no-scroll {
 }
 
 #container {
-  min-height: 100%;
-  display: flex;
-  flex-flow: row nowrap;
-  align-items: stretch;
-}
-#left {
-  flex-grow: 1;
+  box-sizing: border-box;
+  display: grid;
+  grid-auto-rows: 100%;
+  grid-template-columns: 50% 50%;
   min-height: 100%;
   padding-bottom: 2px;
 }
-#divider {
-  flex: 0 0 1px;
-  background-color: #ddd;
-}
-#right {
-  flex-grow: 1;
-  padding-bottom: 2px;
+#container :not(:last-child) {
+  border-right: 1px solid #ddd;
 }

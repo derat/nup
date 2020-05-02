@@ -27,14 +27,12 @@ const template = createTemplate(`
     border-bottom: solid 1px #ddd;
     border-top: solid 1px #ddd;
     cursor: default;
-    padding-left: 8px;
-    padding-right: 10px;
-    padding-top: 2px;
+    padding: 2px 10px 0 10px;
     text-align: left;
     user-select: none;
   }
   td {
-    padding-left: 8px;
+    padding-left: 10px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -64,7 +62,7 @@ const template = createTemplate(`
   th.time {
     width: 3em;
     text-align: right;
-    padding-right: 6px;
+    padding-right: 10px;
     text-overflow: clip;
   }
   tr.highlight {
