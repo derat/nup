@@ -118,7 +118,7 @@ input[type='checkbox'].small:checked:before {
 
 .select-wrapper {
   display: inline-block;
-  margin-right: -8px;
+  margin-right: -4px;
 }
 .select-wrapper:after {
   color: #aaa;

@@ -69,7 +69,7 @@ const template = createTemplate(`
     margin-left: 2px;
   }
   #max-plays-input {
-    margin: 0 2px;
+    margin: 0 6px;
     padding-right: 2px;
     width: 2em;
   }
