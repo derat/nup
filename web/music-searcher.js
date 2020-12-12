@@ -109,39 +109,35 @@ const template = createTemplate(`
 <form id="search-form">
   <div class="heading">Search</div>
   <div class="row">
-    <div>
-      <input id="keywords-input" type="text" placeholder="Keywords">
-      <span id="keywords-clear" class="x-icon" title="Clear text"></span>
-    </div>
+    <input id="keywords-input" type="text" placeholder="Keywords">
+    <span id="keywords-clear" class="x-icon" title="Clear text"></span>
+  </div>
+
+  <div id="tags-input-div" class="row">
+    <tag-suggester id="tags-suggester" tab-advances-focus>
+      <input id="tags-input" slot="text" type="text" placeholder="Tags">
+    </tag-suggester>
+    <span id="tags-clear" class="x-icon" title="Clear text"></span>
   </div>
 
   <div class="row">
-    <div id="tags-input-div">
-      <tag-suggester id="tags-suggester" tab-advances-focus>
-        <input id="tags-input" slot="text" type="text" placeholder="Tags">
-      </tag-suggester>
-      <span id="tags-clear" class="x-icon" title="Clear text"></span>
-    </div>
-  </div>
-
-  <div class="row">
-    <div class="checkbox-col">
+    <label for="shuffle-checkbox" class="checkbox-col">
       <input id="shuffle-checkbox" type="checkbox" value="shuffle">
-      <label for="shuffle-checkbox">Shuffle</label>
-    </div>
-    <div>
+      Shuffle
+    </label>
+    <label for="first-track-checkbox">
       <input id="first-track-checkbox" type="checkbox" value="firstTrack">
-      <label for="first-track-checkbox">First track</label>
-    </div>
+      First track
+    </label>
   </div>
 
   <div class="row">
-    <div class="checkbox-col">
+    <label for="unrated-checkbox" class="checkbox-col">
       <input id="unrated-checkbox" type="checkbox" value="unrated">
-      <label for="unrated-checkbox">Unrated</label>
-    </div>
-    <div class="select-wrapper">
-      <label for="min-rating-select">Min rating</label>
+      Unrated
+    </label>
+    <label for="min-rating-select" class="select-wrapper">
+      Min rating
       <select id="min-rating-select">
         <option value="0.00">★</option>
         <option value="0.25">★★</option>
@@ -149,76 +145,60 @@ const template = createTemplate(`
         <option value="0.75">★★★★</option>
         <option value="1.00">★★★★★</option>
       </select>
-    </div>
+    </label>
   </div>
 
-  <div class="row">
-    <div>
-      <label for="max-plays-input">Played</label>
-      <input id="max-plays-input" type="text">
-      <label for="max-plays-input">or fewer times</label>
-    </div>
-  </div>
+  <label for="max-plays-input" class="row">
+    Played <input id="max-plays-input" type="text"> or fewer times
+  </label>
 
-  <div class="row">
-    <div class="label-col">
-      <label for="first-played-select">First played</label>
+  <label for="first-played-select" class="row">
+    <span class="label-col">First played</span>
+    <div class="select-wrapper">
+      <select id="first-played-select">
+        <option value="0">...</option>
+        <option value="86400">one day</option>
+        <option value="604800">one week</option>
+        <option value="2592000">one month</option>
+        <option value="7776000">three months</option>
+        <option value="15552000">six months</option>
+        <option value="31536000">one year</option>
+        <option value="94608000">three years</option>
+      </select>
     </div>
-    <div>
-      <div class="select-wrapper">
-        <select id="first-played-select">
-          <option value="0">...</option>
-          <option value="86400">one day</option>
-          <option value="604800">one week</option>
-          <option value="2592000">one month</option>
-          <option value="7776000">three months</option>
-          <option value="15552000">six months</option>
-          <option value="31536000">one year</option>
-          <option value="94608000">three years</option>
-        </select>
-      </div>
-      <label for="first-played-select">or less ago</label>
-    </div>
-  </div>
+    or less ago
+  </label>
 
-  <div class="row">
-    <div class="label-col">
-      <label for="last-played-select">Last played</label>
+  <label for="last-played-select" class="row">
+    <span class="label-col">Last played</span>
+    <div class="select-wrapper">
+      <select id="last-played-select">
+        <option value="0">...</option>
+        <option value="86400">one day</option>
+        <option value="604800">one week</option>
+        <option value="2592000">one month</option>
+        <option value="7776000">three months</option>
+        <option value="15552000">six months</option>
+        <option value="31536000">one year</option>
+        <option value="94608000">three years</option>
+      </select>
     </div>
-    <div>
-      <div class="select-wrapper">
-        <select id="last-played-select">
-          <option value="0">...</option>
-          <option value="86400">one day</option>
-          <option value="604800">one week</option>
-          <option value="2592000">one month</option>
-          <option value="7776000">three months</option>
-          <option value="15552000">six months</option>
-          <option value="31536000">one year</option>
-          <option value="94608000">three years</option>
-        </select>
-      </div>
-      <label for="last-played-select">or longer ago</label>
-    </div>
-  </div>
+    or longer ago
+  </label>
 
-  <div class="row">
-    <div class="label-col">
-      <label for="preset-select">Preset</label>
-    </div>
+  <label for="preset-select" class="row">
+    <span class="label-col">Preset</span>
     <div class="select-wrapper">
       <select id="preset-select">
         <option value="">...</option>
-        <option value="mr=3;t=instrumental;lp=6;s=1;play=1"
-          >instrumental old</option
-        >
+        <option value="mr=3;t=instrumental;lp=6;s=1;play=1">instrumental old</option>
         <option value="mr=3;t=mellow;s=1;play=1">mellow</option>
         <option value="ft=1;fp=3">new albums</option>
         <option value="u=1;play=1">unrated</option>
         <option value="mr=3;lp=6;s=1;play=1">old</option>
       </select>
     </div>
-  </div>
+  </label>
 
   <div class="row">
     <div id="search-buttons">
