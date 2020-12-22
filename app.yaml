@@ -12,7 +12,7 @@ handlers:
 - url: /index\.html
   script: auto
   secure: always
-- url: /(.*\.(css|eot|html|gif|ico|jpe?g|js|json|png|svg|ttf|woff|woff2))
+- url: /(.*\.(css|eot|html|gif|ico|jpe?g|js|json|png|svg|ttf|txt|woff|woff2))
   static_files: web/\1
   secure: always
   upload: web/.*
