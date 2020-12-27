@@ -94,7 +94,9 @@ customElements.define(
     handleKeyDown_(e) {
       this.hideSuggestions_();
 
-      if (e.key != 'Tab') return;
+      if (e.key !== 'Tab' || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
+        return;
+      }
 
       const parts = this.getTextParts_();
       if (parts.word.length == 0 && this.tabAdvancesFocus_) return;
@@ -127,7 +129,9 @@ customElements.define(
             matchingWords.length
           ) {
             longestSharedPrefix = newPrefix;
-          } else break;
+          } else {
+            break;
+          }
         }
 
         this.target_.value = parts.before + longestSharedPrefix + parts.after;
