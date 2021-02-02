@@ -20,14 +20,14 @@ import (
 
 const (
 	logInterval = 100
-	albumIdTag  = "MusicBrainz Album Id"
+	albumIDTag  = "MusicBrainz Album Id"
 )
 
-func getCoverFilename(albumId string) string {
-	return albumId + ".jpg"
+func getCoverFilename(albumID string) string {
+	return albumID + ".jpg"
 }
 
-func readSong(path string) (albumId string, err error) {
+func readSong(path string) (albumID string, err error) {
 	fi, err := os.Stat(path)
 	if err != nil {
 		return "", err
@@ -42,10 +42,10 @@ func readSong(path string) (albumId string, err error) {
 	if err != nil {
 		return "", err
 	}
-	return tag.CustomFrames()[albumIdTag], nil
+	return tag.CustomFrames()[albumIDTag], nil
 }
 
-func readDumpFile(jsonPath string, coverDir string, maxSongs int) (albumIds []string, err error) {
+func readDumpFile(jsonPath string, coverDir string, maxSongs int) (albumIDs []string, err error) {
 	missingAlbumIDs := make(map[string]bool)
 
 	f, err := os.Open(jsonPath)
@@ -98,10 +98,10 @@ func readDumpFile(jsonPath string, coverDir string, maxSongs int) (albumIds []st
 	return ret, nil
 }
 
-// downloadCover downloads cover art for albumId into dir.
+// downloadCover downloads cover art for albumID into dir.
 // If the cover was not found, path is empty and err is nil.
-func downloadCover(albumId, dir string) (path string, err error) {
-	url := fmt.Sprintf("https://coverartarchive.org/release/%s/front-500", albumId)
+func downloadCover(albumID, dir string) (path string, err error) {
+	url := fmt.Sprintf("https://coverartarchive.org/release/%s/front-500", albumID)
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("Fetching %v failed: %v", url, err)
@@ -115,7 +115,7 @@ func downloadCover(albumId, dir string) (path string, err error) {
 	}
 	defer resp.Body.Close()
 
-	path = filepath.Join(dir, getCoverFilename(albumId))
+	path = filepath.Join(dir, getCoverFilename(albumID))
 	f, err := os.Create(path)
 	if err != nil {
 		return "", err
@@ -128,16 +128,16 @@ func downloadCover(albumId, dir string) (path string, err error) {
 	return path, nil
 }
 
-func downloadCovers(albumIds []string, dir string, maxRequests int) {
+func downloadCovers(albumIDs []string, dir string, maxRequests int) {
 	numReq := 0
 	canStartReq := func() bool { return numReq < maxRequests }
 	cond := sync.NewCond(&sync.Mutex{})
 
 	wg := sync.WaitGroup{}
-	wg.Add(len(albumIds))
+	wg.Add(len(albumIDs))
 
 	go func() {
-		for _, id := range albumIds {
+		for _, id := range albumIDs {
 			cond.L.Lock()
 			for !canStartReq() {
 				cond.Wait()
@@ -179,14 +179,14 @@ func main() {
 		log.Fatal("-cover-dir must be set")
 	}
 
-	albumIds := make([]string, 0)
+	albumIDs := make([]string, 0)
 	if len(*dumpFile) > 0 {
 		if len(flag.Args()) > 0 {
 			log.Fatal("Cannot both set -dump-file and list music files")
 		}
 		log.Printf("Reading songs from %v", *dumpFile)
 		var err error
-		if albumIds, err = readDumpFile(*dumpFile, *coverDir, *maxSongs); err != nil {
+		if albumIDs, err = readDumpFile(*dumpFile, *coverDir, *maxSongs); err != nil {
 			log.Fatal(err)
 		}
 	} else if len(flag.Args()) > 0 {
@@ -200,12 +200,12 @@ func main() {
 			}
 		}
 		for id, _ := range ids {
-			albumIds = append(albumIds, id)
+			albumIDs = append(albumIDs, id)
 		}
 	} else {
 		log.Fatal("Either set -dump-file or list music files as arguments")
 	}
 
-	log.Printf("Downloading cover(s) for %v album(s)", len(albumIds))
-	downloadCovers(albumIds, *coverDir, *maxRequests)
+	log.Printf("Downloading cover(s) for %v album(s)", len(albumIDs))
+	downloadCovers(albumIDs, *coverDir, *maxRequests)
 }

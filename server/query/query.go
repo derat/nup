@@ -201,12 +201,12 @@ func Songs(ctx context.Context, query *common.SongQuery, cacheOnly bool) ([]type
 	return songs, nil
 }
 
-// runQueriesAndGetIds runs the provided queries in parallel and returns the
+// runQueriesAndGetIDs runs the provided queries in parallel and returns the
 // results from each.
-func runQueriesAndGetIds(ctx context.Context, qs []*datastore.Query) ([][]int64, error) {
+func runQueriesAndGetIDs(ctx context.Context, qs []*datastore.Query) ([][]int64, error) {
 	type queryResult struct {
 		Index int
-		Ids   []int64
+		IDs   []int64
 		Error error
 	}
 	ch := make(chan queryResult, len(qs))
@@ -236,13 +236,13 @@ func runQueriesAndGetIds(ctx context.Context, qs []*datastore.Query) ([][]int64,
 		if qr.Error != nil {
 			return nil, qr.Error
 		}
-		res[qr.Index] = qr.Ids
+		res[qr.Index] = qr.IDs
 	}
 	return res, nil
 }
 
-// intersectSortedIds returns the intersection of two sorted arrays that don't have duplicate values.
-func intersectSortedIds(a, b []int64) []int64 {
+// intersectSortedIDs returns the intersection of two sorted arrays that don't have duplicate values.
+func intersectSortedIDs(a, b []int64) []int64 {
 	m := make([]int64, 0)
 	var i, j int
 	for i < len(a) && j < len(b) {
@@ -259,9 +259,9 @@ func intersectSortedIds(a, b []int64) []int64 {
 	return m
 }
 
-// filterSortedIds returns values present in a but not in b (i.e. the intersection of a and !b).
+// filterSortedIDs returns values present in a but not in b (i.e. the intersection of a and !b).
 // Both arrays must be sorted.
-func filterSortedIds(a, b []int64) []int64 {
+func filterSortedIDs(a, b []int64) []int64 {
 	m := make([]int64, 0)
 	var i, j int
 	for i < len(a) {
@@ -338,23 +338,23 @@ func runQuery(ctx context.Context, query *common.SongQuery) ([]int64, error) {
 	}
 
 	startTime := time.Now()
-	unmergedIds, err := runQueriesAndGetIds(ctx, qs)
+	unmergedIDs, err := runQueriesAndGetIDs(ctx, qs)
 	if err != nil {
 		return nil, err
 	}
 	log.Debugf(ctx, "Ran %v query(s) in %v ms", len(qs), msecSince(startTime))
 
-	var mergedIds []int64
-	for i, a := range unmergedIds {
+	var mergedIDs []int64
+	for i, a := range unmergedIDs {
 		if i == 0 {
-			mergedIds = a
+			mergedIDs = a
 		} else if i < negativeQueryStart {
-			mergedIds = intersectSortedIds(mergedIds, a)
+			mergedIDs = intersectSortedIDs(mergedIDs, a)
 		} else {
-			mergedIds = filterSortedIds(mergedIds, a)
+			mergedIDs = filterSortedIDs(mergedIDs, a)
 		}
 	}
-	return mergedIds, nil
+	return mergedIDs, nil
 }
 
 // sortSongs sorts songs appropriately for the client.

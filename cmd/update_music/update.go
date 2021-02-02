@@ -82,12 +82,12 @@ func updateSongs(cfg Config, ch chan types.Song, numSongs int, replaceUserData b
 	return nil
 }
 
-func deleteSong(cfg Config, songId int64) error {
+func deleteSong(cfg Config, songID int64) error {
 	u, err := cloudutil.ServerURL(cfg.ServerURL, deletePath)
 	if err != nil {
 		return err
 	}
-	u.RawQuery = deleteSongIDParam + "=" + strconv.FormatInt(songId, 10)
+	u.RawQuery = deleteSongIDParam + "=" + strconv.FormatInt(songID, 10)
 	req, err := http.NewRequest("POST", u.String(), nil)
 	if err != nil {
 		return err

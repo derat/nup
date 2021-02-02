@@ -23,7 +23,7 @@ import (
 type checkSettings uint32
 
 const (
-	checkAlbumId checkSettings = 1 << iota
+	checkAlbumID checkSettings = 1 << iota
 	checkCoverSize400
 	checkSongCover
 )
@@ -39,7 +39,7 @@ func checkSongs(songs []*types.Song, musicDir, coverDir string, settings checkSe
 			return nil
 		},
 	}
-	if settings&checkAlbumId != 0 {
+	if settings&checkAlbumID != 0 {
 		fs = append(fs, func(s *types.Song) error {
 			if len(s.AlbumID) == 0 && s.Album != "[non-album tracks]" {
 				return errors.New("missing MusicBrainz album")
@@ -156,7 +156,7 @@ func main() {
 		desc    string // description for check flag
 		def     bool   // on by default?
 	}{
-		"album-id":       {checkAlbumId, "Songs have MusicBrainz album IDs", true},
+		"album-id":       {checkAlbumID, "Songs have MusicBrainz album IDs", true},
 		"cover-size-400": {checkCoverSize400, "Cover images are at least 400x400", false},
 		"song-cover":     {checkSongCover, "Songs have cover files", true},
 	}

@@ -120,14 +120,14 @@ func TestUpdate(tt *testing.T) {
 	log.Print("importing songs from music dir")
 	CopySongsToTempDir(t.MusicDir, Song0s.Filename, Song1s.Filename)
 	t.UpdateSongs()
-	if err := CompareSongs([]types.Song{Song0s, Song1s}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{Song0s, Song1s}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("importing another song")
 	CopySongsToTempDir(t.MusicDir, Song5s.Filename)
 	t.UpdateSongs()
-	if err := CompareSongs([]types.Song{Song0s, Song1s, Song5s}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{Song0s, Song1s, Song5s}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
@@ -135,7 +135,7 @@ func TestUpdate(tt *testing.T) {
 	RemoveFromTempDir(t.MusicDir, Song0s.Filename)
 	CopySongsToTempDir(t.MusicDir, Song0sUpdated.Filename)
 	t.UpdateSongs()
-	if err := CompareSongs([]types.Song{Song0sUpdated, Song1s, Song5s}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{Song0sUpdated, Song1s, Song5s}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 }
@@ -154,7 +154,7 @@ func TestUserData(tt *testing.T) {
 	s.Rating = 0.75
 	s.Tags = []string{"electronic", "instrumental"}
 	t.DoPost("rate_and_tag?songId="+id+"&rating=0.75&tags=electronic+instrumental", nil)
-	if err := CompareSongs([]types.Song{s}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{s}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Fatal(err)
 	}
 
@@ -167,7 +167,7 @@ func TestUserData(tt *testing.T) {
 	for _, p := range s.Plays {
 		t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(p.StartTime.Unix(), 10), nil)
 	}
-	if err := CompareSongs([]types.Song{s}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{s}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Fatal(err)
 	}
 
@@ -179,27 +179,27 @@ func TestUserData(tt *testing.T) {
 	us.Plays = s.Plays
 	CopySongsToTempDir(t.MusicDir, us.Filename)
 	t.UpdateSongs()
-	if err := CompareSongs([]types.Song{us}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{us}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that duplicate plays are ignored")
 	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(s.Plays[len(us.Plays)-1].StartTime.Unix(), 10), nil)
-	if err := CompareSongs([]types.Song{us}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{us}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Fatal(err)
 	}
 
 	log.Print("checking that duplicate tags are ignored")
 	us.Tags = []string{"electronic", "rock"}
 	t.DoPost("rate_and_tag?songId="+id+"&tags=electronic+electronic+rock+electronic", nil)
-	if err := CompareSongs([]types.Song{us}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{us}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Fatal(err)
 	}
 
 	log.Print("clearing tags")
 	us.Tags = nil
 	t.DoPost("rate_and_tag?songId="+id+"&tags=", nil)
-	if err := CompareSongs([]types.Song{us}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{us}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Fatal(err)
 	}
 
@@ -490,13 +490,13 @@ func TestCovers(tt *testing.T) {
 	}
 
 	log.Print("checking that covers are dumped (or not) as requested")
-	if err := CompareSongs([]types.Song{s0, s1, s5}, t.DumpSongs(stripIds, getCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{s0, s1, s5}, t.DumpSongs(stripIDs, getCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 	s0.CoverFilename = ""
 	s1.CoverFilename = ""
 	s5.CoverFilename = ""
-	if err := CompareSongs([]types.Song{s0, s1, s5}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{s0, s1, s5}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 }
@@ -507,7 +507,7 @@ func TestJSONImport(tt *testing.T) {
 
 	log.Print("importing songs from json file")
 	t.ImportSongsFromJSONFile(WriteSongsToJSONFile(t.TempDir, []types.Song{LegacySong1, LegacySong2}), replaceUserData)
-	if err := CompareSongs([]types.Song{LegacySong1, LegacySong2}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{LegacySong1, LegacySong2}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
@@ -523,7 +523,7 @@ func TestJSONImport(tt *testing.T) {
 	us.Plays = us.Plays[0:1]
 	us.Tags = []string{"bogus"}
 	t.ImportSongsFromJSONFile(WriteSongsToJSONFile(t.TempDir, []types.Song{us, LegacySong2}), replaceUserData)
-	if err := CompareSongs([]types.Song{us, LegacySong2}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{us, LegacySong2}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
@@ -532,7 +532,7 @@ func TestJSONImport(tt *testing.T) {
 	st := time.Unix(1410746718, 0)
 	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(st.Unix(), 10), nil)
 	us.Plays = append(us.Plays, types.Play{st, "127.0.0.1"})
-	if err := CompareSongs([]types.Song{us, LegacySong2}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{us, LegacySong2}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
@@ -542,7 +542,7 @@ func TestJSONImport(tt *testing.T) {
 	us2.Rating = us.Rating
 	us2.Tags = us.Tags
 	us2.Plays = us.Plays
-	if err := CompareSongs([]types.Song{us2, LegacySong2}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{us2, LegacySong2}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 }
@@ -611,7 +611,7 @@ func TestDeleteSong(tt *testing.T) {
 	if err := compareQueryResults([]types.Song{LegacySong2}, t.GetSongsForAndroid(postTime, getRegularSongs), IgnoreOrder, cloudutil.AndroidClient); err != nil {
 		tt.Error(err)
 	}
-	if err := CompareSongs([]types.Song{LegacySong2}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{LegacySong2}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
@@ -638,7 +638,7 @@ func TestDeleteSong(tt *testing.T) {
 		IgnoreOrder, cloudutil.AndroidClient); err != nil {
 		tt.Error(err)
 	}
-	if err := CompareSongs([]types.Song{}, t.DumpSongs(stripIds, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 

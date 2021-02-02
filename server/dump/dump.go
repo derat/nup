@@ -132,7 +132,7 @@ func SingleSong(ctx context.Context, id int64) (*types.Song, error) {
 }
 
 func getEntities(ctx context.Context, q *datastore.Query, cursor string, entities []interface{}) (
-	ids, parentIds []int64, nextCursor string, err error) {
+	ids, parentIDs []int64, nextCursor string, err error) {
 	q = q.KeysOnly()
 	if len(cursor) > 0 {
 		dc, err := datastore.DecodeCursor(cursor)
@@ -145,7 +145,7 @@ func getEntities(ctx context.Context, q *datastore.Query, cursor string, entitie
 
 	keys := make([]*datastore.Key, 0, len(entities))
 	ids = make([]int64, 0, len(entities))
-	parentIds = make([]int64, 0, len(entities))
+	parentIDs = make([]int64, 0, len(entities))
 
 	for true {
 		k, err := it.Next(nil)
@@ -162,7 +162,7 @@ func getEntities(ctx context.Context, q *datastore.Query, cursor string, entitie
 		if pk := k.Parent(); pk != nil {
 			pid = pk.IntID()
 		}
-		parentIds = append(parentIds, pid)
+		parentIDs = append(parentIDs, pid)
 
 		if len(keys) == len(entities) {
 			nc, err := it.Cursor()
@@ -180,5 +180,5 @@ func getEntities(ctx context.Context, q *datastore.Query, cursor string, entitie
 			return nil, nil, "", fmt.Errorf("failed to get %v entities: %v", len(keys), err)
 		}
 	}
-	return ids, parentIds, nextCursor, nil
+	return ids, parentIDs, nextCursor, nil
 }

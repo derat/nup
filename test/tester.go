@@ -133,8 +133,8 @@ func (t *Tester) CleanUp() {
 type stripPolicy int
 
 const (
-	stripIds stripPolicy = iota
-	keepIds
+	stripIDs stripPolicy = iota
+	keepIDs
 )
 
 type coverPolicy int
@@ -170,7 +170,7 @@ func (t *Tester) DumpSongs(strip stripPolicy, covers coverPolicy) []types.Song {
 			}
 			panic(fmt.Sprintf("unable to unmarshal song %q: %v", l, err))
 		}
-		if strip == stripIds {
+		if strip == stripIDs {
 			s.SongID = ""
 		}
 		songs = append(songs, s)
@@ -179,7 +179,7 @@ func (t *Tester) DumpSongs(strip stripPolicy, covers coverPolicy) []types.Song {
 }
 
 func (t *Tester) SongID(sha1 string) string {
-	for _, s := range t.DumpSongs(keepIds, skipCovers) {
+	for _, s := range t.DumpSongs(keepIDs, skipCovers) {
 		if s.SHA1 == sha1 {
 			return s.SongID
 		}
@@ -203,8 +203,8 @@ func (t *Tester) UpdateSongs() {
 	}
 }
 
-func (t *Tester) DeleteSong(songId string) {
-	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile, "-delete-song-id="+songId); err != nil {
+func (t *Tester) DeleteSong(songID string) {
+	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile, "-delete-song-id="+songID); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
 }

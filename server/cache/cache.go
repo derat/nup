@@ -225,7 +225,7 @@ func coverKey(fn string, size int) string {
 	// TODO: Hash the filename?
 	// https://godoc.org/google.golang.org/appengine/memcache#Get says that the
 	// key can be at most 250 bytes.
-	return fmt.Sprintf("%s-%s-%d", coverKeyPrefix, size, fn)
+	return fmt.Sprintf("%s-%d-%s", coverKeyPrefix, size, fn)
 }
 
 // SetCover caches a cover image with the supplied filename, requested size, and
@@ -361,7 +361,7 @@ const jsonPropName = "json"
 // loadJSONProp implements datastore.PropertyLoadSaver's Load method.
 func loadJSONProp(props []datastore.Property, dst interface{}) error {
 	if len(props) != 1 {
-		return fmt.Errorf("bad property count %v")
+		return fmt.Errorf("bad property count %v", len(props))
 	}
 	if props[0].Name != jsonPropName {
 		return fmt.Errorf("bad property name %q", props[0].Name)

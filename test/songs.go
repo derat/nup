@@ -64,7 +64,7 @@ var Song5s = types.Song{
 	Rating:   -1,
 }
 
-var Id3v1Song = types.Song{
+var ID3V1Song = types.Song{
 	SHA1:     "fefac74a1d5928316d7131747107c8a61b71ffe4",
 	Filename: "id3v1.mp3",
 	Artist:   "The Legacy Formats",

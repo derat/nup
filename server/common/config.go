@@ -20,7 +20,7 @@ const (
 
 	// Datastore kind and ID for storing the server config for testing.
 	configKind  = "ServerConfig"
-	configKeyId = "config"
+	configKeyID = "config"
 )
 
 var baseCfg *types.ServerConfig
@@ -67,7 +67,7 @@ func LoadConfig() error {
 }
 
 func testConfigKey(ctx context.Context) *datastore.Key {
-	return datastore.NewKey(ctx, configKind, configKeyId, 0, nil)
+	return datastore.NewKey(ctx, configKind, configKeyID, 0, nil)
 }
 
 func Config(ctx context.Context) *types.ServerConfig {

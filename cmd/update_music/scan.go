@@ -22,13 +22,13 @@ import (
 )
 
 const (
-	albumIdTag          = "MusicBrainz Album Id"
-	recordingIdOwner    = "http://musicbrainz.org"
+	albumIDTag          = "MusicBrainz Album Id"
+	recordingIDOwner    = "http://musicbrainz.org"
 	logProgressInterval = 100
 	mp3Extension        = ".mp3"
 )
 
-func readId3Footer(f *os.File, fi os.FileInfo) (length int64, artist, title, album string, err error) {
+func readID3Footer(f *os.File, fi os.FileInfo) (length int64, artist, title, album string, err error) {
 	const (
 		footerLength = 128
 		footerMagic  = "TAG"
@@ -155,7 +155,7 @@ func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan types
 	defer f.Close()
 
 	var footerLength int64
-	footerLength, s.Artist, s.Title, s.Album, err = readId3Footer(f, fi)
+	footerLength, s.Artist, s.Title, s.Album, err = readID3Footer(f, fi)
 	if err != nil {
 		return
 	}
@@ -172,8 +172,8 @@ func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan types
 		s.Artist = tag.Artist()
 		s.Title = tag.Title()
 		s.Album = tag.Album()
-		s.AlbumID = tag.CustomFrames()[albumIdTag]
-		s.RecordingID = tag.UniqueFileIdentifiers()[recordingIdOwner]
+		s.AlbumID = tag.CustomFrames()[albumIDTag]
+		s.RecordingID = tag.UniqueFileIdentifiers()[recordingIDOwner]
 		s.Track = int(tag.Track())
 		s.Disc = int(tag.Disc())
 		headerLength = int64(tag.TagSize())
@@ -201,7 +201,7 @@ func getSongByPath(musicDir, relPath string, updateChan chan types.SongOrErr) {
 }
 
 func scanForUpdatedSongs(musicDir, forceGlob string, lastUpdateTime time.Time, updateChan chan types.SongOrErr, logProgress bool) (numUpdates int, err error) {
-	numMp3s := 0
+	numMP3s := 0
 	err = filepath.Walk(musicDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -214,9 +214,9 @@ func scanForUpdatedSongs(musicDir, forceGlob string, lastUpdateTime time.Time, u
 			return fmt.Errorf("%v isn't subpath of %v: %v", path, musicDir, err)
 		}
 
-		numMp3s++
-		if logProgress && numMp3s%logProgressInterval == 0 {
-			log.Printf("Progress: scanned %v files\n", numMp3s)
+		numMP3s++
+		if logProgress && numMP3s%logProgressInterval == 0 {
+			log.Printf("Progress: scanned %v files\n", numMP3s)
 		}
 
 		if len(forceGlob) > 0 {
@@ -242,7 +242,7 @@ func scanForUpdatedSongs(musicDir, forceGlob string, lastUpdateTime time.Time, u
 	}
 
 	if logProgress {
-		log.Printf("Found %v update(s) among %v files.\n", numUpdates, numMp3s)
+		log.Printf("Found %v update(s) among %v files.\n", numUpdates, numMP3s)
 	}
 	return numUpdates, nil
 }
