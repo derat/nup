@@ -6,10 +6,10 @@ import {$, createShadow, createTemplate} from './common.js';
 const template = createTemplate(`
 <style>
   @import 'dialog.css';
-  #volume-range {
+  #pre-amp-range {
     vertical-align: middle;
   }
-  #volume-span {
+  #pre-amp-span {
     display: inline-block;
     width: 3em;
   }
@@ -17,9 +17,9 @@ const template = createTemplate(`
 <div class="title">Options</div>
 <hr class="title">
 <p>
-  <label for="volume-range">Volume:</label>
-  <input id="volume-range" type="range" min="0.0" max="1.0" step="0.1">
-  <span id="volume-span"></span>
+  <label for="pre-amp-range">Pre-amp:</label>
+  <input id="pre-amp-range" type="range" min="-10" max="10" step="1">
+  <span id="pre-amp-span"></span>
 </p>
 <div class="button-container">
   <button id="ok-button">OK</button>
@@ -32,25 +32,24 @@ export default class OptionsDialog {
     this.manager_ = manager;
     this.closeCallback_ = closeCallback;
 
-    const volume = this.config_.get(this.config_.VOLUME);
+    const preAmp = this.config_.get(this.config_.PRE_AMP);
 
     this.container_ = this.manager_.createDialog();
     this.shadow_ = createShadow(this.container_, template);
 
-    this.volumeRange_ = $('volume-range', this.shadow_);
-    this.volumeRange_.value = volume;
-    this.volumeRange_.addEventListener(
+    this.preAmpRange_ = $('pre-amp-range', this.shadow_);
+    this.preAmpRange_.value = preAmp;
+    this.preAmpRange_.addEventListener(
       'input',
-      () => {
-        const volume = this.volumeRange_.value;
-        this.config_.set(this.config_.VOLUME, volume);
-        this.updateVolumeSpan_(volume);
-      },
-      false,
+      () => this.updatePreAmpSpan_(this.preAmpRange_.value),
+    );
+    this.preAmpRange_.addEventListener(
+      'change',
+      () => this.config_.set(this.config_.PRE_AMP, this.preAmpRange_.value),
     );
 
-    this.volumeSpan_ = $('volume-span', this.shadow_);
-    this.updateVolumeSpan_(volume);
+    this.preAmpSpan_ = $('pre-amp-span', this.shadow_);
+    this.updatePreAmpSpan_(preAmp);
 
     $('ok-button', this.shadow_).addEventListener(
       'click',
@@ -68,8 +67,9 @@ export default class OptionsDialog {
     document.body.addEventListener('keydown', this.keyListener_, false);
   }
 
-  updateVolumeSpan_(volume) {
-    this.volumeSpan_.innerText = parseInt(volume * 100) + '%';
+  updatePreAmpSpan_(preAmp) {
+    const prefix = preAmp > 0 ? '+' : '';
+    this.preAmpSpan_.innerText = `${prefix}${preAmp} dB`;
   }
 
   close() {

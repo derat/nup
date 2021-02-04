@@ -205,13 +205,14 @@ customElements.define(
     SEEK_SECONDS = 10; // seconds skipped by seeking forward or back
     MAX_RETRIES = 2; // number of consecutive playback errors to reply
     NOTIFICATION_SECONDS = 3; // duration for song-change notification
+    GAIN_CHANGE_SECONDS = 0.1; // duration for audio gain change between songs
 
     constructor() {
       super();
 
       this.config_ = new Config();
       this.config_.addCallback((name, value) => {
-        if (name == this.config_.VOLUME) this.audio_.volume = value;
+        if (name == this.config_.PRE_AMP) this.updateGain_();
       });
 
       this.updater_ = new Updater();
@@ -249,7 +250,13 @@ customElements.define(
       this.audio_.addEventListener('play', () => this.onPlay_());
       this.audio_.addEventListener('timeupdate', () => this.onTimeUpdate_());
       this.audio_.addEventListener('error', e => this.onError_(e));
-      this.audio_.volume = this.config_.get(this.config_.VOLUME);
+
+      // Route <audio> output through a GainNode:
+      // https://stackoverflow.com/a/43794379
+      const ctx = new AudioContext();
+      this.gainNode_ = ctx.createGain();
+      this.gainNode_.connect(ctx.destination);
+      ctx.createMediaElementSource(this.audio_).connect(this.gainNode_);
 
       this.coverDiv_ = get('cover-div');
       this.coverImage_ = get('cover-img');
@@ -558,7 +565,13 @@ customElements.define(
       // element: https://stackoverflow.com/a/44547904
       const url = new URL(song.url, document.baseURI).href;
       if (this.audio_.src != url || this.reachedEndOfSongs_) {
-        console.log('Starting ' + song.songId + ' (' + url + ')');
+        // Deal with "The AudioContext was not allowed to start. It must be
+        // resumed (or created) after a user gesture on the page.":
+        // https://developers.google.com/web/updates/2017/09/autoplay-policy-changes#webaudio
+        const ctx = this.gainNode_.context;
+        if (ctx.state === 'suspended') ctx.resume();
+
+        console.log(`Starting ${song.songId} (${url})`);
         this.audio_.src = url;
         this.audio_.currentTime = 0;
         this.lastTimeUpdatePosition_ = 0;
@@ -569,6 +582,9 @@ customElements.define(
         this.lastUpdateTime_ = -1;
         this.reportedCurrentTrack_ = false;
         this.reachedEndOfSongs_ = false;
+
+        this.updateGain_();
+
       }
 
       console.log('Playing');
@@ -802,6 +818,37 @@ customElements.define(
           this.optionsDialog_ = null;
         },
       );
+    }
+
+    // Adjusts |gainNode_|'s gain appropriately for the current song and
+    // settings. This implements the approach described at
+    // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification.
+    updateGain_() {
+      // Ignore the pre-amp setting if we don't have info about the song's
+      // loudness -- scaling the audio seems risky in that case.
+      let scale = 1;
+
+      // TODO: Add an option to use track gain instead?
+      const song = this.currentSong_;
+      if (song && song.albumGain !== undefined) {
+        const preAmp = this.config_.get(this.config_.PRE_AMP);
+        const songAdj = song && song.albumGain !== undefined ? song.albumGain : 0;
+        scale = 10 ** ((songAdj + preAmp) / 20);
+
+        // TODO: Add an option to prevent clipping instead of always doing this?
+        if (song.peakAmplitude !== undefined) {
+          scale = Math.min(scale, 1 / song.peakAmplitude);
+        }
+      }
+
+      // Per https://developer.mozilla.org/en-US/docs/Web/API/GainNode:
+      // "If modified, the new gain is instantly applied, causing unaesthetic
+      // 'clicks' in the resulting audio. To prevent this from happening, never
+      // change the value directly but use the exponential interpolation methods
+      // on the AudioParam interface."
+      console.log(`Scaling amplitude by ${scale.toFixed(3)}`);
+      this.gainNode_.gain.exponentialRampToValueAtTime(
+          scale, this.gainNode_.context.currentTime + this.GAIN_CHANGE_SECONDS);
     }
 
     processAccelerator_(e) {

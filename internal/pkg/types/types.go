@@ -17,6 +17,8 @@ type Play struct {
 }
 
 // Song represents an audio file.
+//
+// When adding fields, be sure to update copySongFileFields() in server/update/update.go.
 type Song struct {
 	// SHA1 is a hash of the audio portion of the file.
 	SHA1 string `datastore:"Sha1" json:"sha1,omitempty"`
@@ -68,6 +70,17 @@ type Song struct {
 
 	// Length is the song's duration in seconds.
 	Length float64 `json:"length"`
+
+	// TrackGain is the song's dB gain adjustment independent of its album. More info:
+	//  https://en.wikipedia.org/wiki/ReplayGain
+	//  https://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification
+	//  https://productionadvice.co.uk/tidal-normalization-upgrade/
+	TrackGain float64 `json:"trackGain"`
+	// AlbumGain is the song's dB gain adjustment relative to its album.
+	AlbumGain float64 `json:"albumGain"`
+	// PeakAmp is the song's peak amplitude, with 1.0 representing the highest
+	// amplitude that can be played without clipping.
+	PeakAmp float64 `json:"peakAmp"`
 
 	// Rating is the song's rating in the range [0.0, 1.0], or -1 if unrated.
 	Rating float64 `json:"rating"`

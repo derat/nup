@@ -33,8 +33,8 @@ class Page(object):
     DIALOG_MANAGER = (By.TAG_NAME, 'dialog-manager')
     OPTIONS_DIALOG = DIALOG_MANAGER + (By.CSS_SELECTOR, '.dialog')
     OPTIONS_OK_BUTTON = OPTIONS_DIALOG + (By.ID, 'ok-button')
-    VOLUME_RANGE = OPTIONS_DIALOG + (By.ID, 'volume-range')
-    VOLUME_SPAN = OPTIONS_DIALOG + (By.ID, 'volume-span')
+    PRE_AMP_RANGE = OPTIONS_DIALOG + (By.ID, 'pre-amp-range')
+    PRE_AMP_SPAN = OPTIONS_DIALOG + (By.ID, 'pre-amp-span')
 
     MUSIC_PLAYER = (By.TAG_NAME, 'music-player')
     ALBUM_DIV = MUSIC_PLAYER + (By.ID, 'album')

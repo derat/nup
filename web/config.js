@@ -4,15 +4,15 @@
 // Config provides persistent storage for preferences.
 export default class Config {
   // Names to pass to get() or set().
-  VOLUME = 'volume';
+  PRE_AMP = 'preAmp';
 
   CONFIG_KEY = 'config'; // localStorage key
 
   constructor() {
     this.callbacks_ = [];
-    this.floatNames_ = new Set([this.VOLUME]);
+    this.floatNames_ = new Set([this.PRE_AMP]);
     this.values_ = {
-      [this.VOLUME]: 0.7,
+      [this.PRE_AMP]: 0.0,
     };
     this.load_();
   }

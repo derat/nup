@@ -246,6 +246,9 @@ func copySongFileFields(dest, src *types.Song) {
 	dest.Track = src.Track
 	dest.Disc = src.Disc
 	dest.Length = src.Length
+	dest.TrackGain = src.TrackGain
+	dest.AlbumGain = src.AlbumGain
+	dest.PeakAmp = src.PeakAmp
 
 	dest.ArtistLower = strings.ToLower(src.Artist)
 	dest.TitleLower = strings.ToLower(src.Title)

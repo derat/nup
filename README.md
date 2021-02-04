@@ -5,7 +5,7 @@ App Engine app for streaming a music collection.
 ## Configuration
 
 Create an `config.json` file in the same directory as `app.yaml` corresponding
-to the `ServerConfig` struct in [types/types.go](./types/types.go):
+to the `ServerConfig` struct in [internal/pkg/types/types.go](./types/types.go):
 
 ```json
 {
@@ -52,8 +52,9 @@ dev_appserver.py --datastore_consistency_policy=consistent .
 This starts a local development App Engine instance listening at
 `http://localhost:8080`.
 
-*   End-to-end Go tests that exercise the App Engine server can be run from the
-    `internal/pkg/test/` directory via `go test`.
+*   End-to-end Go tests that exercise the App Engine server and the `dump_music`
+    and `update_music` commands can be run from the `internal/pkg/test/`
+    directory via `go test`.
 *   Selenium tests that exercise both the web client and the server can be run
     from the `internal/pkg/test/web/` directory via `./tests.py`.
 *   For development, you can import example data and start a file server by

@@ -1,15 +1,22 @@
 #!/usr/bin/python
 
 import os
-import SimpleHTTPServer
+from SimpleHTTPServer import SimpleHTTPRequestHandler
 import SocketServer
 import threading
+
+# See https://stackoverflow.com/a/21957017.
+class CORSRequestHandler (SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header('Access-Control-Allow-Credentials', 'true')
+        self.send_header('Access-Control-Allow-Origin', 'http://localhost:8080')
+        SimpleHTTPRequestHandler.end_headers(self)
 
 class FileServerThread(threading.Thread):
     def __init__(self, path):
         threading.Thread.__init__(self)
         os.chdir(path)
-        handler = SimpleHTTPServer.SimpleHTTPRequestHandler
+        handler = CORSRequestHandler
         handler.log_message = self.log
         self.requests = []
         self.server = SocketServer.TCPServer(('localhost', 0), handler)

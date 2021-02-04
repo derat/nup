@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
@@ -17,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/derat/nup/internal/pkg/mp3gain"
 	"github.com/derat/nup/internal/pkg/types"
 	"github.com/derat/taglib-go/taglib"
 )
@@ -73,37 +75,37 @@ func computeAudioSHA1(f *os.File, fi os.FileInfo, headerLength, footerLength int
 // Format details at http://www.codeproject.com/Articles/8295/MPEG-Audio-Frame-Header.
 func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLength int64) (int64, error) {
 	if _, err := f.Seek(headerLength, 0); err != nil {
-		return 0, fmt.Errorf("Unable to seek to 0x%x: %v", headerLength, err)
+		return 0, fmt.Errorf("unable to seek to %#x: %v", headerLength, err)
 	}
 	var header uint32
 	if err := binary.Read(f, binary.BigEndian, &header); err != nil {
-		return 0, fmt.Errorf("Unable to read frame header at 0x%x: %v", headerLength, err)
+		return 0, fmt.Errorf("unable to read frame header at %#x: %v", headerLength, err)
 	}
 	getBits := func(startBit, numBits uint) uint32 {
 		return (header << startBit) >> (32 - numBits)
 	}
 	if getBits(0, 11) != 0x7ff {
-		return 0, fmt.Errorf("Missing sync at 0x%x (got 0x%x instead of 0x7ff)", headerLength, getBits(0, 11))
+		return 0, fmt.Errorf("missing sync at %#x (got %#x instead of 0x7ff)", headerLength, getBits(0, 11))
 	}
 	if getBits(11, 2) != 0x3 {
-		return 0, fmt.Errorf("Unsupported MPEG Audio version at 0x%x (got 0x%x instead of 0x3)", headerLength, getBits(11, 2))
+		return 0, fmt.Errorf("unsupported MPEG Audio version at %#x (got %#x instead of 0x3)", headerLength, getBits(11, 2))
 	}
 	if getBits(13, 2) != 0x1 {
-		return 0, fmt.Errorf("Unsupported layer at 0%x (got 0x%x instead of 0x1)", headerLength, getBits(13, 2))
+		return 0, fmt.Errorf("unsupported layer at %#x (got %#x instead of 0x1)", headerLength, getBits(13, 2))
 	}
 
 	// This table is specific to MPEG 1, Layer 3.
 	var kbitRates = [...]int64{0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0}
 	kbitRate := kbitRates[getBits(16, 4)]
 	if kbitRate == 0 {
-		return 0, fmt.Errorf("Unsupported bitrate at 0x%x (got index %d)", headerLength, getBits(16, 4))
+		return 0, fmt.Errorf("unsupported bitrate at %#x (got index %d)", headerLength, getBits(16, 4))
 	}
 
 	// This table is specific to MPEG 1.
 	var sampleRates = [...]int64{44100, 48000, 32000, 0}
 	sampleRate := sampleRates[getBits(20, 2)]
 	if sampleRate == 0 {
-		return 0, fmt.Errorf("Unsupported sample rate at 0x%x (got index %d)", headerLength, getBits(20, 2))
+		return 0, fmt.Errorf("unsupported sample rate at %#x (got index %d)", headerLength, getBits(20, 2))
 	}
 
 	xingHeaderStart := headerLength + 4
@@ -120,7 +122,7 @@ func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLeng
 
 	b := make([]byte, 12, 12)
 	if _, err := f.ReadAt(b, xingHeaderStart); err != nil {
-		return 0, fmt.Errorf("Unable to read Xing header at 0x%x: %v", xingHeaderStart, err)
+		return 0, fmt.Errorf("unable to read Xing header at %#x: %v", xingHeaderStart, err)
 	}
 	xingHeaderName := string(b[0:4])
 	if xingHeaderName == "Xing" || xingHeaderName == "Info" {
@@ -128,7 +130,7 @@ func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLeng
 		var xingFlags uint32
 		binary.Read(r, binary.BigEndian, &xingFlags)
 		if xingFlags&0x1 == 0x0 {
-			return 0, fmt.Errorf("Xing header at 0x%x lacks number of frames", xingHeaderStart)
+			return 0, fmt.Errorf("Xing header at %#x lacks number of frames", xingHeaderStart)
 		}
 		var numFrames uint32
 		binary.Read(r, binary.BigEndian, &numFrames)
@@ -143,7 +145,60 @@ func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLeng
 	return (fi.Size() - headerLength - footerLength) / kbitRate * 8, nil
 }
 
-func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan types.SongOrErr) {
+// computeDirGains computes gain adjustments for all MP3 files in dir.
+func computeDirGains(dir string) (map[string]mp3gain.Info, error) {
+	paths, err := filepath.Glob(filepath.Join(dir, "*"+mp3Extension))
+	if err != nil {
+		return nil, err
+	}
+
+	// Group files by album.
+	albums := make(map[string][]string) // paths grouped by album ID
+	for _, p := range paths {
+		f, err := os.Open(p)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+
+		fi, err := f.Stat()
+		if err != nil {
+			return nil, err
+		}
+		if !fi.Mode().IsRegular() {
+			continue
+		}
+
+		// TODO: Consider caching tags so we don't need to decode again in readFileDetails.
+		var album string
+		if tag, err := taglib.Decode(f, fi.Size()); err == nil {
+			album = tag.CustomFrames()[albumIDTag]
+		}
+		// If we didn't get an album ID, just use the path so the file will be in its own group.
+		if album == "" {
+			album = p
+		}
+		albums[album] = append(albums[album], p)
+	}
+
+	// Compute gains for each album.
+	gains := make(map[string]mp3gain.Info, len(paths))
+	for _, paths := range albums {
+		infos, err := mp3gain.ComputeAlbum(paths)
+		if err != nil {
+			return nil, err
+		}
+		for p, info := range infos {
+			gains[p] = info
+		}
+	}
+	return gains, nil
+}
+
+// readFileDetails creates a Song for the file at the supplied path and sends it to updateChan.
+// If an error is encountered, it is sent to the channel instead.
+// TODO: Return song/error directly instead of writing to channel.
+func readFileDetails(path, relPath string, fi os.FileInfo, gain *mp3gain.Info, updateChan chan types.SongOrErr) {
 	s := &types.Song{Filename: relPath}
 	var err error
 	defer func() { updateChan <- types.SongOrErr{s, err} }()
@@ -188,20 +243,83 @@ func readFileDetails(path, relPath string, fi os.FileInfo, updateChan chan types
 		return
 	}
 	s.Length = float64(lengthMs) / 1000
-}
 
-func getSongByPath(musicDir, relPath string, updateChan chan types.SongOrErr) {
-	p := filepath.Join(musicDir, relPath)
-	fi, err := os.Stat(p)
-	if err != nil {
-		updateChan <- types.SongOrErr{nil, err}
-		return
+	if gain != nil {
+		s.TrackGain = gain.TrackGain
+		s.AlbumGain = gain.AlbumGain
+		s.PeakAmp = gain.PeakAmp
 	}
-	readFileDetails(p, relPath, fi, updateChan)
 }
 
-func scanForUpdatedSongs(musicDir, forceGlob string, lastUpdateTime time.Time, updateChan chan types.SongOrErr, logProgress bool) (numUpdates int, err error) {
-	numMP3s := 0
+// getSongsFromFile reads a list of relative (to musicDir) paths from listPath
+// and asynchronously sends the resulting Song structs to updateChan. The number
+// of songs that will be written is returned.
+func getSongsFromFile(listPath, musicDir string, updateChan chan types.SongOrErr,
+	computeGain bool) (numSongs int, err error) {
+	f, err := os.Open(listPath)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+
+	var paths []string                     // relative paths
+	gains := make(map[string]mp3gain.Info) // keyed by full path
+
+	// Read the list synchronously first so we can compute all of the gain adjustments if needed.
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		rel := sc.Text()
+		paths = append(paths, rel)
+
+		if computeGain {
+			// Scan the file's directory if we don't already have its gain info.
+			full := filepath.Join(musicDir, rel)
+			if _, ok := gains[full]; !ok {
+				dir := filepath.Dir(full)
+				log.Printf("Computing gain adjustments for %v", dir)
+				m, err := computeDirGains(dir)
+				if err != nil {
+					return 0, err
+				}
+				for p, gi := range m {
+					gains[p] = gi
+				}
+			}
+		}
+	}
+
+	// Now read the files asynchronously.
+	for _, rel := range paths {
+		go func(rel string) {
+			full := filepath.Join(musicDir, rel)
+			if fi, err := os.Stat(full); err != nil {
+				updateChan <- types.SongOrErr{nil, err}
+			} else {
+				var gain *mp3gain.Info
+				if gi, ok := gains[full]; ok {
+					gain = &gi
+				}
+				readFileDetails(full, rel, fi, gain, updateChan)
+			}
+		}(rel)
+	}
+
+	return len(paths), nil
+}
+
+// scanOptions contains options for scanForUpdatedSongs.
+type scanOptions struct {
+	computeGain bool   // use mp3gain to compute gain adjustments
+	forceGlob   string // glob matching files to update even if unchanged
+	logProgress bool   // periodically log progress while scanning
+}
+
+func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, updateChan chan types.SongOrErr,
+	opts *scanOptions) (numUpdates int, err error) {
+	var numMP3s int
+	var gains map[string]mp3gain.Info // keys are full paths
+	var gainsDir string               // directory for gains
+
 	err = filepath.Walk(musicDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -215,13 +333,13 @@ func scanForUpdatedSongs(musicDir, forceGlob string, lastUpdateTime time.Time, u
 		}
 
 		numMP3s++
-		if logProgress && numMP3s%logProgressInterval == 0 {
-			log.Printf("Progress: scanned %v files\n", numMP3s)
+		if opts.logProgress && numMP3s%logProgressInterval == 0 {
+			log.Printf("Progress: scanned %v files", numMP3s)
 		}
 
-		if len(forceGlob) > 0 {
-			if matched, err := filepath.Match(forceGlob, relPath); err != nil {
-				return fmt.Errorf("Invalid glob %v: %v", forceGlob, err)
+		if opts.forceGlob != "" {
+			if matched, err := filepath.Match(opts.forceGlob, relPath); err != nil {
+				return fmt.Errorf("invalid glob %q: %v", opts.forceGlob, err)
 			} else if !matched {
 				return nil
 			}
@@ -233,15 +351,29 @@ func scanForUpdatedSongs(musicDir, forceGlob string, lastUpdateTime time.Time, u
 			}
 		}
 
+		var gain *mp3gain.Info
+		if opts.computeGain {
+			if dir := filepath.Dir(path); gainsDir != dir {
+				log.Printf("Computing gain adjustments for %v", dir)
+				if gains, err = computeDirGains(dir); err != nil {
+					return fmt.Errorf("failed computing gains for %v: %v", dir, err)
+				}
+				gainsDir = dir
+			}
+			if gi, ok := gains[path]; ok {
+				gain = &gi
+			}
+		}
+
+		go readFileDetails(path, relPath, fi, gain, updateChan)
 		numUpdates++
-		go readFileDetails(path, relPath, fi, updateChan)
 		return nil
 	})
 	if err != nil {
 		return 0, err
 	}
 
-	if logProgress {
+	if opts.logProgress {
 		log.Printf("Found %v update(s) among %v files.\n", numUpdates, numMP3s)
 	}
 	return numUpdates, nil

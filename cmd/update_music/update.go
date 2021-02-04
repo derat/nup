@@ -52,7 +52,7 @@ func updateSongs(cfg Config, ch chan types.Song, numSongs int, replaceUserData b
 
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("Got non-OK status: %v", resp.Status)
+			return fmt.Errorf("got status %q", resp.Status)
 		}
 		return nil
 	}
@@ -65,7 +65,7 @@ func updateSongs(cfg Config, ch chan types.Song, numSongs int, replaceUserData b
 	e := json.NewEncoder(&buf)
 	for i := 0; i < numSongs; i++ {
 		if err = e.Encode(<-ch); err != nil {
-			return fmt.Errorf("Failed to encode song: %v", err)
+			return fmt.Errorf("failed to encode song: %v", err)
 		}
 		if (i+1)%batchSize == 0 {
 			if err = sendFunc(&buf); err != nil {
@@ -102,7 +102,7 @@ func deleteSong(cfg Config, songID int64) error {
 	}
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Got non-OK status: %v", resp.Status)
+		return fmt.Errorf("got status %q", resp.Status)
 	}
 	return nil
 }

@@ -4,7 +4,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"flag"
 	"log"
@@ -22,6 +21,7 @@ type Config struct {
 	CoverDir           string `json:"coverDir"`
 	MusicDir           string `json:"musicDir"`
 	LastUpdateTimeFile string `json:"lastUpdateTimeFile"`
+	ComputeGain        bool   `json:"computeGain"`
 }
 
 func getLastUpdateTime(path string) (t time.Time, err error) {
@@ -110,16 +110,9 @@ func main() {
 		}
 
 		if len(*songPathsFile) > 0 {
-			f, err := os.Open(*songPathsFile)
+			numSongs, err = getSongsFromFile(*songPathsFile, cfg.MusicDir, readChan, cfg.ComputeGain)
 			if err != nil {
-				log.Fatal(err)
-			}
-			defer f.Close()
-
-			scanner := bufio.NewScanner(f)
-			for scanner.Scan() {
-				go func(relPath string) { getSongByPath(cfg.MusicDir, relPath, readChan) }(scanner.Text())
-				numSongs++
+				log.Fatal("Failed reading song list: ", err)
 			}
 		} else {
 			lastUpdateTime, err := getLastUpdateTime(cfg.LastUpdateTimeFile)
@@ -127,8 +120,14 @@ func main() {
 				log.Fatal("Unable to get last update time: ", err)
 			}
 			log.Printf("Scanning for songs in %v updated since %v", cfg.MusicDir, lastUpdateTime.Local())
-			if numSongs, err = scanForUpdatedSongs(cfg.MusicDir, *forceGlob, lastUpdateTime, readChan, true); err != nil {
-				log.Fatal(err)
+			numSongs, err = scanForUpdatedSongs(cfg.MusicDir, lastUpdateTime, readChan, &scanOptions{
+				computeGain: cfg.ComputeGain,
+				forceGlob:   *forceGlob,
+				logProgress: true,
+			})
+
+			if err != nil {
+				log.Fatal("Scanning failed: ", err)
 			}
 			didFullScan = true
 		}

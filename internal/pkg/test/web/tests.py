@@ -675,38 +675,29 @@ class Test(unittest.TestCase):
         page = Page(driver)
         page.show_options()
 
-        def wait_for_volume(expected, check_span=True):
-            audio = page.get(page.AUDIO)
-            span = page.get(page.VOLUME_SPAN) if check_span else None
-            def is_expected():
-                return float(audio.get_attribute('volume')) == expected and \
-                       (not span or span.text == ('%d%%' % (expected * 100)))
-            try:
-                utils.wait(is_expected, timeout_sec=3)
-            except utils.TimeoutError as e:
-                self.fail('Timed out waiting for volume.\nReceived ' +
-                          audio.get_attribute('volume') + ' / ' + span.text)
-
-        wait_for_volume(0.7)
-
-        # Super-hacky, but clicking on the range (in its middle?) seems to bring
-        # it to 50%. Used to send the up arrow key but that looks like it
-        # stopped working.
-        volume_range = page.get(page.VOLUME_RANGE)
-        volume_range.click()
-        wait_for_volume(0.5)
-
+        # I *think* that this clicks the middle of the range. This might be a
+        # no-op since it should be 0, which is the default. :-/
+        pre_amp_range = page.get(page.PRE_AMP_RANGE)
+        pre_amp_range.click()
+        orig = pre_amp_range.get_attribute('value')
         page.click(page.OPTIONS_OK_BUTTON)
         page.wait_until_gone(page.OPTIONS_OK_BUTTON)
 
         page.show_options()
-        wait_for_volume(0.5)
         ESCAPE = u'\ue00c'
         page.get(page.BODY).send_keys(ESCAPE)
         page.wait_until_gone(page.OPTIONS_OK_BUTTON)
 
+        # Now that we're using GainNode instead of setting the <audio> element's
+        # volume, I'm not sure how to check that the setting was actually
+        # applied. Just check that it was saved, since that seems better than
+        # nothing.
         page.reload()
-        wait_for_volume(0.5, check_span=False)
+        page.show_options()
+        new = page.get(page.PRE_AMP_RANGE).get_attribute('value')
+        page.click(page.OPTIONS_OK_BUTTON)
+        if new != orig:
+            self.fail('Pre-amp setting was %s but is now %s', (orig, new))
 
     def test_presets(self):
         song1 = Song('a', 't1', 'unrated')

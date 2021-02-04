@@ -150,8 +150,10 @@ func (t *Tester) DumpSongs(strip stripPolicy, covers coverPolicy) []types.Song {
 		coversValue = "true"
 	}
 
-	stdout, stderr, err := runCommand(filepath.Join(t.binDir, "dump_music"), "-config="+t.dumpConfigFile,
-		"-song-batch-size="+strconv.Itoa(dumpBatchSize), "-play-batch-size="+strconv.Itoa(dumpBatchSize),
+	stdout, stderr, err := runCommand(filepath.Join(t.binDir, "dump_music"),
+		"-config="+t.dumpConfigFile,
+		"-song-batch-size="+strconv.Itoa(dumpBatchSize),
+		"-play-batch-size="+strconv.Itoa(dumpBatchSize),
 		"-covers="+coversValue)
 	if err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
@@ -192,19 +194,25 @@ func (t *Tester) ImportSongsFromJSONFile(path string, policy userDataPolicy) {
 	if policy == replaceUserData {
 		userDataValue = "true"
 	}
-	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile, "-import-json-file="+path, "-import-user-data="+userDataValue); err != nil {
+	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
+		"-config="+t.updateConfigFile,
+		"-import-json-file="+path,
+		"-import-user-data="+userDataValue); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
 }
 
 func (t *Tester) UpdateSongs() {
-	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile); err != nil {
+	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
+		"-config="+t.updateConfigFile); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
 }
 
 func (t *Tester) DeleteSong(songID string) {
-	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"), "-config="+t.updateConfigFile, "-delete-song-id="+songID); err != nil {
+	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
+		"-config="+t.updateConfigFile,
+		"-delete-song-id="+songID); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
 }
