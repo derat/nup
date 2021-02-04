@@ -18,13 +18,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/derat/nup/internal/pkg/types"
 	"github.com/derat/nup/server/cache"
 	"github.com/derat/nup/server/common"
 	"github.com/derat/nup/server/cover"
 	"github.com/derat/nup/server/dump"
 	"github.com/derat/nup/server/query"
 	"github.com/derat/nup/server/update"
-	"github.com/derat/nup/types"
 
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/derat/nup/test"
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/internal/pkg/test"
+	"github.com/derat/nup/internal/pkg/types"
 )
 
 func scanAndCompareSongs(t *testing.T, desc, dir, forceGlob string, lastUpdateTime time.Time, expected []types.Song) {

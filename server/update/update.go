@@ -13,9 +13,9 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/derat/nup/internal/pkg/types"
 	"github.com/derat/nup/server/cache"
 	"github.com/derat/nup/server/common"
-	"github.com/derat/nup/types"
 
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"

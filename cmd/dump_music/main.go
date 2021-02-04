@@ -12,8 +12,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/derat/nup/cloudutil"
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/internal/pkg/cloudutil"
+	"github.com/derat/nup/internal/pkg/types"
 )
 
 const (

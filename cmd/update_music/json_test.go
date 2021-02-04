@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/derat/nup/test"
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/internal/pkg/test"
+	"github.com/derat/nup/internal/pkg/types"
 )
 
 func TestJSON(t *testing.T) {

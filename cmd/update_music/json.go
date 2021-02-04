@@ -8,7 +8,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/internal/pkg/types"
 )
 
 func getSongsFromJSONFile(path string, updateChan chan types.SongOrErr) (numUpdates int, err error) {

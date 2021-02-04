@@ -17,7 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/internal/pkg/types"
 	"github.com/derat/taglib-go/taglib"
 )
 

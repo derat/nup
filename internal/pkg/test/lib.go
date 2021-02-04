@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/internal/pkg/types"
 )
 
 func CreateTempDir() string {

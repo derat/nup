@@ -6,7 +6,7 @@ package test
 import (
 	"time"
 
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/internal/pkg/types"
 )
 
 var Song0s = types.Song{
