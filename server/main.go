@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -17,6 +18,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"cloud.google.com/go/storage"
 
 	"github.com/derat/nup/internal/pkg/types"
 	"github.com/derat/nup/server/cache"
@@ -219,6 +222,7 @@ func main() {
 	http.HandleFunc("/query", handleQuery)
 	http.HandleFunc("/rate_and_tag", handleRateAndTag)
 	http.HandleFunc("/report_played", handleReportPlayed)
+	http.HandleFunc("/song_data", handleSongData)
 	http.HandleFunc("/songs", handleSongs)
 
 	// The google.golang.org/appengine packages are deprecated, and the official
@@ -739,6 +743,52 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 	writeTextResponse(w, "ok")
 }
 
+// The existence of this endpoint makes me extremely unhappy, but it seems necessary due to
+// bad interactions between Google Cloud Storage, the Web Audio API, and CORS:
+//
+//  - The <audio> element doesn't allow its volume to be set above 1.0, so the web client needs to
+//    use GainNode from the Web Audio API to amplify quiet tracks.
+//  - <audio> seems to support playing cross-origin data as long as you don't look at it, but the
+//    Web Audio API replaces cross-origin data with zeros:
+//    https://www.w3.org/TR/webaudio/#MediaElementAudioSourceOptions-security
+//  - You can use CORS to get around that, but the GCS authenticated browser endpoint
+//    (storage.cloud.google.com) doesn't allow CORS requests:
+//    https://cloud.google.com/storage/docs/cross-origin
+//
+// So, I'm copying songs through App Engine instead of letting GCS serve them so they won't be
+// cross-origin.
+//
+// The Web Audio part of this is particularly frustrating, as the JS doesn't actually need to look
+// at the audio data; it just need to amplify it.
+func handleSongData(w http.ResponseWriter, r *http.Request) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "GET", false) {
+		return
+	}
+
+	fn := r.FormValue("filename")
+	if fn == "" {
+		log.Errorf(ctx, "Missing filename in song data request")
+		http.Error(w, "Missing filename", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Handle range requests?
+	rc, err := readSong(ctx, fn)
+	if err != nil {
+		log.Errorf(ctx, "Failed opening song %q: %v", fn, err)
+		// TODO: It'd probably be better to report 404 when appropriate.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rc.Close()
+	w.Header().Set("Content-Type", "audio/mpeg")
+	if _, err := io.Copy(w, rc); err != nil {
+		// Too late to report an HTTP error.
+		log.Errorf(ctx, "Failed copying song %q: %v", fn, err)
+	}
+}
+
 func handleSongs(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
 	if !checkRequest(ctx, w, r, "GET", false) {
@@ -790,4 +840,25 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, cursor)
 	}
 	writeJSONResponse(w, rows)
+}
+
+// readSong opens the song at fn.
+func readSong(ctx context.Context, fn string) (io.ReadCloser, error) {
+	if cfg := common.Config(ctx); cfg.SongBucket != "" {
+		client, err := storage.NewClient(ctx)
+		if err != nil {
+			return nil, err
+		}
+		log.Debugf(ctx, "Opening object %q from bucket %q", fn, cfg.SongBucket)
+		return client.Bucket(cfg.SongBucket).Object(fn).NewReader(ctx)
+	} else if cfg.SongBaseURL != "" {
+		u := cfg.SongBaseURL + fn
+		log.Debugf(ctx, "Opening %v", u)
+		if resp, err := http.Get(u); err != nil {
+			return nil, err
+		} else {
+			return resp.Body, nil
+		}
+	}
+	return nil, errors.New("neither SongBucket nor SongBaseURL is set")
 }

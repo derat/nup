@@ -11,15 +11,14 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/derat/nup/internal/pkg/cloudutil"
 	"github.com/derat/nup/internal/pkg/types"
+	"github.com/derat/nup/server/common"
 )
 
 const (
@@ -34,7 +33,7 @@ func setUpTest() *Tester {
 	t := newTester(server, binDir)
 	if err := t.PingServer(); err != nil {
 		log.Printf("Unable to connect to server: %v\n", err)
-		log.Printf("Run e.g. \"dev_appserver.py --host=0.0.0.0 --datastore_consistency_policy=consistent .\", maybe?")
+		log.Printf("Run dev_appserver.py, maybe?")
 		os.Exit(1)
 	}
 	log.Printf("clearing all data on %v", server)
@@ -58,35 +57,21 @@ func cleanUpTest(t *Tester) {
 	t.CleanUp()
 }
 
-// extractFilePathFromURL extracts the (escaped for Cloud Storage but un-query-escaped) original file path from a URL.
-func extractFilePathFromURL(s string) (string, error) {
-	u, err := url.Parse(s)
-	if err != nil {
-		return "", fmt.Errorf("unable to parse URL")
-	}
-	if u.Scheme != "https" {
-		return "", fmt.Errorf("non-HTTPS scheme %q", u.Scheme)
-	}
-	if u.Host == "storage.cloud.google.com" {
-		return regexp.MustCompile("^/[^/]+/").ReplaceAllLiteralString(u.Path, ""), nil
-	} else if strings.HasSuffix(u.Host, ".storage.googleapis.com") && len(u.Path) > 0 {
-		return u.Path[1:], nil
-	} else {
-		return "", fmt.Errorf("unrecognized URL")
-	}
-}
-
 func compareQueryResults(expected, actual []types.Song, order OrderPolicy, client cloudutil.ClientType) error {
 	expectedCleaned := make([]types.Song, len(expected))
 	for i := range expected {
 		s := expected[i]
-		s.SHA1 = ""
-		s.Plays = nil
-		s.URL = cloudutil.CloudStorageURL(songBucket, s.Filename, client)
-		s.Filename = ""
-		if len(s.CoverFilename) > 0 {
-			s.CoverURL = cloudutil.CloudStorageURL(coverBucket, s.CoverFilename, client)
+		common.PrepareSongForClient(&s, 0, &types.ServerConfig{
+			SongBucket:  songBucket,
+			CoverBucket: coverBucket,
+		}, client)
+
+		// Change some stuff back to match the expected values.
+		s.SongID = ""
+		if len(s.Tags) == 0 {
+			s.Tags = nil
 		}
+
 		expectedCleaned[i] = s
 	}
 

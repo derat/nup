@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -54,6 +55,11 @@ func PrepareSongForClient(s *types.Song, id int64, cfg *types.ServerConfig, clie
 	}
 	s.URL = getURL(s.Filename, cfg.SongBucket, cfg.SongBaseURL)
 	s.CoverURL = getURL(s.CoverFilename, cfg.CoverBucket, cfg.CoverBaseURL)
+
+	// Proxy MP3s for browsers to avoid cross-origin requests.
+	if client == cloudutil.WebClient {
+		s.URL = "/song_data?filename=" + url.QueryEscape(s.Filename)
+	}
 
 	// Create an empty tags slice so that clients don't need to check for null.
 	if s.Tags == nil {

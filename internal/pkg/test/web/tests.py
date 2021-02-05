@@ -55,6 +55,7 @@ def setUpModule():
     # Makes no sense: Chrome starts at a data: URL, so I get a "Cookies are
     # disabled inside 'data:' URLs" exception if I try to add the cookie before
     # loading a page.
+    global base_url
     base_url = 'http://%s:%d' % (constants.HOSTNAME, constants.PORT)
     driver.get(base_url)
     driver.add_cookie({
@@ -83,7 +84,10 @@ class Test(unittest.TestCase):
 
         server.reset_connection()
         server.clear_data()
-        self.base_music_url = 'http://%s:%d/' % file_thread.host_port()
+
+        # The filename really ought to be escaped, but I'm not sure how to get
+        # Python to escape in the same way as Go.
+        self.base_music_url = base_url + '/song_data?filename='
 
     def tearDown(self):
         for entry in driver.get_log('browser'):

@@ -554,9 +554,12 @@ customElements.define(
     // stopped at the end of the last song in the playlist.
     play_() {
       const song = this.currentSong_;
-      if (this.audio_.src != song.url || this.reachedEndOfSongs_) {
-        console.log('Starting ' + song.songId + ' (' + song.url + ')');
-        this.audio_.src = song.url;
+      // Get an absolute URL since that's what we'll get from the <audio>
+      // element: https://stackoverflow.com/a/44547904
+      const url = new URL(song.url, document.baseURI).href;
+      if (this.audio_.src != url || this.reachedEndOfSongs_) {
+        console.log('Starting ' + song.songId + ' (' + url + ')');
+        this.audio_.src = url;
         this.audio_.currentTime = 0;
         this.lastTimeUpdatePosition_ = 0;
         this.lastTimeUpdateSong_ = null;
