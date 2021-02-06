@@ -85,7 +85,7 @@ func writeJSONResponse(w http.ResponseWriter, v interface{}) {
 
 // writeTextResponse writes s to w as a text response.
 func writeTextResponse(w http.ResponseWriter, s string) {
-	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 	w.Write([]byte(s))
 }
 
@@ -390,8 +390,7 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 	}
 	var out bytes.Buffer
 	json.Indent(&out, b, "", "  ")
-	w.Header().Set("Content-Type", "text/plain")
-	out.WriteTo(w)
+	writeTextResponse(w, out.String())
 }
 
 func handleExport(w http.ResponseWriter, r *http.Request) {
