@@ -4,6 +4,7 @@
 import selenium
 import time
 import utils
+from selenium.common.exceptions import StaleElementReferenceException
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -129,7 +130,7 @@ class Page(object):
                     len(cols) == 5 and \
                     cols[0].find_elements_by_tag_name('input')[0].is_selected()
                 songs.append(song)
-        except selenium.common.exceptions.StaleElementReferenceException:
+        except StaleElementReferenceException:
             # Handle the case where the table is getting rewritten. :-/
             return songs
         return songs
@@ -155,13 +156,20 @@ class Page(object):
                string cover image title/tooltip text
         '''
         audio = self.get(Page.AUDIO)
+        try:
+            src = audio.get_attribute('src')
+            paused = audio.get_attribute('paused') is not None
+            ended = audio.get_attribute('ended') is not None
+        except StaleElementReferenceException:
+            # Handle the audio element getting swapped.
+            src = ''
+            paused = False
+            ended = False
+
         song = Song(self.get(Page.ARTIST_DIV).text,
                     self.get(Page.TITLE_DIV).text,
                     self.get(Page.ALBUM_DIV).text)
-        return (song,
-                audio.get_attribute('src'),
-                audio.get_attribute('paused') is not None,
-                audio.get_attribute('ended') is not None,
+        return (song, src, paused, ended,
                 self.get(Page.TIME_DIV).text,
                 self.get(Page.RATING_OVERLAY_DIV).text,
                 self.get(Page.COVER_IMAGE).get_attribute('title'))

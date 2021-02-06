@@ -7,6 +7,7 @@ import {
   createTemplate,
   emptyImg,
   formatTime,
+  getAbsUrl,
   getCurrentTimeSec,
   getScaledCoverUrl,
   updateTitleAttributeForTruncation,
@@ -206,6 +207,7 @@ customElements.define(
     MAX_RETRIES = 2; // number of consecutive playback errors to reply
     NOTIFICATION_SECONDS = 3; // duration for song-change notification
     GAIN_CHANGE_SECONDS = 0.1; // duration for audio gain change between songs
+    PRELOAD_SECONDS = 20; // seconds from end of song when next song should be loaded
 
     constructor() {
       super();
@@ -244,19 +246,13 @@ customElements.define(
         this.cycleTrack_(1);
       });
 
-      this.audio_ = this.shadow_.querySelector('audio');
-      this.audio_.addEventListener('ended', () => this.onEnded_());
-      this.audio_.addEventListener('pause', () => this.onPause_());
-      this.audio_.addEventListener('play', () => this.onPlay_());
-      this.audio_.addEventListener('timeupdate', () => this.onTimeUpdate_());
-      this.audio_.addEventListener('error', e => this.onError_(e));
+      this.audioCtx_ = new AudioContext();
+      this.gainNode_ = this.audioCtx_.createGain();
+      this.gainNode_.connect(this.audioCtx_.destination);
 
-      // Route <audio> output through a GainNode:
-      // https://stackoverflow.com/a/43794379
-      const ctx = new AudioContext();
-      this.gainNode_ = ctx.createGain();
-      this.gainNode_.connect(ctx.destination);
-      ctx.createMediaElementSource(this.audio_).connect(this.gainNode_);
+      this.audio_ = this.shadow_.querySelector('audio');
+      this.configureAudio_();
+      this.nextAudio_ = null;
 
       this.coverDiv_ = get('cover-div');
       this.coverImage_ = get('cover-img');
@@ -324,6 +320,27 @@ customElements.define(
       this.updateSongDisplay_();
     }
 
+    // Adds event handlers to |audio_| and routes it through |gainNode_|.
+    configureAudio_() {
+      this.audio_.addEventListener('ended', () => this.onEnded_());
+      this.audio_.addEventListener('pause', () => this.onPause_());
+      this.audio_.addEventListener('play', () => this.onPlay_());
+      this.audio_.addEventListener('timeupdate', () => this.onTimeUpdate_());
+      this.audio_.addEventListener('error', e => this.onError_(e));
+
+      this.audioSrc_ = this.audioCtx_.createMediaElementSource(this.audio_);
+      this.audioSrc_.connect(this.gainNode_);
+    }
+
+    // Replaces |audio_| with |audio|.
+    swapAudio_(audio) {
+      this.audioSrc_.disconnect(this.gainNode_);
+      this.audio_.removeAttribute('src');
+      this.audio_.parentNode.replaceChild(audio, this.audio_);
+      this.audio_ = audio;
+      this.configureAudio_(); // resets |audioSrc_|
+    }
+
     set dialogManager(manager) {
       this.dialogManager_ = manager;
     }
@@ -362,7 +379,7 @@ customElements.define(
     enqueueSongs(songs, clearFirst, afterCurrent) {
       if (clearFirst) {
         this.audio_.pause();
-        this.audio_.src = emptyImg;
+        this.audio_.removeAttribute('src');
         this.playlistTable_.highlightRow(this.currentIndex_, false);
         this.songs_ = [];
         this.selectTrack_(0);
@@ -563,7 +580,7 @@ customElements.define(
       const song = this.currentSong_;
       // Get an absolute URL since that's what we'll get from the <audio>
       // element: https://stackoverflow.com/a/44547904
-      const url = new URL(song.url, document.baseURI).href;
+      const url = getAbsUrl(song.url);
       if (this.audio_.src != url || this.reachedEndOfSongs_) {
         // Deal with "The AudioContext was not allowed to start. It must be
         // resumed (or created) after a user gesture on the page.":
@@ -571,9 +588,16 @@ customElements.define(
         const ctx = this.gainNode_.context;
         if (ctx.state === 'suspended') ctx.resume();
 
-        console.log(`Starting ${song.songId} (${url})`);
-        this.audio_.src = url;
-        this.audio_.currentTime = 0;
+        if (this.nextAudio_ && this.nextAudio_.src == url) {
+          console.log(`Starting preloaded ${song.songId} (${url})`);
+          this.swapAudio_(this.nextAudio_);
+        } else {
+          console.log(`Starting ${song.songId} (${url})`);
+          this.audio_.src = url;
+          this.audio_.currentTime = 0;
+        }
+        this.nextAudio_ = null;
+
         this.lastTimeUpdatePosition_ = 0;
         this.lastTimeUpdateSong_ = null;
         this.numErrors_ = 0;
@@ -582,9 +606,7 @@ customElements.define(
         this.lastUpdateTime_ = -1;
         this.reportedCurrentTrack_ = false;
         this.reachedEndOfSongs_ = false;
-
         this.updateGain_();
-
       }
 
       console.log('Playing');
@@ -685,6 +707,21 @@ customElements.define(
       }
 
       this.presentationLayer_.updatePosition(position);
+
+      // Preload the next song once we're nearing the end of this one.
+      if (position >= duration - this.PRELOAD_SECONDS && !this.nextAudio_ &&
+          this.currentIndex_ < this.songs_.length - 1) {
+        this.preloadSong_(this.songs_[this.currentIndex_+1]);
+      }
+    }
+
+    // Configures |nextAudio_| to play |song|.
+    preloadSong_(song) {
+      const url = getAbsUrl(song.url);
+      console.log(`Preloading ${song.songId} (${url})`);
+      this.nextAudio_ = this.audio_.cloneNode(true);
+      this.nextAudio_.src = url;
+      this.nextAudio_.preload = 'auto';
     }
 
     onError_(e) {
@@ -848,7 +885,7 @@ customElements.define(
       // on the AudioParam interface."
       console.log(`Scaling amplitude by ${scale.toFixed(3)}`);
       this.gainNode_.gain.exponentialRampToValueAtTime(
-          scale, this.gainNode_.context.currentTime + this.GAIN_CHANGE_SECONDS);
+          scale, this.audioCtx_.currentTime + this.GAIN_CHANGE_SECONDS);
     }
 
     processAccelerator_(e) {

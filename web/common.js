@@ -91,3 +91,9 @@ export function getScaledCoverUrl(filename) {
     filename,
   )}&size=${scaledCoverSize}`;
 }
+
+// Returns an absolute version of |url| if it's relative.
+// If it's already absolute, it is returned unchanged.
+export function getAbsUrl(url) {
+  return new URL(url, document.baseURI).href;
+}
