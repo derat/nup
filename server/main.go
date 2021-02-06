@@ -14,12 +14,11 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
-
-	"cloud.google.com/go/storage"
 
 	"github.com/derat/nup/internal/pkg/types"
 	"github.com/derat/nup/server/cache"
@@ -27,6 +26,7 @@ import (
 	"github.com/derat/nup/server/cover"
 	"github.com/derat/nup/server/dump"
 	"github.com/derat/nup/server/query"
+	"github.com/derat/nup/server/storage"
 	"github.com/derat/nup/server/update"
 
 	"google.golang.org/appengine"
@@ -760,32 +760,37 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 //
 // The Web Audio part of this is particularly frustrating, as the JS doesn't actually need to look
 // at the audio data; it just need to amplify it.
-func handleSongData(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "GET", false) {
+func handleSongData(w http.ResponseWriter, req *http.Request) {
+	ctx := appengine.NewContext(req)
+	if !checkRequest(ctx, w, req, "GET", false) {
 		return
 	}
 
-	fn := r.FormValue("filename")
+	fn := req.FormValue("filename")
 	if fn == "" {
 		log.Errorf(ctx, "Missing filename in song data request")
 		http.Error(w, "Missing filename", http.StatusBadRequest)
 		return
 	}
 
-	// TODO: Handle range requests?
-	rc, err := readSong(ctx, fn)
+	r, err := openSong(ctx, fn)
 	if err != nil {
 		log.Errorf(ctx, "Failed opening song %q: %v", fn, err)
-		// TODO: It'd probably be better to report 404 when appropriate.
+		// TODO: It'd be better to report 404 when appropriate.
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer rc.Close()
-	w.Header().Set("Content-Type", "audio/mpeg")
-	if _, err := io.Copy(w, rc); err != nil {
-		// Too late to report an HTTP error.
-		log.Errorf(ctx, "Failed copying song %q: %v", fn, err)
+	defer r.Close()
+
+	if or, ok := r.(*storage.ObjectReader); ok {
+		// ServeContent handles range requests and last-modified stuff.
+		http.ServeContent(w, req, filepath.Base(fn), or.LastMod, or)
+	} else {
+		w.Header().Set("Content-Type", "audio/mpeg")
+		if _, err := io.Copy(w, r); err != nil {
+			// Too late to report an HTTP error.
+			log.Errorf(ctx, "Failed copying song %q: %v", fn, err)
+		}
 	}
 }
 
@@ -842,15 +847,10 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 	writeJSONResponse(w, rows)
 }
 
-// readSong opens the song at fn.
-func readSong(ctx context.Context, fn string) (io.ReadCloser, error) {
+// openSong opens the song at fn.
+func openSong(ctx context.Context, fn string) (io.ReadCloser, error) {
 	if cfg := common.Config(ctx); cfg.SongBucket != "" {
-		client, err := storage.NewClient(ctx)
-		if err != nil {
-			return nil, err
-		}
-		log.Debugf(ctx, "Opening object %q from bucket %q", fn, cfg.SongBucket)
-		return client.Bucket(cfg.SongBucket).Object(fn).NewReader(ctx)
+		return storage.NewObjectReader(ctx, cfg.SongBucket, fn)
 	} else if cfg.SongBaseURL != "" {
 		u := cfg.SongBaseURL + fn
 		log.Debugf(ctx, "Opening %v", u)
