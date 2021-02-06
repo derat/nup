@@ -466,8 +466,8 @@ class Test(unittest.TestCase):
         self.wait_for_playlist(page, [song1, song2], 0)
 
     def test_play_through_songs(self):
-        song1 = Song('artist', 'track1', 'album', 1, filename=Song.FILE_1S)
-        song2 = Song('artist', 'track2', 'album', 2, filename=Song.FILE_5S)
+        song1 = Song('artist', 'track1', 'album', 1, filename=Song.FILE_5S)
+        song2 = Song('artist', 'track2', 'album', 2, filename=Song.FILE_1S)
         server.import_songs([song1, song2])
 
         page = Page(driver)
