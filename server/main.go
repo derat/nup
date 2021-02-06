@@ -594,6 +594,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		Artist:   r.FormValue("artist"),
 		Title:    r.FormValue("title"),
 		Album:    r.FormValue("album"),
+		AlbumID:  r.FormValue("albumId"),
 		Keywords: strings.Fields(r.FormValue("keywords")),
 		Shuffle:  r.FormValue("shuffle") == "1",
 	}

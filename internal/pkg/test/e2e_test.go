@@ -249,7 +249,7 @@ func TestQueries(tt *testing.T) {
 
 	log.Print("posting some songs")
 	t.PostSongs([]types.Song{LegacySong1, LegacySong2}, replaceUserData, 0)
-	t.PostSongs([]types.Song{Song0s}, keepUserData, 0)
+	t.PostSongs([]types.Song{Song0s, Song1s, Song5s}, keepUserData, 0)
 
 	log.Print("doing a bunch of queries")
 	for _, q := range []struct {
@@ -259,13 +259,15 @@ func TestQueries(tt *testing.T) {
 		{[]string{"artist=AROVANE"}, []types.Song{LegacySong1}},
 		{[]string{"title=thaem+nue"}, []types.Song{LegacySong1}},
 		{[]string{"album=ATOL+scrap"}, []types.Song{LegacySong1}},
+		{[]string{"albumId=1e477f68-c407-4eae-ad01-518528cedc2c"}, []types.Song{Song0s, Song1s}},
+		{[]string{"album=Another+Album", "albumId=a1d2405b-afe0-4e28-a935-b5b256f68131"}, []types.Song{Song5s}},
 		{[]string{"keywords=arovane+thaem+atol"}, []types.Song{LegacySong1}},
 		{[]string{"keywords=arovane+foo"}, []types.Song{}},
 		{[]string{"minRating=1.0"}, []types.Song{}},
 		{[]string{"minRating=0.75"}, []types.Song{LegacySong1}},
 		{[]string{"minRating=0.5"}, []types.Song{LegacySong2, LegacySong1}},
 		{[]string{"minRating=0.0"}, []types.Song{LegacySong2, LegacySong1}},
-		{[]string{"unrated=1"}, []types.Song{Song0s}},
+		{[]string{"unrated=1"}, []types.Song{Song5s, Song0s, Song1s}},
 		{[]string{"tags=instrumental"}, []types.Song{LegacySong2, LegacySong1}},
 		{[]string{"tags=electronic+instrumental"}, []types.Song{LegacySong1}},
 		{[]string{"tags=-electronic+instrumental"}, []types.Song{LegacySong2}},

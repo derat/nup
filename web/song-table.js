@@ -247,10 +247,10 @@ customElements.define(
           this.onCheckboxClick_(e.target, e.shiftKey),
         );
       row.querySelector('.artist a').addEventListener('click', () => {
-        this.emitEvent_('field', {artist: row.song.artist});
+        this.emitEvent_('field', { artist: row.song.artist });
       });
       row.querySelector('.album a').addEventListener('click', () => {
-        this.emitEvent_('field', {album: row.song.album});
+        this.emitEvent_('field', { albumId: row.song.albumId, album: row.song.album });
       });
     }
 

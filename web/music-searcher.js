@@ -293,7 +293,7 @@ customElements.define(
       );
       this.resetButton_ = get('reset-button');
       this.resetButton_.addEventListener('click', () =>
-        this.reset_(null, null, true /* clearResults */),
+        this.reset_(null, null, null, true /* clearResults */),
       );
       this.luckyButton_ = get('lucky-button');
       this.luckyButton_.addEventListener('click', () => this.doLuckySearch_());
@@ -316,7 +316,7 @@ customElements.define(
 
       this.resultsTable_ = get('results-table');
       this.resultsTable_.addEventListener('field', e => {
-        this.reset_(e.detail.artist, e.detail.album, false /* clearResults */);
+        this.reset_(e.detail.artist, e.detail.album, e.detail.albumId, false /* clearResults */);
       });
       this.resultsTable_.addEventListener('check', e => {
         const checked = !!e.detail.count;
@@ -332,7 +332,7 @@ customElements.define(
     set musicPlayer(player) {
       this.musicPlayer_ = player;
       player.addEventListener('field', e => {
-        this.reset_(e.detail.artist, e.detail.album, false /* clearResults */);
+        this.reset_(e.detail.artist, e.detail.album, e.detail.albumId, false /* clearResults */);
       });
       player.addEventListener('tags', e => {
         this.tagSuggester_.words = e.detail.tags;
@@ -340,7 +340,7 @@ customElements.define(
     }
 
     resetForTesting() {
-      this.reset_(null, null, true /* clearResults */);
+      this.reset_(null, null, null, true /* clearResults */);
     }
 
     submitQuery_(appendToQueue) {
@@ -435,10 +435,10 @@ customElements.define(
       }
     }
 
-    // Resets all of the fields in the search form. If |newArtist| or |newAlbum|
-    // are non-null, the supplied values are used. Also jumps to the top of the
-    // page so the form is visible.
-    reset_(newArtist, newAlbum, clearResults) {
+    // Resets all of the fields in the search form. If |newArtist|, |newAlbum|,
+    // or |newAlbumId| are non-null, the supplied values are used. Also jumps to
+    // the top of the page so the form is visible.
+    reset_(newArtist, newAlbum, newAlbumId, clearResults) {
       const keywords = [];
       const clean = s => {
         s = s.replace(/"/g, '\\"');
@@ -447,6 +447,7 @@ customElements.define(
       };
       if (newArtist) keywords.push('artist:' + clean(newArtist));
       if (newAlbum) keywords.push('album:' + clean(newAlbum));
+      if (newAlbumId) keywords.push('albumId:' + clean(newAlbumId));
 
       this.keywordsInput_.value = keywords.join(' ');
       this.tagsInput_.value = null;
@@ -476,7 +477,7 @@ customElements.define(
         this.firstPlayedSelect_.selectedIndex == 0 &&
         this.lastPlayedSelect_.selectedIndex == 0
       ) {
-        this.reset_(null, null, false /* clearResults */);
+        this.reset_(null, null, null, false /* clearResults */);
         this.shuffleCheckbox_.checked = true;
         this.minRatingSelect_.selectedIndex = 3;
       }
@@ -500,7 +501,7 @@ customElements.define(
       if (this.presetSelect_.value == '') return;
 
       const index = this.presetSelect_.selectedIndex;
-      this.reset_(null, null, false /* clearResults */);
+      this.reset_(null, null, null, false /* clearResults */);
       this.presetSelect_.selectedIndex = index;
 
       let play = false;
@@ -556,6 +557,7 @@ function parseQueryString(text) {
     if (
       text.indexOf('artist:') == 0 ||
       text.indexOf('title:') == 0 ||
+      text.indexOf('albumId:') == 0 ||
       text.indexOf('album:') == 0
     ) {
       const key = text.substring(0, text.indexOf(':'));

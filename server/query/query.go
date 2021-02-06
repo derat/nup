@@ -296,6 +296,9 @@ func runQuery(ctx context.Context, query *common.SongQuery) ([]int64, error) {
 	if len(query.Album) > 0 {
 		bq = bq.Filter("AlbumLower =", strings.ToLower(query.Album))
 	}
+	if len(query.AlbumID) > 0 {
+		bq = bq.Filter("AlbumId =", query.AlbumID)
+	}
 	for _, w := range query.Keywords {
 		bq = bq.Filter("Keywords =", strings.ToLower(w))
 	}

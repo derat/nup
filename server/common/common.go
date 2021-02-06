@@ -76,9 +76,10 @@ func PrepareSongForClient(s *types.Song, id int64, cfg *types.ServerConfig, clie
 
 // SongQuery describes a query returning a list of Songs.
 type SongQuery struct {
-	Artist string // Song.Artist
-	Title  string // Song.Title
-	Album  string // Song.Album
+	Artist  string // Song.Artist
+	Title   string // Song.Title
+	Album   string // Song.Album
+	AlbumID string // Song.AlbumID
 
 	Keywords []string // Song.Keywords
 
