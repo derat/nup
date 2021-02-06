@@ -784,6 +784,7 @@ customElements.define(
       const createdTags = [];
       for (let i = 0; i < newRawTags.length; ++i) {
         let tag = newRawTags[i].toLowerCase();
+        if (tag === '') continue;
         if (this.tags_.indexOf(tag) != -1 || song.tags.indexOf(tag) != -1) {
           newTags.push(tag);
         } else if (tag[0] == '+' && tag.length > 1) {
