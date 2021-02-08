@@ -46,7 +46,9 @@ const template = createTemplate(`
     width: 70px;
   }
   #cover-div.empty #cover-img {
-    visibility: hidden;
+    /* Make fully transparent rather than using visibility: hidden so the
+     * image will still be clickable even if the cover is missing. */
+    opacity: 0;
   }
   #rating-overlay {
     color: white;
