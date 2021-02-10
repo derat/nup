@@ -394,9 +394,14 @@ customElements.define(
 
       this.playlistTable_.setSongs(this.songs_);
 
-      if (this.currentIndex_ == -1) this.selectTrack_(0);
-      else if (this.reachedEndOfSongs_) this.cycleTrack_(1);
-      else this.updateButtonState_();
+      if (this.currentIndex_ == -1) {
+        this.selectTrack_(0);
+      } else if (this.reachedEndOfSongs_) {
+        this.cycleTrack_(1);
+      } else {
+        this.updateButtonState_();
+        this.updatePresentationLayerSongs_();
+      }
     }
 
     // Plays the song at |offset| in the playlist relative to the current song.

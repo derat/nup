@@ -55,7 +55,7 @@ class Page(object):
     TITLE_DIV = MUSIC_PLAYER + (By.ID, 'title')
     UPDATE_CLOSE_IMAGE = MUSIC_PLAYER + (By.ID, 'update-close')
 
-    MUSIC_SEARCHER = (By.TAG_NAME, 'music-searcher');
+    MUSIC_SEARCHER = (By.TAG_NAME, 'music-searcher')
     APPEND_BUTTON = MUSIC_SEARCHER + (By.ID, 'append-button')
     FIRST_PLAYED_SELECT = MUSIC_SEARCHER + (By.ID, 'first-played-select')
     FIRST_TRACK_CHECKBOX = MUSIC_SEARCHER + (By.ID, 'first-track-checkbox')
@@ -73,6 +73,14 @@ class Page(object):
         By.ID, 'results-table', By.CSS_SELECTOR, 'table')
     UNRATED_CHECKBOX = MUSIC_SEARCHER + (By.ID, 'unrated-checkbox')
 
+    PRESENTATION_LAYER = MUSIC_PLAYER + (By.CSS_SELECTOR, 'presentation-layer')
+    CURRENT_ARTIST_DIV = PRESENTATION_LAYER + (By.ID, 'current-artist')
+    CURRENT_TITLE_DIV = PRESENTATION_LAYER + (By.ID, 'current-title')
+    CURRENT_ALBUM_DIV = PRESENTATION_LAYER + (By.ID, 'current-album')
+    NEXT_ARTIST_DIV = PRESENTATION_LAYER + (By.ID, 'next-artist')
+    NEXT_TITLE_DIV = PRESENTATION_LAYER + (By.ID, 'next-title')
+    NEXT_ALBUM_DIV = PRESENTATION_LAYER + (By.ID, 'next-album')
+
     keywords = InputElement(MUSIC_SEARCHER + (By.ID, 'keywords-input'))
     max_plays = InputElement(MUSIC_SEARCHER + (By.ID, 'max-plays-input'))
     tags = InputElement(MUSIC_SEARCHER + (By.ID, 'tags-input'))
@@ -88,11 +96,11 @@ class Page(object):
     THREE_YEARS = 'three years'
 
     # Values for MIN_RATING_SELECT and RATING_OVERLAY_DIV.
-    ONE_STAR = u'★';
-    TWO_STARS = u'★★';
-    THREE_STARS = u'★★★';
-    FOUR_STARS = u'★★★★';
-    FIVE_STARS = u'★★★★★';
+    ONE_STAR = u'★'
+    TWO_STARS = u'★★'
+    THREE_STARS = u'★★★'
+    FOUR_STARS = u'★★★★'
+    FIVE_STARS = u'★★★★★'
 
     # Values for PRESET_SELECT.
     PRESET_INSTRUMENTAL_OLD = 'instrumental old'
@@ -112,7 +120,7 @@ class Page(object):
         self.driver.execute_script('document.test.reset()')
 
     def refresh_tags(self):
-        self.driver.execute_script('document.test.updateTags()');
+        self.driver.execute_script('document.test.updateTags()')
 
     def get_songs_from_table(self, table):
         songs = []
@@ -173,6 +181,16 @@ class Page(object):
                 self.get(Page.TIME_DIV).text,
                 self.get(Page.RATING_OVERLAY_DIV).text,
                 self.get(Page.COVER_IMAGE).get_attribute('title'))
+
+    def get_presentation_songs(self):
+        '''Gets tuple of current and next Song from presentation layer.'''
+        return (Song(self.get(Page.CURRENT_ARTIST_DIV).text,
+                     self.get(Page.CURRENT_TITLE_DIV).text,
+                     self.get(Page.CURRENT_ALBUM_DIV).text),
+                Song(self.get(Page.NEXT_ARTIST_DIV).text,
+                     self.get(Page.NEXT_TITLE_DIV).text,
+                     self.get(Page.NEXT_ALBUM_DIV).text))
+
 
     # Waits for and returns the element described by |locator|.
     # |locator| is typically a tuple like (By.ID, 'some-element') or
@@ -263,6 +281,17 @@ class Page(object):
                 new KeyboardEvent('keydown', {
                     key: 'o',
                     keyCode: 79,
+                    altKey: true,
+                })
+            )
+        ''')
+
+    def show_presentation(self):
+        self.driver.execute_script('''
+            document.body.dispatchEvent(
+                new KeyboardEvent('keydown', {
+                    key: 'v',
+                    keyCode: 86,
                     altKey: true,
                 })
             )
