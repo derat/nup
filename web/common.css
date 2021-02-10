@@ -51,6 +51,7 @@ button {
   height: 28px;
   letter-spacing: 0.0892857143em;
   line-height: 28px;
+  overflow: hidden; /* prevent icon from extending focus ring */
   padding: 1px 12px 0 12px;
   text-transform: uppercase;
 }
