@@ -205,18 +205,18 @@ const template = createTemplate(`
 customElements.define(
   'music-player',
   class extends HTMLElement {
-    SEEK_SECONDS = 10; // seconds skipped by seeking forward or back
-    MAX_RETRIES = 2; // number of consecutive playback errors to reply
-    NOTIFICATION_SECONDS = 3; // duration for song-change notification
-    GAIN_CHANGE_SECONDS = 0.1; // duration for audio gain change between songs
-    PRELOAD_SECONDS = 20; // seconds from end of song when next song should be loaded
+    static SEEK_SEC_ = 10; // seconds skipped by seeking forward or back
+    static MAX_RETRIES_ = 2; // number of consecutive playback errors to reply
+    static NOTIFICATION_SEC_ = 3; // duration for song-change notification
+    static GAIN_CHANGE_SEC_ = 0.1; // duration for audio gain change between songs
+    static PRELOAD_SEC_ = 20; // seconds from end of song when next song should be loaded
 
     constructor() {
       super();
 
       this.config_ = new Config();
       this.config_.addCallback((name, value) => {
-        if (name == this.config_.PRE_AMP) this.updateGain_();
+        if (name === Config.PRE_AMP) this.updateGain_();
       });
 
       this.updater_ = new Updater();
@@ -300,9 +300,9 @@ customElements.define(
         ms.setActionHandler('play', () => this.play_());
         ms.setActionHandler('pause', () => this.pause_());
         ms.setActionHandler('seekbackward', () =>
-          this.seek_(-this.SEEK_SECONDS),
+          this.seek_(-this.constructor.SEEK_SEC_),
         );
-        ms.setActionHandler('seekforward', () => this.seek_(this.SEEK_SECONDS));
+        ms.setActionHandler('seekforward', () => this.seek_(this.constructor.SEEK_SEC_));
         ms.setActionHandler('previoustrack', () => this.cycleTrack_(-1));
         ms.setActionHandler('nexttrack', () => this.cycleTrack_(1));
       }
@@ -568,7 +568,7 @@ customElements.define(
       });
       this.closeNotificationTimeoutId_ = window.setTimeout(
         () => this.closeNotification_(),
-        this.NOTIFICATION_SECONDS * 1000,
+        this.constructor.NOTIFICATION_SEC_ * 1000,
       );
     }
 
@@ -716,7 +716,7 @@ customElements.define(
       this.presentationLayer_.updatePosition(position);
 
       // Preload the next song once we're nearing the end of this one.
-      if (position >= duration - this.PRELOAD_SECONDS && !this.nextAudio_ &&
+      if (position >= duration - this.constructor.PRELOAD_SEC_ && !this.nextAudio_ &&
           this.currentIndex_ < this.songs_.length - 1) {
         this.preloadSong_(this.songs_[this.currentIndex_+1]);
       }
@@ -742,7 +742,7 @@ customElements.define(
         case error.MEDIA_ERR_NETWORK: // 2
         case error.MEDIA_ERR_DECODE: // 3
         case error.MEDIA_ERR_SRC_NOT_SUPPORTED: // 4
-          if (this.numErrors_ <= this.MAX_RETRIES) {
+          if (this.numErrors_ <= this.constructor.MAX_RETRIES_) {
             console.log(
               'Retrying from position ' + this.lastTimeUpdatePosition_,
             );
@@ -876,7 +876,7 @@ customElements.define(
       // TODO: Add an option to use track gain instead?
       const song = this.currentSong_;
       if (song && song.albumGain !== undefined) {
-        const preAmp = this.config_.get(this.config_.PRE_AMP);
+        const preAmp = this.config_.get(Config.PRE_AMP);
         const songAdj = song && song.albumGain !== undefined ? song.albumGain : 0;
         scale = 10 ** ((songAdj + preAmp) / 20);
 
@@ -893,7 +893,7 @@ customElements.define(
       // on the AudioParam interface."
       console.log(`Scaling amplitude by ${scale.toFixed(3)}`);
       this.gainNode_.gain.exponentialRampToValueAtTime(
-          scale, this.audioCtx_.currentTime + this.GAIN_CHANGE_SECONDS);
+          scale, this.audioCtx_.currentTime + this.constructor.GAIN_CHANGE_SEC_);
     }
 
     processAccelerator_(e) {
@@ -936,10 +936,10 @@ customElements.define(
         this.hideUpdateDiv_(false);
         return true;
       } else if (e.key == 'ArrowLeft' && !this.updateSong_) {
-        this.seek_(-this.SEEK_SECONDS);
+        this.seek_(-this.constructor.SEEK_SEC_);
         return true;
       } else if (e.key == 'ArrowRight' && !this.updateSong_) {
-        this.seek_(this.SEEK_SECONDS);
+        this.seek_(this.constructor.SEEK_SEC_);
         return true;
       }
 

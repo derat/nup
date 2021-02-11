@@ -2,13 +2,13 @@
 // All rights reserved.
 
 export default class Updater {
-  QUEUED_PLAY_REPORTS_KEY = 'queued_play_reports';
-  IN_PROGRESS_PLAY_REPORTS_KEY = 'in_progress_play_reports';
-  QUEUED_RATINGS_AND_TAGS_KEY = 'queued_ratings_and_tags';
-  IN_PROGRESS_RATINGS_AND_TAGS_KEY = 'in_progress_ratings_and_tags';
+  static QUEUED_PLAY_REPORTS_KEY_ = 'queued_play_reports';
+  static IN_PROGRESS_PLAY_REPORTS_KEY_ = 'in_progress_play_reports';
+  static QUEUED_RATINGS_AND_TAGS_KEY_ = 'queued_ratings_and_tags';
+  static IN_PROGRESS_RATINGS_AND_TAGS_KEY_ = 'in_progress_ratings_and_tags';
 
-  MIN_RETRY_DELAY_MS = 500; // Half a second.
-  MAX_RETRY_DELAY_MS = 300 * 1000; // Five minutes.
+  static MIN_RETRY_DELAY_MS_ = 500; // Half a second.
+  static MAX_RETRY_DELAY_MS_ = 300 * 1000; // Five minutes.
 
   constructor() {
     this.retryTimeoutId_ = -1; // for doRetry_()
@@ -17,18 +17,18 @@ export default class Updater {
     // [{'songId': songId, 'startTime': startTime}, {'songId': songId, 'startTime': startTime}, ...]
     // Put reports that were in-progress during the last run into the queue.
     this.queuedPlayReports_ = readObject(
-      this.QUEUED_PLAY_REPORTS_KEY,
+      Updater.QUEUED_PLAY_REPORTS_KEY_,
       [],
-    ).concat(readObject(this.IN_PROGRESS_PLAY_REPORTS_KEY, []));
+    ).concat(readObject(Updater.IN_PROGRESS_PLAY_REPORTS_KEY_, []));
     this.inProgressPlayReports_ = [];
 
     // {songId: {'rating': rating, 'tags': tags}, songId: {'rating': rating, 'tags': tags}, ...}
     // Either ratings or tags can be null.
     this.queuedRatingsAndTags_ = readObject(
-      this.QUEUED_RATINGS_AND_TAGS_KEY,
+      Updater.QUEUED_RATINGS_AND_TAGS_KEY_,
       {},
     );
-    const oldInProgress = readObject(this.IN_PROGRESS_RATINGS_AND_TAGS_KEY, {});
+    const oldInProgress = readObject(Updater.IN_PROGRESS_RATINGS_AND_TAGS_KEY_, {});
     for (const songId in Object.keys(oldInProgress)) {
       this.queuedRatingsAndTags_[songId] = oldInProgress[songId];
     }
@@ -129,16 +129,16 @@ export default class Updater {
 
   // Persists the current state to local storage.
   writeState_() {
-    localStorage[this.QUEUED_PLAY_REPORTS_KEY] = JSON.stringify(
+    localStorage[Updater.QUEUED_PLAY_REPORTS_KEY_] = JSON.stringify(
       this.queuedPlayReports_,
     );
-    localStorage[this.QUEUED_RATINGS_AND_TAGS_KEY] = JSON.stringify(
+    localStorage[Updater.QUEUED_RATINGS_AND_TAGS_KEY_] = JSON.stringify(
       this.queuedRatingsAndTags_,
     );
-    localStorage[this.IN_PROGRESS_PLAY_REPORTS_KEY] = JSON.stringify(
+    localStorage[Updater.IN_PROGRESS_PLAY_REPORTS_KEY_] = JSON.stringify(
       this.inProgressPlayReports_,
     );
-    localStorage[this.IN_PROGRESS_RATINGS_AND_TAGS_KEY] = JSON.stringify(
+    localStorage[Updater.IN_PROGRESS_RATINGS_AND_TAGS_KEY_] = JSON.stringify(
       this.inProgressRatingsAndTags_,
     );
   }
@@ -160,8 +160,8 @@ export default class Updater {
       ? 0
       : this.lastRetryDelayMs_ > 0
       ? this.lastRetryDelayMs_ * 2
-      : this.MIN_RETRY_DELAY_MS;
-    delayMs = Math.min(delayMs, this.MAX_RETRY_DELAY_MS);
+      : Updater.MIN_RETRY_DELAY_MS_;
+    delayMs = Math.min(delayMs, Updater.MAX_RETRY_DELAY_MS_);
     console.log('Scheduling retry in ' + delayMs + ' ms');
     this.retryTimeoutId_ = window.setTimeout(() => this.doRetry_(), delayMs);
     this.lastRetryDelayMs_ = delayMs;

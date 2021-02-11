@@ -4,15 +4,15 @@
 // Config provides persistent storage for preferences.
 export default class Config {
   // Names to pass to get() or set().
-  PRE_AMP = 'preAmp';
+  static PRE_AMP = 'preAmp';
 
-  CONFIG_KEY = 'config'; // localStorage key
+  static CONFIG_KEY_ = 'config'; // localStorage key
+  static FLOAT_NAMES_ = new Set([Config.PRE_AMP]);
 
   constructor() {
     this.callbacks_ = [];
-    this.floatNames_ = new Set([this.PRE_AMP]);
     this.values_ = {
-      [this.PRE_AMP]: 0.0,
+      [Config.PRE_AMP]: 0.0,
     };
     this.load_();
   }
@@ -37,7 +37,7 @@ export default class Config {
   // or the value is of an inappropriate type.
   set(name, value) {
     const origValue = value;
-    if (this.floatNames_.has(name) != -1) {
+    if (Config.FLOAT_NAMES_.has(name)) {
       value = parseFloat(value);
       if (isNaN(value)) {
         throw new Error(`Non-float '${name}' value '${origValue}'`);
@@ -51,7 +51,7 @@ export default class Config {
 
   // Loads and validates prefs from local storage.
   load_() {
-    const json = localStorage[this.CONFIG_KEY];
+    const json = localStorage[Config.CONFIG_KEY_];
     if (!json) return;
 
     let loaded = {};
@@ -73,6 +73,6 @@ export default class Config {
 
   // Saves all prefs to local storage.
   save() {
-    localStorage[this.CONFIG_KEY] = JSON.stringify(this.values_);
+    localStorage[Config.CONFIG_KEY_] = JSON.stringify(this.values_);
   }
 }

@@ -2,6 +2,7 @@
 // All rights reserved.
 
 import {$, createShadow, createTemplate} from './common.js';
+import Config from './config.js';
 
 const template = createTemplate(`
 <style>
@@ -32,7 +33,7 @@ export default class OptionsDialog {
     this.manager_ = manager;
     this.closeCallback_ = closeCallback;
 
-    const preAmp = this.config_.get(this.config_.PRE_AMP);
+    const preAmp = this.config_.get(Config.PRE_AMP);
 
     this.container_ = this.manager_.createDialog();
     this.shadow_ = createShadow(this.container_, template);
@@ -45,7 +46,7 @@ export default class OptionsDialog {
     );
     this.preAmpRange_.addEventListener(
       'change',
-      () => this.config_.set(this.config_.PRE_AMP, this.preAmpRange_.value),
+      () => this.config_.set(Config.PRE_AMP, this.preAmpRange_.value),
     );
 
     this.preAmpSpan_ = $('pre-amp-span', this.shadow_);

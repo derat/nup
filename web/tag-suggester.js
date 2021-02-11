@@ -41,7 +41,7 @@ const template = createTemplate(`
 customElements.define(
   'tag-suggester',
   class extends HTMLElement {
-    SUGGESTION_MARGIN = 4;
+    static SUGGESTION_MARGIN_ = 4;
 
     constructor() {
       super();
@@ -167,7 +167,7 @@ customElements.define(
       const offset =
         this.target_.offsetTop +
         this.target_.offsetHeight +
-        this.SUGGESTION_MARGIN;
+        this.constructor.SUGGESTION_MARGIN_;
       this.suggestionsDiv_.style.top = `${offset}px`;
       this.suggestionsDiv_.style.left = `${this.target_.offsetLeft}px`;
 
