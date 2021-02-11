@@ -216,7 +216,9 @@ customElements.define(
 
       this.config_ = new Config();
       this.config_.addCallback((name, value) => {
-        if (name === Config.PRE_AMP) this.updateGain_();
+        if (name === Config.GAIN_TYPE || name === Config.PRE_AMP) {
+          this.updateGain_();
+        }
       });
 
       this.updater_ = new Updater();
@@ -869,21 +871,23 @@ customElements.define(
     // settings. This implements the approach described at
     // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification.
     updateGain_() {
-      // Ignore the pre-amp setting if we don't have info about the song's
-      // loudness -- scaling the audio seems risky in that case.
-      let scale = 1;
+      let adj = this.config_.get(Config.PRE_AMP); // decibels
 
-      // TODO: Add an option to use track gain instead?
       const song = this.currentSong_;
-      if (song && song.albumGain !== undefined) {
-        const preAmp = this.config_.get(Config.PRE_AMP);
-        const songAdj = song && song.albumGain !== undefined ? song.albumGain : 0;
-        scale = 10 ** ((songAdj + preAmp) / 20);
-
-        // TODO: Add an option to prevent clipping instead of always doing this?
-        if (song.peakAmplitude !== undefined) {
-          scale = Math.min(scale, 1 / song.peakAmplitude);
+      if (song) {
+        const gainType = this.config_.get(Config.GAIN_TYPE);
+        if (gainType === Config.GAIN_ALBUM) {
+          adj += song.albumGain || 0;
+        } else if (gainType === Config.GAIN_TRACK) {
+          adj += song.trackGain || 0;
         }
+      }
+
+      let scale = 10 ** (adj / 20);
+
+      // TODO: Add an option to prevent clipping instead of always doing this?
+      if (song && song.peakAmp !== undefined) {
+        scale = Math.min(scale, 1 / song.peakAmp);
       }
 
       // Per https://developer.mozilla.org/en-US/docs/Web/API/GainNode:

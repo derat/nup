@@ -34,6 +34,7 @@ class Page(object):
     DIALOG_MANAGER = (By.TAG_NAME, 'dialog-manager')
     OPTIONS_DIALOG = DIALOG_MANAGER + (By.CSS_SELECTOR, '.dialog')
     OPTIONS_OK_BUTTON = OPTIONS_DIALOG + (By.ID, 'ok-button')
+    GAIN_TYPE_SELECT = OPTIONS_DIALOG + (By.ID, 'gain-type-select')
     PRE_AMP_RANGE = OPTIONS_DIALOG + (By.ID, 'pre-amp-range')
     PRE_AMP_SPAN = OPTIONS_DIALOG + (By.ID, 'pre-amp-span')
 
@@ -85,7 +86,7 @@ class Page(object):
     max_plays = InputElement(MUSIC_SEARCHER + (By.ID, 'max-plays-input'))
     tags = InputElement(MUSIC_SEARCHER + (By.ID, 'tags-input'))
 
-    # Values for FIRST_PLAYED_SELECT and LAST_PLAYED_SELECT.
+    # Text for FIRST_PLAYED_SELECT and LAST_PLAYED_SELECT options.
     UNSET_TIME = '...'
     ONE_DAY = 'one day'
     ONE_WEEK = 'one week'
@@ -95,19 +96,24 @@ class Page(object):
     ONE_YEAR = 'one year'
     THREE_YEARS = 'three years'
 
-    # Values for MIN_RATING_SELECT and RATING_OVERLAY_DIV.
+    # Text for MIN_RATING_SELECT options and RATING_OVERLAY_DIV.
     ONE_STAR = u'★'
     TWO_STARS = u'★★'
     THREE_STARS = u'★★★'
     FOUR_STARS = u'★★★★'
     FIVE_STARS = u'★★★★★'
 
-    # Values for PRESET_SELECT.
+    # Text for PRESET_SELECT  options.
     PRESET_INSTRUMENTAL_OLD = 'instrumental old'
     PRESET_MELLOW = 'mellow'
     PRESET_NEW_ALBUMS = 'new albums'
     PRESET_UNRATED = 'unrated'
     PRESET_OLD = 'old'
+
+    # Values for GAIN_TYPE_SELECT options.
+    GAIN_ALBUM = '0'
+    GAIN_TRACK = '1'
+    GAIN_NONE = '2'
 
     def __init__(self, driver):
         self.driver = driver
@@ -218,13 +224,16 @@ class Page(object):
     def click(self, locator):
         self.get(locator).click()
 
-    def select(self, locator, value):
+    def select(self, locator, text=None, value=None):
         select = self.get(locator)
         for option in select.find_elements_by_tag_name('option'):
-            if option.text == value:
+            if (text and option.text == text) or \
+                    (value and option.get_attribute('value') == value):
                 option.click()
                 return
-        raise RuntimeError('Failed to find option "%s"' % value)
+        raise RuntimeError(
+            'Failed to find option with text "%s" or value "%s"' % \
+            (text, value))
 
     def wait_until_gone(self, locator):
         def exists():

@@ -273,7 +273,7 @@ class Test(unittest.TestCase):
                             (page.THREE_STARS, [song3, song4, song5]),
                             (page.FOUR_STARS, [song4, song5]),
                             (page.FIVE_STARS, [song5])):
-            page.select(page.MIN_RATING_SELECT, rating)
+            page.select(page.MIN_RATING_SELECT, text=rating)
             page.click(page.SEARCH_BUTTON)
             self.wait_for_search_results(page, res, msg=rating)
 
@@ -328,8 +328,8 @@ class Test(unittest.TestCase):
                  (page.UNSET_TIME, page.ONE_YEAR, []),
                  (page.UNSET_TIME, page.ONE_MONTH, [song2]),
                  (page.UNSET_TIME, page.ONE_DAY, [song1, song2])):
-            page.select(page.FIRST_PLAYED_SELECT, first)
-            page.select(page.LAST_PLAYED_SELECT, last)
+            page.select(page.FIRST_PLAYED_SELECT, text=first)
+            page.select(page.LAST_PLAYED_SELECT, text=last)
             page.click(page.SEARCH_BUTTON)
             self.wait_for_search_results(page, res, msg='%s/%s' % (first, last))
 
@@ -687,14 +687,24 @@ class Test(unittest.TestCase):
         page = Page(driver)
         page.show_options()
 
+        def get_gain_type():
+            return page.get(page.GAIN_TYPE_SELECT).get_attribute('value')
+        def get_pre_amp():
+            return page.get(page.PRE_AMP_RANGE).get_attribute('value')
+
+        self.assertEqual(get_gain_type(), page.GAIN_ALBUM)
+        page.select(page.GAIN_TYPE_SELECT, value=page.GAIN_TRACK)
+        self.assertEqual(get_gain_type(), page.GAIN_TRACK)
+
         # I *think* that this clicks the middle of the range. This might be a
         # no-op since it should be 0, which is the default. :-/
-        pre_amp_range = page.get(page.PRE_AMP_RANGE)
-        pre_amp_range.click()
-        orig = pre_amp_range.get_attribute('value')
+        page.get(page.PRE_AMP_RANGE).click()
+        orig_pre_amp = get_pre_amp()
+
         page.click(page.OPTIONS_OK_BUTTON)
         page.wait_until_gone(page.OPTIONS_OK_BUTTON)
 
+        # Escape should dismiss the dialog.
         page.show_options()
         ESCAPE = u'\ue00c'
         page.get(page.BODY).send_keys(ESCAPE)
@@ -706,10 +716,9 @@ class Test(unittest.TestCase):
         # nothing.
         page.reload()
         page.show_options()
-        new = page.get(page.PRE_AMP_RANGE).get_attribute('value')
+        self.assertEqual(get_gain_type(), page.GAIN_TRACK)
+        self.assertEqual(get_pre_amp(), orig_pre_amp)
         page.click(page.OPTIONS_OK_BUTTON)
-        if new != orig:
-            self.fail('Pre-amp setting was %s but is now %s', (orig, new))
 
     def test_presets(self):
         song1 = Song('a', 't1', 'unrated')
@@ -724,13 +733,13 @@ class Test(unittest.TestCase):
         server.import_songs([song1, song2, song3, song4, song5, song6])
 
         page = Page(driver)
-        page.select(page.PRESET_SELECT, page.PRESET_INSTRUMENTAL_OLD)
+        page.select(page.PRESET_SELECT, text=page.PRESET_INSTRUMENTAL_OLD)
         self.wait_for_song(page, song5)
-        page.select(page.PRESET_SELECT, page.PRESET_MELLOW)
+        page.select(page.PRESET_SELECT, text=page.PRESET_MELLOW)
         self.wait_for_song(page, song6)
-        page.select(page.PRESET_SELECT, page.PRESET_NEW_ALBUMS)
+        page.select(page.PRESET_SELECT, text=page.PRESET_NEW_ALBUMS)
         self.wait_for_search_results(page, [song2])
-        page.select(page.PRESET_SELECT, page.PRESET_UNRATED)
+        page.select(page.PRESET_SELECT, text=page.PRESET_UNRATED)
         self.wait_for_song(page, song1)
         # TODO: Test PRESET_OLD? Not sure how to, since it shuffles and
         # autoplays (i.e. either song4 or song5 will play)...

@@ -4,14 +4,22 @@
 // Config provides persistent storage for preferences.
 export default class Config {
   // Names to pass to get() or set().
+  static GAIN_TYPE = 'gainType';
   static PRE_AMP = 'preAmp';
+
+  // Values for GAIN_TYPE.
+  static GAIN_ALBUM = 0;
+  static GAIN_TRACK = 1;
+  static GAIN_NONE  = 2;
 
   static CONFIG_KEY_ = 'config'; // localStorage key
   static FLOAT_NAMES_ = new Set([Config.PRE_AMP]);
+  static INT_NAMES_ = new Set([Config.GAIN_TYPE]);
 
   constructor() {
     this.callbacks_ = [];
     this.values_ = {
+      [Config.GAIN_TYPE]: Config.GAIN_ALBUM,
       [Config.PRE_AMP]: 0.0,
     };
     this.load_();
@@ -39,9 +47,11 @@ export default class Config {
     const origValue = value;
     if (Config.FLOAT_NAMES_.has(name)) {
       value = parseFloat(value);
-      if (isNaN(value)) {
-        throw new Error(`Non-float '${name}' value '${origValue}'`);
-      }
+      if (isNaN(value)) throw new Error(`Non-float '${name}' value '${origValue}'`);
+      this.values_[name] = value;
+    } else if (Config.INT_NAMES_.has(name)) {
+      value = parseInt(value);
+      if (isNaN(value)) throw new Error(`Non-int '${name}' value '${origValue}'`);
       this.values_[name] = value;
     } else {
       throw new Error(`Unknown pref '${name}'`);
