@@ -25,6 +25,7 @@ driver = None
 def setUpModule():
     global file_thread
     file_thread = FileServerThread(constants.MUSIC_PATH)
+    file_thread.daemon = True  # avoid hanging on SIGINT
     file_thread.start()
 
     global server
