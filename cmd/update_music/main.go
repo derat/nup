@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"flag"
 	"log"
-	"math"
 	"os"
 	"path/filepath"
 	"time"
@@ -16,53 +15,12 @@ import (
 	"github.com/derat/nup/internal/pkg/types"
 )
 
-type Config struct {
+type config struct {
 	types.ClientConfig
 	CoverDir           string `json:"coverDir"`
 	MusicDir           string `json:"musicDir"`
 	LastUpdateTimeFile string `json:"lastUpdateTimeFile"`
 	ComputeGain        bool   `json:"computeGain"`
-}
-
-func getLastUpdateTime(path string) (t time.Time, err error) {
-	f, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return t, nil
-		}
-		return t, err
-	}
-	defer f.Close()
-
-	if err = json.NewDecoder(f).Decode(&t); err != nil {
-		return t, err
-	}
-	return t, nil
-}
-
-func setLastUpdateTime(path string, t time.Time) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return json.NewEncoder(f).Encode(t)
-}
-
-func getCoverFilename(dir string, song *types.Song) string {
-	if len(song.AlbumID) != 0 {
-		fn := song.AlbumID + ".jpg"
-		if _, err := os.Stat(filepath.Join(dir, fn)); err == nil {
-			return fn
-		}
-	}
-	if len(song.RecordingID) != 0 {
-		fn := song.RecordingID + ".jpg"
-		if _, err := os.Stat(filepath.Join(dir, fn)); err == nil {
-			return fn
-		}
-	}
-	return ""
 }
 
 func main() {
@@ -77,7 +35,7 @@ func main() {
 	songPathsFile := flag.String("song-paths-file", "", "Path to a file containing one relative path per line for songs to force updating")
 	flag.Parse()
 
-	var cfg Config
+	var cfg config
 	if err := cloudutil.ReadJSON(*configFile, &cfg); err != nil {
 		log.Fatal("Unable to read config file: ", err)
 	}
@@ -100,7 +58,7 @@ func main() {
 
 	if len(*importJSONFile) > 0 {
 		log.Printf("Reading songs from %v", *importJSONFile)
-		if numSongs, err = getSongsFromJSONFile(*importJSONFile, readChan); err != nil {
+		if numSongs, err = readSongsFromJSONFile(*importJSONFile, readChan); err != nil {
 			log.Fatal(err)
 		}
 		replaceUserData = *importUserData
@@ -110,7 +68,7 @@ func main() {
 		}
 
 		if len(*songPathsFile) > 0 {
-			numSongs, err = getSongsFromFile(*songPathsFile, cfg.MusicDir, readChan, cfg.ComputeGain)
+			numSongs, err = readSongList(*songPathsFile, cfg.MusicDir, readChan, cfg.ComputeGain)
 			if err != nil {
 				log.Fatal("Failed reading song list: ", err)
 			}
@@ -133,11 +91,11 @@ func main() {
 		}
 	}
 
-	if *limit > 0 {
-		numSongs = int(math.Min(float64(numSongs), float64(*limit)))
+	if *limit > numSongs {
+		numSongs = *limit
 	}
 
-	log.Printf("Sending %v song(s)\n", numSongs)
+	log.Printf("Sending %v song(s)", numSongs)
 
 	// Look up covers and feed songs to the updater.
 	updateChan := make(chan types.Song)
@@ -156,16 +114,19 @@ func main() {
 			log.Print("Sending ", s.Filename)
 			updateChan <- *s.Song
 		}
+		close(updateChan)
 	}()
 
 	if *dryRun {
 		e := json.NewEncoder(os.Stdout)
-		for i := 0; i < numSongs; i++ {
-			e.Encode(<-updateChan)
+		for s := range updateChan {
+			if err := e.Encode(s); err != nil {
+				log.Fatal("Failed encoding song: ", err)
+			}
 		}
 	} else {
-		if err = updateSongs(cfg, updateChan, numSongs, replaceUserData); err != nil {
-			log.Fatal(err)
+		if err = updateSongs(cfg, updateChan, replaceUserData); err != nil {
+			log.Fatal("Failed updating songs: ", err)
 		}
 		if didFullScan {
 			if err = setLastUpdateTime(cfg.LastUpdateTimeFile, startTime); err != nil {
@@ -173,4 +134,48 @@ func main() {
 			}
 		}
 	}
+}
+
+// getLastUpdateTime JSON-unmarshals a time.Time value from p.
+func getLastUpdateTime(p string) (t time.Time, err error) {
+	f, err := os.Open(p)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return t, nil
+		}
+		return t, err
+	}
+	defer f.Close()
+
+	if err = json.NewDecoder(f).Decode(&t); err != nil {
+		return t, err
+	}
+	return t, nil
+}
+
+// setLastUpdateTime JSON-marshals t to p.
+func setLastUpdateTime(p string, t time.Time) error {
+	f, err := os.Create(p)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return json.NewEncoder(f).Encode(t)
+}
+
+// getCoverFilename returns the relative path under dir for song's cover image.
+func getCoverFilename(dir string, song *types.Song) string {
+	if len(song.AlbumID) != 0 {
+		fn := song.AlbumID + ".jpg"
+		if _, err := os.Stat(filepath.Join(dir, fn)); err == nil {
+			return fn
+		}
+	}
+	if len(song.RecordingID) != 0 {
+		fn := song.RecordingID + ".jpg"
+		if _, err := os.Stat(filepath.Join(dir, fn)); err == nil {
+			return fn
+		}
+	}
+	return ""
 }

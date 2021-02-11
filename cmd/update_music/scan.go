@@ -70,10 +70,10 @@ func computeAudioSHA1(f *os.File, fi os.FileInfo, headerLength, footerLength int
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
-// computeAudioDurationMs reads Xing data from the first frame in f to return the audio length in milliseconds.
+// computeAudioDuration reads Xing data from the first frame in f to return the audio length.
 // Only supports MPEG Audio 1, Layer 3.
 // Format details at http://www.codeproject.com/Articles/8295/MPEG-Audio-Frame-Header.
-func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLength int64) (int64, error) {
+func computeAudioDuration(f *os.File, fi os.FileInfo, headerLength, footerLength int64) (time.Duration, error) {
 	if _, err := f.Seek(headerLength, 0); err != nil {
 		return 0, fmt.Errorf("unable to seek to %#x: %v", headerLength, err)
 	}
@@ -137,12 +137,14 @@ func computeAudioDurationMs(f *os.File, fi os.FileInfo, headerLength, footerLeng
 
 		// This constant is specific to MPEG 1, Layer 3.
 		const samplesPerFrame = 1152
-		return int64(samplesPerFrame) * int64(numFrames) * 1000 / sampleRate, nil
+		ms := int64(samplesPerFrame) * int64(numFrames) * 1000 / sampleRate
+		return time.Duration(ms) * time.Millisecond, nil
 	}
 
 	// Okay, no Xing VBR header. Assume that the file has a fixed bitrate.
 	// (The other alternative is to read the whole file to count the number of frames.)
-	return (fi.Size() - headerLength - footerLength) / kbitRate * 8, nil
+	ms := (fi.Size() - headerLength - footerLength) / kbitRate * 8
+	return time.Duration(ms) * time.Millisecond, nil
 }
 
 // computeDirGains computes gain adjustments for all MP3 files in dir.
@@ -169,7 +171,9 @@ func computeDirGains(dir string) (map[string]mp3gain.Info, error) {
 			continue
 		}
 
-		// TODO: Consider caching tags so we don't need to decode again in readFileDetails.
+		// TODO: Consider caching tags so we don't need to decode again in readSong.
+		// In practice, computing gains is so incredibly slow (at least on my computer)
+		// that caching probably doesn't matter in the big scheme of things.
 		var album string
 		if tag, err := taglib.Decode(f, fi.Size()); err == nil {
 			album = tag.CustomFrames()[albumIDTag]
@@ -195,24 +199,19 @@ func computeDirGains(dir string) (map[string]mp3gain.Info, error) {
 	return gains, nil
 }
 
-// readFileDetails creates a Song for the file at the supplied path and sends it to updateChan.
-// If an error is encountered, it is sent to the channel instead.
-// TODO: Return song/error directly instead of writing to channel.
-func readFileDetails(path, relPath string, fi os.FileInfo, gain *mp3gain.Info, updateChan chan types.SongOrErr) {
-	s := &types.Song{Filename: relPath}
-	var err error
-	defer func() { updateChan <- types.SongOrErr{s, err} }()
-
+// readSong creates a Song for the file at the supplied path.
+func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info) (*types.Song, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return
+		return nil, err
 	}
 	defer f.Close()
 
+	s := types.Song{Filename: relPath}
 	var footerLength int64
 	footerLength, s.Artist, s.Title, s.Album, err = readID3Footer(f, fi)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	var headerLength int64
@@ -220,9 +219,8 @@ func readFileDetails(path, relPath string, fi os.FileInfo, gain *mp3gain.Info, u
 	if err != nil {
 		// Tolerate missing ID3v2 tags if we got an artist and title from ID3v1.
 		if len(s.Artist) == 0 && len(s.Title) == 0 {
-			return
+			return nil, err
 		}
-		err = nil
 	} else {
 		s.Artist = tag.Artist()
 		s.Title = tag.Title()
@@ -236,26 +234,26 @@ func readFileDetails(path, relPath string, fi os.FileInfo, gain *mp3gain.Info, u
 
 	s.SHA1, err = computeAudioSHA1(f, fi, headerLength, footerLength)
 	if err != nil {
-		return
+		return nil, err
 	}
-	lengthMs, err := computeAudioDurationMs(f, fi, headerLength, footerLength)
+	dur, err := computeAudioDuration(f, fi, headerLength, footerLength)
 	if err != nil {
-		return
+		return nil, err
 	}
-	s.Length = float64(lengthMs) / 1000
+	s.Length = dur.Seconds()
 
 	if gain != nil {
 		s.TrackGain = gain.TrackGain
 		s.AlbumGain = gain.AlbumGain
 		s.PeakAmp = gain.PeakAmp
 	}
+	return &s, nil
 }
 
-// getSongsFromFile reads a list of relative (to musicDir) paths from listPath
-// and asynchronously sends the resulting Song structs to updateChan. The number
-// of songs that will be written is returned.
-func getSongsFromFile(listPath, musicDir string, updateChan chan types.SongOrErr,
-	computeGain bool) (numSongs int, err error) {
+// readSongList reads a list of relative (to musicDir) paths from listPath
+// and asynchronously sends the resulting Song structs to ch.
+// The number of songs that will be sent to the channel is returned.
+func readSongList(listPath, musicDir string, ch chan types.SongOrErr, computeGain bool) (numSongs int, err error) {
 	f, err := os.Open(listPath)
 	if err != nil {
 		return 0, err
@@ -293,13 +291,14 @@ func getSongsFromFile(listPath, musicDir string, updateChan chan types.SongOrErr
 		go func(rel string) {
 			full := filepath.Join(musicDir, rel)
 			if fi, err := os.Stat(full); err != nil {
-				updateChan <- types.SongOrErr{nil, err}
+				ch <- types.SongOrErr{nil, err}
 			} else {
 				var gain *mp3gain.Info
 				if gi, ok := gains[full]; ok {
 					gain = &gi
 				}
-				readFileDetails(full, rel, fi, gain, updateChan)
+				s, err := readSong(full, rel, fi, gain)
+				ch <- types.SongOrErr{s, err}
 			}
 		}(rel)
 	}
@@ -314,9 +313,12 @@ type scanOptions struct {
 	logProgress bool   // periodically log progress while scanning
 }
 
-func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, updateChan chan types.SongOrErr,
+// scanForUpdatedSongs looks for songs under musicDir updated more recently than
+// lastUpdateTime and asynchronously sends the resulting Song structs to ch.
+// The number of songs that will be sent to the channel is returned.
+func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, ch chan types.SongOrErr,
 	opts *scanOptions) (numUpdates int, err error) {
-	var numMP3s int
+	var numMP3s int                   // total number of songs under musicDir
 	var gains map[string]mp3gain.Info // keys are full paths
 	var gainsDir string               // directory for gains
 
@@ -365,7 +367,10 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, updateChan c
 			}
 		}
 
-		go readFileDetails(path, relPath, fi, gain, updateChan)
+		go func() {
+			s, err := readSong(path, relPath, fi, gain)
+			ch <- types.SongOrErr{s, err}
+		}()
 		numUpdates++
 		return nil
 	})
@@ -374,7 +379,7 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, updateChan c
 	}
 
 	if opts.logProgress {
-		log.Printf("Found %v update(s) among %v files.\n", numUpdates, numMP3s)
+		log.Printf("Found %v update(s) among %v files.", numUpdates, numMP3s)
 	}
 	return numUpdates, nil
 }

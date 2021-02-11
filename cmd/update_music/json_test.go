@@ -21,7 +21,7 @@ func TestJSON(t *testing.T) {
 
 	songs := []types.Song{test.LegacySong1, test.LegacySong2}
 	ch := make(chan types.SongOrErr)
-	num, err := getSongsFromJSONFile(test.WriteSongsToJSONFile(dir, songs), ch)
+	num, err := readSongsFromJSONFile(test.WriteSongsToJSONFile(dir, songs), ch)
 	if err != nil {
 		t.Error(err)
 	}

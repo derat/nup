@@ -17,7 +17,7 @@ import (
 )
 
 func TestUpdate(t *testing.T) {
-	receivedSongs := make([]types.Song, 0)
+	recv := make([]types.Song, 0)
 	replace := ""
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +32,7 @@ func TestUpdate(t *testing.T) {
 			} else if err != nil {
 				t.Errorf("failed to decode song: %v", err)
 			}
-			receivedSongs = append(receivedSongs, s)
+			recv = append(recv, s)
 		}
 
 		w.Header().Set("Content-Type", "text/plain")
@@ -40,7 +40,7 @@ func TestUpdate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := Config{ClientConfig: types.ClientConfig{ServerURL: server.URL}}
+	cfg := config{ClientConfig: types.ClientConfig{ServerURL: server.URL}}
 	ch := make(chan types.Song)
 
 	s0 := types.Song{
@@ -72,29 +72,32 @@ func TestUpdate(t *testing.T) {
 	go func() {
 		ch <- s0
 		ch <- s1
+		close(ch)
 	}()
-	if err := updateSongs(cfg, ch, 2, true); err != nil {
-		t.Fatalf("failed to send songs: %v", err)
+	if err := updateSongs(cfg, ch, true); err != nil {
+		t.Fatalf("Failed to send songs: %v", err)
 	}
-	if err := test.CompareSongs([]types.Song{s0, s1}, receivedSongs, test.CompareOrder); err != nil {
+	if err := test.CompareSongs([]types.Song{s0, s1}, recv, test.CompareOrder); err != nil {
 		t.Error(err)
 	}
 	if replace != "1" {
 		t.Errorf("replaceUserData param was %q instead of 1", replace)
 	}
 
-	receivedSongs = receivedSongs[:0]
-	sentSongs := make([]types.Song, 250, 250)
+	recv = recv[:0]
+	sent := make([]types.Song, 250, 250)
+	ch = make(chan types.Song)
 	go func() {
-		for i := 0; i < len(sentSongs); i++ {
-			sentSongs[i].SHA1 = strconv.Itoa(i)
-			ch <- sentSongs[i]
+		for i := range sent {
+			sent[i].SHA1 = strconv.Itoa(i)
+			ch <- sent[i]
 		}
+		close(ch)
 	}()
-	if err := updateSongs(cfg, ch, len(sentSongs), false); err != nil {
-		t.Fatalf("failed to send songs: %v", err)
+	if err := updateSongs(cfg, ch, false); err != nil {
+		t.Fatalf("Failed to send songs: %v", err)
 	}
-	if err := test.CompareSongs(sentSongs, receivedSongs, test.CompareOrder); err != nil {
+	if err := test.CompareSongs(sent, recv, test.CompareOrder); err != nil {
 		t.Error(err)
 	}
 	if len(replace) > 0 {
