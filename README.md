@@ -2,6 +2,56 @@
 
 App Engine app for streaming a music collection.
 
+## History
+
+In 2001 or 2002, I wrote [dmc], a silly C application that used the [FMOD]
+library to play my MP3 collection. It used OpenGL to render a UI and some simple
+visualizations. I ran it on a small ([Mini-ITX]? I don't remember) computer
+plugged into my TV.
+
+[dmc]: https://www.erat.org/programming.html#dmc
+[FMOD]: https://www.fmod.com/
+[Mini-ITX]: https://en.wikipedia.org/wiki/Mini-ITX
+
+Sometime around 2005 or 2006, I decided that I wanted to be able to rate and tag
+the songs in my music collection and track my playback history so I could listen
+to stuff that I liked but hadn't heard recently, or play non-distracting
+instrumental music while reading or programming. I was using [MPD] to play
+locally-stored MP3 files at the time, so I wrote some [Ruby] scripts to search
+for and enqueue songs and display information about the current song onscreen. I
+also wrote a [Ruby audioscrobbler library] for sending playback reports to the
+service that later became [Last.fm].
+
+[MPD]: https://www.musicpd.org/
+[Ruby]: https://www.ruby-lang.org/
+[Ruby audioscrobbler library]: https://www.erat.org/programming.html#audioscrobbler
+[Last.fm]: https://www.last.fm/
+
+In 2010, I decided that it was silly to need to have my desktop computer turned
+on whenever I wanted to listen to music, so I wrote a daemon in Ruby to serve
+music and album art and support searching/tagging/rating/etc. over HTTP. Song
+information was stored in a [SQLite] database. I added a web interface and wrote
+[an Android client] that supported offline playback, and ran the server on a
+little always-on SoC Linux device. This was before the Raspberry Pi was
+released, and all I remember about the device was that upgrades were terrifying
+because it didn't put out enough power to be able to reliably boot off its
+external HDD.
+
+[SQLite]: https://www.sqlite.org/
+[an Android client]: https://github.com/derat/nup-android
+
+In 2014, I decided that it'd be nice to be less dependent on my home network
+connection, so I rewrote the server in [Go] as a [Google App Engine] app that'd
+serve music and covers from [Google Cloud Storage]. That's what this repository
+contains.
+
+[Go]: https://golang.org/
+[Google App Engine]: https://cloud.google.com/appengine
+[Google Cloud Storage]: https://cloud.google.com/storage
+
+It's 2021 now and I haven't felt the urge to rewrite all this code again, so I
+guess I finally got it right the last time.
+
 ## Configuration
 
 Create an `config.json` file in the same directory as `app.yaml` corresponding
