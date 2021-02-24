@@ -115,12 +115,21 @@ class Page(object):
     GAIN_TRACK = '1'
     GAIN_NONE = '2'
 
+    # Use a short delay before playing when changing tracks.
+    PLAY_DELAY_MS = 10
+
     def __init__(self, driver):
         self.driver = driver
+        self.config_app()
         self.reset()
 
     def reload(self):
         self.driver.refresh()
+        self.config_app()
+
+    def config_app(self):
+        self.driver.execute_script(
+            'document.test.setPlayDelayMs(%d)' % self.PLAY_DELAY_MS)
 
     def reset(self):
         self.driver.execute_script('document.test.reset()')

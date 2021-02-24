@@ -1,7 +1,7 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-import {$, scaledCoverSize} from './common.js';
+import { $, scaledCoverSize } from './common.js';
 
 const dialogManager = document.querySelector('dialog-manager');
 const musicPlayer = document.querySelector('music-player');
@@ -13,14 +13,14 @@ musicSearcher.dialogManager = dialogManager;
 musicSearcher.musicPlayer = musicPlayer;
 
 // Hide the scrollbar while the presentation layer is shown.
-musicPlayer.addEventListener('present', e => {
+musicPlayer.addEventListener('present', (e) => {
   e.detail.visible
     ? document.body.classList.add('no-scroll')
     : document.body.classList.remove('no-scroll');
 });
 
 // Use the cover art as the favicon.
-musicPlayer.addEventListener('cover', e => {
+musicPlayer.addEventListener('cover', (e) => {
   const favicon = $('favicon');
   if (e.detail.url) {
     favicon.href = e.detail.url;
@@ -43,6 +43,7 @@ document.test = {
     musicPlayer.resetForTesting();
     musicSearcher.resetForTesting();
   },
+  setPlayDelayMs: (delayMs) => (musicPlayer.playDelayMs_ = delayMs),
   showOptions: () => musicPlayer.showOptions_(),
   updateTags: () => musicPlayer.updateTagsFromServer_(true /* sync */),
 };

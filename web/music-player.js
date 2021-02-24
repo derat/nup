@@ -208,6 +208,7 @@ customElements.define(
     static SEEK_SEC_ = 10; // seconds skipped by seeking forward or back
     static MAX_RETRIES_ = 2; // number of consecutive playback errors to reply
     static NOTIFICATION_SEC_ = 3; // duration for song-change notification
+    static PLAY_DELAY_MS_ = 500; // delay before playing when cycling track
     static GAIN_CHANGE_SEC_ = 0.1; // duration for audio gain change between songs
     static PRELOAD_SEC_ = 20; // seconds from end of song when next song should be loaded
 
@@ -238,6 +239,8 @@ customElements.define(
       this.updateSong_ = null; // song playing when update div was opened
       this.updatedRating_ = -1.0; // rating set in update div
       this.notification_ = null; // song notification currently shown
+      this.playDelayMs_ = this.constructor.PLAY_DELAY_MS_;
+      this.playTimeoutId_ = 0; // for playInternal_()
       this.closeNotificationTimeoutId_ = 0; // for closeNotification_()
 
       this.shadow_ = createShadow(this, template);
@@ -247,7 +250,7 @@ customElements.define(
         'presentation-layer'
       );
       this.presentationLayer_.addEventListener('next', () => {
-        this.cycleTrack_(1);
+        this.cycleTrack_(1, false /* delayPlay */);
       });
 
       this.audioCtx_ = new AudioContext();
@@ -272,9 +275,13 @@ customElements.define(
       this.timeDiv_ = get('time');
 
       this.prevButton_ = get('prev');
-      this.prevButton_.addEventListener('click', () => this.cycleTrack_(-1));
+      this.prevButton_.addEventListener('click', () =>
+        this.cycleTrack_(-1, true /* delayPlay */)
+      );
       this.nextButton_ = get('next');
-      this.nextButton_.addEventListener('click', () => this.cycleTrack_(1));
+      this.nextButton_.addEventListener('click', () =>
+        this.cycleTrack_(1, true /* delayPlay */)
+      );
       this.playPauseButton_ = get('play-pause');
       this.playPauseButton_.addEventListener('click', () =>
         this.togglePause_()
@@ -299,7 +306,7 @@ customElements.define(
 
       if ('mediaSession' in navigator) {
         const ms = navigator.mediaSession;
-        ms.setActionHandler('play', () => this.play_());
+        ms.setActionHandler('play', () => this.play_(false /* delay */));
         ms.setActionHandler('pause', () => this.pause_());
         ms.setActionHandler('seekbackward', () =>
           this.seek_(-this.constructor.SEEK_SEC_)
@@ -307,8 +314,12 @@ customElements.define(
         ms.setActionHandler('seekforward', () =>
           this.seek_(this.constructor.SEEK_SEC_)
         );
-        ms.setActionHandler('previoustrack', () => this.cycleTrack_(-1));
-        ms.setActionHandler('nexttrack', () => this.cycleTrack_(1));
+        ms.setActionHandler('previoustrack', () =>
+          this.cycleTrack_(-1, true /* delayPlay */)
+        );
+        ms.setActionHandler('nexttrack', () =>
+          this.cycleTrack_(1, true /* delayPlay */)
+        );
       }
 
       document.body.addEventListener('keydown', (e) => {
@@ -388,7 +399,7 @@ customElements.define(
         this.audio_.removeAttribute('src');
         this.playlistTable_.highlightRow(this.currentIndex_, false);
         this.songs_ = [];
-        this.selectTrack_(0);
+        this.selectTrack_(0, false /* delayPlay */);
       }
 
       let index = afterCurrent
@@ -399,9 +410,9 @@ customElements.define(
       this.playlistTable_.setSongs(this.songs_);
 
       if (this.currentIndex_ == -1) {
-        this.selectTrack_(0);
+        this.selectTrack_(0, false /* delayPlay */);
       } else if (this.reachedEndOfSongs_) {
-        this.cycleTrack_(1);
+        this.cycleTrack_(1, false /* delayPlay */);
       } else {
         this.updateButtonState_();
         this.updatePresentationLayerSongs_();
@@ -409,12 +420,16 @@ customElements.define(
     }
 
     // Plays the song at |offset| in the playlist relative to the current song.
-    cycleTrack_(offset) {
-      this.selectTrack_(this.currentIndex_ + offset);
+    // If |delayPlay| is true, waits a bit before actually playing the audio
+    // (in case the user might be about to select a different track).
+    cycleTrack_(offset, delayPlay) {
+      this.selectTrack_(this.currentIndex_ + offset, delayPlay);
     }
 
     // Plays the song at |index| in the playlist.
-    selectTrack_(index) {
+    // If |delayPlay| is true, waits a bit before actually playing the audio
+    // (in case the user might be about to select a different track).
+    selectTrack_(index, delayPlay) {
       if (!this.songs_.length) {
         this.currentIndex_ = -1;
         this.updateSongDisplay_();
@@ -434,8 +449,9 @@ customElements.define(
 
       this.updateSongDisplay_();
       this.updatePresentationLayerSongs_();
-      this.play_();
       this.updateButtonState_();
+      this.play_(delayPlay);
+
       if (!document.hasFocus()) this.showNotification_();
     }
 
@@ -568,10 +584,14 @@ customElements.define(
       const song = this.currentSong_;
       if (!song) return;
 
-      this.notification_ = new Notification(`${song.artist}\n${song.title}`, {
-        body: `${song.album}\n${formatTime(song.length)}`,
-        icon: song.coverFilename ? getScaledCoverUrl(song.coverFilename) : null,
-      });
+      const options = { body: `${song.album}\n${formatTime(song.length)}` };
+      if (song.coverFilename) {
+        options.icon = getScaledCoverUrl(song.coverFilename);
+      }
+      this.notification_ = new Notification(
+        `${song.artist}\n${song.title}`,
+        options
+      );
       this.closeNotificationTimeoutId_ = window.setTimeout(
         () => this.closeNotification_(),
         this.constructor.NOTIFICATION_SEC_ * 1000
@@ -589,7 +609,28 @@ customElements.define(
     // Starts playback. If |currentSong_| isn't being played, switches to it
     // even if we were already playing. Also restarts playback if we were
     // stopped at the end of the last song in the playlist.
-    play_() {
+    //
+    // If |delay| is true, waits a bit before loading media and playing;
+    // otherwise starts playing immediately.
+    play_(delay) {
+      if (this.playTimeoutId_ !== undefined) {
+        window.clearTimeout(this.playTimeoutId_);
+        this.playTimeoutId_ = undefined;
+      }
+
+      if (delay) {
+        console.log(`Playing in ${this.playDelayMs_} ms`);
+        this.playTimeoutId_ = window.setTimeout(() => {
+          this.playTimeoutId_ = undefined;
+          this.playInternal_();
+        }, this.playDelayMs_);
+      } else {
+        this.playInternal_();
+      }
+    }
+
+    // Internal method called by play_().
+    playInternal_() {
       const song = this.currentSong_;
       // Get an absolute URL since that's what we'll get from the <audio>
       // element: https://stackoverflow.com/a/44547904
@@ -647,7 +688,7 @@ customElements.define(
     }
 
     togglePause_() {
-      this.audio_.paused ? this.play_() : this.pause_();
+      this.audio_.paused ? this.play_(false /* delay */) : this.pause_();
     }
 
     seek_(seconds) {
@@ -661,7 +702,7 @@ customElements.define(
       if (this.currentIndex_ >= this.songs_.length - 1) {
         this.reachedEndOfSongs_ = true;
       } else {
-        this.cycleTrack_(1);
+        this.cycleTrack_(1, false /* delay */);
       }
     }
 
@@ -737,14 +778,13 @@ customElements.define(
       console.log(`Preloading ${song.songId} (${url})`);
       this.nextAudio_ = this.audio_.cloneNode(true);
       this.nextAudio_.src = url;
-      this.nextAudio_.preload = 'auto';
     }
 
     onError_(e) {
       this.numErrors_++;
 
       const error = e.target.error;
-      console.log('Got playback error: ' + error.code);
+      console.log(`Got playback error ${error.code} (${error.message})`);
       switch (error.code) {
         case error.MEDIA_ERR_ABORTED: // 1
           break;
@@ -759,8 +799,8 @@ customElements.define(
             this.audio_.currentTime = this.lastTimeUpdatePosition_;
             this.audio_.play();
           } else {
-            console.log('Giving up after ' + this.numErrors_ + ' error(s)');
-            this.cycleTrack_(1);
+            console.log(`Giving up after ${this.numErrors_} errors`);
+            this.cycleTrack_(1, false /* delay */);
           }
           break;
       }
@@ -917,13 +957,13 @@ customElements.define(
         if (song) window.open(getDumpSongUrl(song), '_blank');
         return true;
       } else if (e.altKey && e.key == 'n') {
-        this.cycleTrack_(1);
+        this.cycleTrack_(1, true /* delay */);
         return true;
       } else if (e.altKey && e.key == 'o') {
         this.showOptions_();
         return true;
       } else if (e.altKey && e.key == 'p') {
-        this.cycleTrack_(-1);
+        this.cycleTrack_(-1, true /* delay */);
         return true;
       } else if (e.altKey && e.key == 'r') {
         if (this.showUpdateDiv_()) this.ratingSpan_.focus();
