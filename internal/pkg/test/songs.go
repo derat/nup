@@ -86,8 +86,11 @@ var LegacySong1 = types.Song{
 	Disc:     1,
 	Length:   449,
 	Rating:   0.75,
-	Plays:    []types.Play{{time.Unix(1276057170, 0).UTC(), "127.0.0.1"}, {time.Unix(1297316913, 0).UTC(), "1.2.3.4"}},
-	Tags:     []string{"electronic", "instrumental"},
+	Plays: []types.Play{
+		types.NewPlay(time.Unix(1276057170, 0).UTC(), "127.0.0.1"),
+		types.NewPlay(time.Unix(1297316913, 0).UTC(), "1.2.3.4"),
+	},
+	Tags: []string{"electronic", "instrumental"},
 }
 
 var LegacySong2 = types.Song{
@@ -100,6 +103,6 @@ var LegacySong2 = types.Song{
 	Disc:     1,
 	Length:   182,
 	Rating:   0.5,
-	Plays:    []types.Play{{time.Unix(1394773930, 0).UTC(), "8.8.8.8"}},
+	Plays:    []types.Play{types.NewPlay(time.Unix(1394773930, 0).UTC(), "8.8.8.8")},
 	Tags:     []string{"instrumental", "rock"},
 }

@@ -16,6 +16,8 @@ type Play struct {
 	IPAddress string `datastore:"IpAddress" json:"ip"`
 }
 
+func NewPlay(t time.Time, ip string) Play { return Play{t, ip} }
+
 // Song represents an audio file.
 //
 // When adding fields, be sure to update copySongFileFields() in server/update/update.go.
@@ -27,7 +29,8 @@ type Song struct {
 	SongID string `datastore:"-" json:"songId,omitempty"`
 
 	// Filename is a relative path from the base of the music directory.
-	// Must be escaped for Cloud Storage when constructing URL.
+	// Clients can pass this to the server's /song_data endpoint to download the
+	// song's music data.
 	Filename string `json:"filename,omitempty"`
 
 	// CoverFilename is a relative path from the base of the covers directory.
@@ -35,11 +38,6 @@ type Song struct {
 	// Clients can pass this to the server's /cover endpoint to get a scaled
 	// copy of the cover.
 	CoverFilename string `datastore:",noindex" json:"coverFilename,omitempty"`
-
-	// URL is the song's URL. Only set in search results.
-	URL string `datastore:"-" json:"url,omitempty"`
-	// CoverURL is the cover image's URL. Only set in search results.
-	CoverURL string `datastore:"-" json:"coverUrl,omitempty"`
 
 	// Canonical versions used for display.
 	Artist string `datastore:",noindex" json:"artist"`
@@ -108,6 +106,8 @@ type SongOrErr struct {
 	*Song
 	Err error
 }
+
+func NewSongOrErr(s *Song, err error) SongOrErr { return SongOrErr{s, err} }
 
 // PlayDump is used when dumping data.
 type PlayDump struct {

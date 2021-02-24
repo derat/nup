@@ -28,7 +28,7 @@ func readSongsFromJSONFile(path string, ch chan types.SongOrErr) (numSongs int, 
 		} else if err != nil {
 			return 0, err
 		}
-		go func() { ch <- types.SongOrErr{&s, nil} }()
+		go func() { ch <- types.NewSongOrErr(&s, nil) }()
 		numSongs++
 	}
 	return numSongs, nil

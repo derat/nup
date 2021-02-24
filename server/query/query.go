@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/derat/nup/internal/pkg/cloudutil"
 	"github.com/derat/nup/internal/pkg/types"
 	"github.com/derat/nup/server/cache"
 	"github.com/derat/nup/server/common"
@@ -181,9 +180,8 @@ func Songs(ctx context.Context, query *common.SongQuery, cacheOnly bool) ([]type
 	log.Debugf(ctx, "Fetched %v song(s) from datastore in %v ms", len(songs), msecSince(startTime))
 
 	// Prepare the results for the client.
-	cfg := common.Config(ctx)
 	for i, id := range ids {
-		common.PrepareSongForClient(&songs[i], id, cfg, cloudutil.WebClient)
+		common.PrepareSongForClient(&songs[i], id)
 	}
 	if !query.Shuffle {
 		sortSongs(songs)

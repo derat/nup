@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/derat/nup/internal/pkg/cloudutil"
 	"github.com/derat/nup/internal/pkg/types"
 )
 
@@ -37,25 +36,11 @@ const (
 
 var ErrUnmodified = errors.New("object wasn't modified")
 
-// PrepareSongForClient sets and clears fields in s appropriately for client.
-func PrepareSongForClient(s *types.Song, id int64, cfg *types.ServerConfig, client cloudutil.ClientType) {
+// PrepareSongForClient sets and clears fields in s appropriately for sending it to a
+// web or Android client.
+func PrepareSongForClient(s *types.Song, id int64) {
 	// Set fields that are only present in search results (i.e. not in Datastore).
 	s.SongID = strconv.FormatInt(id, 10)
-
-	// Turn the bare music and cover filenames into URLs.
-	// TODO: Get rid of this once clients are using /cover and /song_data endpoints
-	// instead of going directly to GCS.
-	getURL := func(filename, bucket, baseURL string) string {
-		if len(filename) == 0 {
-			return ""
-		}
-		if len(bucket) > 0 {
-			return cloudutil.CloudStorageURL(bucket, filename, client)
-		}
-		return baseURL + filename
-	}
-	s.URL = getURL(s.Filename, cfg.SongBucket, cfg.SongBaseURL)
-	s.CoverURL = getURL(s.CoverFilename, cfg.CoverBucket, cfg.CoverBaseURL)
 
 	// Create an empty tags slice so that clients don't need to check for null.
 	if s.Tags == nil {

@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/derat/nup/internal/pkg/cloudutil"
 	"github.com/derat/nup/internal/pkg/types"
 	"github.com/derat/nup/server/common"
 )
@@ -57,15 +56,11 @@ func cleanUpTest(t *Tester) {
 	t.CleanUp()
 }
 
-func compareQueryResults(expected, actual []types.Song, order OrderPolicy,
-	client cloudutil.ClientType) error {
+func compareQueryResults(expected, actual []types.Song, order OrderPolicy) error {
 	expectedCleaned := make([]types.Song, len(expected))
 	for i := range expected {
 		s := expected[i]
-		common.PrepareSongForClient(&s, 0, &types.ServerConfig{
-			SongBucket:  songBucket,
-			CoverBucket: coverBucket,
-		}, client)
+		common.PrepareSongForClient(&s, 0)
 
 		// Change some stuff back to match the expected values.
 		s.SongID = ""
@@ -81,7 +76,7 @@ func compareQueryResults(expected, actual []types.Song, order OrderPolicy,
 		s := actual[i]
 
 		if len(s.SongID) == 0 {
-			return fmt.Errorf("song %v (%v) has no ID", i, s.URL)
+			return fmt.Errorf("song %v (%v) has no ID", i, s.Filename)
 		}
 		s.SongID = ""
 
@@ -150,9 +145,9 @@ func TestUserData(tt *testing.T) {
 
 	log.Print("reporting playback")
 	s.Plays = []types.Play{
-		types.Play{time.Unix(1410746718, 0), "127.0.0.1"},
-		types.Play{time.Unix(1410746923, 0), "127.0.0.1"},
-		types.Play{time.Unix(1410747184, 0), "127.0.0.1"},
+		types.NewPlay(time.Unix(1410746718, 0), "127.0.0.1"),
+		types.NewPlay(time.Unix(1410746923, 0), "127.0.0.1"),
+		types.NewPlay(time.Unix(1410747184, 0), "127.0.0.1"),
 	}
 	for _, p := range s.Plays {
 		t.DoPost("report_played?songId="+id+"&startTime="+
@@ -207,12 +202,12 @@ func TestUserData(tt *testing.T) {
 	firstPlaySec := timeToSeconds(plays[0].StartTime)
 	if err := compareQueryResults([]types.Song{us},
 		t.QuerySongs(fmt.Sprintf("minFirstPlayed=%.1f", firstPlaySec-10)),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+		IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 	if err := compareQueryResults([]types.Song{},
 		t.QuerySongs(fmt.Sprintf("minFirstPlayed=%.1f", firstPlaySec+10)),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+		IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
@@ -220,25 +215,24 @@ func TestUserData(tt *testing.T) {
 	lastPlaySec := timeToSeconds(plays[len(plays)-1].StartTime)
 	if err := compareQueryResults([]types.Song{},
 		t.QuerySongs(fmt.Sprintf("maxLastPlayed=%.1f", lastPlaySec-10)),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+		IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 	if err := compareQueryResults([]types.Song{us},
 		t.QuerySongs(fmt.Sprintf("maxLastPlayed=%.1f", lastPlaySec+10)),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+		IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that play stats were updated")
 	for i := 0; i < 3; i++ {
 		if err := compareQueryResults([]types.Song{},
-			t.QuerySongs("maxPlays="+strconv.Itoa(i)),
-			IgnoreOrder, cloudutil.WebClient); err != nil {
+			t.QuerySongs("maxPlays="+strconv.Itoa(i)), IgnoreOrder); err != nil {
 			tt.Error(err)
 		}
 	}
 	if err := compareQueryResults([]types.Song{us},
-		t.QuerySongs("maxPlays=3"), IgnoreOrder, cloudutil.WebClient); err != nil {
+		t.QuerySongs("maxPlays=3"), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 }
@@ -273,8 +267,7 @@ func TestQueries(tt *testing.T) {
 		{[]string{"tags=-electronic+instrumental"}, []types.Song{LegacySong2}},
 		{[]string{"tags=instrumental", "minRating=0.75"}, []types.Song{LegacySong1}},
 	} {
-		if err := compareQueryResults(q.exp, t.QuerySongs(q.params...),
-			CompareOrder, cloudutil.WebClient); err != nil {
+		if err := compareQueryResults(q.exp, t.QuerySongs(q.params...), CompareOrder); err != nil {
 			tt.Errorf("%v: %v", q.params, err)
 		}
 	}
@@ -288,8 +281,7 @@ func TestCaching(tt *testing.T) {
 	const cacheParam = "cacheOnly=1"
 	s1 := LegacySong1
 	t.PostSongs([]types.Song{s1}, replaceUserData, 0)
-	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
@@ -298,8 +290,7 @@ func TestCaching(tt *testing.T) {
 	id1 := t.SongID(s1.SHA1)
 	s1.Rating = 1.0
 	t.DoPost("rate_and_tag?songId="+id1+"&rating=1.0", nil)
-	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(cacheParam),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(cacheParam), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
@@ -308,63 +299,53 @@ func TestCaching(tt *testing.T) {
 	log.Print("updating and re-querying")
 	s1.Artist = "The Artist Formerly Known As " + s1.Artist
 	t.PostSongs([]types.Song{s1}, keepUserData, 0)
-	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that time-based queries aren't cached")
 	timeParam := fmt.Sprintf("maxLastPlayed=%d", s1.Plays[1].StartTime.Unix()+1)
-	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(timeParam),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(timeParam), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]types.Song{}, t.QuerySongs(timeParam, cacheParam),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{}, t.QuerySongs(timeParam, cacheParam), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that play-count-based queries aren't cached")
 	playParam := "maxPlays=10"
-	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(playParam),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(playParam), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
-	if err := compareQueryResults([]types.Song{}, t.QuerySongs(playParam, cacheParam),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{}, t.QuerySongs(playParam, cacheParam), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that datastore cache is used after memcache miss")
-	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 	t.DoPost("flush_cache?onlyMemcache=1", nil)
-	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(cacheParam),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s1}, t.QuerySongs(cacheParam), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that posting a song drops cached queries")
 	s2 := LegacySong2
 	t.PostSongs([]types.Song{s2}, replaceUserData, 0)
-	if err := compareQueryResults([]types.Song{s1, s2}, t.QuerySongs(),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s1, s2}, t.QuerySongs(), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that deleting a song drops cached queries")
 	if err := compareQueryResults([]types.Song{s2},
-		t.QuerySongs("album="+url.QueryEscape(s2.Album)),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+		t.QuerySongs("album="+url.QueryEscape(s2.Album)), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 	id2 := t.SongID(s2.SHA1)
 	t.DeleteSong(id2)
 	if err := compareQueryResults([]types.Song{},
-		t.QuerySongs("album="+url.QueryEscape(s2.Album)),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+		t.QuerySongs("album="+url.QueryEscape(s2.Album)), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 }
@@ -377,18 +358,15 @@ func TestAndroid(tt *testing.T) {
 	now := t.GetNowFromServer()
 	t.PostSongs([]types.Song{LegacySong1, LegacySong2}, replaceUserData, 0)
 	if err := compareQueryResults([]types.Song{LegacySong1, LegacySong2},
-		t.GetSongsForAndroid(time.Time{}, getRegularSongs),
-		IgnoreOrder, cloudutil.AndroidClient); err != nil {
+		t.GetSongsForAndroid(time.Time{}, getRegularSongs), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 	if err := compareQueryResults([]types.Song{LegacySong1, LegacySong2},
-		t.GetSongsForAndroid(now, getRegularSongs),
-		IgnoreOrder, cloudutil.AndroidClient); err != nil {
+		t.GetSongsForAndroid(now, getRegularSongs), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 	if err := compareQueryResults([]types.Song{},
-		t.GetSongsForAndroid(t.GetNowFromServer(), getRegularSongs),
-		IgnoreOrder, cloudutil.AndroidClient); err != nil {
+		t.GetSongsForAndroid(t.GetNowFromServer(), getRegularSongs), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
@@ -399,20 +377,18 @@ func TestAndroid(tt *testing.T) {
 	now = t.GetNowFromServer()
 	t.DoPost("rate_and_tag?songId="+id+"&rating=1.0", nil)
 	if err := compareQueryResults([]types.Song{updatedLegacySong1},
-		t.GetSongsForAndroid(now, getRegularSongs), IgnoreOrder,
-		cloudutil.AndroidClient); err != nil {
+		t.GetSongsForAndroid(now, getRegularSongs), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	// Reporting a play shouldn't update the song's last-modified time.
 	log.Print("reporting playback")
-	p := types.Play{time.Unix(1410746718, 0), "127.0.0.1"}
+	p := types.NewPlay(time.Unix(1410746718, 0), "127.0.0.1")
 	updatedLegacySong1.Plays = append(updatedLegacySong1.Plays, p)
 	now = t.GetNowFromServer()
 	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(p.StartTime.Unix(), 10), nil)
 	if err := compareQueryResults([]types.Song{},
-		t.GetSongsForAndroid(now, getRegularSongs), IgnoreOrder,
-		cloudutil.AndroidClient); err != nil {
+		t.GetSongsForAndroid(now, getRegularSongs), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 }
@@ -475,8 +451,7 @@ func TestCovers(tt *testing.T) {
 	s5.CoverFilename = fmt.Sprintf("%s.jpg", s5.AlbumID)
 	createCover(s5.CoverFilename)
 	t.UpdateSongs()
-	if err := compareQueryResults([]types.Song{Song0s, s5},
-		t.QuerySongs(), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{Song0s, s5}, t.QuerySongs(), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
@@ -487,8 +462,7 @@ func TestCovers(tt *testing.T) {
 	s0.CoverFilename = fmt.Sprintf("%s.jpg", s0.AlbumID)
 	createCover(s0.CoverFilename)
 	t.UpdateSongs()
-	if err := compareQueryResults([]types.Song{s0, s5},
-		t.QuerySongs(), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s0, s5}, t.QuerySongs(), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
@@ -499,8 +473,7 @@ func TestCovers(tt *testing.T) {
 	createCover(s1.CoverFilename)
 	RemoveFromTempDir(t.CoverDir, s0.CoverFilename)
 	t.UpdateSongs()
-	if err := compareQueryResults([]types.Song{s0, s1, s5},
-		t.QuerySongs(), IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{s0, s1, s5}, t.QuerySongs(), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
@@ -552,7 +525,7 @@ func TestJSONImport(tt *testing.T) {
 	id := t.SongID(us.SHA1)
 	st := time.Unix(1410746718, 0)
 	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(st.Unix(), 10), nil)
-	us.Plays = append(us.Plays, types.Play{st, "127.0.0.1"})
+	us.Plays = append(us.Plays, types.NewPlay(st, "127.0.0.1"))
 	if err := CompareSongs([]types.Song{us, LegacySong2},
 		t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
@@ -609,7 +582,7 @@ func TestSorting(tt *testing.T) {
 
 	log.Print("importing songs and checking sort order")
 	t.ImportSongsFromJSONFile(WriteSongsToJSONFile(t.TempDir, songs), replaceUserData)
-	if err := compareQueryResults(songs, t.QuerySongs(), CompareOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults(songs, t.QuerySongs(), CompareOrder); err != nil {
 		tt.Error(err)
 	}
 }
@@ -625,18 +598,15 @@ func TestDeleteSong(tt *testing.T) {
 	t.DeleteSong(id1)
 
 	log.Print("checking non-deleted song")
-	if err := compareQueryResults([]types.Song{LegacySong2}, t.QuerySongs(),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{LegacySong2}, t.QuerySongs(), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 	if err := compareQueryResults([]types.Song{LegacySong2},
-		t.GetSongsForAndroid(time.Time{}, getRegularSongs),
-		IgnoreOrder, cloudutil.AndroidClient); err != nil {
+		t.GetSongsForAndroid(time.Time{}, getRegularSongs), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 	if err := compareQueryResults([]types.Song{LegacySong2},
-		t.GetSongsForAndroid(postTime, getRegularSongs),
-		IgnoreOrder, cloudutil.AndroidClient); err != nil {
+		t.GetSongsForAndroid(postTime, getRegularSongs), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 	if err := CompareSongs([]types.Song{LegacySong2},
@@ -646,8 +616,7 @@ func TestDeleteSong(tt *testing.T) {
 
 	log.Print("checking that deleted song is in android query")
 	deletedSongs := t.GetSongsForAndroid(postTime, getDeletedSongs)
-	if err := compareQueryResults([]types.Song{LegacySong1},
-		deletedSongs, IgnoreOrder, cloudutil.AndroidClient); err != nil {
+	if err := compareQueryResults([]types.Song{LegacySong1}, deletedSongs, IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 	if deletedSongs[0].SongID != id1 {
@@ -661,24 +630,20 @@ func TestDeleteSong(tt *testing.T) {
 	t.DeleteSong(id2)
 
 	log.Print("checking no non-deleted songs")
-	if err := compareQueryResults([]types.Song{}, t.QuerySongs(),
-		IgnoreOrder, cloudutil.WebClient); err != nil {
+	if err := compareQueryResults([]types.Song{}, t.QuerySongs(), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 	if err := compareQueryResults([]types.Song{},
-		t.GetSongsForAndroid(time.Time{}, getRegularSongs),
-		IgnoreOrder, cloudutil.AndroidClient); err != nil {
+		t.GetSongsForAndroid(time.Time{}, getRegularSongs), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
-	if err := CompareSongs([]types.Song{},
-		t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
+	if err := CompareSongs([]types.Song{}, t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 
 	log.Print("checking that both deleted songs are in android query")
 	deletedSongs = t.GetSongsForAndroid(laterTime, getDeletedSongs)
-	if err := compareQueryResults([]types.Song{LegacySong2},
-		deletedSongs, IgnoreOrder, cloudutil.AndroidClient); err != nil {
+	if err := compareQueryResults([]types.Song{LegacySong2}, deletedSongs, IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 	if deletedSongs[0].SongID != id2 {

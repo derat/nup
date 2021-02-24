@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/derat/nup/internal/pkg/cloudutil"
 	"github.com/derat/nup/internal/pkg/types"
 	"github.com/derat/nup/server/common"
 
@@ -97,10 +96,9 @@ func SongsAndroid(ctx context.Context, minLastModified time.Time, deleted bool, 
 		return nil, "", err
 	}
 
-	cfg := common.Config(ctx)
 	songs = songs[0:len(ids)]
 	for i, id := range ids {
-		common.PrepareSongForClient(&songs[i], id, cfg, cloudutil.AndroidClient)
+		common.PrepareSongForClient(&songs[i], id)
 	}
 	return songs, nextCursor, nil
 }

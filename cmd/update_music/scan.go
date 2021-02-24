@@ -291,14 +291,14 @@ func readSongList(listPath, musicDir string, ch chan types.SongOrErr, computeGai
 		go func(rel string) {
 			full := filepath.Join(musicDir, rel)
 			if fi, err := os.Stat(full); err != nil {
-				ch <- types.SongOrErr{nil, err}
+				ch <- types.NewSongOrErr(nil, err)
 			} else {
 				var gain *mp3gain.Info
 				if gi, ok := gains[full]; ok {
 					gain = &gi
 				}
 				s, err := readSong(full, rel, fi, gain)
-				ch <- types.SongOrErr{s, err}
+				ch <- types.NewSongOrErr(s, err)
 			}
 		}(rel)
 	}
@@ -369,7 +369,7 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, ch chan type
 
 		go func() {
 			s, err := readSong(path, relPath, fi, gain)
-			ch <- types.SongOrErr{s, err}
+			ch <- types.NewSongOrErr(s, err)
 		}()
 		numUpdates++
 		return nil

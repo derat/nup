@@ -86,17 +86,6 @@ func WriteSongsToJSONFile(dir string, songs []types.Song) (path string) {
 	return f.Name()
 }
 
-type SongArray []types.Song
-
-func (a SongArray) Len() int      { return len(a) }
-func (a SongArray) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a SongArray) Less(i, j int) bool {
-	if a[i].Filename != a[j].Filename {
-		return a[i].Filename < a[j].Filename
-	}
-	return a[i].URL < a[j].URL
-}
-
 type OrderPolicy int
 
 const (
@@ -106,8 +95,8 @@ const (
 
 func CompareSongs(expected, actual []types.Song, order OrderPolicy) error {
 	if order == IgnoreOrder {
-		sort.Sort(SongArray(expected))
-		sort.Sort(SongArray(actual))
+		sort.Slice(expected, func(i, j int) bool { return expected[i].Filename < expected[j].Filename })
+		sort.Slice(actual, func(i, j int) bool { return actual[i].Filename < actual[j].Filename })
 	}
 
 	m := make([]string, 0)

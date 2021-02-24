@@ -53,8 +53,11 @@ func TestUpdate(t *testing.T) {
 		Disc:     1,
 		Length:   449,
 		Rating:   0.75,
-		Plays:    []types.Play{{time.Unix(1276057170, 0), "127.0.0.1"}, {time.Unix(1297316913, 0), "1.2.3.4"}},
-		Tags:     []string{"electronic", "instrumental"},
+		Plays: []types.Play{
+			types.NewPlay(time.Unix(1276057170, 0), "127.0.0.1"),
+			types.NewPlay(time.Unix(1297316913, 0), "1.2.3.4"),
+		},
+		Tags: []string{"electronic", "instrumental"},
 	}
 	s1 := types.Song{
 		SHA1:     "b70984a4ac5084999b70478cdf163218b90cefdb",
@@ -66,7 +69,7 @@ func TestUpdate(t *testing.T) {
 		Disc:     1,
 		Length:   182,
 		Rating:   0.5,
-		Plays:    []types.Play{{time.Unix(1394773930, 0), "8.8.8.8"}},
+		Plays:    []types.Play{types.NewPlay(time.Unix(1394773930, 0), "8.8.8.8")},
 		Tags:     []string{"instrumental", "rock"},
 	}
 	go func() {
