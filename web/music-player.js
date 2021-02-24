@@ -148,7 +148,7 @@ const template = createTemplate(`
 
 <presentation-layer></presentation-layer>
 
-<audio type="audio/mpeg">
+<audio type="audio/mpeg" preload="auto">
   Your browser doesn't support the audio element.
 </audio>
 
