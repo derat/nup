@@ -40,7 +40,7 @@ const (
 	defaultDumpBatchSize = 100  // default size of batch of dumped entities
 	maxDumpBatchSize     = 5000 // max size of batch of dumped entities
 
-	maxCoverSize     = 800 // max size permitted in /cover requests
+	maxCoverSize     = 800 // max size permitted in /cover scale requests
 	coverJPEGQuality = 90  // quality to use when encoding /cover replies
 )
 
@@ -317,7 +317,7 @@ func handleCover(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing filename", http.StatusBadRequest)
 		return
 	}
-	var size int64 = 140
+	var size int64
 	if r.FormValue("size") != "" {
 		var ok bool
 		if size, ok = parseIntParam(ctx, w, r, "size"); !ok {

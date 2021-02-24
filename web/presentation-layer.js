@@ -7,6 +7,7 @@ import {
   createTemplate,
   emptyImg,
   formatTime,
+  getFullCoverUrl,
   getScaledCoverUrl,
 } from './common.js';
 
@@ -222,7 +223,10 @@ customElements.define(
         this.duration_ = currentSong.length;
       }
       // Use the full-resolution cover image.
-      updateImg(this.currentCover_, currentSong ? currentSong.coverUrl : '');
+      updateImg(
+        this.currentCover_,
+        currentSong ? getFullCoverUrl(currentSong.coverFilename) : ''
+      );
 
       if (!nextSong) {
         this.nextDiv_.classList.add('hidden');
@@ -234,12 +238,12 @@ customElements.define(
       }
       updateImg(
         this.nextCover_,
-        nextSong ? getScaledCoverUrl(nextSong.coverFilename) : '',
+        nextSong ? getScaledCoverUrl(nextSong.coverFilename) : ''
       );
 
       // Preload the next track's full-resolution cover.
-      if (this.visible && nextSong && nextSong.coverUrl) {
-        new Image().src = nextSong.coverUrl;
+      if (this.visible && nextSong && nextSong.coverFilename) {
+        new Image().src = getFullCoverUrl(nextSong.coverFilename);
       }
     }
 
@@ -264,5 +268,5 @@ customElements.define(
     setPlayNextTrackFunction(f) {
       this.playNextTrackFunction_ = f;
     }
-  },
+  }
 );

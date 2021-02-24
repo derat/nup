@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"strconv"
 	"time"
 
@@ -44,6 +43,8 @@ func PrepareSongForClient(s *types.Song, id int64, cfg *types.ServerConfig, clie
 	s.SongID = strconv.FormatInt(id, 10)
 
 	// Turn the bare music and cover filenames into URLs.
+	// TODO: Get rid of this once clients are using /cover and /song_data endpoints
+	// instead of going directly to GCS.
 	getURL := func(filename, bucket, baseURL string) string {
 		if len(filename) == 0 {
 			return ""
@@ -56,11 +57,6 @@ func PrepareSongForClient(s *types.Song, id int64, cfg *types.ServerConfig, clie
 	s.URL = getURL(s.Filename, cfg.SongBucket, cfg.SongBaseURL)
 	s.CoverURL = getURL(s.CoverFilename, cfg.CoverBucket, cfg.CoverBaseURL)
 
-	// Proxy MP3s for browsers to avoid cross-origin requests.
-	if client == cloudutil.WebClient {
-		s.URL = "/song_data?filename=" + url.QueryEscape(s.Filename)
-	}
-
 	// Create an empty tags slice so that clients don't need to check for null.
 	if s.Tags == nil {
 		s.Tags = make([]string, 0)
@@ -69,9 +65,7 @@ func PrepareSongForClient(s *types.Song, id int64, cfg *types.ServerConfig, clie
 	// Clear fields that are passed for updates (and hence not excluded from JSON)
 	// but that aren't needed in search results.
 	s.SHA1 = ""
-	s.Filename = ""
 	s.Plays = s.Plays[:0]
-	// Preserve CoverFilename so clients can pass it to /cover.
 }
 
 // SongQuery describes a query returning a list of Songs.

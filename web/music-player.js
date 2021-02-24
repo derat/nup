@@ -7,9 +7,9 @@ import {
   createTemplate,
   emptyImg,
   formatTime,
-  getAbsUrl,
   getCurrentTimeSec,
   getScaledCoverUrl,
+  getSongUrl,
   updateTitleAttributeForTruncation,
 } from './common.js';
 import Config from './config.js';
@@ -241,10 +241,10 @@ customElements.define(
       this.closeNotificationTimeoutId_ = 0; // for closeNotification_()
 
       this.shadow_ = createShadow(this, template);
-      const get = id => $(id, this.shadow_);
+      const get = (id) => $(id, this.shadow_);
 
       this.presentationLayer_ = this.shadow_.querySelector(
-        'presentation-layer',
+        'presentation-layer'
       );
       this.presentationLayer_.addEventListener('next', () => {
         this.cycleTrack_(1);
@@ -262,7 +262,7 @@ customElements.define(
       this.coverImage_ = get('cover-img');
       this.coverImage_.addEventListener('click', () => this.showUpdateDiv_());
       this.coverImage_.addEventListener('load', () =>
-        this.updateMediaSessionMetadata_(true /* imageLoaded */),
+        this.updateMediaSessionMetadata_(true /* imageLoaded */)
       );
 
       this.ratingOverlayDiv_ = get('rating-overlay');
@@ -277,24 +277,24 @@ customElements.define(
       this.nextButton_.addEventListener('click', () => this.cycleTrack_(1));
       this.playPauseButton_ = get('play-pause');
       this.playPauseButton_.addEventListener('click', () =>
-        this.togglePause_(),
+        this.togglePause_()
       );
 
       this.updateDiv_ = get('update-container');
       get('update-close').addEventListener('click', () =>
-        this.hideUpdateDiv_(true),
+        this.hideUpdateDiv_(true)
       );
       this.ratingSpan_ = get('rating');
-      this.ratingSpan_.addEventListener('keydown', e =>
-        this.handleRatingSpanKeyDown_(e),
+      this.ratingSpan_.addEventListener('keydown', (e) =>
+        this.handleRatingSpanKeyDown_(e)
       );
       this.dumpSongLink_ = get('dump-song');
       this.tagsTextarea_ = get('edit-tags');
       this.tagSuggester_ = get('edit-tags-suggester');
 
       this.playlistTable_ = get('playlist');
-      this.playlistTable_.addEventListener('field', e => {
-        this.dispatchEvent(new CustomEvent('field', {detail: e.detail}));
+      this.playlistTable_.addEventListener('field', (e) => {
+        this.dispatchEvent(new CustomEvent('field', { detail: e.detail }));
       });
 
       if ('mediaSession' in navigator) {
@@ -302,14 +302,16 @@ customElements.define(
         ms.setActionHandler('play', () => this.play_());
         ms.setActionHandler('pause', () => this.pause_());
         ms.setActionHandler('seekbackward', () =>
-          this.seek_(-this.constructor.SEEK_SEC_),
+          this.seek_(-this.constructor.SEEK_SEC_)
         );
-        ms.setActionHandler('seekforward', () => this.seek_(this.constructor.SEEK_SEC_));
+        ms.setActionHandler('seekforward', () =>
+          this.seek_(this.constructor.SEEK_SEC_)
+        );
         ms.setActionHandler('previoustrack', () => this.cycleTrack_(-1));
         ms.setActionHandler('nexttrack', () => this.cycleTrack_(1));
       }
 
-      document.body.addEventListener('keydown', e => {
+      document.body.addEventListener('keydown', (e) => {
         if (this.processAccelerator_(e)) {
           e.preventDefault();
           e.stopPropagation();
@@ -330,7 +332,7 @@ customElements.define(
       this.audio_.addEventListener('pause', () => this.onPause_());
       this.audio_.addEventListener('play', () => this.onPlay_());
       this.audio_.addEventListener('timeupdate', () => this.onTimeUpdate_());
-      this.audio_.addEventListener('error', e => this.onError_(e));
+      this.audio_.addEventListener('error', (e) => this.onError_(e));
 
       this.audioSrc_ = this.audioCtx_.createMediaElementSource(this.audio_);
       this.audioSrc_.connect(this.gainNode_);
@@ -392,7 +394,7 @@ customElements.define(
       let index = afterCurrent
         ? Math.min(this.currentIndex_ + 1, this.songs_.length)
         : this.songs_.length;
-      songs.forEach(s => this.songs_.splice(index++, 0, s));
+      songs.forEach((s) => this.songs_.splice(index++, 0, s));
 
       this.playlistTable_.setSongs(this.songs_);
 
@@ -440,7 +442,7 @@ customElements.define(
     updateTags_(tags) {
       this.tags_ = tags;
       this.tagSuggester_.words = tags;
-      this.dispatchEvent(new CustomEvent('tags', {detail: {tags}}));
+      this.dispatchEvent(new CustomEvent('tags', { detail: { tags } }));
     }
 
     updateButtonState_() {
@@ -461,7 +463,7 @@ customElements.define(
 
       updateTitleAttributeForTruncation(
         this.artistDiv_,
-        song ? song.artist : '',
+        song ? song.artist : ''
       );
       updateTitleAttributeForTruncation(this.titleDiv_, song ? song.title : '');
       updateTitleAttributeForTruncation(this.albumDiv_, song ? song.album : '');
@@ -479,7 +481,9 @@ customElements.define(
 
       // Cache the scaled cover images for the next song and the one after it.
       // This prevents ugly laggy updates here and in <presentation-layer>.
-      const precacheCover = s => {
+      // TODO: Except this probably won't work due to App Engine caching:
+      // https://github.com/derat/nup/issues/1
+      const precacheCover = (s) => {
         if (!s || !s.coverFilename) return;
         new Image().src = getScaledCoverUrl(s.coverFilename);
       };
@@ -542,7 +546,7 @@ customElements.define(
     updatePresentationLayerSongs_() {
       this.presentationLayer_.updateSongs(
         this.currentSong_,
-        this.songs_[this.currentIndex_ + 1] || null,
+        this.songs_[this.currentIndex_ + 1] || null
       );
     }
 
@@ -570,7 +574,7 @@ customElements.define(
       });
       this.closeNotificationTimeoutId_ = window.setTimeout(
         () => this.closeNotification_(),
-        this.constructor.NOTIFICATION_SEC_ * 1000,
+        this.constructor.NOTIFICATION_SEC_ * 1000
       );
     }
 
@@ -589,7 +593,7 @@ customElements.define(
       const song = this.currentSong_;
       // Get an absolute URL since that's what we'll get from the <audio>
       // element: https://stackoverflow.com/a/44547904
-      const url = getAbsUrl(song.url);
+      const url = getSongUrl(song.filename);
       if (this.audio_.src != url || this.reachedEndOfSongs_) {
         // Deal with "The AudioContext was not allowed to start. It must be
         // resumed (or created) after a user gesture on the page.":
@@ -619,7 +623,7 @@ customElements.define(
       }
 
       console.log('Playing');
-      this.audio_.play().catch(e => {
+      this.audio_.play().catch((e) => {
         // play() actually returns a promise that is resolved after playback
         // actually starts. If we change the <audio>'s src or call its pause()
         // method while in the preparatory state, it complains. Ignore those
@@ -718,15 +722,18 @@ customElements.define(
       this.presentationLayer_.updatePosition(position);
 
       // Preload the next song once we're nearing the end of this one.
-      if (position >= duration - this.constructor.PRELOAD_SEC_ && !this.nextAudio_ &&
-          this.currentIndex_ < this.songs_.length - 1) {
-        this.preloadSong_(this.songs_[this.currentIndex_+1]);
+      if (
+        position >= duration - this.constructor.PRELOAD_SEC_ &&
+        !this.nextAudio_ &&
+        this.currentIndex_ < this.songs_.length - 1
+      ) {
+        this.preloadSong_(this.songs_[this.currentIndex_ + 1]);
       }
     }
 
     // Configures |nextAudio_| to play |song|.
     preloadSong_(song) {
-      const url = getAbsUrl(song.url);
+      const url = getSongUrl(song.filename);
       console.log(`Preloading ${song.songId} (${url})`);
       this.nextAudio_ = this.audio_.cloneNode(true);
       this.nextAudio_.src = url;
@@ -746,7 +753,7 @@ customElements.define(
         case error.MEDIA_ERR_SRC_NOT_SUPPORTED: // 4
           if (this.numErrors_ <= this.constructor.MAX_RETRIES_) {
             console.log(
-              'Retrying from position ' + this.lastTimeUpdatePosition_,
+              'Retrying from position ' + this.lastTimeUpdatePosition_
             );
             this.audio_.load();
             this.audio_.currentTime = this.lastTimeUpdatePosition_;
@@ -819,7 +826,7 @@ customElements.define(
       this.updater_.rateAndTag(
         song.songId,
         ratingChanged ? this.updatedRating_ : null,
-        tagsChanged ? newTags : null,
+        tagsChanged ? newTags : null
       );
 
       song.rating = this.updatedRating_;
@@ -840,7 +847,7 @@ customElements.define(
           anchor.addEventListener(
             'click',
             () => this.setRating_(rating),
-            false,
+            false
           );
           anchor.className = 'star';
           this.ratingSpan_.appendChild(anchor);
@@ -863,7 +870,7 @@ customElements.define(
         this.dialogManager_,
         () => {
           this.optionsDialog_ = null;
-        },
+        }
       );
     }
 
@@ -897,7 +904,9 @@ customElements.define(
       // on the AudioParam interface."
       console.log(`Scaling amplitude by ${scale.toFixed(3)}`);
       this.gainNode_.gain.exponentialRampToValueAtTime(
-          scale, this.audioCtx_.currentTime + this.constructor.GAIN_CHANGE_SEC_);
+        scale,
+        this.audioCtx_.currentTime + this.constructor.GAIN_CHANGE_SEC_
+      );
     }
 
     processAccelerator_(e) {
@@ -965,13 +974,13 @@ customElements.define(
     }
 
     emitCoverEvent_(url) {
-      this.dispatchEvent(new CustomEvent('cover', {detail: {url}}));
+      this.dispatchEvent(new CustomEvent('cover', { detail: { url } }));
     }
 
     emitPresentEvent_(visible) {
-      this.dispatchEvent(new CustomEvent('present', {detail: {visible}}));
+      this.dispatchEvent(new CustomEvent('present', { detail: { visible } }));
     }
-  },
+  }
 );
 
 function numStarsToRating(numStars) {

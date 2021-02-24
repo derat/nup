@@ -42,7 +42,8 @@ const grpcPoolSize = 4
 
 // Scale reads the cover image at fn (corresponding to Song.CoverFilename),
 // scales and crops it to be a square image with the supplied width and height
-// size, and writes it in JPEG format to w.
+// size, and writes it in JPEG format to w. If size is zero or negative, the
+// original (possibly non-square) cover data is written.
 func Scale(ctx context.Context, fn string, size, quality int, w io.Writer) error {
 	var data []byte
 	var err error
@@ -70,6 +71,13 @@ func Scale(ctx context.Context, fn string, size, quality int, w io.Writer) error
 			log.Errorf(ctx, "Cache write failed: %v", err) // swallow error
 		}
 	}
+
+	if size <= 0 {
+		log.Debugf(ctx, "Writing %d-byte original cover", len(data))
+		_, err = w.Write(data)
+		return err
+	}
+
 	log.Debugf(ctx, "Decoding %v bytes", len(data))
 	src, _, err := image.Decode(bytes.NewBuffer(data))
 	if err != nil {
@@ -80,10 +88,10 @@ func Scale(ctx context.Context, fn string, size, quality int, w io.Writer) error
 	sr := src.Bounds()
 	if sr.Dx() > sr.Dy() {
 		sr.Min.X += (sr.Dx() - sr.Dy()) / 2
-		sr.Max.X = sr.Dy()
+		sr.Max.X = sr.Min.X + sr.Dy()
 	} else if sr.Dy() > sr.Dx() {
 		sr.Min.Y += (sr.Dy() - sr.Dx()) / 2
-		sr.Max.Y = sr.Dx()
+		sr.Max.Y = sr.Min.Y + sr.Dx()
 	}
 
 	// TODO: Would it be better to never upscale?

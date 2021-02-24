@@ -62,7 +62,7 @@ export function createElement(type, className, parentElement, text) {
 // Creates and returns a new shadow DOM attached to |el|. If |template| is
 // supplied, a copy of it is attached as a child of the root node.
 export function createShadow(el, template) {
-  const shadow = el.attachShadow({mode: 'open'});
+  const shadow = el.attachShadow({ mode: 'open' });
   if (template) shadow.appendChild(template.content.cloneNode(true));
   return shadow;
 }
@@ -82,14 +82,28 @@ export function createStyle(text) {
   return style;
 }
 
+// Returns an absolute URL for the song specified by |filename| (corresponding
+// to a song's |filename| property).
+export function getSongUrl(filename) {
+  return getAbsUrl(`/song_data?filename=${encodeURIComponent(filename)}`);
+}
+
 // Returns a URL for a scaled, square version of the cover image identified by
 // |filename| (corresponding to a song's |coverFilename| property). If
 // |filename| is empty, an empty string is returned.
 export function getScaledCoverUrl(filename) {
   if (!filename) return '';
-  return `/cover?filename=${encodeURIComponent(
-    filename,
-  )}&size=${scaledCoverSize}`;
+  return getAbsUrl(
+    `/cover?filename=${encodeURIComponent(filename)}` +
+      `&size=${scaledCoverSize}`
+  );
+}
+
+// Returns a URL for the full-size, possibly non-square cover image identified
+// by |filename|.
+export function getFullCoverUrl(filename) {
+  if (!filename) return '';
+  return getAbsUrl(`/cover?filename=${encodeURIComponent(filename)}`);
 }
 
 // Returns an absolute version of |url| if it's relative.
