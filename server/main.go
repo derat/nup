@@ -8,13 +8,11 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -36,6 +34,10 @@ import (
 
 const (
 	indexPath = "web/index.html" // path to index relative to base dir
+
+	// Maximum response size permitted by App Engine:
+	// https://cloud.google.com/appengine/docs/standard/go111/how-requests-are-handled
+	maxResponseSize = 32 * 1024 * 1024
 
 	defaultDumpBatchSize = 100  // default size of batch of dumped entities
 	maxDumpBatchSize     = 5000 // max size of batch of dumped entities
@@ -783,9 +785,12 @@ func handleSongData(w http.ResponseWriter, req *http.Request) {
 	defer r.Close()
 
 	if or, ok := r.(*storage.ObjectReader); ok {
-		// ServeContent handles range requests and last-modified stuff.
-		http.ServeContent(w, req, filepath.Base(fn), or.LastMod, or)
+		if err := sendObject(ctx, req, w, or); err != nil {
+			log.Errorf(ctx, "Failed copying song %q: %v", fn, err)
+		}
 	} else {
+		// Just send a 200 with the whole file if we're getting it over HTTP rather than from GCS.
+		// This is only used by tests.
 		w.Header().Set("Content-Type", "audio/mpeg")
 		if _, err := io.Copy(w, r); err != nil {
 			// Too late to report an HTTP error.
@@ -845,20 +850,4 @@ func handleSongs(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, cursor)
 	}
 	writeJSONResponse(w, rows)
-}
-
-// openSong opens the song at fn.
-func openSong(ctx context.Context, fn string) (io.ReadCloser, error) {
-	if cfg := common.Config(ctx); cfg.SongBucket != "" {
-		return storage.NewObjectReader(ctx, cfg.SongBucket, fn)
-	} else if cfg.SongBaseURL != "" {
-		u := cfg.SongBaseURL + fn
-		log.Debugf(ctx, "Opening %v", u)
-		if resp, err := http.Get(u); err != nil {
-			return nil, err
-		} else {
-			return resp.Body, nil
-		}
-	}
-	return nil, errors.New("neither SongBucket nor SongBaseURL is set")
 }
