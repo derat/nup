@@ -53,7 +53,7 @@ const template = createTemplate(`
   #bottom .artist {
     font-weight: bold;
   }
-  #bottom .album {
+  #bottom .title {
     font-style: italic;
   }
 
