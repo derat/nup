@@ -1,7 +1,12 @@
 // Copyright 2010 Daniel Erat.
 // All rights reserved.
 
-import {$, createShadow, createTemplate, getCurrentTimeSec} from './common.js';
+import {
+  $,
+  createShadow,
+  createTemplate,
+  getCurrentTimeSec,
+} from './common.js';
 
 const template = createTemplate(`
 <style>
@@ -29,7 +34,7 @@ const template = createTemplate(`
     display: flex;
     margin-bottom: 6px;
   }
-  #search-form .row > .checkbox-col {
+  #search-form .row .checkbox-col {
     width: 8em;
   }
   #search-form .row .label-col {
@@ -66,7 +71,6 @@ const template = createTemplate(`
     color: #555;
     font-family: var(--icon-font-family);
     font-size: 12px;
-    margin-left: 2px;
   }
   #max-plays-input {
     margin: 0 6px;
@@ -136,69 +140,79 @@ const template = createTemplate(`
       <input id="unrated-checkbox" type="checkbox" value="unrated">
       Unrated
     </label>
-    <label for="min-rating-select" class="select-wrapper">
+    <label for="min-rating-select">
       Min rating
-      <select id="min-rating-select">
-        <option value="0.00">★</option>
-        <option value="0.25">★★</option>
-        <option value="0.50">★★★</option>
-        <option value="0.75">★★★★</option>
-        <option value="1.00">★★★★★</option>
-      </select>
+      <div class="select-wrapper">
+        <select id="min-rating-select">
+          <option value="0.00">★</option>
+          <option value="0.25">★★</option>
+          <option value="0.50">★★★</option>
+          <option value="0.75">★★★★</option>
+          <option value="1.00">★★★★★</option>
+        </select>
+      </div>
     </label>
   </div>
 
-  <label for="max-plays-input" class="row">
-    Played <input id="max-plays-input" type="text"> or fewer times
-  </label>
+  <div class="row">
+    <label for="max-plays-input">
+      Played <input id="max-plays-input" type="text"> or fewer times
+    </label>
+  </div>
 
-  <label for="first-played-select" class="row">
-    <span class="label-col">First played</span>
-    <div class="select-wrapper">
-      <select id="first-played-select">
-        <option value="0">...</option>
-        <option value="86400">one day</option>
-        <option value="604800">one week</option>
-        <option value="2592000">one month</option>
-        <option value="7776000">three months</option>
-        <option value="15552000">six months</option>
-        <option value="31536000">one year</option>
-        <option value="94608000">three years</option>
-      </select>
-    </div>
-    or less ago
-  </label>
+  <div class="row">
+    <label for="first-played-select">
+      <span class="label-col">First played</span>
+      <div class="select-wrapper">
+        <select id="first-played-select">
+          <option value="0">...</option>
+          <option value="86400">one day</option>
+          <option value="604800">one week</option>
+          <option value="2592000">one month</option>
+          <option value="7776000">three months</option>
+          <option value="15552000">six months</option>
+          <option value="31536000">one year</option>
+          <option value="94608000">three years</option>
+        </select>
+      </div>
+      or less ago
+    </label>
+  </div>
 
-  <label for="last-played-select" class="row">
-    <span class="label-col">Last played</span>
-    <div class="select-wrapper">
-      <select id="last-played-select">
-        <option value="0">...</option>
-        <option value="86400">one day</option>
-        <option value="604800">one week</option>
-        <option value="2592000">one month</option>
-        <option value="7776000">three months</option>
-        <option value="15552000">six months</option>
-        <option value="31536000">one year</option>
-        <option value="94608000">three years</option>
-      </select>
-    </div>
-    or longer ago
-  </label>
+  <div class="row">
+    <label for="last-played-select">
+      <span class="label-col">Last played</span>
+      <div class="select-wrapper">
+        <select id="last-played-select">
+          <option value="0">...</option>
+          <option value="86400">one day</option>
+          <option value="604800">one week</option>
+          <option value="2592000">one month</option>
+          <option value="7776000">three months</option>
+          <option value="15552000">six months</option>
+          <option value="31536000">one year</option>
+          <option value="94608000">three years</option>
+        </select>
+      </div>
+      or longer ago
+    </label>
+  </div>
 
-  <label for="preset-select" class="row">
-    <span class="label-col">Preset</span>
-    <div class="select-wrapper">
-      <select id="preset-select">
-        <option value="">...</option>
-        <option value="mr=3;t=instrumental;lp=6;s=1;play=1">instrumental old</option>
-        <option value="mr=3;t=mellow;s=1;play=1">mellow</option>
-        <option value="ft=1;fp=3">new albums</option>
-        <option value="u=1;play=1">unrated</option>
-        <option value="mr=3;lp=6;s=1;play=1">old</option>
-      </select>
-    </div>
-  </label>
+  <div class="row">
+    <label for="preset-select">
+      <span class="label-col">Preset</span>
+      <div class="select-wrapper">
+        <select id="preset-select">
+          <option value="">...</option>
+          <option value="mr=3;t=instrumental;lp=6;s=1;play=1">instrumental old</option>
+          <option value="mr=3;t=mellow;s=1;play=1">mellow</option>
+          <option value="ft=1;fp=3">new albums</option>
+          <option value="u=1;play=1">unrated</option>
+          <option value="mr=3;lp=6;s=1;play=1">old</option>
+        </select>
+      </div>
+    </label>
+  </div>
 
   <div class="row">
     <div id="search-buttons">
@@ -234,66 +248,66 @@ customElements.define(
 
       this.request_ = null;
 
-      document.body.addEventListener('keydown', e =>
-        this.handleBodyKeyDown_(e),
+      document.body.addEventListener('keydown', (e) =>
+        this.handleBodyKeyDown_(e)
       );
 
       this.shadow_ = createShadow(this, template);
-      const get = id => $(id, this.shadow_);
+      const get = (id) => $(id, this.shadow_);
 
       this.keywordsInput_ = get('keywords-input');
-      this.keywordsInput_.addEventListener('keydown', e =>
-        this.handleFormKeyDown_(e),
+      this.keywordsInput_.addEventListener('keydown', (e) =>
+        this.handleFormKeyDown_(e)
       );
       get('keywords-clear').addEventListener(
         'click',
-        () => (this.keywordsInput_.value = null),
+        () => (this.keywordsInput_.value = null)
       );
 
       this.tagSuggester_ = get('tags-suggester');
       this.tagsInput_ = get('tags-input');
-      this.tagsInput_.addEventListener('keydown', e =>
-        this.handleFormKeyDown_(e),
+      this.tagsInput_.addEventListener('keydown', (e) =>
+        this.handleFormKeyDown_(e)
       );
       get('tags-clear').addEventListener(
         'click',
-        () => (this.tagsInput_.value = null),
+        () => (this.tagsInput_.value = null)
       );
 
       this.shuffleCheckbox_ = get('shuffle-checkbox');
-      this.shuffleCheckbox_.addEventListener('keydown', e =>
-        this.handleFormKeyDown_(e),
+      this.shuffleCheckbox_.addEventListener('keydown', (e) =>
+        this.handleFormKeyDown_(e)
       );
       this.firstTrackCheckbox_ = get('first-track-checkbox');
-      this.firstTrackCheckbox_.addEventListener('keydown', e =>
-        this.handleFormKeyDown_(e),
+      this.firstTrackCheckbox_.addEventListener('keydown', (e) =>
+        this.handleFormKeyDown_(e)
       );
       this.unratedCheckbox_ = get('unrated-checkbox');
-      this.unratedCheckbox_.addEventListener('keydown', e =>
-        this.handleFormKeyDown_(e),
+      this.unratedCheckbox_.addEventListener('keydown', (e) =>
+        this.handleFormKeyDown_(e)
       );
-      this.unratedCheckbox_.addEventListener('change', e =>
-        this.handleUnratedCheckboxChanged_(e),
+      this.unratedCheckbox_.addEventListener('change', (e) =>
+        this.handleUnratedCheckboxChanged_(e)
       );
       this.minRatingSelect_ = get('min-rating-select');
       this.maxPlaysInput_ = get('max-plays-input');
-      this.maxPlaysInput_.addEventListener('keydown', e =>
-        this.handleFormKeyDown_(e),
+      this.maxPlaysInput_.addEventListener('keydown', (e) =>
+        this.handleFormKeyDown_(e)
       );
       this.firstPlayedSelect_ = get('first-played-select');
       this.lastPlayedSelect_ = get('last-played-select');
       this.presetSelect_ = get('preset-select');
-      this.presetSelect_.addEventListener('change', e =>
-        this.handlePresetSelectChanged_(e),
+      this.presetSelect_.addEventListener('change', (e) =>
+        this.handlePresetSelectChanged_(e)
       );
 
       this.searchButton_ = get('search-button');
       this.searchButton_.addEventListener('click', () =>
-        this.submitQuery_(false),
+        this.submitQuery_(false)
       );
       this.resetButton_ = get('reset-button');
       this.resetButton_.addEventListener('click', () =>
-        this.reset_(null, null, null, true /* clearResults */),
+        this.reset_(null, null, null, true /* clearResults */)
       );
       this.luckyButton_ = get('lucky-button');
       this.luckyButton_.addEventListener('click', () => this.doLuckySearch_());
@@ -302,23 +316,28 @@ customElements.define(
       this.appendButton_.addEventListener('click', () =>
         this.enqueueSearchResults_(
           false /* clearFirst */,
-          false /* afterCurrent */,
-        ),
+          false /* afterCurrent */
+        )
       );
       this.insertButton_ = get('insert-button');
       this.insertButton_.addEventListener('click', () =>
-        this.enqueueSearchResults_(false, true),
+        this.enqueueSearchResults_(false, true)
       );
       this.replaceButton_ = get('replace-button');
       this.replaceButton_.addEventListener('click', () =>
-        this.enqueueSearchResults_(true, false),
+        this.enqueueSearchResults_(true, false)
       );
 
       this.resultsTable_ = get('results-table');
-      this.resultsTable_.addEventListener('field', e => {
-        this.reset_(e.detail.artist, e.detail.album, e.detail.albumId, false /* clearResults */);
+      this.resultsTable_.addEventListener('field', (e) => {
+        this.reset_(
+          e.detail.artist,
+          e.detail.album,
+          e.detail.albumId,
+          false /* clearResults */
+        );
       });
-      this.resultsTable_.addEventListener('check', e => {
+      this.resultsTable_.addEventListener('check', (e) => {
         const checked = !!e.detail.count;
         this.appendButton_.disabled = this.insertButton_.disabled = this.replaceButton_.disabled = !checked;
       });
@@ -331,10 +350,15 @@ customElements.define(
     }
     set musicPlayer(player) {
       this.musicPlayer_ = player;
-      player.addEventListener('field', e => {
-        this.reset_(e.detail.artist, e.detail.album, e.detail.albumId, false /* clearResults */);
+      player.addEventListener('field', (e) => {
+        this.reset_(
+          e.detail.artist,
+          e.detail.album,
+          e.detail.albumId,
+          false /* clearResults */
+        );
       });
-      player.addEventListener('tags', e => {
+      player.addEventListener('tags', (e) => {
         this.tagSuggester_.words = e.detail.tags;
       });
     }
@@ -363,13 +387,13 @@ customElements.define(
       if (this.firstPlayedSelect_.value != 0) {
         terms.push(
           'minFirstPlayed=' +
-            (getCurrentTimeSec() - parseInt(this.firstPlayedSelect_.value)),
+            (getCurrentTimeSec() - parseInt(this.firstPlayedSelect_.value))
         );
       }
       if (this.lastPlayedSelect_.value != 0) {
         terms.push(
           'maxLastPlayed=' +
-            (getCurrentTimeSec() - parseInt(this.lastPlayedSelect_.value)),
+            (getCurrentTimeSec() - parseInt(this.lastPlayedSelect_.value))
         );
       }
 
@@ -394,14 +418,14 @@ customElements.define(
           } else {
             this.showMessage_(
               'Search Failed',
-              'Response from server was empty.',
+              'Response from server was empty.'
             );
           }
         } else {
           if (req.status && req.responseText) {
             this.showMessage_(
               'Search Failed',
-              'Got ' + req.status + ': ' + req.responseText,
+              'Got ' + req.status + ': ' + req.responseText
             );
           } else {
             this.showMessage_('Search Failed', 'Missing status in request.');
@@ -412,7 +436,7 @@ customElements.define(
         this.request_ = null;
       };
 
-      this.request_.onerror = e => {
+      this.request_.onerror = (e) => {
         this.showMessage_('Search Failed', 'Request to server failed.');
         console.log(e);
       };
@@ -440,7 +464,7 @@ customElements.define(
     // the top of the page so the form is visible.
     reset_(newArtist, newAlbum, newAlbumId, clearResults) {
       const keywords = [];
-      const clean = s => {
+      const clean = (s) => {
         s = s.replace(/"/g, '\\"');
         if (s.indexOf(' ') != -1) s = '"' + s + '"';
         return s;
@@ -545,7 +569,7 @@ customElements.define(
       if (!this.dialogManager_) return;
       this.dialogManager_.createMessageDialog(title, message);
     }
-  },
+  }
 );
 
 function parseQueryString(text) {
@@ -590,7 +614,7 @@ function parseQueryString(text) {
       // The server splits on non-alphanumeric characters to make keywords.
       // Split on miscellaneous punctuation here to at least handle some of this.
       keywords = keywords.concat(
-        match[1].split(/[-_+=~!?@#$%^&*()'".,:;]+/).filter(s => s.length),
+        match[1].split(/[-_+=~!?@#$%^&*()'".,:;]+/).filter((s) => s.length)
       );
       text = match[2];
     }
