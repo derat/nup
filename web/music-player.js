@@ -1045,5 +1045,5 @@ function getRatingString(rating, withLabel, includeEmpty) {
 }
 
 function getDumpSongUrl(song) {
-  return `/dump_song?id=${song.songId}`;
+  return `/dump_song?songId=${song.songId}`;
 }

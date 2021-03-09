@@ -211,13 +211,10 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	http.HandleFunc("/", handleIndex)
-	http.HandleFunc("/clear", handleClear)
-	http.HandleFunc("/config", handleConfig)
 	http.HandleFunc("/cover", handleCover)
 	http.HandleFunc("/delete_song", handleDeleteSong)
 	http.HandleFunc("/dump_song", handleDumpSong)
 	http.HandleFunc("/export", handleExport)
-	http.HandleFunc("/flush_cache", handleFlushCache)
 	http.HandleFunc("/import", handleImport)
 	http.HandleFunc("/list_tags", handleListTags)
 	http.HandleFunc("/now_nsec", handleNowNsec)
@@ -226,6 +223,12 @@ func main() {
 	http.HandleFunc("/report_played", handleReportPlayed)
 	http.HandleFunc("/song_data", handleSongData)
 	http.HandleFunc("/songs", handleSongs)
+
+	if appengine.IsDevAppServer() {
+		http.HandleFunc("/clear", handleClear)
+		http.HandleFunc("/config", handleConfig)
+		http.HandleFunc("/flush_cache", handleFlushCache)
+	}
 
 	// The google.golang.org/appengine packages are deprecated, and the official
 	// way forward is to use cloud.google.com/go and call http.ListenAndServe():
@@ -271,10 +274,6 @@ func handleClear(w http.ResponseWriter, r *http.Request) {
 	if !checkRequest(ctx, w, r, "POST", false) {
 		return
 	}
-	if !appengine.IsDevAppServer() {
-		http.Error(w, "Only works on dev server", http.StatusBadRequest)
-		return
-	}
 	if err := update.ClearData(ctx); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -285,10 +284,6 @@ func handleClear(w http.ResponseWriter, r *http.Request) {
 func handleConfig(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
 	if !checkRequest(ctx, w, r, "POST", false) {
-		return
-	}
-	if !appengine.IsDevAppServer() {
-		http.Error(w, "Only works on dev server", http.StatusBadRequest)
 		return
 	}
 
@@ -372,7 +367,7 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, ok := parseIntParam(ctx, w, r, "id")
+	id, ok := parseIntParam(ctx, w, r, "songId")
 	if !ok {
 		return
 	}
@@ -401,11 +396,6 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	includeCovers := false
-	if r.FormValue("covers") == "1" {
-		includeCovers = true
-	}
-
 	var max int64 = defaultDumpBatchSize
 	if len(r.FormValue("max")) > 0 {
 		var ok bool
@@ -426,16 +416,46 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 
 	switch r.FormValue("type") {
 	case "song":
+		var minLastModified time.Time
+		if len(r.FormValue("minLastModifiedNsec")) > 0 {
+			ns, ok := parseIntParam(ctx, w, r, "minLastModifiedNsec")
+			if !ok {
+				return
+			}
+			if ns > 0 {
+				minLastModified = time.Unix(0, ns)
+			}
+		}
+
 		var songs []types.Song
-		songs, nextCursor, err = dump.Songs(ctx, max, r.FormValue("cursor"), includeCovers)
+		songs, nextCursor, err = dump.Songs(ctx, max, r.FormValue("cursor"),
+			r.FormValue("deleted") == "1", minLastModified)
 		if err != nil {
 			log.Errorf(ctx, "Dumping songs failed: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		omit := make(map[string]bool)
+		for _, s := range strings.Split(r.FormValue("omit"), ",") {
+			omit[s] = true
+		}
 		objectPtrs = make([]interface{}, len(songs))
 		for i := range songs {
-			objectPtrs[i] = &songs[i]
+			s := &songs[i]
+			if omit["coverFilename"] {
+				s.CoverFilename = ""
+			}
+			if omit["plays"] {
+				s.Plays = nil
+			}
+			if omit["sha1"] {
+				s.SHA1 = ""
+			}
+			if omit["tags"] {
+				s.Tags = nil
+			}
+			objectPtrs[i] = s
 		}
 	case "play":
 		var plays []types.PlayDump
@@ -473,10 +493,6 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 func handleFlushCache(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
 	if !checkRequest(ctx, w, r, "POST", false) {
-		return
-	}
-	if !appengine.IsDevAppServer() {
-		http.Error(w, "Only works on dev server", http.StatusBadRequest)
 		return
 	}
 	if err := cache.Flush(ctx, cache.Memcache); err != nil {
@@ -799,6 +815,7 @@ func handleSongData(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// TODO: Delete this after updating the Android client to use /export.
 func handleSongs(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
 	if !checkRequest(ctx, w, r, "GET", false) {

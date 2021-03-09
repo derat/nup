@@ -36,8 +36,7 @@ const (
 
 var ErrUnmodified = errors.New("object wasn't modified")
 
-// PrepareSongForClient sets and clears fields in s appropriately for sending it to a
-// web or Android client.
+// PrepareSongForClient sets fields in s appropriately for sending it to a web or Android client.
 func PrepareSongForClient(s *types.Song, id int64) {
 	// Set fields that are only present in search results (i.e. not in Datastore).
 	s.SongID = strconv.FormatInt(id, 10)

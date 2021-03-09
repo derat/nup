@@ -23,30 +23,38 @@ const (
 )
 
 // Songs returns songs from datastore.
-// max contains the maximum number of songs to return in this call.
-// If cursor is non-empty, it is used to resume an already-started query.
-// If includeCovers is true, the Song.CoverFilename field is preserved.
-func Songs(ctx context.Context, max int64, cursor string, includeCovers bool) (
+// max specifies the maximum number of songs to return in this call.
+// cursor contains an optional cursor for continuing an earlier request.
+// deleted specifies that only deleted (rather than only live) songs should be returned.
+// minLastModified specifies a minimum last-modified time for returned songs.
+func Songs(ctx context.Context, max int64, cursor string, deleted bool, minLastModified time.Time) (
 	songs []types.Song, nextCursor string, err error) {
+	kind := common.SongKind
+	if deleted {
+		kind = common.DeletedSongKind
+	}
+	query := datastore.NewQuery(kind)
+	if minLastModified.IsZero() {
+		// The sort property must match the filter, so only sort when we aren't filtering.
+		query = query.Order(keyProperty)
+	} else {
+		query = query.Filter("LastModifiedTime >= ", minLastModified)
+	}
+
 	songs = make([]types.Song, max)
 	songPtrs := make([]interface{}, max)
 	for i := range songs {
 		songPtrs[i] = &songs[i]
 	}
 
-	ids, _, nextCursor, err := getEntities(
-		ctx, datastore.NewQuery(common.SongKind).Order(keyProperty), cursor, songPtrs)
+	ids, _, nextCursor, err := getEntities(ctx, query, cursor, songPtrs)
 	if err != nil {
 		return nil, "", err
 	}
 
 	songs = songs[0:len(ids)]
 	for i, id := range ids {
-		s := &songs[i]
-		s.SongID = strconv.FormatInt(id, 10)
-		if !includeCovers {
-			s.CoverFilename = ""
-		}
+		songs[i].SongID = strconv.FormatInt(id, 10)
 	}
 	return songs, nextCursor, nil
 }

@@ -324,47 +324,52 @@ const (
 )
 
 func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted deletionPolicy) []types.Song {
-	var nsec int64
-	if !minLastModified.IsZero() {
-		nsec = minLastModified.UnixNano()
+	params := []string{
+		"type=song",
+		"max=" + strconv.Itoa(androidBatchSize),
+		"omit=plays,sha1",
 	}
-	deletedVal := 0
 	if deleted == getDeletedSongs {
-		deletedVal = 1
+		params = append(params, "deleted=1")
+	}
+	if !minLastModified.IsZero() {
+		params = append(params, fmt.Sprintf("minLastModifiedNsec=%d", minLastModified.UnixNano()))
 	}
 
 	songs := make([]types.Song, 0)
 	var cursor string
 
 	for {
-		path := fmt.Sprintf("songs?minLastModifiedNsec=%d&deleted=%d&max=%d", nsec, deletedVal, androidBatchSize)
-		if len(cursor) > 0 {
+		path := "export?" + strings.Join(params, "&")
+		if cursor != "" {
 			path += "&cursor=" + cursor
 		}
 
 		resp := t.SendRequest(t.NewRequest("GET", path, nil))
 		defer resp.Body.Close()
 
-		data, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			panic(err)
-		}
-		var items []json.RawMessage
-		if err = json.Unmarshal(data, &items); err != nil && err != io.EOF {
-			panic(err)
-		}
-
+		// We receive a sequence of marshaled songs optionally followed by a cursor.
 		cursor = ""
-		for _, item := range items {
-			s := types.Song{}
-			if err = json.Unmarshal(item, &s); err == nil {
+		dec := json.NewDecoder(resp.Body)
+		for {
+			var msg json.RawMessage
+			if err := dec.Decode(&msg); err == io.EOF {
+				break
+			} else if err != nil {
+				panic(err)
+			}
+
+			var s types.Song
+			if err := json.Unmarshal(msg, &s); err == nil {
 				songs = append(songs, s)
-			} else if err := json.Unmarshal(item, &cursor); err != nil {
+			} else if err := json.Unmarshal(msg, &cursor); err == nil {
+				break
+			} else {
 				panic(err)
 			}
 		}
 
-		if len(cursor) == 0 {
+		if cursor == "" {
 			break
 		}
 	}

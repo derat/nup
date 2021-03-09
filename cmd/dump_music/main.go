@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/derat/nup/internal/pkg/cloudutil"
 	"github.com/derat/nup/internal/pkg/types"
@@ -27,7 +28,7 @@ const (
 	chanSize             = 50
 )
 
-func getEntities(cfg *types.ClientConfig, entityType string, extraArgs string, batchSize int, f func([]byte)) {
+func getEntities(cfg *types.ClientConfig, entityType string, extraArgs []string, batchSize int, f func([]byte)) {
 	client := http.Client{}
 	u, err := cloudutil.ServerURL(cfg.ServerURL, exportPath)
 	if err != nil {
@@ -38,7 +39,7 @@ func getEntities(cfg *types.ClientConfig, entityType string, extraArgs string, b
 	for {
 		u.RawQuery = fmt.Sprintf("type=%s&max=%d", entityType, batchSize)
 		if len(extraArgs) > 0 {
-			u.RawQuery += "&" + extraArgs
+			u.RawQuery += "&" + strings.Join(extraArgs, "&")
 		}
 		if len(cursor) > 0 {
 			u.RawQuery += "&cursor=" + cursor
@@ -77,11 +78,9 @@ func getEntities(cfg *types.ClientConfig, entityType string, extraArgs string, b
 }
 
 func getSongs(cfg *types.ClientConfig, batchSize int, includeCovers bool, ch chan *types.Song) {
-	extraArgs := "covers="
-	if includeCovers {
-		extraArgs += "1"
-	} else {
-		extraArgs += "0"
+	var extraArgs []string
+	if !includeCovers {
+		extraArgs = append(extraArgs, "omit=coverFilename")
 	}
 
 	getEntities(cfg, "song", extraArgs, batchSize, func(b []byte) {
@@ -96,7 +95,7 @@ func getSongs(cfg *types.ClientConfig, batchSize int, includeCovers bool, ch cha
 }
 
 func getPlays(cfg *types.ClientConfig, batchSize int, ch chan *types.PlayDump) {
-	getEntities(cfg, "play", "", batchSize, func(b []byte) {
+	getEntities(cfg, "play", nil, batchSize, func(b []byte) {
 		var pd types.PlayDump
 		if err := json.Unmarshal(b, &pd); err == nil {
 			ch <- &pd
