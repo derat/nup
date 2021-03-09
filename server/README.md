@@ -8,18 +8,18 @@ Returns the index page.
 
 ### /clear (POST, dev-only)
 
-Deletes all song and play objects from Datastore.
+Deletes all song and play objects from Datastore. Used by tests.
 
 ### /config (POST, dev-only)
 
 Unmarshals a JSON-encoded [ServerConfig] struct from the request body and
-applies it.
+applies it. Used by tests.
 
 ### /cover (GET)
 
 Returns an album cover art image in JPEG format.
 
-*   `filename` - Image filename from [Song]'s `CoverFilename` field.
+*   `filename` - Image path from [Song]'s `CoverFilename` field.
 *   `size` (optional) - Integer cover dimensions, e.g. `400` to request that the
     image be scaled (and possibly cropped) to 400x400.
 
@@ -37,9 +37,9 @@ Returns a JSON-marshaled [Song] object. [Play]s are included.
 
 ### /export (GET)
 
-Returns a sequence of JSON-marshaled [Song] or [Play] objects, followed by a
-JSON string containing a cursor for the next batch if not all objects were
-returned.
+Returns a series of JSON-marshaled [Song] or [Play] objects, followed by an
+optional JSON string containing a cursor for the next batch if not all objects
+were returned.
 
 *   `cursor` (optional) - Cursor to continue an earlier request.
 *   `max` (optional) - Integer maximum number of items to return.
@@ -50,19 +50,19 @@ Several parameters are only relevant for the `song` type:
 *   `deleted` (optional) - If `1`, return deleted songs rather than non-deleted
     songs.
 *   `minLastModifiedNsec` (optional) - Integer nanoseconds since Unix epoch of
-    songs' last-modified timestamps. Used to only get incremental updates.
-*   `omit` (optional) - Comma-separated list of fields to clear. Available
-    fields are `coverFilename`, `plays`, and `sha1`.
+    songs' last-modified timestamps. Used for incremental updates.
+*   `omit` (optional) - Comma-separated list of [Song] fields to clear.
+    Available fields are `coverFilename`, `plays`, and `sha1`.
 
 ### /flush\_cache (POST, dev-only)
 
-Flushes data cached in Memcache (and possibly also in Datastore).
+Flushes data cached in Memcache (and possibly also in Datastore). Used by tests.
 
 *   `onlyMemcache` (optional) - If `1`, don't flush the Datastore cache.
 
 ### /import (POST)
 
-Imports a sequence (not an array) of JSON-marshaled [Song] and [Play] objects
+Imports a series (not an array) of JSON-marshaled [Song] and [Play] objects
 into Datastore.
 
 *   `replaceUserData` (optional) - If `1`, replace the songs' existing user data
@@ -134,7 +134,7 @@ address.
 
 Returns a song's MP3 data.
 
-*   `filename` - Image filename from [Song]'s `Filename` field.
+*   `filename` - MP3 path from [Song]'s `Filename` field.
 
 [ServerConfig]: ../internal/pkg/types/types.go
 [Play]: ../internal/pkg/types/types.go
