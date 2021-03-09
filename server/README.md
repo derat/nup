@@ -136,6 +136,6 @@ Returns a song's MP3 data.
 
 *   `filename` - Image filename from [Song]'s `Filename` field.
 
-[ServerConfig](../internal/pkg/types/types.go)
-[Play](../internal/pkg/types/types.go)
-[Song](../internal/pkg/types/types.go)
+[ServerConfig]: ../internal/pkg/types/types.go
+[Play]: ../internal/pkg/types/types.go
+[Song]: ../internal/pkg/types/types.go
