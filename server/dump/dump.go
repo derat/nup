@@ -83,34 +83,6 @@ func Plays(ctx context.Context, max int64, cursor string) (
 	return plays, nextCursor, nil
 }
 
-// SongsAndroid returns newly-updated songs from datastore for the Android client.
-// If deleted is true, deleted songs will be returned instead.
-func SongsAndroid(ctx context.Context, minLastModified time.Time, deleted bool, max int64, cursor string) (
-	songs []types.Song, nextCursor string, err error) {
-	songs = make([]types.Song, max)
-	songPtrs := make([]interface{}, max)
-	for i := range songs {
-		songPtrs[i] = &songs[i]
-	}
-
-	kind := common.SongKind
-	if deleted {
-		kind = common.DeletedSongKind
-	}
-
-	ids, _, nextCursor, err := getEntities(ctx, datastore.NewQuery(kind).Filter(
-		"LastModifiedTime >= ", minLastModified), cursor, songPtrs)
-	if err != nil {
-		return nil, "", err
-	}
-
-	songs = songs[0:len(ids)]
-	for i, id := range ids {
-		common.PrepareSongForClient(&songs[i], id)
-	}
-	return songs, nextCursor, nil
-}
-
 // SingleSong returns the song identified by id.
 func SingleSong(ctx context.Context, id int64) (*types.Song, error) {
 	sk := datastore.NewKey(ctx, common.SongKind, "", id, nil)

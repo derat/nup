@@ -52,7 +52,7 @@ Several parameters are only relevant for the `song` type:
 *   `minLastModifiedNsec` (optional) - Integer nanoseconds since Unix epoch of
     songs' last-modified timestamps. Used to only get incremental updates.
 *   `omit` (optional) - Comma-separated list of fields to clear. Available
-    fields are `coverFilename`, `plays`, `sha1`, and `tags`.
+    fields are `coverFilename`, `plays`, and `sha1`.
 
 ### /flush\_cache (POST, dev-only)
 
@@ -135,18 +135,6 @@ address.
 Returns a song's MP3 data.
 
 *   `filename` - Image filename from [Song]'s `Filename` field.
-
-### /songs (GET)
-
-Returns a JSON array consisting of [Song] objects followed by a string cursor
-for the next batch if not all songs were returned.
-
-*   `cursor` (optional) - Cursor to continue an earlier request.
-*   `deleted` (optional) - If `1`, return deleted songs rather than non-deleted
-    songs.
-*   `max` (optional) - Integer maximum number of songs to return.
-*   `minLastModifiedNsec` (optional) - Integer nanoseconds since Unix epoch of
-    songs' last-modified timestamps. Used to only get incremental updates.
 
 [ServerConfig](../internal/pkg/types/types.go)
 [Play](../internal/pkg/types/types.go)

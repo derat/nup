@@ -222,7 +222,6 @@ func main() {
 	http.HandleFunc("/rate_and_tag", handleRateAndTag)
 	http.HandleFunc("/report_played", handleReportPlayed)
 	http.HandleFunc("/song_data", handleSongData)
-	http.HandleFunc("/songs", handleSongs)
 
 	if appengine.IsDevAppServer() {
 		http.HandleFunc("/clear", handleClear)
@@ -451,9 +450,6 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 			}
 			if omit["sha1"] {
 				s.SHA1 = ""
-			}
-			if omit["tags"] {
-				s.Tags = nil
 			}
 			objectPtrs[i] = s
 		}
@@ -813,58 +809,4 @@ func handleSongData(w http.ResponseWriter, req *http.Request) {
 			log.Errorf(ctx, "Failed copying song %q: %v", fn, err)
 		}
 	}
-}
-
-// TODO: Delete this after updating the Android client to use /export.
-func handleSongs(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "GET", false) {
-		return
-	}
-
-	var max int64 = defaultDumpBatchSize
-	if len(r.FormValue("max")) > 0 {
-		var ok bool
-		if max, ok = parseIntParam(ctx, w, r, "max"); !ok {
-			return
-		}
-	}
-	if max > maxDumpBatchSize {
-		max = maxDumpBatchSize
-	}
-
-	var minLastModified time.Time
-	if len(r.FormValue("minLastModifiedNsec")) > 0 {
-		ns, ok := parseIntParam(ctx, w, r, "minLastModifiedNsec")
-		if !ok {
-			return
-		}
-		if ns > 0 {
-			minLastModified = time.Unix(0, ns)
-		}
-	}
-
-	var deleted int64
-	if len(r.FormValue("deleted")) > 0 {
-		var ok bool
-		if deleted, ok = parseIntParam(ctx, w, r, "deleted"); !ok {
-			return
-		}
-	}
-
-	songs, cursor, err := dump.SongsAndroid(ctx, minLastModified, deleted != 0, max, r.FormValue("cursor"))
-	if err != nil {
-		log.Errorf(ctx, "Unable to get songs: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	rows := make([]interface{}, 0)
-	for _, s := range songs {
-		rows = append(rows, s)
-	}
-	if len(cursor) > 0 {
-		rows = append(rows, cursor)
-	}
-	writeJSONResponse(w, rows)
 }

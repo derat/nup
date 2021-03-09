@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/derat/nup/internal/pkg/types"
-	"github.com/derat/nup/server/common"
+	"github.com/derat/nup/server/query"
 )
 
 const (
@@ -60,7 +60,7 @@ func compareQueryResults(expected, actual []types.Song, order OrderPolicy) error
 	expectedCleaned := make([]types.Song, len(expected))
 	for i := range expected {
 		s := expected[i]
-		common.PrepareSongForClient(&s, 0)
+		query.CleanSong(&s, 0)
 
 		// Change some stuff back to match the expected values.
 		s.SongID = ""

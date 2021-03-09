@@ -9,6 +9,7 @@ import (
 	"errors"
 	"math/rand"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -181,7 +182,7 @@ func Songs(ctx context.Context, query *common.SongQuery, cacheOnly bool) ([]type
 
 	// Prepare the results for the client.
 	for i, id := range ids {
-		common.PrepareSongForClient(&songs[i], id)
+		CleanSong(&songs[i], id)
 	}
 	if !query.Shuffle {
 		sortSongs(songs)
@@ -356,6 +357,22 @@ func runQuery(ctx context.Context, query *common.SongQuery) ([]int64, error) {
 		}
 	}
 	return mergedIDs, nil
+}
+
+// CleanSong prepares s to be returned in results.
+// This is exported so it can be called by tests.
+func CleanSong(s *types.Song, id int64) {
+	s.SongID = strconv.FormatInt(id, 10)
+
+	// Create an empty tags slice so that clients don't need to check for null.
+	if s.Tags == nil {
+		s.Tags = make([]string, 0)
+	}
+
+	// Clear fields that are passed for updates (and hence not excluded from JSON)
+	// but that aren't needed in search results.
+	s.SHA1 = ""
+	s.Plays = s.Plays[:0]
 }
 
 // sortSongs sorts songs appropriately for the client.

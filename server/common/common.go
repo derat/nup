@@ -10,10 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
-
-	"github.com/derat/nup/internal/pkg/types"
 )
 
 const (
@@ -35,22 +32,6 @@ const (
 )
 
 var ErrUnmodified = errors.New("object wasn't modified")
-
-// PrepareSongForClient sets fields in s appropriately for sending it to a web or Android client.
-func PrepareSongForClient(s *types.Song, id int64) {
-	// Set fields that are only present in search results (i.e. not in Datastore).
-	s.SongID = strconv.FormatInt(id, 10)
-
-	// Create an empty tags slice so that clients don't need to check for null.
-	if s.Tags == nil {
-		s.Tags = make([]string, 0)
-	}
-
-	// Clear fields that are passed for updates (and hence not excluded from JSON)
-	// but that aren't needed in search results.
-	s.SHA1 = ""
-	s.Plays = s.Plays[:0]
-}
 
 // SongQuery describes a query returning a list of Songs.
 type SongQuery struct {
