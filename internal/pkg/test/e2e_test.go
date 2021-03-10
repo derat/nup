@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/derat/nup/internal/pkg/types"
 	"github.com/derat/nup/server/query"
+	"github.com/derat/nup/server/types"
 )
 
 const (

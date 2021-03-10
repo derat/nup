@@ -11,8 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/derat/nup/internal/pkg/types"
-	"github.com/derat/nup/server/common"
+	"github.com/derat/nup/server/types"
 
 	"google.golang.org/appengine/datastore"
 )
@@ -29,9 +28,9 @@ const (
 // minLastModified specifies a minimum last-modified time for returned songs.
 func Songs(ctx context.Context, max int64, cursor string, deleted bool, minLastModified time.Time) (
 	songs []types.Song, nextCursor string, err error) {
-	kind := common.SongKind
+	kind := types.SongKind
 	if deleted {
-		kind = common.DeletedSongKind
+		kind = types.DeletedSongKind
 	}
 	query := datastore.NewQuery(kind)
 	if minLastModified.IsZero() {
@@ -71,7 +70,7 @@ func Plays(ctx context.Context, max int64, cursor string) (
 	}
 
 	_, pids, nextCursor, err := getEntities(
-		ctx, datastore.NewQuery(common.PlayKind).Order(keyProperty), cursor, playPtrs)
+		ctx, datastore.NewQuery(types.PlayKind).Order(keyProperty), cursor, playPtrs)
 	if err != nil {
 		return nil, "", err
 	}
@@ -85,7 +84,7 @@ func Plays(ctx context.Context, max int64, cursor string) (
 
 // SingleSong returns the song identified by id.
 func SingleSong(ctx context.Context, id int64) (*types.Song, error) {
-	sk := datastore.NewKey(ctx, common.SongKind, "", id, nil)
+	sk := datastore.NewKey(ctx, types.SongKind, "", id, nil)
 	s := &types.Song{}
 	if err := datastore.Get(ctx, sk, s); err != nil {
 		return nil, err
@@ -97,7 +96,7 @@ func SingleSong(ctx context.Context, id int64) (*types.Song, error) {
 	for i := range plays {
 		playPtrs[i] = &plays[i].Play
 	}
-	pids, _, _, err := getEntities(ctx, datastore.NewQuery(common.PlayKind).Ancestor(sk), "", playPtrs)
+	pids, _, _, err := getEntities(ctx, datastore.NewQuery(types.PlayKind).Ancestor(sk), "", playPtrs)
 	if err != nil {
 		return nil, err
 	}

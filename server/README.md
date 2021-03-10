@@ -136,6 +136,6 @@ Returns a JSON-marshaled array of strings containing known tags.
 
 *   `requireCache` (optional) - If `1`, only return cached data. Used by tests.
 
-[ServerConfig]: ../internal/pkg/types/types.go
-[Play]: ../internal/pkg/types/types.go
-[Song]: ../internal/pkg/types/types.go
+[ServerConfig]: ./types/config.go
+[Play]: ./types/song.go
+[Song]: ./types/song.go

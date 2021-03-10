@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/derat/nup/internal/pkg/test"
-	"github.com/derat/nup/internal/pkg/types"
+	"github.com/derat/nup/server/types"
 )
 
 func scanAndCompareSongs(t *testing.T, desc, dir, forceGlob string, lastUpdateTime time.Time, expected []types.Song) {

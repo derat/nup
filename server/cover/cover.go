@@ -20,7 +20,7 @@ import (
 	"cloud.google.com/go/storage"
 
 	"github.com/derat/nup/server/cache"
-	"github.com/derat/nup/server/common"
+	"github.com/derat/nup/server/types"
 
 	"golang.org/x/image/draw"
 
@@ -44,7 +44,8 @@ const grpcPoolSize = 4
 // scales and crops it to be a square image with the supplied width and height
 // size, and writes it in JPEG format to w. If size is zero or negative, the
 // original (possibly non-square) cover data is written.
-func Scale(ctx context.Context, fn string, size, quality int, w io.Writer) error {
+func Scale(ctx context.Context, cfg *types.ServerConfig, fn string,
+	size, quality int, w io.Writer) error {
 	var data []byte
 	var err error
 
@@ -63,7 +64,7 @@ func Scale(ctx context.Context, fn string, size, quality int, w io.Writer) error
 
 	if len(data) == 0 {
 		log.Debugf(ctx, "Loading original cover")
-		if data, err = load(ctx, fn); err != nil {
+		if data, err = load(ctx, cfg, fn); err != nil {
 			return fmt.Errorf("failed to read cover: %v", err)
 		}
 		log.Debugf(ctx, "Caching %v-byte original cover", len(data))
@@ -119,9 +120,9 @@ func Scale(ctx context.Context, fn string, size, quality int, w io.Writer) error
 
 // load loads and returns the cover image with the supplied original
 // filename (see Song.CoverFilename).
-func load(ctx context.Context, fn string) ([]byte, error) {
+func load(ctx context.Context, cfg *types.ServerConfig, fn string) ([]byte, error) {
 	var r io.ReadCloser
-	if cfg := common.Config(ctx); cfg.CoverBucket != "" {
+	if cfg.CoverBucket != "" {
 		// It would seem more reasonable to call NewClient from an init()
 		// function instead, but that produces an error like the following:
 		//

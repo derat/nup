@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/derat/nup/server/common"
+	"github.com/derat/nup/server/types"
 
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
@@ -50,7 +50,7 @@ func queryMapDatastoreKey(ctx context.Context) *datastore.Key {
 
 // query holds an individual query and its cached results.
 type query struct {
-	Query common.SongQuery
+	Query types.SongQuery
 	IDs   []int64 // song IDs
 }
 
@@ -84,7 +84,7 @@ func loadQueryMap(ctx context.Context, t Type) (queryMap, error) {
 }
 
 // updateQueryMap loads queryMap from t, passes them to f, and saves
-// the updated queries back to t. If f returns common.ErrUnmodified, the queries
+// the updated queries back to t. If f returns types.ErrUnmodified, the queries
 // won't be saved.
 func updateQueryMap(ctx context.Context, f func(queryMap) error, t Type) error {
 	m, err := loadQueryMap(ctx, t)
@@ -95,7 +95,7 @@ func updateQueryMap(ctx context.Context, f func(queryMap) error, t Type) error {
 	if m == nil { // cache miss
 		m = make(queryMap)
 	}
-	if err := f(m); err == common.ErrUnmodified {
+	if err := f(m); err == types.ErrUnmodified {
 		return nil
 	} else if err != nil {
 		return err
@@ -113,7 +113,7 @@ func updateQueryMap(ctx context.Context, f func(queryMap) error, t Type) error {
 
 // GetQuery returns cached results for q from t.
 // If the query isn't cached, then a nil slice is returned.
-func GetQuery(ctx context.Context, q *common.SongQuery, t Type) ([]int64, error) {
+func GetQuery(ctx context.Context, q *types.SongQuery, t Type) ([]int64, error) {
 	if m, err := loadQueryMap(ctx, t); err != nil {
 		return nil, err
 	} else if m == nil { // cache miss
@@ -125,7 +125,7 @@ func GetQuery(ctx context.Context, q *common.SongQuery, t Type) ([]int64, error)
 }
 
 // SetQuery caches ids as results for query in t.
-func SetQuery(ctx context.Context, q *common.SongQuery, ids []int64, t Type) error {
+func SetQuery(ctx context.Context, q *types.SongQuery, ids []int64, t Type) error {
 	return updateQueryMap(ctx, func(m queryMap) error {
 		m[q.Hash()] = query{Query: *q, IDs: ids}
 		return nil
@@ -133,7 +133,7 @@ func SetQuery(ctx context.Context, q *common.SongQuery, ids []int64, t Type) err
 }
 
 // FlushForUpdate deletes the appropriate cached data for an update of the supplied types.
-func FlushForUpdate(ctx context.Context, ut common.UpdateTypes) error {
+func FlushForUpdate(ctx context.Context, ut types.UpdateTypes) error {
 	var errs []error
 
 	for _, t := range []Type{Memcache, Datastore} {
@@ -146,7 +146,7 @@ func FlushForUpdate(ctx context.Context, ut common.UpdateTypes) error {
 				}
 			}
 			if flushed == 0 {
-				return common.ErrUnmodified
+				return types.ErrUnmodified
 			}
 			log.Debugf(ctx, "Flushing %v cached query(s) from %v in response to update of type %v",
 				flushed, t, ut)
@@ -154,7 +154,7 @@ func FlushForUpdate(ctx context.Context, ut common.UpdateTypes) error {
 		}, t))
 	}
 
-	if ut&common.TagsUpdate != 0 || ut&common.MetadataUpdate != 0 {
+	if ut&types.TagsUpdate != 0 || ut&types.MetadataUpdate != 0 {
 		log.Debugf(ctx, "Flushing cached tags in response to update of type %v", ut)
 		errs = append(errs, deleteMemcache(ctx, tagListKey))
 		errs = append(errs, deleteDatastore(ctx, tagListDatastoreKey(ctx)))

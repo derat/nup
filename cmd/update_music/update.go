@@ -9,21 +9,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 
-	"github.com/derat/nup/internal/pkg/cloudutil"
-	"github.com/derat/nup/internal/pkg/types"
+	"github.com/derat/nup/server/types"
 )
 
-const (
-	batchSize = 100 // updateSongs HTTP request batch size
-
-	deletePath        = "delete_song" // server path to delete songs
-	deleteSongIDParam = "songId"      // query param
-
-	importPath         = "import"            // server path to import songs
-	importReplaceParam = "replaceUserData=1" // query param
-)
+const batchSize = 100 // updateSongs HTTP request batch size
 
 // updateSongs reads all songs from ch and sends them to the server.
 //
@@ -31,16 +21,11 @@ const (
 // are replaced with data from ch; otherwise the user data on the server
 // are preserved and only static fields (e.g. artist, title, album, etc.)
 // are replaced.
-func updateSongs(cfg config, ch chan types.Song, replaceUserData bool) error {
-	u, err := cloudutil.ServerURL(cfg.ServerURL, importPath)
-	if err != nil {
-		return err
-	}
+func updateSongs(cfg *config, ch chan types.Song, replaceUserData bool) error {
+	u := cfg.GetURL("/import")
 	if replaceUserData {
-		u.RawQuery = importReplaceParam
+		u.RawQuery = "replaceUserData=1"
 	}
-
-	client := http.Client{}
 
 	sendFunc := func(r io.Reader) error {
 		req, err := http.NewRequest("POST", u.String(), r)
@@ -50,7 +35,7 @@ func updateSongs(cfg config, ch chan types.Song, replaceUserData bool) error {
 		req.Header.Set("Content-Type", "text/plain")
 		req.SetBasicAuth(cfg.Username, cfg.Password)
 
-		resp, err := client.Do(req)
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return err
 		}
@@ -71,18 +56,18 @@ func updateSongs(cfg config, ch chan types.Song, replaceUserData bool) error {
 	e := json.NewEncoder(&buf)
 	for s := range ch {
 		numSongs++
-		if err = e.Encode(s); err != nil {
+		if err := e.Encode(s); err != nil {
 			return fmt.Errorf("failed to encode song: %v", err)
 		}
 		if numSongs%batchSize == 0 {
-			if err = sendFunc(&buf); err != nil {
+			if err := sendFunc(&buf); err != nil {
 				return err
 			}
 			buf.Reset()
 		}
 	}
 	if buf.Len() > 0 {
-		if err = sendFunc(&buf); err != nil {
+		if err := sendFunc(&buf); err != nil {
 			return err
 		}
 	}
@@ -90,12 +75,9 @@ func updateSongs(cfg config, ch chan types.Song, replaceUserData bool) error {
 }
 
 // deleteSong sends a request to the server to delete the song with the specified ID.
-func deleteSong(cfg config, songID int64) error {
-	u, err := cloudutil.ServerURL(cfg.ServerURL, deletePath)
-	if err != nil {
-		return err
-	}
-	u.RawQuery = deleteSongIDParam + "=" + strconv.FormatInt(songID, 10)
+func deleteSong(cfg *config, songID int64) error {
+	u := cfg.GetURL("/delete_song")
+	u.RawQuery = fmt.Sprintf("songId=%v", songID)
 	req, err := http.NewRequest("POST", u.String(), nil)
 	if err != nil {
 		return err
@@ -103,8 +85,7 @@ func deleteSong(cfg config, songID int64) error {
 	req.Header.Set("Content-Type", "text/plain")
 	req.SetBasicAuth(cfg.Username, cfg.Password)
 
-	client := http.Client{}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}

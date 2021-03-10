@@ -13,13 +13,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/derat/nup/internal/pkg/cloudutil"
-	"github.com/derat/nup/internal/pkg/types"
+	"github.com/derat/nup/server/types"
 )
 
 const (
-	exportPath = "export"
-
 	progressInterval = 100
 
 	// TODO: Tune these numbers.
@@ -29,13 +26,8 @@ const (
 )
 
 func getEntities(cfg *types.ClientConfig, entityType string, extraArgs []string, batchSize int, f func([]byte)) {
-	client := http.Client{}
-	u, err := cloudutil.ServerURL(cfg.ServerURL, exportPath)
-	if err != nil {
-		log.Fatal("Failed to get server URL: ", err)
-	}
-
-	cursor := ""
+	u := cfg.GetURL("/export")
+	var cursor string
 	for {
 		u.RawQuery = fmt.Sprintf("type=%s&max=%d", entityType, batchSize)
 		if len(extraArgs) > 0 {
@@ -51,7 +43,7 @@ func getEntities(cfg *types.ClientConfig, entityType string, extraArgs []string,
 		}
 		req.SetBasicAuth(cfg.Username, cfg.Password)
 
-		resp, err := client.Do(req)
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			log.Fatalf("Failed to fetch %v: %v", u.String(), err)
 		}
@@ -114,7 +106,7 @@ func main() {
 	flag.Parse()
 
 	var cfg types.ClientConfig
-	if err := cloudutil.ReadJSON(*configFile, &cfg); err != nil {
+	if err := types.LoadClientConfig(*configFile, &cfg); err != nil {
 		log.Fatal("Unable to read config file: ", err)
 	}
 

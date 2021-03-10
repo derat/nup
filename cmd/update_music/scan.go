@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/derat/nup/internal/pkg/mp3gain"
-	"github.com/derat/nup/internal/pkg/types"
+	"github.com/derat/nup/server/types"
 	"github.com/derat/taglib-go/taglib"
 )
 

@@ -55,7 +55,8 @@ guess I finally got it right the last time.
 ## Configuration
 
 Create an `config.json` file in the same directory as `app.yaml` corresponding
-to the `ServerConfig` struct in [internal/pkg/types/types.go](./types/types.go):
+to the `ServerConfig` struct in
+[server/types/config.go](./server/types/config.go):
 
 ```json
 {

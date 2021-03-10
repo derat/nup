@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/derat/nup/internal/pkg/test"
-	"github.com/derat/nup/internal/pkg/types"
+	"github.com/derat/nup/server/types"
 )
 
 func TestJSON(t *testing.T) {

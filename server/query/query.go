@@ -13,9 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/derat/nup/internal/pkg/types"
 	"github.com/derat/nup/server/cache"
-	"github.com/derat/nup/server/common"
+	"github.com/derat/nup/server/types"
 
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
@@ -53,7 +52,7 @@ func Tags(ctx context.Context, requireCache bool) ([]string, error) {
 	if tags == nil {
 		startTime := time.Now()
 		tagMap := make(map[string]struct{})
-		it := datastore.NewQuery(common.SongKind).Project("Tags").Distinct().Run(ctx)
+		it := datastore.NewQuery(types.SongKind).Project("Tags").Distinct().Run(ctx)
 		for {
 			var song types.Song
 			if _, err := it.Next(&song); err == datastore.Done {
@@ -104,7 +103,7 @@ func Tags(ctx context.Context, requireCache bool) ([]string, error) {
 // Songs executes the supplied query and returns matching songs.
 // If cacheOnly is true, empty results are returned if the query's results
 // aren't cached.
-func Songs(ctx context.Context, query *common.SongQuery, cacheOnly bool) ([]types.Song, error) {
+func Songs(ctx context.Context, query *types.SongQuery, cacheOnly bool) ([]types.Song, error) {
 	var ids []int64
 	var err error
 
@@ -173,7 +172,7 @@ func Songs(ctx context.Context, query *common.SongQuery, cacheOnly bool) ([]type
 	startTime := time.Now()
 	keys := make([]*datastore.Key, 0, len(songs))
 	for _, id := range ids {
-		keys = append(keys, datastore.NewKey(ctx, common.SongKind, "", id, nil))
+		keys = append(keys, datastore.NewKey(ctx, types.SongKind, "", id, nil))
 	}
 	if err = datastore.GetMulti(ctx, keys, songs); err != nil {
 		return nil, err
@@ -283,9 +282,9 @@ func shufflePartial(a []int64, n int) {
 	}
 }
 
-func runQuery(ctx context.Context, query *common.SongQuery) ([]int64, error) {
+func runQuery(ctx context.Context, query *types.SongQuery) ([]int64, error) {
 	// First, build a base query with all of the equality filters.
-	bq := datastore.NewQuery(common.SongKind).KeysOnly()
+	bq := datastore.NewQuery(types.SongKind).KeysOnly()
 	if len(query.Artist) > 0 {
 		bq = bq.Filter("ArtistLower =", strings.ToLower(query.Artist))
 	}

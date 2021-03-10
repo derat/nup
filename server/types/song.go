@@ -8,6 +8,14 @@ import (
 	"time"
 )
 
+const (
+	// Datastore kinds of various objects.
+	PlayKind        = "Play"
+	SongKind        = "Song"
+	DeletedPlayKind = "DeletedPlay"
+	DeletedSongKind = "DeletedSong"
+)
+
 // Play represents one playback of a Song.
 type Play struct {
 	// StartTime is the time at which playback started.
@@ -123,46 +131,3 @@ type PlayArray []Play
 func (a PlayArray) Len() int           { return len(a) }
 func (a PlayArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a PlayArray) Less(i, j int) bool { return a[i].StartTime.Before(a[j].StartTime) }
-
-// ClientConfig holds configuration details shared across client binaries.
-type ClientConfig struct {
-	// ServerURL contains the App Engine server URL.
-	ServerURL string `json:"serverUrl"`
-	// Username contains an HTTP basic auth username.
-	Username string `json:"username"`
-	// Password contains an HTTP basic auth password.
-	Password string `json:"password"`
-}
-
-// BasicAuthInfo contains information used for validating HTTP basic authentication.
-type BasicAuthInfo struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-// ServerConfig holds the App Engine server's configuration.
-type ServerConfig struct {
-	// GoogleUsers contains email addresses of Google accounts allowed to access
-	// the web interface.
-	GoogleUsers []string `json:"googleUsers"`
-
-	// BasicAuthUsers contains for accounts using HTTP basic authentication
-	// (i.e. command-line tools or the Android client).
-	BasicAuthUsers []BasicAuthInfo `json:"basicAuthUsers"`
-
-	// SongBucket contains the name of the Google Cloud Storage bucket holding song files.
-	SongBucket string `json:"songBucket"`
-	// CoverBucket contains the name of the Google Cloud Storage bucket holding album cover images.
-	CoverBucket string `json:"coverBucket"`
-
-	// SongBaseURL contains the slash-terminated URL under which song files are stored.
-	// Exactly one of SongBucket and SongBaseURL must be set.
-	SongBaseURL string `json:"songBaseUrl"`
-	// CoverBaseURL contains the slash-terminated URL under which album cover images are stored.
-	// Exactly one of CoverBucket and CoverBaseURL must be set.
-	CoverBaseURL string `json:"coverBaseUrl"`
-
-	// ForceUpdateFailures is set by tests to indicate that failure be reported
-	// for all user data updates (ratings, tags, plays). Ignored for non-development servers.
-	ForceUpdateFailures bool `json:"forceUpdateFailures"`
-}

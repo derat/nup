@@ -10,8 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/derat/nup/internal/pkg/types"
-	"github.com/derat/nup/server/common"
+	"github.com/derat/nup/server/types"
 
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
@@ -83,9 +82,8 @@ func hasWebDriverCookie(r *http.Request) bool {
 // checkRequest verifies that r is an authorized request using method.
 // If the request is unauthorized and redirectToLogin is true, the client
 // is redirected to the login screen.
-func checkRequest(ctx context.Context, w http.ResponseWriter, r *http.Request,
+func checkRequest(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request,
 	method string, redirectToLogin bool) bool {
-	cfg := common.Config(ctx)
 	username, allowed := hasAllowedGoogleAuth(ctx, cfg)
 	if !allowed && len(username) == 0 {
 		username, allowed = hasAllowedBasicAuth(r, cfg)

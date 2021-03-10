@@ -1,7 +1,7 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-package common
+package main
 
 import (
 	"context"
@@ -10,8 +10,7 @@ import (
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 
-	"github.com/derat/nup/internal/pkg/cloudutil"
-	"github.com/derat/nup/internal/pkg/types"
+	"github.com/derat/nup/server/types"
 )
 
 const (
@@ -23,12 +22,13 @@ const (
 	configKeyID = "config"
 )
 
+// Singleton loaded from disk by loadConfig().
 var baseCfg *types.ServerConfig
 
-func AddTestUserToConfig(cfg *types.ServerConfig) {
+func addTestUserToConfig(cfg *types.ServerConfig) {
 	cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, types.BasicAuthInfo{
-		Username: cloudutil.TestUsername,
-		Password: cloudutil.TestPassword,
+		Username: types.TestUsername,
+		Password: types.TestPassword,
 	})
 }
 
@@ -40,9 +40,11 @@ func cleanBaseURL(u *string) {
 	}
 }
 
-func LoadConfig() error {
-	baseCfg = &types.ServerConfig{}
-	if err := cloudutil.ReadJSON(configPath, baseCfg); err != nil {
+// loadConfig loads the server configuration from disk.
+// It should be called once at the start of main().
+func loadConfig() error {
+	var err error
+	if baseCfg, err = types.LoadServerConfig(configPath); err != nil {
 		return err
 	}
 
@@ -61,7 +63,7 @@ func LoadConfig() error {
 	}
 
 	if appengine.IsDevAppServer() {
-		AddTestUserToConfig(baseCfg)
+		addTestUserToConfig(baseCfg)
 	}
 	return nil
 }
@@ -70,9 +72,10 @@ func testConfigKey(ctx context.Context) *datastore.Key {
 	return datastore.NewKey(ctx, configKind, configKeyID, 0, nil)
 }
 
-func Config(ctx context.Context) *types.ServerConfig {
+// getConfig returns the currently-in-use config.
+func getConfig(ctx context.Context) *types.ServerConfig {
 	if appengine.IsDevAppServer() {
-		testConfig := types.ServerConfig{}
+		var testConfig types.ServerConfig
 		if err := datastore.Get(ctx, testConfigKey(ctx), &testConfig); err == nil {
 			return &testConfig
 		} else if err != datastore.ErrNoSuchEntity {
@@ -81,18 +84,18 @@ func Config(ctx context.Context) *types.ServerConfig {
 	}
 
 	if baseCfg == nil {
-		panic("loadBaseConfig() not called")
+		panic("loadConfig() not called")
 	}
 	return baseCfg
 }
 
-func SaveTestConfig(ctx context.Context, cfg *types.ServerConfig) {
+func saveTestConfig(ctx context.Context, cfg *types.ServerConfig) {
 	if _, err := datastore.Put(ctx, testConfigKey(ctx), cfg); err != nil {
 		panic(err)
 	}
 }
 
-func ClearTestConfig(ctx context.Context) {
+func clearTestConfig(ctx context.Context) {
 	if err := datastore.Delete(ctx, testConfigKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
 		panic(err)
 	}

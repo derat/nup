@@ -1,37 +1,15 @@
-// Copyright 2020 Daniel Erat.
+// Copyright 2021 Daniel Erat.
 // All rights reserved.
 
-// Package common contains code shared across multiple packages.
-package common
+package types
 
 import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 )
-
-const (
-	// Datastore kinds of various objects.
-	PlayKind        = "Play"
-	SongKind        = "Song"
-	DeletedPlayKind = "DeletedPlay"
-	DeletedSongKind = "DeletedSong"
-)
-
-// UpdateTypes is a bitfield describing what was changed by an update.
-type UpdateTypes uint8
-
-const (
-	MetadataUpdate UpdateTypes = 1 << iota // song metadata
-	RatingUpdate
-	TagsUpdate
-	PlaysUpdate
-)
-
-var ErrUnmodified = errors.New("object wasn't modified")
 
 // SongQuery describes a query returning a list of Songs.
 type SongQuery struct {
@@ -94,3 +72,13 @@ func (q *SongQuery) ResultsInvalidated(ut UpdateTypes) bool {
 	}
 	return false
 }
+
+// UpdateTypes is a bitfield describing what was changed by an update.
+type UpdateTypes uint8
+
+const (
+	MetadataUpdate UpdateTypes = 1 << iota // song metadata
+	RatingUpdate
+	TagsUpdate
+	PlaysUpdate
+)

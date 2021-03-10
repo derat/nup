@@ -11,8 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/derat/nup/internal/pkg/cloudutil"
-	"github.com/derat/nup/internal/pkg/types"
+	"github.com/derat/nup/server/types"
 )
 
 type config struct {
@@ -36,7 +35,7 @@ func main() {
 	flag.Parse()
 
 	var cfg config
-	if err := cloudutil.ReadJSON(*configFile, &cfg); err != nil {
+	if err := types.LoadClientConfig(*configFile, &cfg); err != nil {
 		log.Fatal("Unable to read config file: ", err)
 	}
 
@@ -45,7 +44,7 @@ func main() {
 			log.Fatal("-dry-run is incompatible with -delete-song-id")
 		}
 		log.Printf("Deleting song %v", *deleteSongID)
-		deleteSong(cfg, *deleteSongID)
+		deleteSong(&cfg, *deleteSongID)
 		return
 	}
 
@@ -125,7 +124,7 @@ func main() {
 			}
 		}
 	} else {
-		if err = updateSongs(cfg, updateChan, replaceUserData); err != nil {
+		if err = updateSongs(&cfg, updateChan, replaceUserData); err != nil {
 			log.Fatal("Failed updating songs: ", err)
 		}
 		if didFullScan {

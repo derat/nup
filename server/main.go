@@ -16,13 +16,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/derat/nup/internal/pkg/types"
 	"github.com/derat/nup/server/cache"
-	"github.com/derat/nup/server/common"
 	"github.com/derat/nup/server/cover"
 	"github.com/derat/nup/server/dump"
 	"github.com/derat/nup/server/query"
 	"github.com/derat/nup/server/storage"
+	"github.com/derat/nup/server/types"
 	"github.com/derat/nup/server/update"
 
 	"google.golang.org/appengine"
@@ -40,7 +39,7 @@ const (
 )
 
 func main() {
-	if err := common.LoadConfig(); err != nil {
+	if err := loadConfig(); err != nil {
 		panic(fmt.Sprintf("Loading config failed: %v", err))
 	}
 	rand.Seed(time.Now().UnixNano())
@@ -105,7 +104,8 @@ func main() {
 
 func handleClear(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "POST", false) {
+	cfg := getConfig(ctx)
+	if !checkRequest(ctx, cfg, w, r, "POST", false) {
 		return
 	}
 	if err := update.ClearData(ctx); err != nil {
@@ -117,16 +117,16 @@ func handleClear(w http.ResponseWriter, r *http.Request) {
 
 func handleConfig(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "POST", false) {
+	if !checkRequest(ctx, getConfig(ctx), w, r, "POST", false) {
 		return
 	}
 
-	cfg := types.ServerConfig{}
+	var cfg types.ServerConfig
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err == nil {
-		common.AddTestUserToConfig(&cfg)
-		common.SaveTestConfig(ctx, &cfg)
+		addTestUserToConfig(&cfg)
+		saveTestConfig(ctx, &cfg)
 	} else if err == io.EOF {
-		common.ClearTestConfig(ctx)
+		clearTestConfig(ctx)
 	} else {
 		log.Errorf(ctx, "Failed to decode config: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -138,7 +138,8 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 
 func handleCover(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "GET", false) {
+	cfg := getConfig(ctx)
+	if !checkRequest(ctx, cfg, w, r, "GET", false) {
 		return
 	}
 
@@ -162,7 +163,7 @@ func handleCover(w http.ResponseWriter, r *http.Request) {
 
 	addLongCacheHeaders(w)
 	w.Header().Set("Content-Type", "image/jpeg")
-	if err := cover.Scale(ctx, fn, int(size), coverJPEGQuality, w); err != nil {
+	if err := cover.Scale(ctx, cfg, fn, int(size), coverJPEGQuality, w); err != nil {
 		log.Errorf(ctx, "Failed to scale cover: %v", err)
 		http.Error(w, "Scaling failed", http.StatusInternalServerError)
 		return
@@ -171,7 +172,7 @@ func handleCover(w http.ResponseWriter, r *http.Request) {
 
 func handleDeleteSong(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "POST", false) {
+	if !checkRequest(ctx, getConfig(ctx), w, r, "POST", false) {
 		return
 	}
 	id, ok := parseIntParam(ctx, w, r, "songId")
@@ -187,7 +188,7 @@ func handleDeleteSong(w http.ResponseWriter, r *http.Request) {
 
 func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "GET", false) {
+	if !checkRequest(ctx, getConfig(ctx), w, r, "GET", false) {
 		return
 	}
 
@@ -216,7 +217,7 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 
 func handleExport(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "GET", false) {
+	if !checkRequest(ctx, getConfig(ctx), w, r, "GET", false) {
 		return
 	}
 
@@ -313,7 +314,7 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 
 func handleFlushCache(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "POST", false) {
+	if !checkRequest(ctx, getConfig(ctx), w, r, "POST", false) {
 		return
 	}
 	if err := cache.Flush(ctx, cache.Memcache); err != nil {
@@ -333,7 +334,7 @@ func handleFlushCache(w http.ResponseWriter, r *http.Request) {
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "GET", true) {
+	if !checkRequest(ctx, getConfig(ctx), w, r, "GET", true) {
 		return
 	}
 
@@ -358,7 +359,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 func handleImport(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "POST", false) {
+	if !checkRequest(ctx, getConfig(ctx), w, r, "POST", false) {
 		return
 	}
 
@@ -390,7 +391,7 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 		}
 		numSongs++
 	}
-	if err := cache.FlushForUpdate(ctx, common.MetadataUpdate); err != nil {
+	if err := cache.FlushForUpdate(ctx, types.MetadataUpdate); err != nil {
 		log.Errorf(ctx, "Failed to flush cached queries: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -400,7 +401,7 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 
 func handleNow(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "GET", false) {
+	if !checkRequest(ctx, getConfig(ctx), w, r, "GET", false) {
 		return
 	}
 	writeTextResponse(w, strconv.FormatInt(time.Now().UnixNano(), 10))
@@ -408,7 +409,7 @@ func handleNow(w http.ResponseWriter, r *http.Request) {
 
 func handlePlayed(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "POST", false) {
+	if !checkRequest(ctx, getConfig(ctx), w, r, "POST", false) {
 		return
 	}
 
@@ -423,7 +424,7 @@ func handlePlayed(w http.ResponseWriter, r *http.Request) {
 	}
 	startTime := secondsToTime(startTimeFloat)
 
-	cfg := common.Config(ctx)
+	cfg := getConfig(ctx)
 	if cfg.ForceUpdateFailures && appengine.IsDevAppServer() {
 		http.Error(w, "Returning an error, as requested", http.StatusInternalServerError)
 		return
@@ -441,13 +442,13 @@ func handlePlayed(w http.ResponseWriter, r *http.Request) {
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "GET", false) {
+	if !checkRequest(ctx, getConfig(ctx), w, r, "GET", false) {
 		return
 	}
 
 	cacheOnly := r.FormValue("cacheOnly") == "1"
 
-	q := common.SongQuery{
+	q := types.SongQuery{
 		Artist:   r.FormValue("artist"),
 		Title:    r.FormValue("title"),
 		Album:    r.FormValue("album"),
@@ -515,7 +516,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 
 func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "POST", false) {
+	if !checkRequest(ctx, getConfig(ctx), w, r, "POST", false) {
 		return
 	}
 	id, ok := parseIntParam(ctx, w, r, "songId")
@@ -553,7 +554,7 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := common.Config(ctx)
+	cfg := getConfig(ctx)
 	if cfg.ForceUpdateFailures && appengine.IsDevAppServer() {
 		http.Error(w, "Returning an error, as requested", http.StatusInternalServerError)
 		return
@@ -586,7 +587,8 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 // at the audio data; it just need to amplify it.
 func handleSong(w http.ResponseWriter, req *http.Request) {
 	ctx := appengine.NewContext(req)
-	if !checkRequest(ctx, w, req, "GET", false) {
+	cfg := getConfig(ctx)
+	if !checkRequest(ctx, cfg, w, req, "GET", false) {
 		return
 	}
 
@@ -597,7 +599,7 @@ func handleSong(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	r, err := openSong(ctx, fn)
+	r, err := openSong(ctx, cfg, fn)
 	if err != nil {
 		log.Errorf(ctx, "Failed opening song %q: %v", fn, err)
 		// TODO: It'd be better to report 404 when appropriate.
@@ -625,7 +627,7 @@ func handleSong(w http.ResponseWriter, req *http.Request) {
 
 func handleTags(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "GET", false) {
+	if !checkRequest(ctx, getConfig(ctx), w, r, "GET", false) {
 		return
 	}
 	tags, err := query.Tags(ctx, r.FormValue("requireCache") == "1")

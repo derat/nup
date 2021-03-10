@@ -17,7 +17,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/derat/nup/internal/pkg/types"
+	"github.com/derat/nup/server/types"
 )
 
 type checkSettings uint32
