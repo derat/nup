@@ -85,7 +85,7 @@ export function createStyle(text) {
 // Returns an absolute URL for the song specified by |filename| (corresponding
 // to a song's |filename| property).
 export function getSongUrl(filename) {
-  return getAbsUrl(`/song_data?filename=${encodeURIComponent(filename)}`);
+  return getAbsUrl(`/song?filename=${encodeURIComponent(filename)}`);
 }
 
 // Returns a URL for a scaled, square version of the cover image identified by

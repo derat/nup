@@ -71,15 +71,18 @@ into Datastore.
 *   `updateDelayNsec` (optional) - Integer value containing nanoseconds to wait
     before writing to Datastore. Used by tests.
 
-### /list\_tags (GET)
-
-Returns a JSON-marshaled array of strings containing known tags.
-
-*   `requireCache` (optional) - If `1`, only return cached data. Used by tests.
-
-### /now\_nsec (GET)
+### /now (GET)
 
 Returns the server's current time as integer nanoseconds since the Unix epoch.
+
+### /played (POST)
+
+Records a single play of a song in Datastore. Also saves the reporter's IP
+address.
+
+*   `songId` - Integer ID from [Song]'s `SongID` field.
+*   `startTime` - Float seconds since the Unix epoch specifying when playback
+    of the song started.
 
 ### /query (GET)
 
@@ -121,20 +124,17 @@ Updates a song's rating and/or tags in Datastore.
 *   `updateDelayNsec` (optional) - Integer value containing nanoseconds to wait
     before writing to Datastore. Used by tests.
 
-### /report\_played (POST)
-
-Records a single play of a song in Datastore. Also saves the reporter's IP
-address.
-
-*   `songId` - Integer ID from [Song]'s `SongID` field.
-*   `startTime` - Float seconds since the Unix epoch specifying when playback
-    of the song started.
-
-### /song\_data (GET)
+### /song (GET)
 
 Returns a song's MP3 data.
 
 *   `filename` - MP3 path from [Song]'s `Filename` field.
+
+### /tags (GET)
+
+Returns a JSON-marshaled array of strings containing known tags.
+
+*   `requireCache` (optional) - If `1`, only return cached data. Used by tests.
 
 [ServerConfig]: ../internal/pkg/types/types.go
 [Play]: ../internal/pkg/types/types.go

@@ -29,7 +29,7 @@ type Song struct {
 	SongID string `datastore:"-" json:"songId,omitempty"`
 
 	// Filename is a relative path from the base of the music directory.
-	// Clients can pass this to the server's /song_data endpoint to download the
+	// Clients can pass this to the server's /song endpoint to download the
 	// song's music data.
 	Filename string `json:"filename,omitempty"`
 

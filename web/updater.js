@@ -52,10 +52,8 @@ export default class Updater {
     this.writeState_();
 
     const url =
-      'report_played?songId=' +
-      encodeURIComponent(songId) +
-      '&startTime=' +
-      encodeURIComponent(startTime);
+      `played?songId=${encodeURIComponent(songId)}` +
+      `&startTime=${encodeURIComponent(startTime)}`;
     console.log('Reporting track: ' + url);
     const req = new XMLHttpRequest();
 

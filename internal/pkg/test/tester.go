@@ -284,7 +284,7 @@ func (t *Tester) QuerySongs(params ...string) []types.Song {
 }
 
 func (t *Tester) GetTags(requireCache bool) string {
-	path := "list_tags"
+	path := "tags"
 	if requireCache {
 		path += "?requireCache=1"
 	}
@@ -300,7 +300,7 @@ func (t *Tester) GetTags(requireCache bool) string {
 }
 
 func (t *Tester) GetNowFromServer() time.Time {
-	resp := t.SendRequest(t.NewRequest("GET", "now_nsec", nil))
+	resp := t.SendRequest(t.NewRequest("GET", "now", nil))
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)

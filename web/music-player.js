@@ -364,7 +364,7 @@ customElements.define(
 
     updateTagsFromServer_(sync) {
       const req = new XMLHttpRequest();
-      req.open('GET', 'list_tags', !sync);
+      req.open('GET', 'tags', !sync);
       req.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
       req.onreadystatechange = () => {
         if (req.readyState == 4) {

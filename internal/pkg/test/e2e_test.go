@@ -150,8 +150,7 @@ func TestUserData(tt *testing.T) {
 		types.NewPlay(time.Unix(1410747184, 0), "127.0.0.1"),
 	}
 	for _, p := range s.Plays {
-		t.DoPost("report_played?songId="+id+"&startTime="+
-			strconv.FormatInt(p.StartTime.Unix(), 10), nil)
+		t.DoPost(fmt.Sprintf("played?songId=%v&startTime=%v", id, p.StartTime.Unix()), nil)
 	}
 	if err := CompareSongs([]types.Song{s},
 		t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
@@ -172,8 +171,8 @@ func TestUserData(tt *testing.T) {
 	}
 
 	log.Print("checking that duplicate plays are ignored")
-	t.DoPost("report_played?songId="+id+"&startTime="+
-		strconv.FormatInt(s.Plays[len(us.Plays)-1].StartTime.Unix(), 10), nil)
+	t.DoPost(fmt.Sprintf("played?songId=%v&startTime=%v",
+		id, s.Plays[len(us.Plays)-1].StartTime.Unix()), nil)
 	if err := CompareSongs([]types.Song{us},
 		t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Fatal(err)
@@ -386,7 +385,7 @@ func TestAndroid(tt *testing.T) {
 	p := types.NewPlay(time.Unix(1410746718, 0), "127.0.0.1")
 	updatedLegacySong1.Plays = append(updatedLegacySong1.Plays, p)
 	now = t.GetNowFromServer()
-	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(p.StartTime.Unix(), 10), nil)
+	t.DoPost(fmt.Sprintf("played?songId=%v&startTime=%v", id, p.StartTime.Unix()), nil)
 	if err := compareQueryResults([]types.Song{},
 		t.GetSongsForAndroid(now, getRegularSongs), IgnoreOrder); err != nil {
 		tt.Error(err)
@@ -524,7 +523,7 @@ func TestJSONImport(tt *testing.T) {
 	log.Print("reporting play")
 	id := t.SongID(us.SHA1)
 	st := time.Unix(1410746718, 0)
-	t.DoPost("report_played?songId="+id+"&startTime="+strconv.FormatInt(st.Unix(), 10), nil)
+	t.DoPost(fmt.Sprintf("played?songId=%v&startTime=%v", id, st.Unix()), nil)
 	us.Plays = append(us.Plays, types.NewPlay(st, "127.0.0.1"))
 	if err := CompareSongs([]types.Song{us, LegacySong2},
 		t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {

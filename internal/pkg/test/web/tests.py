@@ -88,7 +88,7 @@ class Test(unittest.TestCase):
 
         # The filename really ought to be escaped, but I'm not sure how to get
         # Python to escape in the same way as Go.
-        self.base_music_url = base_url + '/song_data?filename='
+        self.base_music_url = base_url + '/song?filename='
 
     def tearDown(self):
         for entry in driver.get_log('browser'):

@@ -51,12 +51,12 @@ func main() {
 	http.HandleFunc("/dump_song", handleDumpSong)
 	http.HandleFunc("/export", handleExport)
 	http.HandleFunc("/import", handleImport)
-	http.HandleFunc("/list_tags", handleListTags)
-	http.HandleFunc("/now_nsec", handleNowNsec)
+	http.HandleFunc("/now", handleNow)
+	http.HandleFunc("/played", handlePlayed)
 	http.HandleFunc("/query", handleQuery)
 	http.HandleFunc("/rate_and_tag", handleRateAndTag)
-	http.HandleFunc("/report_played", handleReportPlayed)
-	http.HandleFunc("/song_data", handleSongData)
+	http.HandleFunc("/song", handleSong)
+	http.HandleFunc("/tags", handleTags)
 
 	if appengine.IsDevAppServer() {
 		http.HandleFunc("/clear", handleClear)
@@ -398,26 +398,45 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 	writeTextResponse(w, "ok")
 }
 
-func handleListTags(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "GET", false) {
-		return
-	}
-	tags, err := query.Tags(ctx, r.FormValue("requireCache") == "1")
-	if err != nil {
-		log.Errorf(ctx, "Unable to query tags: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeJSONResponse(w, tags)
-}
-
-func handleNowNsec(w http.ResponseWriter, r *http.Request) {
+func handleNow(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
 	if !checkRequest(ctx, w, r, "GET", false) {
 		return
 	}
 	writeTextResponse(w, strconv.FormatInt(time.Now().UnixNano(), 10))
+}
+
+func handlePlayed(w http.ResponseWriter, r *http.Request) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "POST", false) {
+		return
+	}
+
+	id, ok := parseIntParam(ctx, w, r, "songId")
+	if !ok {
+		return
+	}
+
+	startTimeFloat, ok := parseFloatParam(ctx, w, r, "startTime")
+	if !ok {
+		return
+	}
+	startTime := secondsToTime(startTimeFloat)
+
+	cfg := common.Config(ctx)
+	if cfg.ForceUpdateFailures && appengine.IsDevAppServer() {
+		http.Error(w, "Returning an error, as requested", http.StatusInternalServerError)
+		return
+	}
+
+	// Drop the trailing colon and port number. We can't just split on ':' and
+	// take the first item since we may get an IPv6 address like "[::1]:12345".
+	ip := regexp.MustCompile(":\\d+$").ReplaceAllString(r.RemoteAddr, "")
+	if err := update.AddPlay(ctx, id, startTime, ip); err != nil {
+		log.Errorf(ctx, "Got error while recording play: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	writeTextResponse(w, "ok")
 }
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {
@@ -548,39 +567,6 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 	writeTextResponse(w, "ok")
 }
 
-func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, w, r, "POST", false) {
-		return
-	}
-
-	id, ok := parseIntParam(ctx, w, r, "songId")
-	if !ok {
-		return
-	}
-
-	startTimeFloat, ok := parseFloatParam(ctx, w, r, "startTime")
-	if !ok {
-		return
-	}
-	startTime := secondsToTime(startTimeFloat)
-
-	cfg := common.Config(ctx)
-	if cfg.ForceUpdateFailures && appengine.IsDevAppServer() {
-		http.Error(w, "Returning an error, as requested", http.StatusInternalServerError)
-		return
-	}
-
-	// Drop the trailing colon and port number. We can't just split on ':' and
-	// take the first item since we may get an IPv6 address like "[::1]:12345".
-	ip := regexp.MustCompile(":\\d+$").ReplaceAllString(r.RemoteAddr, "")
-	if err := update.AddPlay(ctx, id, startTime, ip); err != nil {
-		log.Errorf(ctx, "Got error while recording play: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-	writeTextResponse(w, "ok")
-}
-
 // The existence of this endpoint makes me extremely unhappy, but it seems necessary due to
 // bad interactions between Google Cloud Storage, the Web Audio API, and CORS:
 //
@@ -598,7 +584,7 @@ func handleReportPlayed(w http.ResponseWriter, r *http.Request) {
 //
 // The Web Audio part of this is particularly frustrating, as the JS doesn't actually need to look
 // at the audio data; it just need to amplify it.
-func handleSongData(w http.ResponseWriter, req *http.Request) {
+func handleSong(w http.ResponseWriter, req *http.Request) {
 	ctx := appengine.NewContext(req)
 	if !checkRequest(ctx, w, req, "GET", false) {
 		return
@@ -635,6 +621,20 @@ func handleSongData(w http.ResponseWriter, req *http.Request) {
 			log.Errorf(ctx, "Failed copying song %q: %v", fn, err)
 		}
 	}
+}
+
+func handleTags(w http.ResponseWriter, r *http.Request) {
+	ctx := appengine.NewContext(r)
+	if !checkRequest(ctx, w, r, "GET", false) {
+		return
+	}
+	tags, err := query.Tags(ctx, r.FormValue("requireCache") == "1")
+	if err != nil {
+		log.Errorf(ctx, "Unable to query tags: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSONResponse(w, tags)
 }
 
 // secondsToTime converts fractional seconds since the Unix epoch to a time.Time.
