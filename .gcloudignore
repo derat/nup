@@ -28,5 +28,5 @@
 *.md
 *.sh
 cmd/
-test/
+internal/pkg/test/
 web/fontello/LICENSE.txt
