@@ -113,31 +113,31 @@ const template = createTemplate(`
 <form id="search-form">
   <div class="heading">Search</div>
   <div class="row">
-    <input id="keywords-input" type="text" placeholder="Keywords">
+    <input id="keywords-input" type="text" placeholder="Keywords" />
     <span id="keywords-clear" class="x-icon" title="Clear text"></span>
   </div>
 
   <div id="tags-input-div" class="row">
     <tag-suggester id="tags-suggester" tab-advances-focus>
-      <input id="tags-input" slot="text" type="text" placeholder="Tags">
+      <input id="tags-input" slot="text" type="text" placeholder="Tags" />
     </tag-suggester>
     <span id="tags-clear" class="x-icon" title="Clear text"></span>
   </div>
 
   <div class="row">
     <label for="shuffle-checkbox" class="checkbox-col">
-      <input id="shuffle-checkbox" type="checkbox" value="shuffle">
+      <input id="shuffle-checkbox" type="checkbox" value="shuffle" />
       Shuffle
     </label>
     <label for="first-track-checkbox">
-      <input id="first-track-checkbox" type="checkbox" value="firstTrack">
+      <input id="first-track-checkbox" type="checkbox" value="firstTrack" />
       First track
     </label>
   </div>
 
   <div class="row">
     <label for="unrated-checkbox" class="checkbox-col">
-      <input id="unrated-checkbox" type="checkbox" value="unrated">
+      <input id="unrated-checkbox" type="checkbox" value="unrated" />
       Unrated
     </label>
     <label for="min-rating-select">
@@ -156,7 +156,7 @@ const template = createTemplate(`
 
   <div class="row">
     <label for="max-plays-input">
-      Played <input id="max-plays-input" type="text"> or fewer times
+      Played <input id="max-plays-input" type="text" /> or fewer times
     </label>
   </div>
 
@@ -204,7 +204,9 @@ const template = createTemplate(`
       <div class="select-wrapper">
         <select id="preset-select">
           <option value="">...</option>
-          <option value="mr=3;t=instrumental;lp=6;s=1;play=1">instrumental old</option>
+          <option value="mr=3;t=instrumental;lp=6;s=1;play=1">
+            instrumental old
+          </option>
           <option value="mr=3;t=mellow;s=1;play=1">mellow</option>
           <option value="ft=1;fp=3">new albums</option>
           <option value="u=1;play=1">unrated</option>

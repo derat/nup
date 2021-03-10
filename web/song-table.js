@@ -79,15 +79,14 @@ const template = createTemplate(`
 <table>
   <thead>
     <tr>
-      <th class="checkbox"><input type="checkbox" class="small"></th>
+      <th class="checkbox"><input type="checkbox" class="small" /></th>
       <th class="artist">Artist</th>
       <th class="title">Title</th>
       <th class="album">Album</th>
       <th class="time">Time</th>
     </tr>
   </thead>
-  <tbody>
-  </tbody>
+  <tbody></tbody>
 </table>
 `);
 
@@ -101,7 +100,7 @@ const noCheckboxesTemplate = createTemplate(`
 
 const rowTemplate = createTemplate(`
 <tr>
-  <td class="checkbox"><input type="checkbox" class="small"></td>
+  <td class="checkbox"><input type="checkbox" class="small" /></td>
   <td class="artist"><a></a></td>
   <td class="title"></td>
   <td class="album"><a></a></td>
@@ -131,9 +130,9 @@ customElements.define(
       this.table_ = this.shadow_.querySelector('table');
 
       this.headingCheckbox_ = this.shadow_.querySelector(
-        'input[type="checkbox"]',
+        'input[type="checkbox"]'
       );
-      this.headingCheckbox_.addEventListener('click', e => {
+      this.headingCheckbox_.addEventListener('click', (e) => {
         this.onCheckboxClick_(this.headingCheckbox_, e.shiftKey);
       });
       if (!this.useCheckboxes_) {
@@ -153,8 +152,8 @@ customElements.define(
       return !this.useCheckboxes_
         ? []
         : this.songRows_
-            .filter(r => r.cells[0].children[0].checked)
-            .map(r => r.song);
+            .filter((r) => r.cells[0].children[0].checked)
+            .map((r) => r.song);
     }
 
     // Sets highlighting for the song at index |index| to |highlight|.
@@ -177,7 +176,7 @@ customElements.define(
     // Updates the table to contain |newSongs| while trying to be smart about
     // not doing any more work than necessary.
     setSongs(newSongs) {
-      const oldSongs = this.songRows_.map(r => r.song);
+      const oldSongs = this.songRows_.map((r) => r.song);
 
       // Walk forward from the beginning and backward from the end to look for
       // common runs of songs.
@@ -226,7 +225,7 @@ customElements.define(
 
     // Emits a |name| CustomEvent with its 'detail' property set to |detail|.
     emitEvent_(name, detail) {
-      this.dispatchEvent(new CustomEvent(name, {detail}));
+      this.dispatchEvent(new CustomEvent(name, { detail }));
     }
 
     // Inserts and initializes a new song row at |index| (ignoring the header
@@ -237,20 +236,23 @@ customElements.define(
       const tbody = this.table_.querySelector('tbody');
       tbody.insertBefore(
         rowTemplate.content.cloneNode(true),
-        tbody.children ? tbody.children[index] : null,
+        tbody.children ? tbody.children[index] : null
       );
       const row = tbody.children[index];
 
       row
         .querySelector('input[type="checkbox"]')
-        .addEventListener('click', e =>
-          this.onCheckboxClick_(e.target, e.shiftKey),
+        .addEventListener('click', (e) =>
+          this.onCheckboxClick_(e.target, e.shiftKey)
         );
       row.querySelector('.artist a').addEventListener('click', () => {
         this.emitEvent_('field', { artist: row.song.artist });
       });
       row.querySelector('.album a').addEventListener('click', () => {
-        this.emitEvent_('field', { albumId: row.song.albumId, album: row.song.album });
+        this.emitEvent_('field', {
+          albumId: row.song.albumId,
+          album: row.song.album,
+        });
       });
     }
 
@@ -281,7 +283,7 @@ customElements.define(
 
     // Handles one of the checkboxes being clicked.
     onCheckboxClick_(checkbox, shiftHeld) {
-      const getCheckbox = i => this.table_.rows[i].cells[0].children[0];
+      const getCheckbox = (i) => this.table_.rows[i].cells[0].children[0];
 
       let index = -1;
       for (let i = 0; i < this.table_.rows.length; i++) {
@@ -325,7 +327,7 @@ customElements.define(
       this.updateHeadingCheckbox_();
       this.lastClickedCheckboxIndex_ = index;
 
-      this.emitEvent_('check', {count: this.numCheckedSongs_});
+      this.emitEvent_('check', { count: this.numCheckedSongs_ });
     }
 
     // Updates |headingCheckbox_|'s visual state for the current number of
@@ -338,5 +340,5 @@ customElements.define(
         this.headingCheckbox_.classList.remove('transparent');
       }
     }
-  },
+  }
 );

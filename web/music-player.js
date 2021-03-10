@@ -154,7 +154,7 @@ const template = createTemplate(`
 
 <div id="song-info">
   <div id="cover-div">
-    <img id="cover-img">
+    <img id="cover-img" />
     <div id="rating-overlay"></div>
   </div>
   <div id="details">

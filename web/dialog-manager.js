@@ -1,7 +1,7 @@
 // Copyright 2011 Daniel Erat.
 // All rights reserved.
 
-import {$, createElement, createShadow, createTemplate} from './common.js';
+import { $, createElement, createShadow, createTemplate } from './common.js';
 
 const template = createTemplate(`
 <style>
@@ -66,7 +66,7 @@ const messageDialogTemplate = createTemplate(`
   }
 </style>
 <div id="title" class="title"></div>
-<hr class="title">
+<hr class="title" />
 <div id="message"></div>
 <div class="button-container">
   <button id="ok-button">OK</button>
@@ -81,7 +81,11 @@ customElements.define(
 
       this.shadow_ = createShadow(this, template);
       this.lightbox_ = $('lightbox', this.shadow_);
-      this.lightbox_.addEventListener('click', e => e.stopPropagation(), false);
+      this.lightbox_.addEventListener(
+        'click',
+        (e) => e.stopPropagation(),
+        false
+      );
       this.container_ = $('container', this.shadow_);
     }
 
@@ -104,17 +108,17 @@ customElements.define(
       const dialog = this.createDialog();
       dialog.addEventListener(
         'keydown',
-        e => {
+        (e) => {
           if (e.key == 'Escape') {
             e.preventDefault();
             this.closeDialog(dialog);
           }
         },
-        false,
+        false
       );
 
       dialog.classList.add('message-dialog');
-      const shadow = dialog.attachShadow({mode: 'open'});
+      const shadow = dialog.attachShadow({ mode: 'open' });
       shadow.appendChild(messageDialogTemplate.content.cloneNode(true));
       $('title', shadow).innerText = titleText;
       $('message', shadow).innerText = messageText;
@@ -122,5 +126,5 @@ customElements.define(
       button.addEventListener('click', () => this.closeDialog(dialog), false);
       button.focus();
     }
-  },
+  }
 );

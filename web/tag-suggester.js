@@ -1,7 +1,7 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
-import {$, createElement, createShadow, createTemplate} from './common.js';
+import { $, createElement, createShadow, createTemplate } from './common.js';
 
 const template = createTemplate(`
 <style>
@@ -59,13 +59,13 @@ customElements.define(
         throw new Error('Editable element must be provided via slot');
       }
       this.target_ = slotElements[0];
-      this.target_.addEventListener('keydown', e => this.handleKeyDown_(e));
+      this.target_.addEventListener('keydown', (e) => this.handleKeyDown_(e));
       this.target_.addEventListener('focus', () => {
         this.target_.selectionStart = this.target_.selectionEnd = this.target_.value.length;
       });
       this.target_.spellcheck = false;
 
-      document.addEventListener('click', e => this.hideSuggestions_(), false);
+      document.addEventListener('click', (e) => this.hideSuggestions_(), false);
     }
 
     set words(words) {
@@ -177,7 +177,7 @@ customElements.define(
     hideSuggestions_() {
       this.suggestionsDiv_.classList.remove('shown');
     }
-  },
+  }
 );
 
 function findWordsWithPrefix(words, prefix) {

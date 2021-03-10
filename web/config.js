@@ -10,7 +10,7 @@ export default class Config {
   // Values for GAIN_TYPE.
   static GAIN_ALBUM = 0;
   static GAIN_TRACK = 1;
-  static GAIN_NONE  = 2;
+  static GAIN_NONE = 2;
 
   static CONFIG_KEY_ = 'config'; // localStorage key
   static FLOAT_NAMES_ = new Set([Config.PRE_AMP]);
@@ -47,16 +47,16 @@ export default class Config {
     const origValue = value;
     if (Config.FLOAT_NAMES_.has(name)) {
       value = parseFloat(value);
-      if (isNaN(value)) throw new Error(`Non-float '${name}' value '${origValue}'`);
+      if (isNaN(value)) throw new Error(`Non-float '${name}' '${origValue}'`);
       this.values_[name] = value;
     } else if (Config.INT_NAMES_.has(name)) {
       value = parseInt(value);
-      if (isNaN(value)) throw new Error(`Non-int '${name}' value '${origValue}'`);
+      if (isNaN(value)) throw new Error(`Non-int '${name}' '${origValue}'`);
       this.values_[name] = value;
     } else {
       throw new Error(`Unknown pref '${name}'`);
     }
-    this.callbacks_.forEach(cb => cb(name, value));
+    this.callbacks_.forEach((cb) => cb(name, value));
   }
 
   // Loads and validates prefs from local storage.

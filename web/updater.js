@@ -18,7 +18,7 @@ export default class Updater {
     // Put reports that were in-progress during the last run into the queue.
     this.queuedPlayReports_ = readObject(
       Updater.QUEUED_PLAY_REPORTS_KEY_,
-      [],
+      []
     ).concat(readObject(Updater.IN_PROGRESS_PLAY_REPORTS_KEY_, []));
     this.inProgressPlayReports_ = [];
 
@@ -26,9 +26,12 @@ export default class Updater {
     // Either ratings or tags can be null.
     this.queuedRatingsAndTags_ = readObject(
       Updater.QUEUED_RATINGS_AND_TAGS_KEY_,
-      {},
+      {}
     );
-    const oldInProgress = readObject(Updater.IN_PROGRESS_RATINGS_AND_TAGS_KEY_, {});
+    const oldInProgress = readObject(
+      Updater.IN_PROGRESS_RATINGS_AND_TAGS_KEY_,
+      {}
+    );
     for (const songId in Object.keys(oldInProgress)) {
       this.queuedRatingsAndTags_[songId] = oldInProgress[songId];
     }
@@ -103,7 +106,7 @@ export default class Updater {
 
     const handleError = () => {
       console.log(
-        'Rating/tagging to ' + url + ' failed; queuing to retry later',
+        'Rating/tagging to ' + url + ' failed; queuing to retry later'
       );
       delete this.inProgressRatingsAndTags_[songId];
       addRatingAndTags(songId, rating, tags, this.queuedRatingsAndTags_);
@@ -130,16 +133,16 @@ export default class Updater {
   // Persists the current state to local storage.
   writeState_() {
     localStorage[Updater.QUEUED_PLAY_REPORTS_KEY_] = JSON.stringify(
-      this.queuedPlayReports_,
+      this.queuedPlayReports_
     );
     localStorage[Updater.QUEUED_RATINGS_AND_TAGS_KEY_] = JSON.stringify(
-      this.queuedRatingsAndTags_,
+      this.queuedRatingsAndTags_
     );
     localStorage[Updater.IN_PROGRESS_PLAY_REPORTS_KEY_] = JSON.stringify(
-      this.inProgressPlayReports_,
+      this.inProgressPlayReports_
     );
     localStorage[Updater.IN_PROGRESS_RATINGS_AND_TAGS_KEY_] = JSON.stringify(
-      this.inProgressRatingsAndTags_,
+      this.inProgressRatingsAndTags_
     );
   }
 
@@ -205,7 +208,7 @@ function readObject(key, defaultObject) {
 
 // Appends a play report to |list|.
 function addPlayReport(songId, startTime, list) {
-  list.push({songId: songId, startTime: startTime});
+  list.push({ songId: songId, startTime: startTime });
 }
 
 // Removes the specified play report from |list|.
@@ -220,5 +223,5 @@ function removePlayReport(songId, startTime, list) {
 
 // Sets |songId|'s rating and tags within |obj|.
 function addRatingAndTags(songId, rating, tags, obj) {
-  obj[songId] = {rating: rating, tags: tags};
+  obj[songId] = { rating: rating, tags: tags };
 }

@@ -236,7 +236,9 @@ class Page(object):
     def select(self, locator, text=None, value=None):
         select = self.get(locator)
         for option in select.find_elements_by_tag_name('option'):
-            if (text and option.text == text) or \
+            # Prettier sometimes adds whitespace when it wraps line, so
+            # (partially) work around this by calling strip().
+            if (text and option.text.strip() == text) or \
                     (value and option.get_attribute('value') == value):
                 option.click()
                 return
