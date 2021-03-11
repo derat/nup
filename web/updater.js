@@ -1,6 +1,8 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
+import { handleFetchError } from './common.js';
+
 export default class Updater {
   static QUEUED_PLAY_REPORTS_KEY_ = 'queued_play_reports';
   static IN_PROGRESS_PLAY_REPORTS_KEY_ = 'in_progress_play_reports';
@@ -54,31 +56,22 @@ export default class Updater {
     const url =
       `played?songId=${encodeURIComponent(songId)}` +
       `&startTime=${encodeURIComponent(startTime)}`;
-    console.log('Reporting track: ' + url);
-    const req = new XMLHttpRequest();
+    console.log(`Reporting track: ${url}`);
 
-    const handleError = () => {
-      console.log('Reporting to ' + url + ' failed; queuing to retry later');
-      removePlayReport(songId, startTime, this.inProgressPlayReports_);
-      addPlayReport(songId, startTime, this.queuedPlayReports_);
-      this.writeState_();
-      this.scheduleRetry_(false);
-    };
-
-    req.onload = () => {
-      if (req.status == 200) {
+    fetch(url, { method: 'POST' })
+      .then((res) => handleFetchError(res))
+      .then(() => {
         removePlayReport(songId, startTime, this.inProgressPlayReports_);
         this.writeState_();
-        this.scheduleRetry_(true);
-      } else {
-        console.log('Got ' + req.status + ': ' + req.responseText);
-        handleError();
-      }
-    };
-    req.onerror = () => handleError();
-
-    req.open('POST', url, true);
-    req.send();
+        this.scheduleRetry_(true /* lastWasSuccessful */);
+      })
+      .catch((err) => {
+        console.error(`Reporting to ${url} failed: ${err}`);
+        removePlayReport(songId, startTime, this.inProgressPlayReports_);
+        addPlayReport(songId, startTime, this.queuedPlayReports_);
+        this.writeState_();
+        this.scheduleRetry_(false /* lastWasSuccessful */);
+      });
   }
 
   // Asynchronously notifies the server that song |songId| was given |rating| (a
@@ -96,36 +89,25 @@ export default class Updater {
     addRatingAndTags(songId, rating, tags, this.inProgressRatingsAndTags_);
     this.writeState_();
 
-    let url = 'rate_and_tag?songId=' + encodeURIComponent(songId);
-    if (rating != null) url += '&rating=' + encodeURIComponent(rating);
-    if (tags != null) url += '&tags=' + encodeURIComponent(tags.join(' '));
-    console.log('Rating/tagging track: ' + url);
-    const req = new XMLHttpRequest();
+    let url = `rate_and_tag?songId=${encodeURIComponent(songId)}`;
+    if (rating != null) url += `&rating=${encodeURIComponent(rating)}`;
+    if (tags != null) url += `&tags=${encodeURIComponent(tags.join(' '))}`;
+    console.log(`Rating/tagging track: ${url}`);
 
-    const handleError = () => {
-      console.log(
-        'Rating/tagging to ' + url + ' failed; queuing to retry later'
-      );
-      delete this.inProgressRatingsAndTags_[songId];
-      addRatingAndTags(songId, rating, tags, this.queuedRatingsAndTags_);
-      this.writeState_();
-      this.scheduleRetry_(false);
-    };
-
-    req.onload = () => {
-      if (req.status == 200) {
+    fetch(url, { method: 'POST' })
+      .then((res) => handleFetchError(res))
+      .then(() => {
         delete this.inProgressRatingsAndTags_[songId];
         this.writeState_();
-        this.scheduleRetry_(true);
-      } else {
-        console.log('Got ' + req.status + ': ' + req.responseText);
-        handleError();
-      }
-    };
-    req.onerror = () => handleError();
-
-    req.open('POST', url, true);
-    req.send();
+        this.scheduleRetry_(true /* lastWasSuccessful */);
+      })
+      .catch((err) => {
+        console.log(`Rating/tagging to ${url} failed: ${err}`);
+        delete this.inProgressRatingsAndTags_[songId];
+        addRatingAndTags(songId, rating, tags, this.queuedRatingsAndTags_);
+        this.writeState_();
+        this.scheduleRetry_(false /* lastWasSuccessful */);
+      });
   }
 
   // Persists the current state to local storage.

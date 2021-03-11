@@ -111,3 +111,13 @@ export function getFullCoverUrl(filename) {
 export function getAbsUrl(url) {
   return new URL(url, document.baseURI).href;
 }
+
+// Throws if |response| failed due to the server returning an error status.
+export function handleFetchError(response) {
+  if (!response.ok) {
+    return response.text().then((text) => {
+      throw new Error(`${response.status}: ${text}`, response);
+    });
+  }
+  return response;
+}

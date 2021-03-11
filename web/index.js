@@ -45,5 +45,5 @@ document.test = {
   },
   setPlayDelayMs: (delayMs) => (musicPlayer.playDelayMs_ = delayMs),
   showOptions: () => musicPlayer.showOptions_(),
-  updateTags: () => musicPlayer.updateTagsFromServer_(true /* sync */),
+  updateTags: async () => await musicPlayer.updateTagsFromServer_(),
 };

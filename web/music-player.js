@@ -10,6 +10,7 @@ import {
   getCurrentTimeSec,
   getScaledCoverUrl,
   getSongUrl,
+  handleFetchError,
   updateTitleAttributeForTruncation,
 } from './common.js';
 import Config from './config.js';
@@ -362,22 +363,19 @@ customElements.define(
       this.dialogManager_ = manager;
     }
 
-    updateTagsFromServer_(sync) {
-      const req = new XMLHttpRequest();
-      req.open('GET', 'tags', !sync);
-      req.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-      req.onreadystatechange = () => {
-        if (req.readyState == 4) {
-          if (req.status == 200) {
-            const tags = JSON.parse(req.responseText);
-            this.updateTags_(tags);
-            console.log('Loaded ' + tags.length + ' tag(s)');
-          } else {
-            console.log('Got ' + req.status + ' while loading tags');
-          }
-        }
-      };
-      req.send(null);
+    // Requests known tags from the server and updates the internal list.
+    // Returns a promise for completion of the task.
+    updateTagsFromServer_() {
+      return fetch('tags', { method: 'GET' })
+        .then((res) => handleFetchError(res))
+        .then((res) => res.json())
+        .then((tags) => {
+          this.updateTags_(tags);
+          console.log('Loaded ' + tags.length + ' tag(s)');
+        })
+        .catch((err) => {
+          console.error(`Failed loading tags: ${err}`);
+        });
     }
 
     get currentSong_() {

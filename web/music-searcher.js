@@ -6,6 +6,7 @@ import {
   createShadow,
   createTemplate,
   getCurrentTimeSec,
+  handleFetchError,
 } from './common.js';
 
 const template = createTemplate(`
@@ -248,7 +249,7 @@ customElements.define(
     constructor() {
       super();
 
-      this.request_ = null;
+      this.fetchController_ = null;
 
       document.body.addEventListener('keydown', (e) =>
         this.handleBodyKeyDown_(e)
@@ -404,50 +405,30 @@ customElements.define(
         return;
       }
 
-      if (this.request_) this.request_.abort();
+      const url = 'query?' + terms.join('&');
+      console.log(`Sending query: ${url}`);
 
-      this.request_ = new XMLHttpRequest();
-
-      this.request_.onload = () => {
-        const req = this.request_;
-        if (req.status == 200) {
-          if (req.responseText) {
-            const songs = eval('(' + req.responseText + ')');
-            console.log('Got response with ' + songs.length + ' song(s)');
-            this.resultsTable_.setSongs(songs);
-            this.resultsTable_.setAllCheckboxes(true);
-            if (appendToQueue) this.enqueueSearchResults_(true, true);
-          } else {
-            this.showMessage_(
-              'Search Failed',
-              'Response from server was empty.'
-            );
-          }
-        } else {
-          if (req.status && req.responseText) {
-            this.showMessage_(
-              'Search Failed',
-              'Got ' + req.status + ': ' + req.responseText
-            );
-          } else {
-            this.showMessage_('Search Failed', 'Missing status in request.');
-          }
-        }
-
-        this.waitingDiv_.classList.remove('shown');
-        this.request_ = null;
-      };
-
-      this.request_.onerror = (e) => {
-        this.showMessage_('Search Failed', 'Request to server failed.');
-        console.log(e);
-      };
+      if (this.fetchController_) this.fetchController_.abort();
+      this.fetchController_ = new AbortController();
+      const signal = this.fetchController_.signal;
 
       this.waitingDiv_.classList.add('shown');
-      const url = 'query?' + terms.join('&');
-      console.log('Sending query: ' + url);
-      this.request_.open('GET', url, true);
-      this.request_.send();
+
+      fetch(url, { method: 'GET', signal })
+        .then((res) => handleFetchError(res))
+        .then((res) => res.json())
+        .then((songs) => {
+          console.log('Got response with ' + songs.length + ' song(s)');
+          this.resultsTable_.setSongs(songs);
+          this.resultsTable_.setAllCheckboxes(true);
+          if (appendToQueue) this.enqueueSearchResults_(true, true);
+        })
+        .catch((err) => {
+          this.showMessage_('Search Failed', err.toString());
+        })
+        .finally(() => {
+          this.waitingDiv_.classList.remove('shown');
+        });
     }
 
     enqueueSearchResults_(clearFirst, afterCurrent) {
