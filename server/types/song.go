@@ -64,9 +64,14 @@ type Song struct {
 	// (generally, a MusicBrainz release ID taken from a "MusicBrainz Album Id" ID3v2 tag).
 	AlbumID string `datastore:"AlbumId" json:"albumId,omitempty"`
 
+	// CoverID is an opaque ID from a "nup Cover Id" ID3v2 tag used to specify cover art.
+	// If unset, AlbumID and then RecordingID is used when looking for art.
+	CoverID string `datastore:"-" json:"-"`
+
 	// RecordingID is an opaque ID uniquely identifying the recording
 	// (generally, the MusicBrainz ID corresponding to the MusicBrainz recording entity,
-	// taken from a UFID ID3v2 tag). Only used to find cover art for non-album tracks.
+	// taken from a UFID ID3v2 tag). Only used to find cover art if neither AlbumID nor CoverID
+	// is set.
 	RecordingID string `datastore:"-" json:"-"`
 
 	// Track is the song's track number, or 0 if unset.

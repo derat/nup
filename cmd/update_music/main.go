@@ -105,8 +105,10 @@ func main() {
 				log.Fatalf("Got error for %v: %v\n", s.Filename, s.Err)
 			}
 			s.CoverFilename = getCoverFilename(cfg.CoverDir, s.Song)
-			if *requireCovers && len(s.CoverFilename) == 0 && (len(s.AlbumID) > 0 || len(s.RecordingID) > 0) {
-				log.Fatalf("Failed to find cover for %v (album=%v, recording=%v)", s.Filename, s.AlbumID, s.RecordingID)
+			if *requireCovers && len(s.CoverFilename) == 0 &&
+				(len(s.AlbumID) > 0 || len(s.CoverID) > 0 || len(s.RecordingID) > 0) {
+				log.Fatalf("Failed to find cover for %v (album=%v, cover=%v, recording=%v)",
+					s.Filename, s.AlbumID, s.CoverID, s.RecordingID)
 			}
 			s.RecordingID = ""
 
@@ -164,16 +166,12 @@ func setLastUpdateTime(p string, t time.Time) error {
 
 // getCoverFilename returns the relative path under dir for song's cover image.
 func getCoverFilename(dir string, song *types.Song) string {
-	if len(song.AlbumID) != 0 {
-		fn := song.AlbumID + ".jpg"
-		if _, err := os.Stat(filepath.Join(dir, fn)); err == nil {
-			return fn
-		}
-	}
-	if len(song.RecordingID) != 0 {
-		fn := song.RecordingID + ".jpg"
-		if _, err := os.Stat(filepath.Join(dir, fn)); err == nil {
-			return fn
+	for _, s := range []string{song.CoverID, song.AlbumID, song.RecordingID} {
+		if len(s) > 0 {
+			fn := s + ".jpg"
+			if _, err := os.Stat(filepath.Join(dir, fn)); err == nil {
+				return fn
+			}
 		}
 	}
 	return ""

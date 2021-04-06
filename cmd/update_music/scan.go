@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	albumIDTag          = "MusicBrainz Album Id" // used as cover ID
-	coverIDTag          = "nup Cover Id"         // fallback if albumIDTag is unset
+	albumIDTag          = "MusicBrainz Album Id" // usually used as cover ID
+	coverIDTag          = "nup Cover Id"         // can be set for non-MusicBrainz tracks
 	recordingIDOwner    = "http://musicbrainz.org"
 	logProgressInterval = 100
 	mp3Extension        = ".mp3"
@@ -226,15 +226,11 @@ func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info) (*types.
 		s.Artist = tag.Artist()
 		s.Title = tag.Title()
 		s.Album = tag.Album()
+		s.AlbumID = tag.CustomFrames()[albumIDTag]
+		s.CoverID = tag.CustomFrames()[coverIDTag]
 		s.RecordingID = tag.UniqueFileIdentifiers()[recordingIDOwner]
 		s.Track = int(tag.Track())
 		s.Disc = int(tag.Disc())
-
-		custom := tag.CustomFrames()
-		if s.AlbumID = custom[albumIDTag]; s.AlbumID == "" {
-			s.AlbumID = custom[coverIDTag]
-		}
-
 		headerLength = int64(tag.TagSize())
 	}
 
