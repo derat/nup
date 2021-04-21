@@ -240,9 +240,9 @@ customElements.define(
       this.updateSong_ = null; // song playing when update div was opened
       this.updatedRating_ = -1.0; // rating set in update div
       this.notification_ = null; // song notification currently shown
+      this.closeNotificationTimeoutId_ = null; // for closeNotification_()
       this.playDelayMs_ = this.constructor.PLAY_DELAY_MS_;
       this.playTimeoutId_ = 0; // for playInternal_()
-      this.closeNotificationTimeoutId_ = 0; // for closeNotification_()
 
       this.shadow_ = createShadow(this, template);
       const get = (id) => $(id, this.shadow_);
@@ -574,9 +574,10 @@ customElements.define(
         return;
       }
 
-      if (this.notification_) {
+      this.closeNotification_();
+      if (this.closeNotificationTimeoutId_ !== null) {
         window.clearTimeout(this.closeNotificationTimeoutId_);
-        this.closeNotification_();
+        this.closeNotificationTimeoutId_ = null;
       }
 
       const song = this.currentSong_;
@@ -590,18 +591,15 @@ customElements.define(
         `${song.artist}\n${song.title}`,
         options
       );
-      this.closeNotificationTimeoutId_ = window.setTimeout(
-        () => this.closeNotification_(),
-        this.constructor.NOTIFICATION_SEC_ * 1000
-      );
+      this.closeNotificationTimeoutId_ = window.setTimeout(() => {
+        this.closeNotificationTimeoutId_ = null;
+        this.closeNotification_();
+      }, this.constructor.NOTIFICATION_SEC_ * 1000);
     }
 
     closeNotification_() {
-      if (!this.notification_) return;
-
-      this.notification_.close();
+      if (this.notification_) this.notification_.close();
       this.notification_ = null;
-      this.closeNotificationTimeoutId_ = 0;
     }
 
     // Starts playback. If |currentSong_| isn't being played, switches to it
