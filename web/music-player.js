@@ -638,7 +638,11 @@ customElements.define(
         const ctx = this.gainNode_.context;
         if (ctx.state === 'suspended') ctx.resume();
 
-        if (this.nextAudio_ && this.nextAudio_.src == url) {
+        if (
+          this.nextAudio_ &&
+          this.nextAudio_.src === url &&
+          this.nextAudio_.error === null
+        ) {
           console.log(`Starting preloaded ${song.songId} (${url})`);
           this.swapAudio_(this.nextAudio_);
         } else {
