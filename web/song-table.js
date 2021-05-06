@@ -18,6 +18,7 @@ const template = createTemplate(`
   }
   table {
     border-collapse: collapse;
+    line-height: 1.2;
     padding-right: 10px;
     table-layout: fixed;
     width: 100%;
