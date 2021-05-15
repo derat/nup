@@ -21,7 +21,8 @@ const template = createTemplate(`
 <style>
   @import 'common.css';
   :host {
-    display: block;
+    display: flex;
+    flex-direction: column;
   }
   #song-info {
     display: flex;
@@ -443,6 +444,7 @@ customElements.define(
 
       this.playlistTable_.highlightRow(this.currentIndex_, false);
       this.playlistTable_.highlightRow(index, true);
+      this.playlistTable_.scrollToRow(index);
       this.currentIndex_ = index;
 
       this.updateSongDisplay_();

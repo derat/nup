@@ -83,6 +83,7 @@ input[type='checkbox'] {
   border: solid 1px #ddd;
   border-radius: 2px;
   height: 14px;
+  position: relative;
   width: 14px;
 }
 input[type='checkbox']:checked {

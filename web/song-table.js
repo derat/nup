@@ -15,28 +15,55 @@ const template = createTemplate(`
   @import 'common.css';
   :host {
     display: block;
+    overflow-y: auto;
   }
+
   table {
     border-collapse: collapse;
     line-height: 1.2;
-    padding-right: 10px;
+    padding-right: 0;
     table-layout: fixed;
     width: 100%;
   }
+
   th {
     background-color: #f5f5f5;
-    border-bottom: solid 1px #ddd;
-    border-top: solid 1px #ddd;
     cursor: default;
     padding: 2px 10px 0 10px;
+    position: sticky;
     text-align: left;
+    top: 0;
     user-select: none;
+    z-index: 1;
   }
+
+  /* Gross hack from https://stackoverflow.com/a/57170489/6882947 to keep
+   * borders from scrolling along with table contents. */
+  th:after, th:before {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 100%;
+  }
+  th:before {
+    border-top: solid 1px #ddd;
+    top: 0;
+  }
+  th:after {
+    border-bottom: solid 1px #ddd;
+    bottom: 0;
+  }
+
+  tr {
+    scroll-margin-bottom: 22px;
+    scroll-margin-top: 42px;
+  }
+
   td {
-    padding-left: 10px;
-    white-space: nowrap;
     overflow: hidden;
+    padding-left: 10px;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   td a {
@@ -157,13 +184,22 @@ customElements.define(
             .map((r) => r.song);
     }
 
-    // Sets highlighting for the song at index |index| to |highlight|.
+    // Sets highlighting for the song at |index| to |highlight|.
     highlightRow(index, highlight) {
       if (index < 0 || index >= this.numSongs) return;
 
       const row = this.songRows_[index];
       if (highlight) row.classList.add('highlight');
       else row.classList.remove('highlight');
+    }
+
+    // Scrolls the table so that the song at |index| is in view.
+    scrollToRow(index) {
+      if (index < 0 || index >= this.numSongs) return;
+      this.songRows_[index].scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
     }
 
     // Sets all checkboxes to |checked|.

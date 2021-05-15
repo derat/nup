@@ -13,7 +13,8 @@ const template = createTemplate(`
 <style>
   @import 'common.css';
   :host {
-    display: block;
+    display: flex;
+    flex-direction: column;
   }
   .heading {
     font-size: 15px;
