@@ -27,6 +27,17 @@ body.no-scroll {
   overflow: hidden;
   padding-bottom: 2px;
 }
-#container :not(:last-child) {
+#container > :not(:last-child) {
+  /* With Chrome on a high-DPI display, there's a 1-2 pixel white gap between the music-player
+   * component and its right border that I'm utterly unable to get rid of. I've tried:
+   *
+   * - setting a left border on music-searcher instead
+   * - setting negative margins
+   * - using grid-gap and background-color on #container
+   * - making #container a flexbox and adding a dedicated div for the border
+   * - probably other stuff that I'm forgetting
+   *
+   * I suspect that this is a rounding bug in Chrome's subpixel-rendering code. Things work as
+   * expected in Firefox. */
   border-right: 1px solid #ddd;
 }
