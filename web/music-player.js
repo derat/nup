@@ -78,6 +78,7 @@ const template = createTemplate(`
   }
   #controls {
     margin: var(--margin);
+    margin-top: 0;
     user-select: none;
   }
   #controls button {
