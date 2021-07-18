@@ -201,7 +201,8 @@ func computeDirGains(dir string) (map[string]mp3gain.Info, error) {
 }
 
 // readSong creates a Song for the file at the supplied path.
-func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info) (*types.Song, error) {
+func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info,
+	artistRewrites map[string]string) (*types.Song, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -234,6 +235,10 @@ func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info) (*types.
 		headerLength = int64(tag.TagSize())
 	}
 
+	if repl, ok := artistRewrites[s.Artist]; ok {
+		s.Artist = repl
+	}
+
 	s.SHA1, err = computeAudioSHA1(f, fi, headerLength, footerLength)
 	if err != nil {
 		return nil, err
@@ -255,7 +260,8 @@ func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info) (*types.
 // readSongList reads a list of relative (to musicDir) paths from listPath
 // and asynchronously sends the resulting Song structs to ch.
 // The number of songs that will be sent to the channel is returned.
-func readSongList(listPath, musicDir string, ch chan types.SongOrErr, computeGain bool) (numSongs int, err error) {
+func readSongList(listPath, musicDir string, ch chan types.SongOrErr,
+	computeGain bool, artistRewrites map[string]string) (numSongs int, err error) {
 	f, err := os.Open(listPath)
 	if err != nil {
 		return 0, err
@@ -299,7 +305,7 @@ func readSongList(listPath, musicDir string, ch chan types.SongOrErr, computeGai
 				if gi, ok := gains[full]; ok {
 					gain = &gi
 				}
-				s, err := readSong(full, rel, fi, gain)
+				s, err := readSong(full, rel, fi, gain, artistRewrites)
 				ch <- types.NewSongOrErr(s, err)
 			}
 		}(rel)
@@ -310,9 +316,10 @@ func readSongList(listPath, musicDir string, ch chan types.SongOrErr, computeGai
 
 // scanOptions contains options for scanForUpdatedSongs.
 type scanOptions struct {
-	computeGain bool   // use mp3gain to compute gain adjustments
-	forceGlob   string // glob matching files to update even if unchanged
-	logProgress bool   // periodically log progress while scanning
+	computeGain    bool              // use mp3gain to compute gain adjustments
+	forceGlob      string            // glob matching files to update even if unchanged
+	logProgress    bool              // periodically log progress while scanning
+	artistRewrites map[string]string // artist names from tags to rewrite
 }
 
 // scanForUpdatedSongs looks for songs under musicDir updated more recently than
@@ -370,7 +377,7 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, ch chan type
 		}
 
 		go func() {
-			s, err := readSong(path, relPath, fi, gain)
+			s, err := readSong(path, relPath, fi, gain, opts.artistRewrites)
 			ch <- types.NewSongOrErr(s, err)
 		}()
 		numUpdates++

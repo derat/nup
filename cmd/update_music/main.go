@@ -16,10 +16,21 @@ import (
 
 type config struct {
 	types.ClientConfig
-	CoverDir           string `json:"coverDir"`
-	MusicDir           string `json:"musicDir"`
+
+	// CoverDir is the base directory containing cover art.
+	CoverDir string `json:"coverDir"`
+	// MusicDir is the base directory containing song files.
+	MusicDir string `json:"musicDir"`
+	// LastUpdateTimeFile is the path to a JSON file storing the time an update was last performed.
+	// The file will be created if it does not already exist.
 	LastUpdateTimeFile string `json:"lastUpdateTimeFile"`
-	ComputeGain        bool   `json:"computeGain"`
+	// ComputeGain indicates whether the mp3gain program should be used to compute per-song
+	// and per-album gain information so that volume can be normalized during playback.
+	ComputeGain bool `json:"computeGain"`
+	// ArtistRewrites is a map from original ID3 tag artist names to replacement names that should
+	// be used for updates. This can be used to fix incorrectly-tagged files without needing to
+	// reupload them.
+	ArtistRewrites map[string]string `json:"artistRewrites"`
 }
 
 func main() {
@@ -67,7 +78,7 @@ func main() {
 		}
 
 		if len(*songPathsFile) > 0 {
-			numSongs, err = readSongList(*songPathsFile, cfg.MusicDir, readChan, cfg.ComputeGain)
+			numSongs, err = readSongList(*songPathsFile, cfg.MusicDir, readChan, cfg.ComputeGain, cfg.ArtistRewrites)
 			if err != nil {
 				log.Fatal("Failed reading song list: ", err)
 			}
@@ -78,9 +89,10 @@ func main() {
 			}
 			log.Printf("Scanning for songs in %v updated since %v", cfg.MusicDir, lastUpdateTime.Local())
 			numSongs, err = scanForUpdatedSongs(cfg.MusicDir, lastUpdateTime, readChan, &scanOptions{
-				computeGain: cfg.ComputeGain,
-				forceGlob:   *forceGlob,
-				logProgress: true,
+				computeGain:    cfg.ComputeGain,
+				forceGlob:      *forceGlob,
+				logProgress:    true,
+				artistRewrites: cfg.ArtistRewrites,
 			})
 
 			if err != nil {
