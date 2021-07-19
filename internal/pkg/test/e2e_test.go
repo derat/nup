@@ -265,6 +265,7 @@ func TestQueries(tt *testing.T) {
 		{[]string{"tags=electronic+instrumental"}, []types.Song{LegacySong1}},
 		{[]string{"tags=-electronic+instrumental"}, []types.Song{LegacySong2}},
 		{[]string{"tags=instrumental", "minRating=0.75"}, []types.Song{LegacySong1}},
+		{[]string{"firstTrack=1"}, []types.Song{LegacySong1, Song0s}},
 	} {
 		if err := compareQueryResults(q.exp, t.QuerySongs(q.params...), CompareOrder); err != nil {
 			tt.Errorf("%v: %v", q.params, err)

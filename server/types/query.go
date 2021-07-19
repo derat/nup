@@ -31,7 +31,10 @@ type SongQuery struct {
 	MaxLastStartTime  time.Time // Song.LastStartTime
 
 	Track int64 // Song.Track
-	Disc  int64 // Song.Disc
+	Disc  int64 // Song.Disc (may be 0 or 1 for single-disc albums)
+
+	MaxDisc    int64 // Song.Disc
+	HasMaxDisc bool  // MaxDisc is set
 
 	Tags    []string // present in Song.Tags
 	NotTags []string // not present in Song.Tags

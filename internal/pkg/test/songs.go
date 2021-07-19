@@ -82,7 +82,7 @@ var LegacySong1 = types.Song{
 	Artist:   "Arovane",
 	Title:    "Thaem Nue",
 	Album:    "Atol Scrap",
-	Track:    3,
+	Track:    1,
 	Disc:     1,
 	Length:   449,
 	Rating:   0.75,

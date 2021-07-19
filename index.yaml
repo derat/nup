@@ -86,3 +86,8 @@ indexes:
   properties:
   - name: Tags
   - name: Rating
+
+- kind: Song
+  properties:
+  - name: Track
+  - name: Disc

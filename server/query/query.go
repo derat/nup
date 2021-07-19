@@ -322,6 +322,9 @@ func runQuery(ctx context.Context, query *types.SongQuery) ([]int64, error) {
 	if query.HasMaxPlays {
 		qs = append(qs, bq.Filter("NumPlays <=", query.MaxPlays))
 	}
+	if query.HasMaxDisc {
+		qs = append(qs, bq.Filter("Disc <=", query.MaxDisc))
+	}
 	if !query.MinFirstStartTime.IsZero() {
 		qs = append(qs, bq.Filter("FirstStartTime >=", query.MinFirstStartTime))
 	}

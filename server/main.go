@@ -459,7 +459,8 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 
 	if r.FormValue("firstTrack") == "1" {
 		q.Track = 1
-		q.Disc = 1
+		q.MaxDisc = 1 // also match tracks with an unset disc number
+		q.HasMaxDisc = true
 	}
 
 	if len(r.FormValue("minRating")) > 0 {
