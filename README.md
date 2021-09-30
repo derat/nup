@@ -141,7 +141,7 @@ into the new file.
     syntax and double-check what will be done.
 7.  Run a command like the following to delete the old file's database object:
     ```sh
-    update_music -config $HOME/.nup/update_music.json delete-song-id <ID>
+    update_music -config $HOME/.nup/update_music.json -delete-song-id <ID>
     ```
     `ID` corresponds to the numeric value of the old file's `songId` property.
 8.  Delete `old/song.mp3` or remove it from your local music directory.
