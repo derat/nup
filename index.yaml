@@ -34,12 +34,6 @@ indexes:
 - kind: Song
   properties:
   - name: ArtistLower
-  - name: Track
-  - name: Disc
-
-- kind: Song
-  properties:
-  - name: ArtistLower
   - name: LastStartTime
 
 - kind: Song
@@ -51,6 +45,12 @@ indexes:
   properties:
   - name: ArtistLower
   - name: Rating
+
+- kind: Song
+  properties:
+  - name: ArtistLower
+  - name: Track
+  - name: Disc
 
 - kind: Song
   properties:
