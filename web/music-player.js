@@ -586,14 +586,13 @@ customElements.define(
       const song = this.currentSong_;
       if (!song) return;
 
-      const options = { body: `${song.album}\n${formatTime(song.length)}` };
+      const options = {
+        body: `${song.title}\n${song.album}\n${formatTime(song.length)}`,
+      };
       if (song.coverFilename) {
         options.icon = getScaledCoverUrl(song.coverFilename);
       }
-      this.notification_ = new Notification(
-        `${song.artist}\n${song.title}`,
-        options
-      );
+      this.notification_ = new Notification(`${song.artist}`, options);
       this.closeNotificationTimeoutId_ = window.setTimeout(() => {
         this.closeNotificationTimeoutId_ = null;
         this.closeNotification_();
