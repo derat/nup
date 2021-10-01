@@ -106,7 +106,7 @@ func CompareSongs(expected, actual []types.Song, order OrderPolicy) error {
 			for j := range s.Plays {
 				s.Plays[j].StartTime = s.Plays[j].StartTime.UTC()
 				// Ugly hack to handle IPv6 addresses.
-				if s.Plays[j].IPAddress == "[::1]" {
+				if s.Plays[j].IPAddress == "::1" {
 					s.Plays[j].IPAddress = "127.0.0.1"
 				}
 			}

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"os"
 	"regexp"
@@ -430,9 +431,14 @@ func handlePlayed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Drop the trailing colon and port number. We can't just split on ':' and
-	// take the first item since we may get an IPv6 address like "[::1]:12345".
-	ip := regexp.MustCompile(":\\d+$").ReplaceAllString(r.RemoteAddr, "")
+	// SplitHostPort removes brackets for us.
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		// Drop the trailing colon and port number. We can't just split on ':' and
+		// take the first item since we may get an IPv6 address like "[::1]:12345".
+		ip = regexp.MustCompile(":\\d+$").ReplaceAllString(r.RemoteAddr, "")
+	}
+
 	if err := update.AddPlay(ctx, id, startTime, ip); err != nil {
 		log.Errorf(ctx, "Got error while recording play: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
