@@ -25,6 +25,7 @@ type checkSettings uint32
 const (
 	checkAlbumID checkSettings = 1 << iota
 	checkCoverSize400
+	checkImported
 	checkSongCover
 )
 
@@ -77,6 +78,32 @@ func checkSongs(songs []*types.Song, musicDir, coverDir string, settings checkSe
 			}
 		}
 	}
+
+	if settings&checkImported != 0 {
+		known := make(map[string]struct{}, len(songs))
+		for _, s := range songs {
+			known[s.Filename] = struct{}{}
+		}
+		if err := filepath.Walk(musicDir, func(path string, fi os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if !fi.Mode().IsRegular() || strings.ToLower(filepath.Ext(path)) != ".mp3" {
+				return nil
+			}
+			pre := musicDir + "/"
+			if !strings.HasPrefix(path, pre) {
+				return fmt.Errorf("%v doesn't have expected prefix %v", path, pre)
+			}
+			path = path[len(pre):]
+			if _, ok := known[path]; !ok {
+				log.Printf("%v not imported", path)
+			}
+			return nil
+		}); err != nil {
+			log.Fatalf("Failed walking %v: %v", musicDir, err)
+		}
+	}
 }
 
 func checkCovers(songs []*types.Song, coverDir string, settings checkSettings) {
@@ -98,14 +125,18 @@ func checkCovers(songs []*types.Song, coverDir string, settings checkSettings) {
 		}
 	}
 
-	fs := [](func(fn string) error){
-		func(fn string) error {
+	var fs [](func(fn string) error)
+
+	// We can only check for unused covers if the songs dump contained cover filenames.
+	if len(songFns) > 0 {
+		fs = append(fs, func(fn string) error {
 			if _, ok := songFns[fn]; !ok {
 				return errors.New("unused cover")
 			}
 			return nil
-		},
+		})
 	}
+
 	if settings&checkCoverSize400 != 0 {
 		fs = append(fs, func(fn string) error {
 			p := filepath.Join(coverDir, fn)
@@ -158,6 +189,7 @@ func main() {
 	}{
 		"album-id":       {checkAlbumID, "Songs have MusicBrainz album IDs", true},
 		"cover-size-400": {checkCoverSize400, "Cover images are at least 400x400", false},
+		"imported":       {checkImported, "All songs have been imported", true},
 		"song-cover":     {checkSongCover, "Songs have cover files", true},
 	}
 	var defaultChecks []string
