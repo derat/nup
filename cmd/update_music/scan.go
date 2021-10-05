@@ -14,7 +14,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -28,7 +27,6 @@ const (
 	coverIDTag          = "nup Cover Id"         // can be set for non-MusicBrainz tracks
 	recordingIDOwner    = "http://musicbrainz.org"
 	logProgressInterval = 100
-	mp3Extension        = ".mp3"
 )
 
 func readID3Footer(f *os.File, fi os.FileInfo) (length int64, artist, title, album string, err error) {
@@ -150,7 +148,7 @@ func computeAudioDuration(f *os.File, fi os.FileInfo, headerLength, footerLength
 
 // computeDirGains computes gain adjustments for all MP3 files in dir.
 func computeDirGains(dir string) (map[string]mp3gain.Info, error) {
-	paths, err := filepath.Glob(filepath.Join(dir, "*"+mp3Extension))
+	paths, err := filepath.Glob(filepath.Join(dir, "*.[mM][pP]3")) // case-insensitive :-/
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +333,7 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, ch chan type
 		if err != nil {
 			return err
 		}
-		if fi.Mode()&os.ModeType != 0 || strings.ToLower(filepath.Ext(path)) != mp3Extension {
+		if !fi.Mode().IsRegular() || !types.IsMusicPath(path) {
 			return nil
 		}
 		relPath, err := filepath.Rel(musicDir, path)

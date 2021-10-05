@@ -88,7 +88,7 @@ func checkSongs(songs []*types.Song, musicDir, coverDir string, settings checkSe
 			if err != nil {
 				return err
 			}
-			if !fi.Mode().IsRegular() || strings.ToLower(filepath.Ext(path)) != ".mp3" {
+			if !fi.Mode().IsRegular() || !types.IsMusicPath(path) {
 				return nil
 			}
 			pre := musicDir + "/"

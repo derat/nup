@@ -5,6 +5,8 @@
 package types
 
 import (
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -136,3 +138,8 @@ type PlayArray []Play
 func (a PlayArray) Len() int           { return len(a) }
 func (a PlayArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a PlayArray) Less(i, j int) bool { return a[i].StartTime.Before(a[j].StartTime) }
+
+// IsMusicPath returns true if path p has an extension suggesting that it's a music file.
+func IsMusicPath(p string) bool {
+	return strings.ToLower(filepath.Ext(p)) == ".mp3"
+}
