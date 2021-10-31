@@ -490,6 +490,41 @@ class Test(unittest.TestCase):
         self.wait_for_song(page, song2, False)
         self.wait_for_playlist(page, [song1, song2], 1)
 
+    def test_context_menu(self):
+        song1 = Song('a', 't1', 'al', track=1, filename=Song.FILE_5S)
+        song2 = Song('a', 't2', 'al', track=2, filename=Song.FILE_5S)
+        song3 = Song('a', 't3', 'al', track=3, filename=Song.FILE_5S)
+        song4 = Song('a', 't4', 'al', track=4, filename=Song.FILE_5S)
+        song5 = Song('a', 't5', 'al', track=5, filename=Song.FILE_5S)
+        songs = [song1, song2, song3, song4, song5]
+        server.import_songs(songs)
+
+        page = Page(driver)
+        page.keywords = song1.album
+        page.click(page.LUCKY_BUTTON)
+        self.wait_for_song(page, song1, False)
+        self.wait_for_playlist(page, songs, 0)
+
+        page.right_click_playlist_song(3)
+        page.click(page.MENU_PLAY)
+        self.wait_for_song(page, song4, False)
+        self.wait_for_playlist(page, songs, 3)
+
+        page.right_click_playlist_song(2)
+        page.click(page.MENU_PLAY)
+        self.wait_for_song(page, song3, False)
+        self.wait_for_playlist(page, songs, 2)
+
+        page.right_click_playlist_song(0)
+        page.click(page.MENU_REMOVE)
+        self.wait_for_song(page, song3, False)
+        self.wait_for_playlist(page, [song2, song3, song4, song5], 1)
+
+        page.right_click_playlist_song(1)
+        page.click(page.MENU_TRUNCATE)
+        self.wait_for_song(page, song2, True)
+        self.wait_for_playlist(page, [song2], 0)
+
     def test_display_time_while_playing(self):
         song = Song('ar', 't', 'al', 1, filename=Song.FILE_5S, length=5.0)
         server.import_songs([song])

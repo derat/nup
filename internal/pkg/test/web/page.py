@@ -37,6 +37,11 @@ class Page(object):
     GAIN_TYPE_SELECT = OPTIONS_DIALOG + (By.ID, 'gain-type-select')
     PRE_AMP_RANGE = OPTIONS_DIALOG + (By.ID, 'pre-amp-range')
     PRE_AMP_SPAN = OPTIONS_DIALOG + (By.ID, 'pre-amp-span')
+    MENU = DIALOG_MANAGER + (By.CSS_SELECTOR, '.menu')
+    MENU_PLAY = MENU + (By.ID, 'play')
+    MENU_REMOVE = MENU + (By.ID, 'remove')
+    MENU_TRUNCATE = MENU + (By.ID, 'truncate')
+    MENU_DEBUG = MENU + (By.ID, 'debug')
 
     MUSIC_PLAYER = (By.TAG_NAME, 'music-player')
     ALBUM_DIV = MUSIC_PLAYER + (By.ID, 'album')
@@ -279,6 +284,11 @@ class Page(object):
     def click_rating(self, num_stars):
         stars = self.get(self.RATING_SPAN).find_elements_by_tag_name('a')
         stars[num_stars-1].click()
+
+    def right_click_playlist_song(self, row_index):
+        row = self.get(Page.PLAYLIST_TABLE).\
+            find_elements_by_tag_name('tr')[row_index + 1]
+        ActionChains(self.driver).context_click(row).perform()
 
     def get_tag_suggestions(self, locator):
         suggester = self.get(locator)

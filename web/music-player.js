@@ -308,14 +308,27 @@ customElements.define(
       this.playlistTable_.addEventListener('menu', (e) => {
         if (!this.dialogManager_) throw new Error('No <dialog-manager>');
 
+        const idx = e.detail.index;
         const orig = e.detail.orig;
         orig.preventDefault();
         this.dialogManager_.createMenu(orig.pageX, orig.pageY, [
           {
+            id: 'play',
             text: 'Play',
-            cb: () => this.selectTrack_(e.detail.index),
+            cb: () => this.selectTrack_(idx),
           },
           {
+            id: 'remove',
+            text: 'Remove',
+            cb: () => this.removeSongs_(idx, 1),
+          },
+          {
+            id: 'truncate',
+            text: 'Truncate',
+            cb: () => this.removeSongs_(idx, this.songs_.length - idx),
+          },
+          {
+            id: 'debug',
             text: 'Debug',
             cb: () => window.open(getDumpSongUrl(e.detail.songId), '_blank'),
           },
@@ -409,13 +422,7 @@ customElements.define(
     // If |afterCurrent| is true, |songs| are inserted immediately after the
     // current song. Otherwise, they are appended to the end of the playlist.
     enqueueSongs(songs, clearFirst, afterCurrent) {
-      if (clearFirst) {
-        this.audio_.pause();
-        this.audio_.removeAttribute('src');
-        this.playlistTable_.highlightRow(this.currentIndex_, false);
-        this.songs_ = [];
-        this.selectTrack_(0, false /* delayPlay */);
-      }
+      if (clearFirst) this.removeSongs_(0, this.songs_.length);
 
       let index = afterCurrent
         ? Math.min(this.currentIndex_ + 1, this.songs_.length)
@@ -432,6 +439,50 @@ customElements.define(
         this.updateButtonState_();
         this.updatePresentationLayerSongs_();
       }
+    }
+
+    // Removes |len| songs starting at index |start| from the playlist.
+    removeSongs_(start, len) {
+      if (start < 0 || len <= 0 || start + len > this.songs_.length) return;
+
+      this.songs_.splice(start, len);
+      this.playlistTable_.setSongs(this.songs_);
+
+      // If we're keeping the current song, things are pretty simple.
+      const end = start + len - 1;
+      if (start > this.currentIndex_ || end < this.currentIndex_) {
+        // If we're removing songs before the current one, we need to update the
+        // index and highlighting.
+        if (end < this.currentIndex_) {
+          this.playlistTable_.highlightRow(this.currentIndex_, false);
+          this.currentIndex_ -= len;
+          this.playlistTable_.highlightRow(this.currentIndex_, true);
+        }
+        this.updateButtonState_();
+        this.updatePresentationLayerSongs_();
+        return;
+      }
+
+      // Stop playing the (just-removed) current song and choose a new one.
+      this.audio_.pause();
+      this.audio_.removeAttribute('src');
+      this.playlistTable_.highlightRow(this.currentIndex_, false);
+      this.currentIndex_ = -1;
+
+      // If there are songs after the last-removed one, switch to the first of
+      // them.
+      if (this.songs_.length > start) {
+        this.selectTrack_(start, false /* delayPlay */);
+        return;
+      }
+
+      // Otherwise, we truncated the playlist, i.e. we deleted all songs from
+      // the currently-playing one to the end. Jump to the last song.
+      // TODO: Pausing is hokey. It'd probably be better to act as if we'd
+      // actually reached the end of the last song, but that'd probably require
+      // waiting for its duration to be loaded so we can seek.
+      this.selectTrack_(this.songs_.length, false /* delayPlay */);
+      this.pause_();
     }
 
     // Plays the song at |offset| in the playlist relative to the current song.

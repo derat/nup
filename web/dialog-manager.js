@@ -172,10 +172,9 @@ customElements.define(
       this.updateLightbox_();
 
       for (const item of items) {
-        createElement('div', 'item', menu, item.text).addEventListener(
-          'click',
-          (e) => item.cb()
-        );
+        const el = createElement('div', 'item', menu, item.text);
+        el.id = item.id;
+        el.addEventListener('click', (e) => item.cb());
       }
 
       // Keep the menu onscreen.
