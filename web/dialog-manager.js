@@ -14,7 +14,7 @@ const template = createTemplate(`
     background-color: black;
     display: none;
     height: 100%;
-    opacity: 0.1;
+    opacity: 0;
     pointer-events: auto;
     position: fixed;
     width: 100%;
@@ -22,6 +22,9 @@ const template = createTemplate(`
   }
   .lightbox.shown {
     display: block;
+  }
+  .lightbox.dimming {
+    opacity: 0.1;
   }
   .outer-container {
     display: table;
@@ -40,8 +43,6 @@ const template = createTemplate(`
     background-color: white;
     border: solid 1px #aaa;
     box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
-    -moz-box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
-    -webkit-box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
     display: inline-block;
     padding: var(--margin);
     pointer-events: auto;
@@ -49,6 +50,26 @@ const template = createTemplate(`
   }
   .message-dialog {
     width: 400px;
+  }
+  .menu {
+    background-color: white;
+    box-shadow: 0 1px 2px 1px rgba(0, 0, 0, 0.2);
+    pointer-events: auto;
+    position: absolute;
+    text-align: left;
+  }
+  .menu .item {
+    cursor: default;
+    padding: 6px 12px;
+  }
+  .menu .item:hover {
+    background-color: #eee;
+  }
+  .menu .item:first-child {
+    padding-top: 8px;
+  }
+  .menu .item:last-child {
+    padding-bottom: 8px;
   }
 </style>
 <div id="lightbox" class="lightbox"></div>
@@ -73,6 +94,8 @@ const messageDialogTemplate = createTemplate(`
 </div>
 `);
 
+// <dialog-manager> manages dialog windows and context menus. It dims the rest
+// of the page behind dialogs and blocks mouse events.
 customElements.define(
   'dialog-manager',
   class extends HTMLElement {
@@ -83,39 +106,50 @@ customElements.define(
       this.lightbox_ = $('lightbox', this.shadow_);
       this.lightbox_.addEventListener(
         'click',
-        (e) => e.stopPropagation(),
-        false
-      );
-      this.container_ = $('container', this.shadow_);
-    }
-
-    get numDialogs() {
-      return this.container_.children.length;
-    }
-
-    createDialog() {
-      const dialog = createElement('span', 'dialog', this.container_);
-      if (this.numDialogs == 1) this.lightbox_.classList.add('shown');
-      return dialog;
-    }
-
-    closeDialog(dialog) {
-      this.container_.removeChild(dialog);
-      if (!this.numDialogs) this.lightbox_.classList.remove('shown');
-    }
-
-    createMessageDialog(titleText, messageText) {
-      const dialog = this.createDialog();
-      dialog.addEventListener(
-        'keydown',
         (e) => {
-          if (e.key == 'Escape') {
-            e.preventDefault();
-            this.closeDialog(dialog);
-          }
+          // Close all menus if the lightbox receives a click.
+          this.menus_.forEach((m) => this.closeChild(m));
+          e.stopPropagation();
         },
         false
       );
+      this.container_ = $('container', this.shadow_);
+
+      // Close all menus if the Escape key is pressed.
+      document.body.addEventListener('keydown', (e) => {
+        if (e.key == 'Escape') this.menus_.forEach((m) => this.closeChild(m));
+      });
+    }
+
+    get numChildren() {
+      return this.container_.children.length;
+    }
+
+    get menus_() {
+      return Array.from(this.container_.children).filter((c) =>
+        c.classList.contains('menu')
+      );
+    }
+
+    // Creates, displays, and returns an empty dialog window container. The
+    // caller should add content within the returned container and is
+    // responsible for closing the dialog by passing it to closeChild().
+    createDialog() {
+      const dialog = createElement('span', 'dialog', this.container_);
+      this.updateLightbox_();
+      return dialog;
+    }
+
+    // Creates and displays a dialog window already containing the supplied
+    // title and text.
+    createMessageDialog(titleText, messageText) {
+      const dialog = this.createDialog();
+      dialog.addEventListener('keydown', (e) => {
+        if (e.key == 'Escape') {
+          e.preventDefault();
+          this.closeChild(dialog);
+        }
+      });
 
       dialog.classList.add('message-dialog');
       const shadow = dialog.attachShadow({ mode: 'open' });
@@ -123,8 +157,58 @@ customElements.define(
       $('title', shadow).innerText = titleText;
       $('message', shadow).innerText = messageText;
       const button = $('ok-button', shadow);
-      button.addEventListener('click', () => this.closeDialog(dialog), false);
+      button.addEventListener('click', () => this.closeChild(dialog), false);
       button.focus();
+    }
+
+    // Creates and displays a simple context menu at the specified location.
+    // |items| is an array of objects with 'text' properties containing the menu
+    // item text and 'cb' properties containing the corresponding callback.
+    createMenu(x, y, items) {
+      const menu = createElement('span', 'menu', this.container_);
+      menu.addEventListener('click', (e) => {
+        this.closeChild(menu);
+      });
+      this.updateLightbox_();
+
+      for (const item of items) {
+        createElement('div', 'item', menu, item.text).addEventListener(
+          'click',
+          (e) => item.cb()
+        );
+      }
+
+      // Keep the menu onscreen.
+      menu.style.left =
+        x + menu.clientWidth <= window.innerWidth
+          ? `${x}px`
+          : `${x - menu.clientWidth}px`;
+      menu.style.top =
+        y + menu.clientHeight <= window.innerHeight
+          ? `${y}px`
+          : `${y - menu.clientHeight}px`;
+    }
+
+    // Closes |child| (either a dialog or a menu).
+    // A 'close' event is dispatched to |child|.
+    closeChild(child) {
+      child.dispatchEvent(new Event('close'));
+      this.container_.removeChild(child);
+      this.updateLightbox_();
+    }
+
+    // Updates the lightbox's visibility and opacity.
+    updateLightbox_() {
+      if (this.numChildren > 0) {
+        this.lightbox_.classList.add('shown');
+        if (this.numChildren > this.menus_.length) {
+          this.lightbox_.classList.add('dimming');
+        } else {
+          this.lightbox_.classList.remove('dimming');
+        }
+      } else {
+        this.lightbox_.classList.remove('shown');
+      }
     }
   }
 );

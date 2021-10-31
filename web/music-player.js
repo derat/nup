@@ -249,9 +249,8 @@ customElements.define(
       this.shadow_ = createShadow(this, template);
       const get = (id) => $(id, this.shadow_);
 
-      this.presentationLayer_ = this.shadow_.querySelector(
-        'presentation-layer'
-      );
+      this.presentationLayer_ =
+        this.shadow_.querySelector('presentation-layer');
       this.presentationLayer_.addEventListener('next', () => {
         this.cycleTrack_(1, false /* delayPlay */);
       });
@@ -305,6 +304,22 @@ customElements.define(
       this.playlistTable_ = get('playlist');
       this.playlistTable_.addEventListener('field', (e) => {
         this.dispatchEvent(new CustomEvent('field', { detail: e.detail }));
+      });
+      this.playlistTable_.addEventListener('menu', (e) => {
+        if (!this.dialogManager_) throw new Error('No <dialog-manager>');
+
+        const orig = e.detail.orig;
+        orig.preventDefault();
+        this.dialogManager_.createMenu(orig.pageX, orig.pageY, [
+          {
+            text: 'Play',
+            cb: () => this.selectTrack_(e.detail.index),
+          },
+          {
+            text: 'Debug',
+            cb: () => window.open(getDumpSongUrl(e.detail.songId), '_blank'),
+          },
+        ]);
       });
 
       if ('mediaSession' in navigator) {
@@ -434,6 +449,7 @@ customElements.define(
         this.currentIndex_ = -1;
         this.updateSongDisplay_();
         this.updateButtonState_();
+        this.updatePresentationLayerSongs_();
         this.reachedEndOfSongs_ = false;
         return;
       }
@@ -816,7 +832,7 @@ customElements.define(
       if (this.updateSong_) return true;
 
       this.setRating_(song.rating);
-      this.dumpSongLink_.href = getDumpSongUrl(song);
+      this.dumpSongLink_.href = getDumpSongUrl(song.songId);
       this.tagsTextarea_.value = song.tags.length
         ? song.tags.sort().join(' ') + ' ' // append space to ease editing
         : '';
@@ -952,11 +968,11 @@ customElements.define(
     }
 
     processAccelerator_(e) {
-      if (this.dialogManager_ && this.dialogManager_.numDialogs) return false;
+      if (this.dialogManager_ && this.dialogManager_.numChildren) return false;
 
       if (e.altKey && e.key == 'd') {
         const song = this.currentSong_;
-        if (song) window.open(getDumpSongUrl(song), '_blank');
+        if (song) window.open(getDumpSongUrl(song.songId), '_blank');
         return true;
       } else if (e.altKey && e.key == 'n') {
         this.cycleTrack_(1, true /* delay */);
@@ -1046,6 +1062,6 @@ function getRatingString(rating, withLabel, includeEmpty) {
   return ratingString;
 }
 
-function getDumpSongUrl(song) {
-  return `/dump_song?songId=${song.songId}`;
+function getDumpSongUrl(songId) {
+  return `/dump_song?songId=${songId}`;
 }

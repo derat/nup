@@ -343,7 +343,10 @@ customElements.define(
       });
       this.resultsTable_.addEventListener('check', (e) => {
         const checked = !!e.detail.count;
-        this.appendButton_.disabled = this.insertButton_.disabled = this.replaceButton_.disabled = !checked;
+        this.appendButton_.disabled =
+          this.insertButton_.disabled =
+          this.replaceButton_.disabled =
+            !checked;
       });
 
       this.waitingDiv_ = get('waiting');
@@ -539,7 +542,7 @@ customElements.define(
     }
 
     handleBodyKeyDown_(e) {
-      if (this.dialogManager_ && this.dialogManager_.numDialogs) return;
+      if (this.dialogManager_ && this.dialogManager_.numChildren) return;
 
       if (e.key == '/') {
         this.keywordsInput_.focus();

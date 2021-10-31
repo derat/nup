@@ -104,6 +104,7 @@ const template = createTemplate(`
     opacity: 0.3;
   }
 </style>
+
 <table>
   <thead>
     <tr>
@@ -144,6 +145,11 @@ const rowTemplate = createTemplate(`
 //
 // When a song's artist or album field is clicked, a 'field' event will be
 // emitted with either a |detail.artist| or |detail.album| property.
+//
+// When a song is right-clicked, a 'menu' event is emitted with |detail.songId|,
+// |detail.index|, and |detail.orig| (containing the original PointerEvent)
+// properties. The receiver should call detail.orig.preventDefault() if it
+// displays its own menu.
 customElements.define(
   'song-table',
   class extends HTMLElement {
@@ -289,6 +295,13 @@ customElements.define(
         this.emitEvent_('field', {
           albumId: row.song.albumId,
           album: row.song.album,
+        });
+      });
+      row.addEventListener('contextmenu', (e) => {
+        this.emitEvent_('menu', {
+          songId: row.song.songId,
+          index: this.songRows_.indexOf(row), // don't use orig (stale) index
+          orig: e, // PointerEvent
         });
       });
     }

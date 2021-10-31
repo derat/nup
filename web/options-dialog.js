@@ -87,11 +87,7 @@ export default class OptionsDialog {
     this.preAmpSpan_ = $('pre-amp-span', this.shadow_);
     this.updatePreAmpSpan_(preAmp);
 
-    $('ok-button', this.shadow_).addEventListener(
-      'click',
-      () => this.close(),
-      false
-    );
+    $('ok-button', this.shadow_).addEventListener('click', () => this.close());
 
     this.keyListener_ = (e) => {
       if (e.key == 'Escape') {
@@ -100,7 +96,7 @@ export default class OptionsDialog {
         this.close();
       }
     };
-    document.body.addEventListener('keydown', this.keyListener_, false);
+    document.body.addEventListener('keydown', this.keyListener_);
   }
 
   updatePreAmpSpan_(preAmp) {
@@ -111,7 +107,7 @@ export default class OptionsDialog {
   close() {
     document.body.removeEventListener('keydown', this.keyListener_, false);
     this.config_.save();
-    this.manager_.closeDialog(this.container_);
+    this.manager_.closeChild(this.container_);
     if (this.closeCallback_) this.closeCallback_();
   }
 }
