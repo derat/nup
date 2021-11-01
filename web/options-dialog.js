@@ -34,6 +34,19 @@ const template = createTemplate(`
 <hr class="title" />
 
 <div class="row">
+  <label for="theme-select">
+    <span class="label-col">Theme</span>
+    <div class="select-wrapper">
+      <select id="theme-select">
+        <option value="0">Auto</option>
+        <option value="1">Light</option>
+        <option value="2">Dark</option>
+      </select>
+    </div>
+  </label>
+</div>
+
+<div class="row">
   <label for="gain-type-select">
     <span class="label-col">Gain</span>
     <div class="select-wrapper">
@@ -67,6 +80,12 @@ export default class OptionsDialog {
 
     this.container_ = this.manager_.createDialog();
     this.shadow_ = createShadow(this.container_, template);
+
+    this.themeSelect_ = $('theme-select', this.shadow_);
+    this.themeSelect_.value = this.config_.get(Config.THEME);
+    this.themeSelect_.addEventListener('change', () =>
+      this.config_.set(Config.THEME, this.themeSelect_.value)
+    );
 
     this.gainTypeSelect_ = $('gain-type-select', this.shadow_);
     this.gainTypeSelect_.value = this.config_.get(Config.GAIN_TYPE);

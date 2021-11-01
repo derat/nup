@@ -14,9 +14,7 @@
   --font-family: 'Roboto', sans-serif;
   --font-size: 13.3333px;
 
-  --accent-color: #42a5f5;
-
-  --control-border: 1px solid #ddd;
+  --control-border: 1px solid var(--control-color);
   --control-border-radius: 4px;
   --control-line-height: 16px;
 
@@ -24,26 +22,68 @@
   --button-spacing: 6px; /* horizontal spacing between buttons */
 
   --icon-font-family: fontello, sans-serif;
+
+  --bg-color: #fff;
+  --text-color: #000;
+  --text-hover-color: #666;
+  --accent-color: #42a5f5; /* song table highlight */
+  --accent-text-color: #fff;
+  --border-color: #ddd; /* between frames */
+  --button-color: #aaa;
+  --button-hover-color: #666;
+  --button-disabled-color: #ddd;
+  --control-color: #ddd;
+  --control-active-color: #999; /* checked checkbox */
+  --cover-missing-color: #f5f5f5;
+  --dialog-border-color: #aaa;
+  --dialog-title-color: var(--accent-color);
+  --header-color: #f5f5f5; /* song table header */
+  --icon-color: #aaa; /* clear button, select arrow */
+  --icon-hover-color: #666;
+  --menu-hover-color: #eee;
+  --suggestions-color: #eee; /* tag suggestions background */
+}
+
+[data-theme='dark'] {
+  --bg-color: #222;
+  --text-color: #ccc;
+  --text-hover-color: #eee;
+  --accent-color: #1f517a;
+  --accent-text-color: #fff;
+  --border-color: #555;
+  --button-color: #888;
+  --button-hover-color: #aaa;
+  --button-disabled-color: #666;
+  --control-color: #777;
+  --control-active-color: #ccc;
+  --cover-missing-color: #333;
+  --dialog-border-color: #444;
+  --dialog-title-color: #42a5f5;
+  --header-color: #333;
+  --icon-color: #aaa;
+  --icon-hover-color: #ccc;
+  --menu-hover-color: #444;
+  --suggestions-color: #444;
 }
 
 span.x-icon {
-  color: #aaa;
+  color: var(--icon-color);
   font-family: fontello, sans-serif;
   font-size: 10px;
   padding: 4px;
 }
 span.x-icon:hover {
-  color: #666;
+  color: var(--icon-hover-color);
 }
 span.x-icon::before {
   content: '\d7'; /* × */
 }
 
 button {
-  background-color: #aaa;
+  background-color: var(--button-color);
   border: none;
   border-radius: var(--control-border-radius);
-  color: white;
+  color: var(--bg-color);
   cursor: pointer;
   font-family: var(--font-family);
   font-size: 12px;
@@ -55,8 +95,11 @@ button {
   padding: 1px 12px 0 12px;
   text-transform: uppercase;
 }
+button:hover {
+  background-color: var(--button-hover-color);
+}
 button:disabled {
-  background-color: #ddd;
+  background-color: var(--button-disabled-color);
   box-shadow: none;
   cursor: default;
 }
@@ -67,8 +110,10 @@ textarea {
   -moz-appearance: none;
   -ms-appearance: none;
   -webkit-appearance: none;
+  background-color: var(--bg-color);
   border: var(--control-border);
   border-radius: var(--control-border-radius);
+  color: var(--text-color);
   font-family: var(--font-family);
   line-height: var(--control-line-height);
   padding: 6px 4px 4px 6px;
@@ -79,16 +124,16 @@ input[type='checkbox'] {
   -moz-appearance: none;
   -ms-appearance: none;
   -webkit-appearance: none;
-  background-color: white;
-  border: solid 1px #ddd;
+  background-color: var(--bg-color);
+  border: solid 1px var(--control-color);
   border-radius: 2px;
   height: 14px;
   position: relative;
   width: 14px;
 }
 input[type='checkbox']:checked {
-  border-color: #999;
-  color: #999;
+  border-color: var(--control-active-color);
+  color: var(--control-active-color);
 }
 input[type='checkbox']:checked:before {
   content: '\2713'; /* ✓ */
@@ -124,7 +169,7 @@ input[type='checkbox'].small:checked:before {
   margin-right: -8px;
 }
 .select-wrapper:after {
-  color: #aaa;
+  color: var(--icon-color);
   font-family: fontello, sans-serif;
   font-size: 10px;
   position: relative;
@@ -138,9 +183,10 @@ select {
   -moz-appearance: none;
   -ms-appearance: none;
   -webkit-appearance: none;
-  background-color: white;
+  background-color: var(--bg-color);
   border: var(--control-border);
   border-radius: var(--control-border-radius);
+  color: var(--text-color);
   font-family: var(--font-family);
   line-height: var(--control-line-height);
   padding: 6px 24px 4px 6px;

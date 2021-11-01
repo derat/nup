@@ -7,8 +7,8 @@ html {
   height: 100%;
 }
 body {
-  background-color: white;
-  color: black;
+  background-color: var(--bg-color);
+  color: var(--text-color);
   font-family: var(--font-family);
   font-size: var(--font-size);
   height: 100%;
@@ -39,5 +39,5 @@ body.no-scroll {
    *
    * I suspect that this is a rounding bug in Chrome's subpixel-rendering code. Things work as
    * expected in Firefox. */
-  border-right: 1px solid #ddd;
+  border-right: 1px solid var(--border-color);
 }

@@ -4,8 +4,14 @@
 // Config provides persistent storage for preferences.
 export default class Config {
   // Names to pass to get() or set().
+  static THEME = 'theme';
   static GAIN_TYPE = 'gainType';
   static PRE_AMP = 'preAmp';
+
+  // Values for THEME.
+  static THEME_AUTO = 0;
+  static THEME_LIGHT = 1;
+  static THEME_DARK = 2;
 
   // Values for GAIN_TYPE.
   static GAIN_ALBUM = 0;
@@ -14,11 +20,12 @@ export default class Config {
 
   static CONFIG_KEY_ = 'config'; // localStorage key
   static FLOAT_NAMES_ = new Set([Config.PRE_AMP]);
-  static INT_NAMES_ = new Set([Config.GAIN_TYPE]);
+  static INT_NAMES_ = new Set([Config.THEME, Config.GAIN_TYPE]);
 
   constructor() {
     this.callbacks_ = [];
     this.values_ = {
+      [Config.THEME]: Config.THEME_AUTO,
       [Config.GAIN_TYPE]: Config.GAIN_ALBUM,
       [Config.PRE_AMP]: 0.0,
     };

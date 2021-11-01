@@ -4,7 +4,7 @@
 @import 'common.css';
 
 div.title {
-  color: var(--accent-color);
+  color: var(--dialog-title-color);
   font-size: 18px;
   font-weight: bold;
   overflow: hidden;
@@ -13,11 +13,10 @@ div.title {
 }
 
 hr.title {
-  background-color: #ddd;
-  color: #aaa;
+  background-color: var(--border-color);
   border: 0;
   height: 1px;
-  margin-top: 4px 0;
+  margin: 4px 0;
 }
 
 div.button-container {

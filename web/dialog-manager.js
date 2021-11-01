@@ -11,7 +11,7 @@ const template = createTemplate(`
     pointer-events: none;
   }
   .lightbox {
-    background-color: black;
+    background-color: #000;
     display: none;
     height: 100%;
     opacity: 0;
@@ -40,8 +40,8 @@ const template = createTemplate(`
     vertical-align: middle;
   }
   .dialog {
-    background-color: white;
-    border: solid 1px #aaa;
+    background-color: var(--bg-color);
+    border: solid 1px var(--dialog-border-color);
     box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
     display: inline-block;
     padding: var(--margin);
@@ -52,7 +52,7 @@ const template = createTemplate(`
     width: 400px;
   }
   .menu {
-    background-color: white;
+    background-color: var(--bg-color);
     box-shadow: 0 1px 2px 1px rgba(0, 0, 0, 0.2);
     pointer-events: auto;
     position: absolute;
@@ -63,7 +63,7 @@ const template = createTemplate(`
     padding: 6px 12px;
   }
   .menu .item:hover {
-    background-color: #eee;
+    background-color: var(--menu-hover-color);
   }
   .menu .item:first-child {
     padding-top: 8px;

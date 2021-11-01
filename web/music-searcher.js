@@ -70,7 +70,6 @@ const template = createTemplate(`
   #min-rating-select {
     /* The stars are too close together, but letter-spacing unfortunately
      * doesn't work on <select>. */
-    color: #555;
     font-family: var(--icon-font-family);
     font-size: 12px;
   }
@@ -86,7 +85,7 @@ const template = createTemplate(`
     margin-left: var(--button-spacing);
   }
   #results-controls {
-    border-top: 1px solid #ddd;
+    border-top: 1px solid var(--border-color);
     padding: var(--margin) 0 var(--margin) var(--margin);
     user-select: none;
   }
@@ -99,7 +98,7 @@ const template = createTemplate(`
   #waiting {
     background-color: #a00;
     border-radius: 8px;
-    color: white;
+    color: #fff;
     display: none;
     font-size: 11px;
     padding: 5px;

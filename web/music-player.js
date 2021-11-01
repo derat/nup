@@ -36,8 +36,8 @@ const template = createTemplate(`
     margin-right: 6px;
   }
   #cover-div.empty {
-    background-color: #f5f5f5;
-    outline: solid 1px #ddd;
+    background-color: var(--cover-missing-color);
+    outline: solid 1px var(--border-color);
     outline-offset: -1px;
   }
   #cover-img {
@@ -53,14 +53,14 @@ const template = createTemplate(`
     opacity: 0;
   }
   #rating-overlay {
-    color: white;
+    color: #fff;
     font-family: var(--icon-font-family);
     font-size: 12px;
     left: calc(var(--margin) + 2px);
     letter-spacing: 2px;
     pointer-events: none;
     position: absolute;
-    text-shadow: 0 0 8px black;
+    text-shadow: 0 0 8px #000;
     top: calc(var(--margin) + 55px);
     user-select: none;
   }
@@ -90,7 +90,7 @@ const template = createTemplate(`
     margin-left: var(--button-spacing);
   }
   #update-container {
-    background-color: white;
+    background-color: var(--bg-color);
     border-radius: 4px;
     box-shadow: 0 1px 4px 1px rgba(0, 0, 0, 0.3);
     display: none;
@@ -98,7 +98,7 @@ const template = createTemplate(`
     padding: 8px;
     position: absolute;
     top: var(--margin);
-    z-index: 1;
+    z-index: 2;
   }
   #update-container.shown {
     display: block;
@@ -114,25 +114,23 @@ const template = createTemplate(`
     font-size: 16px;
   }
   #rating a.star {
-    color: #666;
+    color: var(--text-color);
     cursor: pointer;
     display: inline-block;
     min-width: 17px; /* black and white stars have different sizes :-/ */
+    opacity: 0.7;
   }
   #rating a.star:hover {
-    color: #888;
+    opacity: 0.8;
   }
   a.debug-link {
-    color: #aaa;
+    color: var(--text-color);
     font-family: Arial, Helvetica, sans-serif;
     font-size: 10px;
+    opacity: 0.7;
     text-decoration: none;
   }
-  #dump-song-link {
-    margin-left: 40px;
-  }
   #edit-tags {
-    border: solid 1px #ddd;
     font-family: Arial, Helvetica, sans-serif;
     height: 48px;
     margin-bottom: -4px;
@@ -217,13 +215,6 @@ customElements.define(
 
     constructor() {
       super();
-
-      this.config_ = new Config();
-      this.config_.addCallback((name, value) => {
-        if (name === Config.GAIN_TYPE || name === Config.PRE_AMP) {
-          this.updateGain_();
-        }
-      });
 
       this.updater_ = new Updater();
       this.optionsDialog_ = null;
@@ -387,6 +378,15 @@ customElements.define(
       this.audio_.parentNode.replaceChild(audio, this.audio_);
       this.audio_ = audio;
       this.configureAudio_(); // resets |audioSrc_|
+    }
+
+    set config(config) {
+      this.config_ = config;
+      this.config_.addCallback((name, value) => {
+        if (name === Config.GAIN_TYPE || name === Config.PRE_AMP) {
+          this.updateGain_();
+        }
+      });
     }
 
     set dialogManager(manager) {
@@ -965,6 +965,7 @@ customElements.define(
 
     showOptions_() {
       if (this.optionsDialog_) return;
+      if (!this.config_) throw new Error('No config');
       if (!this.dialogManager_) throw new Error('No <dialog-manager>');
 
       this.optionsDialog_ = new OptionsDialog(

@@ -9,16 +9,16 @@ const template = createTemplate(`
     display: contents;
   }
   #suggestions {
-    background-color: #eee;
+    background-color: var(--suggestions-color);
     border-radius: 4px;
     box-shadow: 0 1px 2px 1px rgba(0, 0, 0, 0.3);
-    color: black;
+    color: var(--text-color);
     display: none;
     flex-wrap: wrap;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 10px;
     overflow: hidden;
-    padding: 4px 0 0 4px; /* see margin on div below */
+    padding: 6px 0 0 8px; /* see margin on div below */
     position: absolute;
     text-overflow: ellipsis;
     z-index: 1;
@@ -27,10 +27,10 @@ const template = createTemplate(`
     display: inline-flex;
   }
   #suggestions div {
-    margin: 0 4px 4px 0;
+    margin: 0 8px 4px 0;
   }
   #suggestions div:hover {
-    color: #666;
+    color: var(--text-hover-color);
     cursor: pointer;
   }
 </style>
@@ -61,7 +61,8 @@ customElements.define(
       this.target_ = slotElements[0];
       this.target_.addEventListener('keydown', (e) => this.handleKeyDown_(e));
       this.target_.addEventListener('focus', () => {
-        this.target_.selectionStart = this.target_.selectionEnd = this.target_.value.length;
+        this.target_.selectionStart = this.target_.selectionEnd =
+          this.target_.value.length;
       });
       this.target_.spellcheck = false;
 

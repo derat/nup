@@ -27,7 +27,7 @@ const template = createTemplate(`
   }
 
   th {
-    background-color: #f5f5f5;
+    background-color: var(--header-color);
     cursor: default;
     padding: 2px 10px 0 10px;
     position: sticky;
@@ -46,11 +46,11 @@ const template = createTemplate(`
     width: 100%;
   }
   th:before {
-    border-top: solid 1px #ddd;
+    border-top: solid 1px var(--border-color);
     top: 0;
   }
   th:after {
-    border-bottom: solid 1px #ddd;
+    border-bottom: solid 1px var(--border-color);
     bottom: 0;
   }
 
@@ -67,16 +67,16 @@ const template = createTemplate(`
   }
 
   td a {
-    color: black;
+    color: var(--text-color);
     text-decoration: none;
     cursor: pointer;
   }
   td a:hover {
-    color: #666;
+    color: var(--link-color);
     text-decoration: underline;
   }
   tr.highlight td a {
-    color: white;
+    color: var(--accent-text-color);
   }
 
   td.checkbox,
@@ -95,7 +95,7 @@ const template = createTemplate(`
   }
   tr.highlight {
     background-color: var(--accent-color);
-    color: white;
+    color: var(--accent-text-color);
   }
   input[type='checkbox'] {
     margin: 2px 0 0 0;

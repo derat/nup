@@ -2,15 +2,39 @@
 // All rights reserved.
 
 import { $, scaledCoverSize } from './common.js';
+import Config from './config.js';
 
+const config = new Config();
 const dialogManager = document.querySelector('dialog-manager');
 const musicPlayer = document.querySelector('music-player');
 const musicSearcher = document.querySelector('music-searcher');
 
 // Wire up dependencies between components.
+musicPlayer.config = config;
 musicPlayer.dialogManager = dialogManager;
 musicSearcher.dialogManager = dialogManager;
 musicSearcher.musicPlayer = musicPlayer;
+
+// Watch for theme changes.
+const darkMediaQuery = '(prefers-color-scheme: dark)';
+const updateTheme = (theme) => {
+  let dark = false;
+  switch (theme) {
+    case Config.THEME_AUTO:
+      dark = window.matchMedia(darkMediaQuery).matches;
+      break;
+    case Config.THEME_LIGHT:
+      break;
+    case Config.THEME_DARK:
+      dark = true;
+      break;
+  }
+  if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+  else document.documentElement.removeAttribute('data-theme');
+};
+config.addCallback((k, v) => k === Config.THEME && updateTheme(v));
+window.matchMedia(darkMediaQuery).addListener((e) => updateTheme());
+updateTheme(config.get(Config.THEME));
 
 // Hide the scrollbar while the presentation layer is shown.
 musicPlayer.addEventListener('present', (e) => {
