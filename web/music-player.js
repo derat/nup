@@ -231,12 +231,12 @@ customElements.define(
       this.songs_ = []; // songs in the order in which they should be played
       this.tags_ = []; // available tags loaded from server
       this.currentIndex_ = -1; // index into |songs| of current track
-      this.lastTimeUpdatePosition_ = 0; // playback position at last onTimeUpdate_()
-      this.lastTimeUpdateSong_ = null; // current song at last onTimeUpdate_()
+      this.lastUpdateTime_ = -1; // seconds since epoch for last onTimeUpdate_()
+      this.lastUpdatePosition_ = 0; // playback position at last onTimeUpdate_()
+      this.lastUpdateSong_ = null; // current song at last onTimeUpdate_()
       this.numErrors_ = 0; // consecutive playback errors
       this.startTime_ = -1; // seconds since epoch when current track started
       this.totalPlayedSec_ = 0; // total seconds playing current song
-      this.lastUpdateTime_ = -1; // seconds since epoch for last onTimeUpdate_()
       this.reportedCurrentTrack_ = false; // already reported current as played?
       this.reachedEndOfSongs_ = false; // did we hit end of last song?
       this.updateSong_ = null; // song playing when update div was opened
@@ -401,7 +401,7 @@ customElements.define(
         .then((res) => res.json())
         .then((tags) => {
           this.updateTags_(tags);
-          console.log('Loaded ' + tags.length + ' tag(s)');
+          console.log(`Loaded ${tags.length} tag(s)`);
         })
         .catch((err) => {
           console.error(`Failed loading tags: ${err}`);
@@ -538,7 +538,7 @@ customElements.define(
 
     updateSongDisplay_() {
       const song = this.currentSong_;
-      document.title = song ? song.artist + ' - ' + song.title : 'Player';
+      document.title = song ? `${song.artist} - ${song.title}` : 'Player';
 
       this.artistDiv_.innerText = song ? song.artist : '';
       this.titleDiv_.innerText = song ? song.title : '';
@@ -721,12 +721,12 @@ customElements.define(
         }
         this.nextAudio_ = null;
 
-        this.lastTimeUpdatePosition_ = 0;
-        this.lastTimeUpdateSong_ = null;
+        this.lastUpdateTime_ = -1;
+        this.lastUpdatePosition_ = 0;
+        this.lastUpdateSong_ = null;
         this.numErrors_ = 0;
         this.startTime_ = getCurrentTimeSec();
         this.totalPlayedSec_ = 0;
-        this.lastUpdateTime_ = -1;
         this.reportedCurrentTrack_ = false;
         this.reachedEndOfSongs_ = false;
         this.updateGain_();
@@ -789,51 +789,46 @@ customElements.define(
 
     onTimeUpdate_() {
       const song = this.currentSong_;
-      const position = this.audio_.currentTime;
+      const pos = this.audio_.currentTime;
+      const dur = song ? song.length : this.audio_.duration;
 
       // Avoid resetting |numErrors_| if we get called repeatedly without making
       // any progress.
-      if (
-        song == this.lastTimeUpdateSong_ &&
-        position == this.lastTimeUpdatePosition_
-      ) {
+      if (song == this.lastUpdateSong_ && pos == this.lastUpdatePosition_) {
         return;
-      }
-
-      this.lastTimeUpdatePosition_ = position;
-      this.lastTimeUpdateSong_ = song;
-      this.numErrors_ = 0;
-
-      const duration = song ? song.length : this.audio_.duration;
-      if (duration) {
-        const cur = formatTime(position);
-        const dur = formatTime(duration);
-        this.timeDiv_.innerText = `[ ${cur} / ${dur} ]`;
-      } else {
-        this.timeDiv_.innerText = '';
       }
 
       const now = getCurrentTimeSec();
       if (this.lastUpdateTime_ > 0) {
-        this.totalPlayedSec_ += now - this.lastUpdateTime_;
+        // Playback can hang if the network is flaky, so make sure that we don't
+        // incorrectly increment the total played time by the wall time if the
+        // position didn't move as much: https://github.com/derat/nup/issues/20
+        const timeDiff = now - this.lastUpdateTime_;
+        const posDiff = pos - this.lastUpdatePosition_;
+        this.totalPlayedSec_ += Math.max(Math.min(timeDiff, posDiff), 0);
       }
+
       this.lastUpdateTime_ = now;
+      this.lastUpdatePosition_ = pos;
+      this.lastUpdateSong_ = song;
+      this.numErrors_ = 0;
 
-      if (!this.reportedCurrentTrack_) {
-        if (
-          this.totalPlayedSec_ >= 240 ||
-          this.totalPlayedSec_ > duration / 2
-        ) {
-          this.reportedCurrentTrack_ = true;
-          this.updater_.reportPlay(song.songId, this.startTime_);
-        }
+      if (
+        !this.reportedCurrentTrack_ &&
+        (this.totalPlayedSec_ >= 240 || this.totalPlayedSec_ > dur / 2)
+      ) {
+        this.updater_.reportPlay(song.songId, this.startTime_);
+        this.reportedCurrentTrack_ = true;
       }
 
-      this.presentationLayer_.updatePosition(position);
+      this.timeDiv_.innerText = dur
+        ? `[ ${formatTime(pos)} / ${formatTime(dur)} ]`
+        : '';
+      this.presentationLayer_.updatePosition(pos);
 
       // Preload the next song once we're nearing the end of this one.
       if (
-        position >= duration - this.constructor.PRELOAD_SEC_ &&
+        pos >= dur - this.constructor.PRELOAD_SEC_ &&
         !this.nextAudio_ &&
         this.currentIndex_ < this.songs_.length - 1
       ) {
@@ -861,11 +856,9 @@ customElements.define(
         case error.MEDIA_ERR_DECODE: // 3
         case error.MEDIA_ERR_SRC_NOT_SUPPORTED: // 4
           if (this.numErrors_ <= this.constructor.MAX_RETRIES_) {
-            console.log(
-              'Retrying from position ' + this.lastTimeUpdatePosition_
-            );
+            console.log(`Retrying from position ${this.lastUpdatePosition_}`);
             this.audio_.load();
-            this.audio_.currentTime = this.lastTimeUpdatePosition_;
+            this.audio_.currentTime = this.lastUpdatePosition_;
             this.audio_.play();
           } else {
             console.log(`Giving up after ${this.numErrors_} errors`);
@@ -917,7 +910,7 @@ customElements.define(
           newTags.push(tag);
           if (this.tags_.indexOf(tag) == -1) createdTags.push(tag);
         } else {
-          console.log('Skipping unknown tag "' + tag + '"');
+          console.log(`Skipping unknown tag "${tag}"`);
         }
       }
       // Remove duplicates.
