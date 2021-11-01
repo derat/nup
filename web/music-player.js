@@ -33,7 +33,7 @@ const template = createTemplate(`
     align-items: center;
     display: flex;
     justify-content: center;
-    margin-right: 6px;
+    margin-right: var(--margin);
   }
   #cover-div.empty {
     background-color: var(--cover-missing-color);

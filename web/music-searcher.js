@@ -36,6 +36,9 @@ const template = createTemplate(`
     display: flex;
     margin-bottom: 6px;
   }
+  #search-form .row:last-child {
+    margin-bottom: 0;
+  }
   #search-form .row .checkbox-col {
     width: 8em;
   }
