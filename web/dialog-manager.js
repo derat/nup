@@ -41,7 +41,7 @@ const template = createTemplate(`
   }
   .dialog {
     background-color: var(--bg-color);
-    border: solid 1px var(--dialog-border-color);
+    border: solid 1px var(--frame-border-color);
     box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
     display: inline-block;
     padding: var(--margin);
@@ -53,6 +53,7 @@ const template = createTemplate(`
   }
   .menu {
     background-color: var(--bg-color);
+    border: solid 1px var(--frame-border-color);
     box-shadow: 0 1px 2px 1px rgba(0, 0, 0, 0.2);
     pointer-events: auto;
     position: absolute;

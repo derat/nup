@@ -91,6 +91,7 @@ const template = createTemplate(`
   }
   #update-container {
     background-color: var(--bg-color);
+    border: solid 1px var(--frame-border-color);
     border-radius: 4px;
     box-shadow: 0 1px 4px 1px rgba(0, 0, 0, 0.3);
     display: none;
@@ -118,10 +119,10 @@ const template = createTemplate(`
     cursor: pointer;
     display: inline-block;
     min-width: 17px; /* black and white stars have different sizes :-/ */
-    opacity: 0.7;
+    opacity: 0.6;
   }
   #rating a.star:hover {
-    opacity: 0.8;
+    opacity: 0.9;
   }
   a.debug-link {
     color: var(--text-color);
