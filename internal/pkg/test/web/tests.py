@@ -115,16 +115,22 @@ class Test(unittest.TestCase):
                       '.\nReceived:\n' +
                       pprint.pformat(page.get_search_results()))
 
-    def wait_for_playlist(self, page, songs, highlighted_index=-1, msg=''):
+    def wait_for_playlist(self, page, songs, active_index=-1, menu_index=-1,
+                          msg=''):
         '''Waits until the page is displaying the expected playlist.'''
         def is_expected():
             playlist = page.get_playlist()
             if playlist != songs:
                 return False
-            if highlighted_index >= 0:
+            if active_index >= 0:
                 for i, song in enumerate(playlist):
-                    if (highlighted_index == i and not song.highlighted) or \
-                       (highlighted_index != i and song.highlighted):
+                    if (active_index == i and not song.active) or \
+                       (active_index != i and song.active):
+                        return False
+            if menu_index >= 0:
+                for i, song in enumerate(playlist):
+                    if (menu_index == i and not song.menu) or \
+                       (menu_index != i and song.menu):
                         return False
             return True
         try:
@@ -503,27 +509,31 @@ class Test(unittest.TestCase):
         page.keywords = song1.album
         page.click(page.LUCKY_BUTTON)
         self.wait_for_song(page, song1, False)
-        self.wait_for_playlist(page, songs, 0)
+        self.wait_for_playlist(page, songs, 0, -1)
 
         page.right_click_playlist_song(3)
+        self.wait_for_playlist(page, songs, menu_index=3)
         page.click(page.MENU_PLAY)
         self.wait_for_song(page, song4, False)
-        self.wait_for_playlist(page, songs, 3)
+        self.wait_for_playlist(page, songs, 3, -1)
 
         page.right_click_playlist_song(2)
+        self.wait_for_playlist(page, songs, menu_index=2)
         page.click(page.MENU_PLAY)
         self.wait_for_song(page, song3, False)
-        self.wait_for_playlist(page, songs, 2)
+        self.wait_for_playlist(page, songs, 2, -1)
 
         page.right_click_playlist_song(0)
+        self.wait_for_playlist(page, songs, menu_index=0)
         page.click(page.MENU_REMOVE)
         self.wait_for_song(page, song3, False)
-        self.wait_for_playlist(page, [song2, song3, song4, song5], 1)
+        self.wait_for_playlist(page, [song2, song3, song4, song5], 1, -1)
 
         page.right_click_playlist_song(1)
+        self.wait_for_playlist(page, [song2, song3, song4, song5], menu_index=1)
         page.click(page.MENU_TRUNCATE)
         self.wait_for_song(page, song2, True)
-        self.wait_for_playlist(page, [song2], 0)
+        self.wait_for_playlist(page, [song2], 0, -1)
 
     def test_display_time_while_playing(self):
         song = Song('ar', 't', 'al', 1, filename=Song.FILE_5S, length=5.0)

@@ -8,7 +8,7 @@ class TimeoutError(Exception):
     def __str__(self):
         return repr(self.value)
 
-def wait(f, timeout_sec=10, sleep_sec=0.1):
+def wait(f, timeout_sec=10, sleep_sec=0.05):
     '''Waits for a function to return true.'''
     start = time.time()
     while True:

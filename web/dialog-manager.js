@@ -187,6 +187,8 @@ customElements.define(
         y + menu.clientHeight <= window.innerHeight
           ? `${y}px`
           : `${y - menu.clientHeight}px`;
+
+      return menu;
     }
 
     // Closes |child| (either a dialog or a menu).

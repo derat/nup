@@ -55,8 +55,19 @@ const template = createTemplate(`
   }
 
   tr {
+    background-color: var(--bg-color);
     scroll-margin-bottom: 22px;
     scroll-margin-top: 42px;
+  }
+  tr.active {
+    background-color: var(--accent-color);
+    color: var(--accent-text-color);
+  }
+  tr.menu {
+    background-color: var(--bg-active-color);
+  }
+  tr.active.menu {
+    background-color: var(--accent-active-color);
   }
 
   td {
@@ -75,7 +86,7 @@ const template = createTemplate(`
     color: var(--link-color);
     text-decoration: underline;
   }
-  tr.highlight td a {
+  tr.active td a {
     color: var(--accent-text-color);
   }
 
@@ -92,10 +103,6 @@ const template = createTemplate(`
     text-align: right;
     padding-right: 10px;
     text-overflow: clip;
-  }
-  tr.highlight {
-    background-color: var(--accent-color);
-    color: var(--accent-text-color);
   }
   input[type='checkbox'] {
     margin: 2px 0 0 0;
@@ -190,16 +197,28 @@ customElements.define(
             .map((r) => r.song);
     }
 
-    // Sets highlighting for the song at |index| to |highlight|.
-    highlightRow(index, highlight) {
+    // Marks the row at |index| as being active (or not).
+    // The row receives a strong highlight.
+    setRowActive(index, active) {
+      this.setRowClass_(index, 'active', active);
+    }
+
+    // Marks the row at |index| as having its context menu shown (or not).
+    // The row receives a faint highlight.
+    setRowMenuShown(index, menuShown) {
+      this.setRowClass_(index, 'menu', menuShown);
+    }
+
+    // Helper method that adds or removes |cls| from the row at |index|.
+    setRowClass_(index, cls, add) {
       if (index < 0 || index >= this.numSongs) return;
 
       const row = this.songRows_[index];
-      if (highlight) row.classList.add('highlight');
-      else row.classList.remove('highlight');
+      if (add) row.classList.add(cls);
+      else row.classList.remove(cls);
     }
 
-    // Scrolls the table so that the song at |index| is in view.
+    // Scrolls the table so that the row at |index| is in view.
     scrollToRow(index) {
       if (index < 0 || index >= this.numSongs) return;
       this.songRows_[index].scrollIntoView({
@@ -314,7 +333,7 @@ customElements.define(
     // Updates |row| to display data about |song|. Also attaches |song|.
     updateSongRow_(index, song) {
       const row = this.songRows_[index];
-      row.classList.remove('highlight');
+      row.classList.remove('active');
 
       // HTML5 dataset properties can only hold strings, so we attach the song
       // directly to the element instead. (Serializing it to JSON would also be

@@ -24,9 +24,11 @@
   --icon-font-family: fontello, sans-serif;
 
   --bg-color: #fff;
+  --bg-active-color: #eee; /* song row with context menu */
   --text-color: #000;
   --text-hover-color: #666;
-  --accent-color: #42a5f5; /* song table highlight */
+  --accent-color: #42a5f5; /* song row highlight, material blue 400 */
+  --accent-active-color: #1976d2; /* material blue 700 */
   --accent-text-color: #fff;
   --border-color: #ddd; /* between frames */
   --button-color: #aaa;
@@ -46,9 +48,11 @@
 
 [data-theme='dark'] {
   --bg-color: #222;
+  --bg-active-color: #333;
   --text-color: #ccc;
   --text-hover-color: #eee;
   --accent-color: #1f517a;
+  --accent-active-color: #296ea6;
   --accent-text-color: #fff;
   --border-color: #555;
   --button-color: #888;
@@ -58,7 +62,7 @@
   --control-active-color: #888;
   --cover-missing-color: #333;
   --frame-border-color: #444;
-  --dialog-title-color: #42a5f5;
+  --dialog-title-color: #42a5f5; /* material blue 400 */
   --header-color: #333;
   --icon-color: #aaa;
   --icon-hover-color: #ccc;

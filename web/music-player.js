@@ -303,7 +303,8 @@ customElements.define(
         const idx = e.detail.index;
         const orig = e.detail.orig;
         orig.preventDefault();
-        this.dialogManager_.createMenu(orig.pageX, orig.pageY, [
+
+        const menu = this.dialogManager_.createMenu(orig.pageX, orig.pageY, [
           {
             id: 'play',
             text: 'Play',
@@ -325,6 +326,13 @@ customElements.define(
             cb: () => window.open(getDumpSongUrl(e.detail.songId), '_blank'),
           },
         ]);
+
+        // Highlight the playlist row, and then remove the highlighting when the
+        // menu is closed.
+        this.playlistTable_.setRowMenuShown(idx, true);
+        menu.addEventListener('close', () => {
+          this.playlistTable_.setRowMenuShown(idx, false);
+        });
       });
 
       if ('mediaSession' in navigator) {
@@ -455,9 +463,9 @@ customElements.define(
         // If we're removing songs before the current one, we need to update the
         // index and highlighting.
         if (end < this.currentIndex_) {
-          this.playlistTable_.highlightRow(this.currentIndex_, false);
+          this.playlistTable_.setRowActive(this.currentIndex_, false);
           this.currentIndex_ -= len;
-          this.playlistTable_.highlightRow(this.currentIndex_, true);
+          this.playlistTable_.setRowActive(this.currentIndex_, true);
         }
         this.updateButtonState_();
         this.updatePresentationLayerSongs_();
@@ -467,7 +475,7 @@ customElements.define(
       // Stop playing the (just-removed) current song and choose a new one.
       this.audio_.pause();
       this.audio_.removeAttribute('src');
-      this.playlistTable_.highlightRow(this.currentIndex_, false);
+      this.playlistTable_.setRowActive(this.currentIndex_, false);
       this.currentIndex_ = -1;
 
       // If there are songs after the last-removed one, switch to the first of
@@ -511,8 +519,8 @@ customElements.define(
 
       if (index == this.currentIndex_) return;
 
-      this.playlistTable_.highlightRow(this.currentIndex_, false);
-      this.playlistTable_.highlightRow(index, true);
+      this.playlistTable_.setRowActive(this.currentIndex_, false);
+      this.playlistTable_.setRowActive(index, true);
       this.playlistTable_.scrollToRow(index);
       this.currentIndex_ = index;
 

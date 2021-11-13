@@ -29,8 +29,9 @@ class Song:
         self.sha1 = sha.new('%s-%s-%s' % (artist, album, title)).hexdigest()
         self.album_id = '%s-%s' % (artist, album)
 
-        # Used for playlist entries and search results, respectively.
-        self.highlighted = False
+        # Used for playlist entries and search results.
+        self.active = False
+        self.menu = False
         self.checked = False
 
     def to_dict(self):
@@ -53,8 +54,10 @@ class Song:
 
     def __str__(self):
         info = ''
-        if self.highlighted:
-            info += ' (highlighted)'
+        if self.active:
+            info += ' (active)'
+        if self.menu:
+            info += ' (menu)'
         if self.checked:
             info += ' (checked)'
         return '[%s, %s, %s%s]' % (self.artist, self.title, self.album, info)
