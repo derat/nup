@@ -18,7 +18,7 @@ curl -u "${APP_AUTH}" --data @app_config.json "${APP_URL}/config"
 "${UPDATE_MUSIC}" --require-covers \
   --config update_config.json \
   --import-json-file songs.txt
-rm -f last_update_time.json
+rm -f last_update_info.json
 
 # To test with actual songs, serve their directory rather than '.' and update
 # songBaseURL in app_config.json (if the songs aren't in a music/ subdir).

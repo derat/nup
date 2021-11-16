@@ -101,14 +101,14 @@ func newTester(serverURL, binDir string) *Tester {
 
 	// Corresponds to Config in cmd/update_music/main.go.
 	t.updateConfigFile = writeConfig("update_config.json", struct {
-		LastUpdateTimeFile string `json:"lastUpdateTimeFile"`
+		LastUpdateInfoFile string `json:"lastUpdateInfoFile"`
 		ServerURL          string `json:"serverUrl"`
 		Username           string `json:"username"`
 		Password           string `json:"password"`
 		CoverDir           string `json:"coverDir"`
 		MusicDir           string `json:"musicDir"`
 	}{
-		filepath.Join(t.TempDir, "last_update_time"),
+		filepath.Join(t.TempDir, "last_update_info.json"),
 		t.serverURL,
 		types.TestUsername,
 		types.TestPassword,

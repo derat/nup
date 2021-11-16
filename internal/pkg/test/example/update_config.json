@@ -4,5 +4,5 @@
   "password": "testpass",
   "musicDir": "music",
   "coverDir": "covers",
-  "lastUpdateTimeFile": "last_update_time.json"
+  "lastUpdateInfoFile": "last_update_info.json"
 }

@@ -99,7 +99,7 @@ func TestUpdate(tt *testing.T) {
 	defer cleanUpTest(t)
 
 	log.Print("importing songs from music dir")
-	CopySongsToTempDir(t.MusicDir, Song0s.Filename, Song1s.Filename)
+	CopySongs(t.MusicDir, Song0s.Filename, Song1s.Filename)
 	t.UpdateSongs()
 	if err := CompareSongs([]types.Song{Song0s, Song1s},
 		t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
@@ -107,7 +107,7 @@ func TestUpdate(tt *testing.T) {
 	}
 
 	log.Print("importing another song")
-	CopySongsToTempDir(t.MusicDir, Song5s.Filename)
+	CopySongs(t.MusicDir, Song5s.Filename)
 	t.UpdateSongs()
 	if err := CompareSongs([]types.Song{Song0s, Song1s, Song5s},
 		t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
@@ -115,8 +115,8 @@ func TestUpdate(tt *testing.T) {
 	}
 
 	log.Print("updating a song")
-	RemoveFromTempDir(t.MusicDir, Song0s.Filename)
-	CopySongsToTempDir(t.MusicDir, Song0sUpdated.Filename)
+	DeleteSongs(t.MusicDir, Song0s.Filename)
+	CopySongs(t.MusicDir, Song0sUpdated.Filename)
 	t.UpdateSongs()
 	if err := CompareSongs([]types.Song{Song0sUpdated, Song1s, Song5s},
 		t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
@@ -129,7 +129,7 @@ func TestUserData(tt *testing.T) {
 	defer cleanUpTest(t)
 
 	log.Print("importing a song")
-	CopySongsToTempDir(t.MusicDir, Song0s.Filename)
+	CopySongs(t.MusicDir, Song0s.Filename)
 	t.UpdateSongs()
 	id := t.SongID(Song0s.SHA1)
 
@@ -158,12 +158,12 @@ func TestUserData(tt *testing.T) {
 	}
 
 	log.Print("updating song and checking that user data is preserved")
-	RemoveFromTempDir(t.MusicDir, s.Filename)
+	DeleteSongs(t.MusicDir, s.Filename)
 	us := Song0sUpdated
 	us.Rating = s.Rating
 	us.Tags = s.Tags
 	us.Plays = s.Plays
-	CopySongsToTempDir(t.MusicDir, us.Filename)
+	CopySongs(t.MusicDir, us.Filename)
 	t.UpdateSongs()
 	if err := CompareSongs([]types.Song{us},
 		t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
@@ -446,7 +446,7 @@ func TestCovers(tt *testing.T) {
 	}
 
 	log.Print("writing cover and updating songs")
-	CopySongsToTempDir(t.MusicDir, Song0s.Filename, Song5s.Filename)
+	CopySongs(t.MusicDir, Song0s.Filename, Song5s.Filename)
 	s5 := Song5s
 	s5.CoverFilename = fmt.Sprintf("%s.jpg", s5.AlbumID)
 	createCover(s5.CoverFilename)
@@ -456,8 +456,8 @@ func TestCovers(tt *testing.T) {
 	}
 
 	log.Print("writing another cover and updating again")
-	RemoveFromTempDir(t.MusicDir, Song0s.Filename)
-	CopySongsToTempDir(t.MusicDir, Song0sUpdated.Filename)
+	DeleteSongs(t.MusicDir, Song0s.Filename)
+	CopySongs(t.MusicDir, Song0sUpdated.Filename)
 	s0 := Song0sUpdated
 	s0.CoverFilename = fmt.Sprintf("%s.jpg", s0.AlbumID)
 	createCover(s0.CoverFilename)
@@ -467,11 +467,11 @@ func TestCovers(tt *testing.T) {
 	}
 
 	log.Print("writing cover named after recording id")
-	CopySongsToTempDir(t.MusicDir, Song1s.Filename)
+	CopySongs(t.MusicDir, Song1s.Filename)
 	s1 := Song1s
 	s1.CoverFilename = fmt.Sprintf("%s.jpg", s1.RecordingID)
 	createCover(s1.CoverFilename)
-	RemoveFromTempDir(t.CoverDir, s0.CoverFilename)
+	DeleteSongs(t.CoverDir, s0.CoverFilename)
 	t.UpdateSongs()
 	if err := compareQueryResults([]types.Song{s0, s1, s5}, t.QuerySongs(), IgnoreOrder); err != nil {
 		tt.Error(err)

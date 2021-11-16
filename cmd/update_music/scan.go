@@ -14,6 +14,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"syscall"
 	"time"
 
@@ -320,14 +321,21 @@ type scanOptions struct {
 	artistRewrites map[string]string // artist names from tags to rewrite
 }
 
-// scanForUpdatedSongs looks for songs under musicDir updated more recently than
-// lastUpdateTime and asynchronously sends the resulting Song structs to ch.
-// The number of songs that will be sent to the channel is returned.
-func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, ch chan types.SongOrErr,
-	opts *scanOptions) (numUpdates int, err error) {
+// scanForUpdatedSongs looks for songs under musicDir updated more recently than lastUpdateTime or
+// in directories not listed in lastUpdateDirs and asynchronously sends the resulting Song structs
+// to ch. The number of songs that will be sent to the channel and seen directories (relative to
+// musicDir) are returned.
+func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDirs []string,
+	ch chan types.SongOrErr, opts *scanOptions) (numUpdates int, seenDirs []string, err error) {
 	var numMP3s int                   // total number of songs under musicDir
 	var gains map[string]mp3gain.Info // keys are full paths
 	var gainsDir string               // directory for gains
+
+	oldDirs := make(map[string]struct{}, len(lastUpdateDirs))
+	for _, d := range lastUpdateDirs {
+		oldDirs[d] = struct{}{}
+	}
+	newDirs := make(map[string]struct{})
 
 	err = filepath.Walk(musicDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
@@ -346,6 +354,9 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, ch chan type
 			log.Printf("Progress: scanned %v files", numMP3s)
 		}
 
+		relDir := filepath.Dir(relPath)
+		newDirs[relDir] = struct{}{}
+
 		if opts.forceGlob != "" {
 			if matched, err := filepath.Match(opts.forceGlob, relPath); err != nil {
 				return fmt.Errorf("invalid glob %q: %v", opts.forceGlob, err)
@@ -353,13 +364,26 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, ch chan type
 				return nil
 			}
 		} else {
+			// Bail out if the file isn't new and we saw its directory in the last update.
+			// We need to check for new directories to handle the situation described at
+			// https://github.com/derat/nup/issues/22 where a directory containing files
+			// with old timestamps is moved into the tree.
 			stat := fi.Sys().(*syscall.Stat_t)
 			ctime := time.Unix(int64(stat.Ctim.Sec), int64(stat.Ctim.Nsec))
-			if fi.ModTime().Before(lastUpdateTime) && ctime.Before(lastUpdateTime) {
+			oldFile := fi.ModTime().Before(lastUpdateTime) && ctime.Before(lastUpdateTime)
+			_, oldDir := oldDirs[relDir]
+
+			// Handle old configs that don't include previously-seen directories.
+			if len(oldDirs) == 0 {
+				oldDir = true
+			}
+
+			if oldFile && oldDir {
 				return nil
 			}
 		}
 
+		// Compute the gains for this directory if we didn't already do it.
 		var gain *mp3gain.Info
 		if opts.computeGain {
 			if dir := filepath.Dir(path); gainsDir != dir {
@@ -382,11 +406,15 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, ch chan type
 		return nil
 	})
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 
 	if opts.logProgress {
 		log.Printf("Found %v update(s) among %v files.", numUpdates, numMP3s)
 	}
-	return numUpdates, nil
+	for d := range newDirs {
+		seenDirs = append(seenDirs, d)
+	}
+	sort.Strings(seenDirs)
+	return numUpdates, seenDirs, nil
 }

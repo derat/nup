@@ -30,12 +30,18 @@ func CreateTempDir() string {
 func GetDataDir() string {
 	_, p, _, ok := runtime.Caller(0)
 	if !ok {
-		panic("unable to get runtime caller info")
+		panic("Unable to get runtime caller info")
 	}
 	return filepath.Join(filepath.Dir(p), "data")
 }
 
-func CopySongsToTempDir(dir string, filenames ...string) {
+// CopySongs copies the provided songs (e.g. Song0s.Filename) into dir.
+// The supplied directory is created if it doesn't already exist.
+func CopySongs(dir string, filenames ...string) {
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		panic(err)
+	}
+
 	for _, fn := range filenames {
 		sp := filepath.Join(GetDataDir(), "music", fn)
 		s, err := os.Open(sp)
@@ -62,7 +68,8 @@ func CopySongsToTempDir(dir string, filenames ...string) {
 	}
 }
 
-func RemoveFromTempDir(dir string, filenames ...string) {
+// DeleteSongs removes the provided songs (e.g. Song0s.Filename) from dir.
+func DeleteSongs(dir string, filenames ...string) {
 	for _, fn := range filenames {
 		if err := os.Remove(filepath.Join(dir, fn)); err != nil {
 			panic(err)

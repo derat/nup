@@ -21,9 +21,9 @@ type config struct {
 	CoverDir string `json:"coverDir"`
 	// MusicDir is the base directory containing song files.
 	MusicDir string `json:"musicDir"`
-	// LastUpdateTimeFile is the path to a JSON file storing the time an update was last performed.
+	// LastUpdateInfoFile is the path to a JSON file storing info about the last update.
 	// The file will be created if it does not already exist.
-	LastUpdateTimeFile string `json:"lastUpdateTimeFile"`
+	LastUpdateInfoFile string `json:"lastUpdateInfoFile"`
 	// ComputeGain indicates whether the mp3gain program should be used to compute per-song
 	// and per-album gain information so that volume can be normalized during playback.
 	ComputeGain bool `json:"computeGain"`
@@ -60,11 +60,11 @@ func main() {
 	}
 
 	var err error
-	numSongs := 0
+	var numSongs int
+	var scannedDirs []string
+	var replaceUserData, didFullScan bool
 	readChan := make(chan types.SongOrErr)
 	startTime := time.Now()
-	replaceUserData := false
-	didFullScan := false
 
 	if len(*importJSONFile) > 0 {
 		log.Printf("Reading songs from %v", *importJSONFile)
@@ -83,18 +83,18 @@ func main() {
 				log.Fatal("Failed reading song list: ", err)
 			}
 		} else {
-			lastUpdateTime, err := getLastUpdateTime(cfg.LastUpdateTimeFile)
+			info, err := readLastUpdateInfo(cfg.LastUpdateInfoFile)
 			if err != nil {
-				log.Fatal("Unable to get last update time: ", err)
+				log.Fatal("Unable to get last update info: ", err)
 			}
-			log.Printf("Scanning for songs in %v updated since %v", cfg.MusicDir, lastUpdateTime.Local())
-			numSongs, err = scanForUpdatedSongs(cfg.MusicDir, lastUpdateTime, readChan, &scanOptions{
+			log.Printf("Scanning for songs in %v updated since %v", cfg.MusicDir, info.Time.Local())
+			opts := scanOptions{
 				computeGain:    cfg.ComputeGain,
 				forceGlob:      *forceGlob,
 				logProgress:    true,
 				artistRewrites: cfg.ArtistRewrites,
-			})
-
+			}
+			numSongs, scannedDirs, err = scanForUpdatedSongs(cfg.MusicDir, info.Time, info.Dirs, readChan, &opts)
 			if err != nil {
 				log.Fatal("Scanning failed: ", err)
 			}
@@ -138,42 +138,55 @@ func main() {
 			}
 		}
 	} else {
-		if err = updateSongs(&cfg, updateChan, replaceUserData); err != nil {
+		if err := updateSongs(&cfg, updateChan, replaceUserData); err != nil {
 			log.Fatal("Failed updating songs: ", err)
 		}
 		if didFullScan {
-			if err = setLastUpdateTime(cfg.LastUpdateTimeFile, startTime); err != nil {
-				log.Fatal("Failed setting last-update time: ", err)
+			if err := writeLastUpdateInfo(cfg.LastUpdateInfoFile, lastUpdateInfo{
+				Time: startTime,
+				Dirs: scannedDirs,
+			}); err != nil {
+				log.Fatal("Failed saving update info: ", err)
 			}
 		}
 	}
 }
 
-// getLastUpdateTime JSON-unmarshals a time.Time value from p.
-func getLastUpdateTime(p string) (t time.Time, err error) {
+// lastUpdateInfo contains information about the last full update that was performed.
+// It is used to identify new music files.
+type lastUpdateInfo struct {
+	// Time contains the time at which the last update was started.
+	Time time.Time `json:"time"`
+	// Dirs contains all song-containing directories that were seen (relative to config.MusicDir).
+	Dirs []string `json:"dirs"`
+}
+
+// readLastUpdateInfo JSON-unmarshals a lastUpdateInfo struct from the file at p.
+func readLastUpdateInfo(p string) (info lastUpdateInfo, err error) {
 	f, err := os.Open(p)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return t, nil
+			return info, nil
 		}
-		return t, err
+		return info, err
 	}
 	defer f.Close()
 
-	if err = json.NewDecoder(f).Decode(&t); err != nil {
-		return t, err
-	}
-	return t, nil
+	err = json.NewDecoder(f).Decode(&info)
+	return info, err
 }
 
-// setLastUpdateTime JSON-marshals t to p.
-func setLastUpdateTime(p string, t time.Time) error {
+// writeLastUpdateInfo JSON-marshals info to a file at p.
+func writeLastUpdateInfo(p string, info lastUpdateInfo) error {
 	f, err := os.Create(p)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return json.NewEncoder(f).Encode(t)
+	if err := json.NewEncoder(f).Encode(info); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 // getCoverFilename returns the relative path under dir for song's cover image.
