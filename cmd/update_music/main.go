@@ -131,9 +131,9 @@ func main() {
 	}()
 
 	if *dryRun {
-		e := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(os.Stdout)
 		for s := range updateChan {
-			if err := e.Encode(s); err != nil {
+			if err := enc.Encode(s); err != nil {
 				log.Fatal("Failed encoding song: ", err)
 			}
 		}
@@ -182,7 +182,9 @@ func writeLastUpdateInfo(p string, info lastUpdateInfo) error {
 	if err != nil {
 		return err
 	}
-	if err := json.NewEncoder(f).Encode(info); err != nil {
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(info); err != nil {
 		f.Close()
 		return err
 	}
