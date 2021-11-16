@@ -69,12 +69,12 @@ func main() {
 	if len(*importJSONFile) > 0 {
 		log.Printf("Reading songs from %v", *importJSONFile)
 		if numSongs, err = readSongsFromJSONFile(*importJSONFile, readChan); err != nil {
-			log.Fatal(err)
+			log.Fatal("Failed reading songs: ", err)
 		}
 		replaceUserData = *importUserData
 	} else {
 		if len(cfg.MusicDir) == 0 {
-			log.Fatal("MusicDir not set in config")
+			log.Fatal("musicDir not set in config")
 		}
 
 		if len(*songPathsFile) > 0 {
@@ -83,6 +83,9 @@ func main() {
 				log.Fatal("Failed reading song list: ", err)
 			}
 		} else {
+			if len(cfg.LastUpdateInfoFile) == 0 {
+				log.Fatal("lastUpdateInfoFile not set in config")
+			}
 			info, err := readLastUpdateInfo(cfg.LastUpdateInfoFile)
 			if err != nil {
 				log.Fatal("Unable to get last update info: ", err)
