@@ -2,6 +2,32 @@
 
 App Engine app for streaming a music collection.
 
+## Overview
+
+This repository contains a [Google App Engine] app for interacting with a
+personal music collection, along with a web client and various command-line
+tools for managing the data.
+
+The basic idea is that you mirror your music collection (and the corresponding
+album artwork) to [Google Cloud Storage] and then run the `update_music` command
+against the local copy to save metadata to a [Datastore] database.
+User-generated information like ratings, tags, and playback history is also
+saved in Datastore. The App Engine app performs queries against Datastore and
+serves songs and album art from Cloud Storage.
+
+An [Android client](https://github.com/derat/nup-android/) is also available.
+
+This project is probably only of potential interest to people who both [buy all
+of their music](https://www.erat.org/buying_music.html) and are comfortable
+setting up a [Google Cloud] project and compiling and running command-line
+programs, which seems like a very small set. If it sounds appealing to you and
+you'd like to see more detailed instructions, though, please let me know!
+
+[Google App Engine]: https://cloud.google.com/appengine
+[Google Cloud Storage]: https://cloud.google.com/storage
+[Datastore]: https://cloud.google.com/datastore
+[Google Cloud]: https://cloud.google.com/
+
 ## History
 
 In 2001 or 2002, I wrote [dmc], a silly C application that used the [FMOD]
@@ -9,7 +35,7 @@ library to play my MP3 collection. It used OpenGL to render a UI and some simple
 visualizations. I ran it on a small ([Mini-ITX]? I don't remember) computer
 plugged into my TV.
 
-[dmc]: https://www.erat.org/programming.html#dmc
+[dmc]: https://www.erat.org/programming.html#older
 [FMOD]: https://www.fmod.com/
 [Mini-ITX]: https://en.wikipedia.org/wiki/Mini-ITX
 
@@ -46,16 +72,33 @@ serve music and covers from [Google Cloud Storage]. That's what this repository
 contains.
 
 [Go]: https://golang.org/
-[Google App Engine]: https://cloud.google.com/appengine
-[Google Cloud Storage]: https://cloud.google.com/storage
 
-It's 2021 now and I haven't felt the urge to rewrite all this code again, so I
-guess I finally got it right the last time.
+It's 2021 now and I haven't felt the urge to rewrite all this code again.
+
+The name "nup" doesn't mean anything; it just didn't seem to be used by any
+major projects. (I tried to think of a backronym for it but didn't come up with
+anything obvious other than the 'p' standing for "player".)
 
 ## Configuration
 
-Create an `config.json` file in the same directory as `app.yaml` corresponding
-to the `ServerConfig` struct in
+At the very least, you'll need to do the following:
+
+*   Create a [Google Cloud] project.
+*   Enable the Cloud Storage and App Engine APIs.
+*   Create Cloud Storage buckets for your songs and album art.
+*   Use the [gsutil] tool to sync songs and album art to Cloud Storage.
+*   Configure and deploy the App Engine app.
+*   Compile the `update_music` tool, create a small config file for it, and use
+    it to send song metadata to the App Engine app so it can be saved to
+    Datastore.
+
+As mentioned above, please let me know if you're feeling adventurous and would
+like to see detailed instructions for these steps.
+
+[gsutil]: https://cloud.google.com/storage/docs/gsutil
+
+Before deploying the App Engine app, create an `config.json` file in the same
+directory as `app.yaml` corresponding to the `ServerConfig` struct in
 [server/types/config.go](./server/types/config.go):
 
 ```json
@@ -116,6 +159,13 @@ This starts a local development App Engine instance listening at
 *   For development, you can import example data and start a file server by
     running `./import_to_devserver.sh` in the `internal/pkg/test/example/`
     directory. Use `test@example.com` to log in.
+
+Go unit tests can be executed by running the following from the root of this
+repository:
+
+```sh
+go test ./...
+```
 
 ## Merging songs
 
