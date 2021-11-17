@@ -497,11 +497,11 @@ class Test(unittest.TestCase):
         self.wait_for_playlist(page, [song1, song2], 1)
 
     def test_context_menu(self):
-        song1 = Song('a', 't1', 'al', track=1, filename=Song.FILE_5S)
-        song2 = Song('a', 't2', 'al', track=2, filename=Song.FILE_5S)
-        song3 = Song('a', 't3', 'al', track=3, filename=Song.FILE_5S)
-        song4 = Song('a', 't4', 'al', track=4, filename=Song.FILE_5S)
-        song5 = Song('a', 't5', 'al', track=5, filename=Song.FILE_5S)
+        song1 = Song('a', 't1', 'al', track=1, filename=Song.FILE_10S)
+        song2 = Song('a', 't2', 'al', track=2, filename=Song.FILE_10S)
+        song3 = Song('a', 't3', 'al', track=3, filename=Song.FILE_10S)
+        song4 = Song('a', 't4', 'al', track=4, filename=Song.FILE_10S)
+        song5 = Song('a', 't5', 'al', track=5, filename=Song.FILE_10S)
         songs = [song1, song2, song3, song4, song5]
         server.import_songs(songs)
 

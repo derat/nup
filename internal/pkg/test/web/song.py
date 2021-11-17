@@ -8,6 +8,7 @@ class Song:
     FILE_0S = '0s.mp3'
     FILE_1S = '1s.mp3'
     FILE_5S = '5s.mp3'
+    FILE_10S = '10s.mp3'
 
     def __init__(self, artist, title, album, track=0, disc=0, rating=-1.0,
                  filename=FILE_5S, length=5.0, tags=None, plays=None):
