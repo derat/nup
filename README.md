@@ -88,9 +88,14 @@ All other fields are documented in the Go file linked above.
 program being present and `projectId` being set in `config.json` as described
 above.)
 
-To deploy the App Engine app, run the `deploy.sh` script.
+To deploy the App Engine app and delete old, non-serving versions, run the
+`deploy.sh` script.
 
-To delete old, non-serving versions of the app, run `delete_old_versions.sh`.
+Note that App Engine often continues serving stale versions of static files for
+10 minutes or more after deploying. I think that [this has been broken for a
+long time](https://issuetracker.google.com/issues/35890923). [This Stack
+Overflow question](https://stackoverflow.com/q/2783082/6882947) has more
+discussion.
 
 ## Development and testing
 

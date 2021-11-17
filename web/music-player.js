@@ -214,6 +214,7 @@ customElements.define(
     static PLAY_DELAY_MS_ = 500; // delay before playing when cycling track
     static GAIN_CHANGE_SEC_ = 0.1; // duration for audio gain change between songs
     static PRELOAD_SEC_ = 20; // seconds from end of song when next song should be loaded
+    static RESUME_WHEN_ONLINE_SEC_ = 30; // maximum delay for auto-resume when online
 
     constructor() {
       super();
@@ -232,6 +233,7 @@ customElements.define(
       this.totalPlayedSec_ = 0; // total seconds playing current song
       this.reportedCurrentTrack_ = false; // already reported current as played?
       this.reachedEndOfSongs_ = false; // did we hit end of last song?
+      this.pausedForOfflineTime_ = -1; // seconds since epoch when auto-paused
       this.updateSong_ = null; // song playing when update div was opened
       this.updatedRating_ = -1.0; // rating set in update div
       this.notification_ = null; // song notification currently shown
@@ -352,6 +354,20 @@ customElements.define(
           this.cycleTrack_(1, true /* delayPlay */)
         );
       }
+
+      // Automatically resume playing if we previously paused due to going
+      // offline: https://github.com/derat/nup/issues/17
+      window.addEventListener('online', (e) => {
+        if (this.pausedForOfflineTime_ > 0) {
+          console.log('Back online');
+          const resume =
+            getCurrentTimeSec() - this.pausedForOfflineTime_ <=
+            this.constructor.RESUME_WHEN_ONLINE_SEC_;
+          this.pausedForOfflineTime_ = -1;
+          this.reloadAudio_();
+          if (resume) this.play_();
+        }
+      });
 
       document.body.addEventListener('keydown', (e) => {
         if (this.processAccelerator_(e)) {
@@ -738,6 +754,7 @@ customElements.define(
         this.totalPlayedSec_ = 0;
         this.reportedCurrentTrack_ = false;
         this.reachedEndOfSongs_ = false;
+        this.pausedForOfflineTime_ = -1;
         this.updateGain_();
       }
 
@@ -864,17 +881,28 @@ customElements.define(
         case error.MEDIA_ERR_NETWORK: // 2
         case error.MEDIA_ERR_DECODE: // 3
         case error.MEDIA_ERR_SRC_NOT_SUPPORTED: // 4
-          if (this.numErrors_ <= this.constructor.MAX_RETRIES_) {
+          if (!navigator.onLine) {
+            console.log('Currently offline');
+            this.pause_();
+            this.pausedForOfflineTime_ = getCurrentTimeSec();
+          } else if (this.numErrors_ <= this.constructor.MAX_RETRIES_) {
             console.log(`Retrying from position ${this.lastUpdatePosition_}`);
-            this.audio_.load();
-            this.audio_.currentTime = this.lastUpdatePosition_;
-            this.audio_.play();
+            this.reloadAudio_();
+            this.play_();
           } else {
             console.log(`Giving up after ${this.numErrors_} errors`);
             this.cycleTrack_(1, false /* delay */);
           }
           break;
       }
+    }
+
+    // Reinitializes the audio element. This is sometimes needed to get it back
+    // into a playable state after a network error -- otherwise, play() triggers
+    // a 'The element has no supported sources.' error.
+    reloadAudio_() {
+      this.audio_.load();
+      this.audio_.currentTime = this.lastUpdatePosition_;
     }
 
     showUpdateDiv_() {
