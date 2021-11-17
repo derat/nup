@@ -6,6 +6,7 @@ import {
   createShadow,
   createTemplate,
   getCurrentTimeSec,
+  getDumpSongUrl,
   handleFetchError,
 } from './common.js';
 
@@ -349,6 +350,26 @@ customElements.define(
           this.insertButton_.disabled =
           this.replaceButton_.disabled =
             !checked;
+      });
+      this.resultsTable_.addEventListener('menu', (e) => {
+        if (!this.dialogManager_) throw new Error('No <dialog-manager>');
+
+        const idx = e.detail.index;
+        const orig = e.detail.orig;
+        orig.preventDefault();
+        const menu = this.dialogManager_.createMenu(orig.pageX, orig.pageY, [
+          {
+            id: 'debug',
+            text: 'Debug',
+            cb: () => window.open(getDumpSongUrl(e.detail.songId), '_blank'),
+          },
+        ]);
+
+        // Highlight the row while the menu is open.
+        this.resultsTable_.setRowMenuShown(idx, true);
+        menu.addEventListener('close', () => {
+          this.resultsTable_.setRowMenuShown(idx, false);
+        });
       });
 
       this.waitingDiv_ = get('waiting');

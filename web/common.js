@@ -106,6 +106,11 @@ export function getFullCoverUrl(filename) {
   return getAbsUrl(`/cover?filename=${encodeURIComponent(filename)}`);
 }
 
+// Returns a URL for dumping information about the song identified by |songId|.
+export function getDumpSongUrl(songId) {
+  return `/dump_song?songId=${songId}`;
+}
+
 // Returns an absolute version of |url| if it's relative.
 // If it's already absolute, it is returned unchanged.
 export function getAbsUrl(url) {

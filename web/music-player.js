@@ -8,6 +8,7 @@ import {
   emptyImg,
   formatTime,
   getCurrentTimeSec,
+  getDumpSongUrl,
   getScaledCoverUrl,
   getSongUrl,
   handleFetchError,
@@ -327,8 +328,7 @@ customElements.define(
           },
         ]);
 
-        // Highlight the playlist row, and then remove the highlighting when the
-        // menu is closed.
+        // Highlight the row while the menu is open.
         this.playlistTable_.setRowMenuShown(idx, true);
         menu.addEventListener('close', () => {
           this.playlistTable_.setRowMenuShown(idx, false);
@@ -1114,8 +1114,4 @@ function getRatingString(rating, withLabel, includeEmpty) {
     else break;
   }
   return ratingString;
-}
-
-function getDumpSongUrl(songId) {
-  return `/dump_song?songId=${songId}`;
 }
