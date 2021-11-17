@@ -4,6 +4,13 @@ App Engine app for streaming a music collection.
 
 ## Overview
 
+<p float="left">
+  <img src="https://user-images.githubusercontent.com/40385/142275393-040006bd-448b-4638-9a3e-c03e191fc5d1.png"
+       width="49%" alt="light mode screenshot">
+  <img src="https://user-images.githubusercontent.com/40385/142275425-dbe5453f-ad36-4204-afc2-1a99044c0d66.png"
+       width="49%" alt="dark mode screenshot">
+</p>
+
 This repository contains a [Google App Engine] app for interacting with a
 personal music collection, along with a web client and various command-line
 tools for managing the data.
