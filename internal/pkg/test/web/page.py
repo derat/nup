@@ -37,11 +37,10 @@ class Page(object):
     GAIN_TYPE_SELECT = OPTIONS_DIALOG + (By.ID, 'gain-type-select')
     PRE_AMP_RANGE = OPTIONS_DIALOG + (By.ID, 'pre-amp-range')
     PRE_AMP_SPAN = OPTIONS_DIALOG + (By.ID, 'pre-amp-span')
-    MENU = DIALOG_MANAGER + (By.CSS_SELECTOR, '.menu')
-    MENU_PLAY = MENU + (By.ID, 'play')
-    MENU_REMOVE = MENU + (By.ID, 'remove')
-    MENU_TRUNCATE = MENU + (By.ID, 'truncate')
-    MENU_DEBUG = MENU + (By.ID, 'debug')
+    MENU_PLAY = DIALOG_MANAGER + (By.ID, 'play')
+    MENU_REMOVE = DIALOG_MANAGER + (By.ID, 'remove')
+    MENU_TRUNCATE = DIALOG_MANAGER + (By.ID, 'truncate')
+    MENU_DEBUG = DIALOG_MANAGER + (By.ID, 'debug')
 
     MUSIC_PLAYER = (By.TAG_NAME, 'music-player')
     ALBUM_DIV = MUSIC_PLAYER + (By.ID, 'album')
@@ -214,27 +213,66 @@ class Page(object):
 
 
     # Waits for and returns the element described by |locator|.
-    # |locator| is typically a tuple like (By.ID, 'some-element') or
-    # (By.CSS_SELECTOR, 'div.foo').
     #
-    # To handle elements nested within one or more Shadow DOMs, |locator|
-    # can also contain additional By a <criterion>) pairs. Note that shadow DOMs
-    # only support certain mechanisms (just By.ID or By.CSS_SELECTOR?).
-    def get(self, locator):
-        utils.wait(lambda: self.driver.find_element(locator[0], locator[1]))
-        return self.get_nowait(locator)
+    # |locator| is typically a tuple like (By.ID, 'some-element') or
+    # (By.CSS_SELECTOR, 'div.foo'). To handle elements nested within one or more
+    # Shadow DOMs, |locator| can also contain additional pairs.
+    #
+    # If |multiple| is true, multiple elements will be returned if they are
+    # matched by the final pair. Otherwise, only a single element is returned.
+    def get(self, locator, multiple=False):
+        f = lambda: self.get_nowait(locator, multiple)
+        utils.wait(f)
+        return f()
 
-    def get_nowait(self, locator, el=None):
+    def get_nowait(self, locator, multiple):
         if not len(locator) or len(locator) % 2 != 0:
             raise RuntimeError('Invalid locator %s', locator)
 
-        el = (el if el else self.driver).find_element(locator[0], locator[1])
-        if len(locator) == 2:
-            return el
+        # This code formerly used the 'return arguments[0].shadowRoot' approach
+        # described at https://stackoverflow.com/a/37253205/6882947, but that
+        # seems to have broken as a result of either upgrading to
+        # python-selenium 3.14.1 (from 3.8.0, I think) or upgrading to Chrome
+        # (and chromedriver) 96.0.4664.45 (from 94, I think).
+        #
+        # After upgrading, I just get back a dictionary like
+        # {u'shadow-6066-11e4-a52e-4f735466cecf': u'9ab4aaee-8108-45c2-9341-c232a9685355'}
+        # when I evaluate shadowRoot. Trying to recursively call find_element()
+        # on it as before yields "AttributeError: 'dict' object has no attribute
+        # 'find_element'". (For all I know, the version of Selenium that I'm
+        # using is just too old for the current chromedriver.)
+        #
+        # So, what we have instead here is an approximate JavaScript
+        # reimplementation of Selenium's element-finding code. :-(
+        query = ''
+        while len(locator):
+            query = 'expand(%s)' % query if query else 'document'
 
-        root = self.driver.execute_script(
-            'return arguments[0].shadowRoot', el)
-        return self.get_nowait(locator[2:], root if root else el)
+            by, term = locator[0], locator[1]
+            if by == By.ID:
+                query += ".getElementById('%s')" % term
+            elif by == By.TAG_NAME:
+                if multiple and len(locator) == 2:
+                    query += ".getElementsByTagName('%s')" % term
+                else:
+                    query += ".getElementsByTagName('%s').item(0)" % term
+            elif by == By.CSS_SELECTOR:
+                if multiple and len(locator) == 2:
+                    query += ".querySelectorAll('%s')" % term
+                else:
+                    query += ".querySelector('%s')" % term
+            else:
+                raise RuntimeError("Invalid locator '%s'", by)
+
+            locator = locator[2:]
+
+        script = 'const expand = e => e.shadowRoot || e; return ' + query
+        try:
+            return self.driver.execute_script(script)
+        except selenium.common.exceptions.JavascriptException as e:
+            if 'Cannot read properties of null' in str(e):
+                raise selenium.common.exceptions.NoSuchElementException(str(e))
+            raise e
 
     def click(self, locator):
         self.get(locator).click()
@@ -255,7 +293,7 @@ class Page(object):
     def wait_until_gone(self, locator):
         def exists():
             try:
-                self.get_nowait(locator)
+                self.get_nowait(locator, False)
                 return True
             except selenium.common.exceptions.NoSuchElementException:
                 return False
@@ -292,10 +330,7 @@ class Page(object):
         ActionChains(self.driver).context_click(row).perform()
 
     def get_tag_suggestions(self, locator):
-        suggester = self.get(locator)
-        root = self.driver.execute_script('return arguments[0].shadowRoot',
-                                          suggester)
-        items = root.find_elements_by_css_selector('#suggestions div')
+        items = self.get(locator + (By.CSS_SELECTOR, '#suggestions div'), True)
         return [i.text for i in items]
 
     def show_options(self):
