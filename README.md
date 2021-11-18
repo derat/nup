@@ -134,9 +134,8 @@ All other fields are documented in the Go file linked above.
 
 ## Deploying
 
-(The following commands depend on the [jq](https://stedolan.github.io/jq/)
-program being present and `projectId` being set in `config.json` as described
-above.)
+(The following command depends on the [jq] program being present and `projectId`
+being set in `config.json` as described above.)
 
 To deploy the App Engine app and delete old, non-serving versions, run the
 `deploy.sh` script.
@@ -147,12 +146,14 @@ long time](https://issuetracker.google.com/issues/35890923). [This Stack
 Overflow question](https://stackoverflow.com/q/2783082/6882947) has more
 discussion.
 
+[jq]: https://stedolan.github.io/jq/
+
 ## Development and testing
 
 First, from the base directory, run:
 
 ```sh
-dev_appserver.py --datastore_consistency_policy=consistent .
+dev_appserver.py --application=nup --datastore_consistency_policy=consistent .
 ```
 
 This starts a local development App Engine instance listening at

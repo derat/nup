@@ -7,5 +7,5 @@ require (
 	github.com/derat/taglib-go v0.0.0-20200408183415-49d1875d1328
 	golang.org/x/image v0.0.0-20190802002840-cff245a6509b
 	google.golang.org/api v0.18.0
-	google.golang.org/appengine v1.6.5
+	google.golang.org/appengine/v2 v2.0.1
 )

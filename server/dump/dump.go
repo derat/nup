@@ -13,7 +13,7 @@ import (
 
 	"github.com/derat/nup/server/types"
 
-	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/v2/datastore"
 )
 
 const (

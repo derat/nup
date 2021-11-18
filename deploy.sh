@@ -2,9 +2,15 @@
 
 project=$(./project_id.sh)
 
-# Surprisingly, --quiet only disables yes/no prompts (which we want)
-# rather than suppressing output (which we don't want).
-gcloud app --project="$project" --quiet deploy "$@"
+# As of November 2021, 'beta' is required here to use App Engine bundled
+# services (e.g. memcache) from the go115 runtime. Without it, the 'deploy'
+# command prints 'WARNING: There is a dependency on App Engine APIs, but they
+# are not enabled in your app.yaml. Set the app_engine_apis property.' even when
+# the property is set.
+#
+# Surprisingly, --quiet only disables yes/no prompts (which we want) rather than
+# suppressing output (which we don't want).
+gcloud beta app --project="$project" --quiet deploy "$@"
 
 # Clean up stale versions of the app so they aren't sitting around.
 versions=$(

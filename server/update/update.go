@@ -16,9 +16,9 @@ import (
 	"github.com/derat/nup/server/cache"
 	"github.com/derat/nup/server/types"
 
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/v2"
+	"google.golang.org/appengine/v2/datastore"
+	"google.golang.org/appengine/v2/log"
 )
 
 // AddPlay adds a play report to the song identified by id in datastore.

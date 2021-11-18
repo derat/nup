@@ -7,8 +7,8 @@ import (
 	"context"
 	"errors"
 
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/v2"
+	"google.golang.org/appengine/v2/datastore"
 
 	"github.com/derat/nup/server/types"
 )

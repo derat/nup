@@ -1,13 +1,14 @@
-# TODO: Switch to go112, but doing so apparently requires migrating from
-# google.golang.org/appengine to cloud.google.com/go and also makes
-# dev_appserver.py unusable. Yay.
-# https://cloud.google.com/appengine/docs/standard/go112/go-differences
-runtime: go111
+runtime: go115
 
 # app.yaml is supposed to be in the same directory as go.mod.
 main: server
 
-# Make the app handle index.html so we can check auth.
+# Support using App Engine bundled services (e.g. memcache).
+app_engine_apis: true
+
+# Make the app handle index.html so we can check auth. Note that it won't
+# actually serve it; this just prevents the static file from being accessed
+# directly.
 handlers:
 - url: /index\.html
   script: auto

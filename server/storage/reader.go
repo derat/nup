@@ -8,7 +8,7 @@ import (
 	"io"
 	"time"
 
-	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/v2/log"
 
 	"cloud.google.com/go/storage"
 )

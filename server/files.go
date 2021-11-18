@@ -17,7 +17,7 @@ import (
 	"github.com/derat/nup/server/storage"
 	"github.com/derat/nup/server/types"
 
-	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/v2/log"
 )
 
 const maxFileRangeSize = maxResponseSize - 32*1024 // save space for headers

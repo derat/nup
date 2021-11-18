@@ -25,7 +25,7 @@ import (
 	"golang.org/x/image/draw"
 
 	"google.golang.org/api/option"
-	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/v2/log"
 )
 
 // A single storage.Client is initialized in response to the first load() call
