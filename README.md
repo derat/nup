@@ -150,14 +150,8 @@ discussion.
 
 ## Development and testing
 
-First, from the base directory, run:
-
-```sh
-dev_appserver.py --application=nup --datastore_consistency_policy=consistent .
-```
-
-This starts a local development App Engine instance listening at
-`http://localhost:8080`.
+First, from the base directory, run the `./dev.sh` script. This starts a local
+development App Engine instance listening at `http://localhost:8080`.
 
 *   End-to-end Go tests that exercise the App Engine server and the `dump_music`
     and `update_music` commands can be run from the `internal/pkg/test/`
