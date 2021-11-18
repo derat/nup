@@ -81,7 +81,8 @@ func hasWebDriverCookie(r *http.Request) bool {
 
 // checkRequest verifies that r is an authorized request using method.
 // If the request is unauthorized and redirectToLogin is true, the client
-// is redirected to the login screen.
+// is redirected to the login screen. Otherwise, an appropriate error is
+// written to w.
 func checkRequest(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request,
 	method string, redirectToLogin bool) bool {
 	username, allowed := hasAllowedGoogleAuth(ctx, cfg)
@@ -112,6 +113,24 @@ func checkRequest(ctx context.Context, cfg *types.ServerConfig, w http.ResponseW
 	}
 
 	return true
+}
+
+// handlerFunc handles HTTP requests to a single endpoint.
+type handlerFunc func(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request)
+
+// addHandler registers fn to handle HTTP requests to the specified path.
+// Requests are verified to come from an authorized user and use the specified HTTP method before
+// they are passed to fn. If redirectToLogin is true, unauthorized requests are redirected to the
+// login page.
+func addHandler(path, method string, redirectToLogin bool, fn handlerFunc) {
+	http.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		ctx := appengine.NewContext(r)
+		cfg := getConfig(ctx)
+		if !checkRequest(ctx, cfg, w, r, method, redirectToLogin) {
+			return
+		}
+		fn(ctx, cfg, w, r)
+	})
 }
 
 // parseIntParam parses and returns the named int64 form parameter from r.

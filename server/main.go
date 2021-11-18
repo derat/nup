@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -45,23 +46,25 @@ func main() {
 	}
 	rand.Seed(time.Now().UnixNano())
 
-	http.HandleFunc("/", handleIndex)
-	http.HandleFunc("/cover", handleCover)
-	http.HandleFunc("/delete_song", handleDeleteSong)
-	http.HandleFunc("/dump_song", handleDumpSong)
-	http.HandleFunc("/export", handleExport)
-	http.HandleFunc("/import", handleImport)
-	http.HandleFunc("/now", handleNow)
-	http.HandleFunc("/played", handlePlayed)
-	http.HandleFunc("/query", handleQuery)
-	http.HandleFunc("/rate_and_tag", handleRateAndTag)
-	http.HandleFunc("/song", handleSong)
-	http.HandleFunc("/tags", handleTags)
+	// Use a wrapper instead of calling http.HandleFunc directly to reduce the risk
+	// that a handler neglects checking that requests are authorized.
+	addHandler("/", http.MethodGet, true /* redirectToLogin */, handleIndex)
+	addHandler("/cover", http.MethodGet, false, handleCover)
+	addHandler("/delete_song", http.MethodPost, false, handleDeleteSong)
+	addHandler("/dump_song", http.MethodGet, false, handleDumpSong)
+	addHandler("/export", http.MethodGet, false, handleExport)
+	addHandler("/import", http.MethodPost, false, handleImport)
+	addHandler("/now", http.MethodGet, false, handleNow)
+	addHandler("/played", http.MethodPost, false, handlePlayed)
+	addHandler("/query", http.MethodGet, false, handleQuery)
+	addHandler("/rate_and_tag", http.MethodPost, false, handleRateAndTag)
+	addHandler("/song", http.MethodGet, false, handleSong)
+	addHandler("/tags", http.MethodGet, false, handleTags)
 
 	if appengine.IsDevAppServer() {
-		http.HandleFunc("/clear", handleClear)
-		http.HandleFunc("/config", handleConfig)
-		http.HandleFunc("/flush_cache", handleFlushCache)
+		addHandler("/clear", http.MethodPost, false, handleClear)
+		addHandler("/config", http.MethodPost, false, handleConfig)
+		addHandler("/flush_cache", http.MethodPost, false, handleFlushCache)
 	}
 
 	// The google.golang.org/appengine packages are (were?) deprecated, and the official way forward
@@ -104,12 +107,7 @@ func main() {
 	appengine.Main()
 }
 
-func handleClear(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	cfg := getConfig(ctx)
-	if !checkRequest(ctx, cfg, w, r, "POST", false) {
-		return
-	}
+func handleClear(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
 	if err := update.ClearData(ctx); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -117,16 +115,15 @@ func handleClear(w http.ResponseWriter, r *http.Request) {
 	writeTextResponse(w, "ok")
 }
 
-func handleConfig(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, getConfig(ctx), w, r, "POST", false) {
+func handleConfig(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+	if !checkRequest(ctx, cfg, w, r, "POST", false) {
 		return
 	}
 
-	var cfg types.ServerConfig
-	if err := json.NewDecoder(r.Body).Decode(&cfg); err == nil {
-		addTestUserToConfig(&cfg)
-		saveTestConfig(ctx, &cfg)
+	var newCfg types.ServerConfig
+	if err := json.NewDecoder(r.Body).Decode(&newCfg); err == nil {
+		addTestUserToConfig(&newCfg)
+		saveTestConfig(ctx, &newCfg)
 	} else if err == io.EOF {
 		clearTestConfig(ctx)
 	} else {
@@ -138,13 +135,7 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 	writeTextResponse(w, "ok")
 }
 
-func handleCover(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	cfg := getConfig(ctx)
-	if !checkRequest(ctx, cfg, w, r, "GET", false) {
-		return
-	}
-
+func handleCover(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
 	fn := r.FormValue("filename")
 	if fn == "" {
 		log.Errorf(ctx, "Missing filename in cover request")
@@ -172,11 +163,7 @@ func handleCover(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleDeleteSong(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, getConfig(ctx), w, r, "POST", false) {
-		return
-	}
+func handleDeleteSong(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(ctx, w, r, "songId")
 	if !ok {
 		return
@@ -188,12 +175,7 @@ func handleDeleteSong(w http.ResponseWriter, r *http.Request) {
 	writeTextResponse(w, "ok")
 }
 
-func handleDumpSong(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, getConfig(ctx), w, r, "GET", false) {
-		return
-	}
-
+func handleDumpSong(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(ctx, w, r, "songId")
 	if !ok {
 		return
@@ -217,12 +199,7 @@ func handleDumpSong(w http.ResponseWriter, r *http.Request) {
 	writeTextResponse(w, out.String())
 }
 
-func handleExport(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, getConfig(ctx), w, r, "GET", false) {
-		return
-	}
-
+func handleExport(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
 	var max int64 = defaultDumpBatchSize
 	if len(r.FormValue("max")) > 0 {
 		var ok bool
@@ -314,11 +291,7 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleFlushCache(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, getConfig(ctx), w, r, "POST", false) {
-		return
-	}
+func handleFlushCache(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
 	if err := cache.Flush(ctx, cache.Memcache); err != nil {
 		log.Errorf(ctx, "Flushing memcache failed: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -334,37 +307,7 @@ func handleFlushCache(w http.ResponseWriter, r *http.Request) {
 	writeTextResponse(w, "ok")
 }
 
-func handleIndex(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, getConfig(ctx), w, r, "GET", true) {
-		return
-	}
-
-	if r.URL.Path != "/" {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-
-	f, err := os.Open(indexPath)
-	if err != nil {
-		log.Errorf(ctx, "Failed to open %v: %v", indexPath, err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer f.Close()
-
-	w.Header().Set("Content-Type", "text/html")
-	if _, err = io.Copy(w, f); err != nil {
-		log.Errorf(ctx, "Failed to copy %v to response: %v", indexPath, err)
-	}
-}
-
-func handleImport(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, getConfig(ctx), w, r, "POST", false) {
-		return
-	}
-
+func handleImport(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
 	var updateDelayNsec int64
 	if len(r.FormValue("updateDelayNsec")) > 0 {
 		var ok bool
@@ -401,20 +344,31 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 	writeTextResponse(w, "ok")
 }
 
-func handleNow(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, getConfig(ctx), w, r, "GET", false) {
+func handleIndex(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
+
+	f, err := os.Open(indexPath)
+	if err != nil {
+		log.Errorf(ctx, "Failed to open %v: %v", indexPath, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
+
+	w.Header().Set("Content-Type", "text/html")
+	if _, err = io.Copy(w, f); err != nil {
+		log.Errorf(ctx, "Failed to copy %v to response: %v", indexPath, err)
+	}
+}
+
+func handleNow(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
 	writeTextResponse(w, strconv.FormatInt(time.Now().UnixNano(), 10))
 }
 
-func handlePlayed(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, getConfig(ctx), w, r, "POST", false) {
-		return
-	}
-
+func handlePlayed(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(ctx, w, r, "songId")
 	if !ok {
 		return
@@ -426,7 +380,6 @@ func handlePlayed(w http.ResponseWriter, r *http.Request) {
 	}
 	startTime := secondsToTime(startTimeFloat)
 
-	cfg := getConfig(ctx)
 	if cfg.ForceUpdateFailures && appengine.IsDevAppServer() {
 		http.Error(w, "Returning an error, as requested", http.StatusInternalServerError)
 		return
@@ -447,12 +400,7 @@ func handlePlayed(w http.ResponseWriter, r *http.Request) {
 	writeTextResponse(w, "ok")
 }
 
-func handleQuery(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, getConfig(ctx), w, r, "GET", false) {
-		return
-	}
-
+func handleQuery(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
 	cacheOnly := r.FormValue("cacheOnly") == "1"
 
 	q := types.SongQuery{
@@ -522,11 +470,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	writeJSONResponse(w, songs)
 }
 
-func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, getConfig(ctx), w, r, "POST", false) {
-		return
-	}
+func handleRateAndTag(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(ctx, w, r, "songId")
 	if !ok {
 		return
@@ -562,7 +506,6 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := getConfig(ctx)
 	if cfg.ForceUpdateFailures && appengine.IsDevAppServer() {
 		http.Error(w, "Returning an error, as requested", http.StatusInternalServerError)
 		return
@@ -593,13 +536,7 @@ func handleRateAndTag(w http.ResponseWriter, r *http.Request) {
 //
 // The Web Audio part of this is particularly frustrating, as the JS doesn't actually need to look
 // at the audio data; it just need to amplify it.
-func handleSong(w http.ResponseWriter, req *http.Request) {
-	ctx := appengine.NewContext(req)
-	cfg := getConfig(ctx)
-	if !checkRequest(ctx, cfg, w, req, "GET", false) {
-		return
-	}
-
+func handleSong(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, req *http.Request) {
 	fn := req.FormValue("filename")
 	if fn == "" {
 		log.Errorf(ctx, "Missing filename in song data request")
@@ -633,11 +570,7 @@ func handleSong(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func handleTags(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	if !checkRequest(ctx, getConfig(ctx), w, r, "GET", false) {
-		return
-	}
+func handleTags(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
 	tags, err := query.Tags(ctx, r.FormValue("requireCache") == "1")
 	if err != nil {
 		log.Errorf(ctx, "Unable to query tags: %v", err)
