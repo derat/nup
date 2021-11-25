@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -39,6 +40,8 @@ func main() {
 	configFile := flag.String("config", "", "Path to config file")
 	deleteSongID := flag.Int64("delete-song-id", 0, "Delete song with given ID")
 	dryRun := flag.Bool("dry-run", false, "Only print what would be updated")
+	dumpedGainsFile := flag.String("dumped-gains-file", "",
+		"Path to a dump_music file from which gains will be read (instead of being computed)")
 	forceGlob := flag.String("force-glob", "",
 		"Glob pattern relative to music dir for files to scan and update even if they haven't changed")
 	importJSONFile := flag.String("import-json-file", "",
@@ -102,6 +105,13 @@ func main() {
 			forceGlob:      *forceGlob,
 			logProgress:    true,
 			artistRewrites: cfg.ArtistRewrites,
+		}
+
+		if len(*dumpedGainsFile) > 0 {
+			opts.dumpedGains, err = readDumpedGains(*dumpedGainsFile)
+			if err != nil {
+				log.Fatal("Failed reading dumped gains: ", err)
+			}
 		}
 
 		if len(*songPathsFile) > 0 {
@@ -226,4 +236,34 @@ func getCoverFilename(dir string, song *types.Song) string {
 		}
 	}
 	return ""
+}
+
+// readDumpedGains reads gains from a dump_music file at p.
+// The returned map is keyed by song filename.
+func readDumpedGains(p string) (map[string]mp3gain.Info, error) {
+	f, err := os.Open(p)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	gains := make(map[string]mp3gain.Info)
+	d := json.NewDecoder(f)
+	for {
+		var s types.Song
+		if err := d.Decode(&s); err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		if s.TrackGain == 0 && s.AlbumGain == 0 && s.PeakAmp == 0 {
+			return nil, fmt.Errorf("missing gain info for %q", s.Filename)
+		}
+		gains[s.Filename] = mp3gain.Info{
+			TrackGain: s.TrackGain,
+			AlbumGain: s.AlbumGain,
+			PeakAmp:   s.PeakAmp,
+		}
+	}
+	return gains, nil
 }

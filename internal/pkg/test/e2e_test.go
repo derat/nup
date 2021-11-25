@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -119,6 +120,23 @@ func TestUpdate(tt *testing.T) {
 	CopySongs(t.MusicDir, Song0sUpdated.Filename)
 	t.UpdateSongs()
 	if err := CompareSongs([]types.Song{Song0sUpdated, Song1s, Song5s},
+		t.DumpSongs(stripIDs), IgnoreOrder); err != nil {
+		tt.Error(err)
+	}
+
+	gs5 := Song5s
+	gs5.TrackGain = -6.3
+	gs5.AlbumGain = -7.1
+	gs5.PeakAmp = 0.9
+
+	// If we pass a glob, only the matched file should be updated.
+	// Change the song's gain info (by getting it from a dump) so we can
+	// verify that it worked as expected.
+	log.Print("importing dumped gain with glob")
+	glob := strings.TrimSuffix(gs5.Filename, ".mp3") + ".*"
+	dumpPath := WriteSongsToJSONFile(t.TempDir, []types.Song{gs5})
+	t.UpdateSongs(forceGlobFlag(glob), dumpedGainsFlag(dumpPath))
+	if err := CompareSongs([]types.Song{Song0sUpdated, Song1s, gs5},
 		t.DumpSongs(stripIDs), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
@@ -541,11 +559,30 @@ func TestUpdateList(tt *testing.T) {
 	defer cleanUpTest(t)
 
 	CopySongs(t.MusicDir, Song0s.Filename, Song1s.Filename, Song5s.Filename)
+	listPath := WriteSongPathsFile(t.TempDir, Song0s.Filename, Song5s.Filename)
+
+	gs0 := Song0s
+	gs0.TrackGain = -8.4
+	gs0.AlbumGain = -7.6
+	gs0.PeakAmp = 1.2
+
+	gs5 := Song5s
+	gs5.TrackGain = -6.3
+	gs5.AlbumGain = -7.1
+	gs5.PeakAmp = 0.9
 
 	log.Print("updating songs from list")
-	t.UpdateSongsFromList(WriteSongPathsFile(t.TempDir, Song0s.Filename, Song5s.Filename))
+	t.UpdateSongsFromList(listPath)
 	if err := CompareSongs([]types.Song{Song0s, Song5s},
 		t.DumpSongs(stripIDs), IgnoreOrder); err != nil {
+		tt.Error(err)
+	}
+
+	// When a dump file is passed, its gain info should be sent to the server.
+	log.Print("updating songs from list with dumped gains")
+	dumpPath := WriteSongsToJSONFile(t.TempDir, []types.Song{gs0, gs5})
+	t.UpdateSongsFromList(listPath, dumpedGainsFlag(dumpPath))
+	if err := CompareSongs([]types.Song{gs0, gs5}, t.DumpSongs(stripIDs), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}
 }

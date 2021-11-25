@@ -277,17 +277,25 @@ func readSongList(listPath, musicDir string, ch chan types.SongOrErr,
 		paths = append(paths, rel)
 
 		if opts.computeGain {
-			// Scan the file's directory if we don't already have its gain info.
-			full := filepath.Join(musicDir, rel)
-			if _, ok := gains[full]; !ok {
-				dir := filepath.Dir(full)
-				log.Printf("Computing gain adjustments for %v", dir)
-				m, err := computeDirGains(dir)
-				if err != nil {
-					return 0, err
+			if opts.dumpedGains != nil {
+				gi, ok := opts.dumpedGains[rel]
+				if !ok {
+					return 0, fmt.Errorf("no dumped gain info for %q", rel)
 				}
-				for p, gi := range m {
-					gains[p] = gi
+				gains[filepath.Join(musicDir, rel)] = gi
+			} else {
+				// Scan the file's directory if we don't already have its gain info.
+				full := filepath.Join(musicDir, rel)
+				if _, ok := gains[full]; !ok {
+					dir := filepath.Dir(full)
+					log.Printf("Computing gain adjustments for %v", dir)
+					m, err := computeDirGains(dir)
+					if err != nil {
+						return 0, err
+					}
+					for p, gi := range m {
+						gains[p] = gi
+					}
 				}
 			}
 		}
@@ -316,10 +324,11 @@ func readSongList(listPath, musicDir string, ch chan types.SongOrErr,
 // scanOptions contains options for scanForUpdatedSongs and readSongList.
 // Some of the options aren't used by readSongList.
 type scanOptions struct {
-	computeGain    bool              // use mp3gain to compute gain adjustments
-	forceGlob      string            // glob matching files to update even if unchanged
-	logProgress    bool              // periodically log progress while scanning
-	artistRewrites map[string]string // artist names from tags to rewrite
+	computeGain    bool                    // use mp3gain to compute gain adjustments
+	forceGlob      string                  // glob matching files to update even if unchanged
+	logProgress    bool                    // periodically log progress while scanning
+	artistRewrites map[string]string       // artist names from tags to rewrite
+	dumpedGains    map[string]mp3gain.Info // precomputed gains keyed by Song.Filename
 }
 
 // scanForUpdatedSongs looks for songs under musicDir updated more recently than lastUpdateTime or
@@ -347,7 +356,7 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDi
 		}
 		relPath, err := filepath.Rel(musicDir, path)
 		if err != nil {
-			return fmt.Errorf("%v isn't subpath of %v: %v", path, musicDir, err)
+			return fmt.Errorf("%q isn't subpath of %q: %v", path, musicDir, err)
 		}
 
 		numMP3s++
@@ -384,17 +393,27 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDi
 			}
 		}
 
-		// Compute the gains for this directory if we didn't already do it.
 		var gain *mp3gain.Info
 		if opts.computeGain {
-			if dir := filepath.Dir(path); gainsDir != dir {
-				log.Printf("Computing gain adjustments for %v", dir)
-				if gains, err = computeDirGains(dir); err != nil {
-					return fmt.Errorf("failed computing gains for %v: %v", dir, err)
+			if opts.dumpedGains != nil {
+				gi, ok := opts.dumpedGains[relPath]
+				if !ok {
+					return fmt.Errorf("no dumped gain info for %q", relPath)
 				}
-				gainsDir = dir
-			}
-			if gi, ok := gains[path]; ok {
+				gain = &gi
+			} else {
+				// Compute the gains for this directory if we didn't already do it.
+				if dir := filepath.Dir(path); gainsDir != dir {
+					log.Printf("Computing gain adjustments for %v", dir)
+					if gains, err = computeDirGains(dir); err != nil {
+						return fmt.Errorf("failed computing gains for %q: %v", dir, err)
+					}
+					gainsDir = dir
+				}
+				gi, ok := gains[path]
+				if !ok {
+					return fmt.Errorf("missing gain info for %q after computing", relPath)
+				}
 				gain = &gi
 			}
 		}

@@ -190,6 +190,9 @@ func (t *Tester) SongID(sha1 string) string {
 
 const keepUserDataFlag = "-import-user-data=false"
 
+func dumpedGainsFlag(p string) string  { return "-dumped-gains-file=" + p }
+func forceGlobFlag(glob string) string { return "-force-glob=" + glob }
+
 func (t *Tester) UpdateSongs(flags ...string) {
 	args := append([]string{
 		"-config=" + t.updateConfigFile,
