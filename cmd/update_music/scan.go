@@ -18,7 +18,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/derat/nup/internal/pkg/mp3gain"
+	"github.com/derat/nup/mp3gain"
 	"github.com/derat/nup/server/types"
 	"github.com/derat/taglib-go/taglib"
 )

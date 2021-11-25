@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/derat/nup/internal/pkg/test"
 	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/test"
 )
 
 func TestUpdate(t *testing.T) {
