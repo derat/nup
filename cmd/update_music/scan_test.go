@@ -42,6 +42,11 @@ func scanAndCompareSongs(t *testing.T, desc, dir string, lastUpdateTime time.Tim
 					return dirs
 				}
 				expected[i].Rating = 0
+				if !opts.computeGain {
+					expected[i].TrackGain = 0
+					expected[i].AlbumGain = 0
+					expected[i].PeakAmp = 0
+				}
 				break
 			}
 		}
@@ -167,8 +172,9 @@ func TestScanAndCompareSongs_NewFiles(t *testing.T) {
 
 	// This sleep statement is really gross, but it seems like without it, the rename is often
 	// (always?) fast enough that Song1s's ctime doesn't actually change during the rename,
-	// resulting in it not getting picked up by the second scan.
-	time.Sleep(time.Millisecond)
+	// resulting in it not getting picked up by the second scan. I initially set this to 1 ms, but
+	// it was still flaky, so here we are...
+	time.Sleep(10 * time.Millisecond)
 
 	mv(filepath.Join(dir, test.Song1s.Filename),
 		filepath.Join(musicDir, oldArtist, oldAlbum, test.Song1s.Filename))

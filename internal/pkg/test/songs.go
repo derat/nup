@@ -9,6 +9,15 @@ import (
 	"github.com/derat/nup/server/types"
 )
 
+const (
+	// Hardcoded gain info used for all songs. Instead of actually running mp3gain (which may not
+	// even be installed) during testing, these values get passed to update_music via its
+	// -test-gain-info flag.
+	TrackGain = -6.7
+	AlbumGain = -6.3
+	PeakAmp   = 1.05
+)
+
 var Song0s = types.Song{
 	SHA1:        "fefac74a1d5928316d7131747107c8a61b71ffe4",
 	Filename:    "0s.mp3",
@@ -20,20 +29,26 @@ var Song0s = types.Song{
 	Track:       1,
 	Disc:        0,
 	Length:      0.026,
+	TrackGain:   TrackGain,
+	AlbumGain:   AlbumGain,
+	PeakAmp:     PeakAmp,
 	Rating:      -1,
 }
 
 var Song0sUpdated = types.Song{
-	SHA1:        "fefac74a1d5928316d7131747107c8a61b71ffe4",
+	SHA1:        Song0s.SHA1,
 	Filename:    "0s-updated.mp3",
-	Artist:      "First Artist",
+	Artist:      Song0s.Artist,
 	Title:       "Zero Seconds (Remix)",
-	Album:       "First Album",
-	AlbumID:     "1e477f68-c407-4eae-ad01-518528cedc2c",
+	Album:       Song0s.Album,
+	AlbumID:     Song0s.AlbumID,
 	RecordingID: "271a81af-6c2d-44cf-a0b8-a25ad74c82f9",
-	Track:       1,
-	Disc:        0,
-	Length:      0.026,
+	Track:       Song0s.Track,
+	Disc:        Song0s.Disc,
+	Length:      Song0s.Length,
+	TrackGain:   TrackGain,
+	AlbumGain:   AlbumGain,
+	PeakAmp:     PeakAmp,
 	Rating:      -1,
 }
 
@@ -48,44 +63,56 @@ var Song1s = types.Song{
 	Track:       2,
 	Disc:        0,
 	Length:      1.071,
+	TrackGain:   TrackGain,
+	AlbumGain:   AlbumGain,
+	PeakAmp:     PeakAmp,
 	Rating:      -1,
 }
 
 var Song5s = types.Song{
-	SHA1:     "63afdde2b390804562d54788865fff1bfd11cf94",
-	Filename: "5s.mp3",
-	Artist:   "Third Artist",
-	Title:    "Five Seconds",
-	Album:    "Another Album",
-	AlbumID:  "a1d2405b-afe0-4e28-a935-b5b256f68131",
-	Track:    1,
-	Disc:     2,
-	Length:   5.041,
-	Rating:   -1,
+	SHA1:      "63afdde2b390804562d54788865fff1bfd11cf94",
+	Filename:  "5s.mp3",
+	Artist:    "Third Artist",
+	Title:     "Five Seconds",
+	Album:     "Another Album",
+	AlbumID:   "a1d2405b-afe0-4e28-a935-b5b256f68131",
+	Track:     1,
+	Disc:      2,
+	Length:    5.041,
+	TrackGain: TrackGain,
+	AlbumGain: AlbumGain,
+	PeakAmp:   PeakAmp,
+	Rating:    -1,
 }
 
 var ID3V1Song = types.Song{
-	SHA1:     "fefac74a1d5928316d7131747107c8a61b71ffe4",
-	Filename: "id3v1.mp3",
-	Artist:   "The Legacy Formats",
-	Title:    "Give It Up For ID3v1",
-	Album:    "UTF-8, Who Needs It?",
-	Track:    0,
-	Disc:     0,
-	Length:   0.026,
-	Rating:   -1,
+	SHA1:      "fefac74a1d5928316d7131747107c8a61b71ffe4",
+	Filename:  "id3v1.mp3",
+	Artist:    "The Legacy Formats",
+	Title:     "Give It Up For ID3v1",
+	Album:     "UTF-8, Who Needs It?",
+	Track:     0,
+	Disc:      0,
+	Length:    0.026,
+	TrackGain: TrackGain,
+	AlbumGain: AlbumGain,
+	PeakAmp:   PeakAmp,
+	Rating:    -1,
 }
 
 var LegacySong1 = types.Song{
-	SHA1:     "1977c91fea860245695dcceea0805c14cede7559",
-	Filename: "arovane/atol_scrap/thaem_nue.mp3",
-	Artist:   "Arovane",
-	Title:    "Thaem Nue",
-	Album:    "Atol Scrap",
-	Track:    1,
-	Disc:     1,
-	Length:   449,
-	Rating:   0.75,
+	SHA1:      "1977c91fea860245695dcceea0805c14cede7559",
+	Filename:  "arovane/atol_scrap/thaem_nue.mp3",
+	Artist:    "Arovane",
+	Title:     "Thaem Nue",
+	Album:     "Atol Scrap",
+	Track:     1,
+	Disc:      1,
+	Length:    449,
+	TrackGain: TrackGain,
+	AlbumGain: AlbumGain,
+	PeakAmp:   PeakAmp,
+	Rating:    0.75,
 	Plays: []types.Play{
 		types.NewPlay(time.Unix(1276057170, 0).UTC(), "127.0.0.1"),
 		types.NewPlay(time.Unix(1297316913, 0).UTC(), "1.2.3.4"),
@@ -94,15 +121,18 @@ var LegacySong1 = types.Song{
 }
 
 var LegacySong2 = types.Song{
-	SHA1:     "b70984a4ac5084999b70478cdf163218b90cefdb",
-	Filename: "gary_hoey/animal_instinct/motown_fever.mp3",
-	Artist:   "Gary Hoey",
-	Title:    "Motown Fever",
-	Album:    "Animal Instinct",
-	Track:    7,
-	Disc:     1,
-	Length:   182,
-	Rating:   0.5,
-	Plays:    []types.Play{types.NewPlay(time.Unix(1394773930, 0).UTC(), "8.8.8.8")},
-	Tags:     []string{"instrumental", "rock"},
+	SHA1:      "b70984a4ac5084999b70478cdf163218b90cefdb",
+	Filename:  "gary_hoey/animal_instinct/motown_fever.mp3",
+	Artist:    "Gary Hoey",
+	Title:     "Motown Fever",
+	Album:     "Animal Instinct",
+	Track:     7,
+	Disc:      1,
+	Length:    182,
+	TrackGain: TrackGain,
+	AlbumGain: AlbumGain,
+	PeakAmp:   PeakAmp,
+	Rating:    0.5,
+	Plays:     []types.Play{types.NewPlay(time.Unix(1394773930, 0).UTC(), "8.8.8.8")},
+	Tags:      []string{"instrumental", "rock"},
 }

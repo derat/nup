@@ -6,11 +6,13 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/derat/nup/internal/pkg/mp3gain"
 	"github.com/derat/nup/server/types"
 )
 
@@ -48,6 +50,8 @@ func main() {
 		"Die if cover images aren't found for any songs that have album IDs")
 	songPathsFile := flag.String("song-paths-file", "",
 		"Path to a file containing one relative path per line for songs to force updating")
+	testGainInfo := flag.String("test-gain-info", "",
+		"Hardcoded gain info as \"track:album:amp\" (for testing)")
 	flag.Parse()
 
 	var cfg config
@@ -70,6 +74,15 @@ func main() {
 	var replaceUserData, didFullScan bool
 	readChan := make(chan types.SongOrErr)
 	startTime := time.Now()
+
+	if len(*testGainInfo) > 0 {
+		var info mp3gain.Info
+		if _, err := fmt.Sscanf(*testGainInfo, "%f:%f:%f",
+			&info.TrackGain, &info.AlbumGain, &info.PeakAmp); err != nil {
+			log.Fatalf("Bad -test-gain-info (want \"track:album:amp\"): %v", err)
+		}
+		mp3gain.SetInfoForTest(&info)
+	}
 
 	if len(*importJSONFile) > 0 {
 		log.Printf("Reading songs from %v", *importJSONFile)

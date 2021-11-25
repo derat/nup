@@ -120,6 +120,7 @@ func newTester(serverURL, binDir string) *Tester {
 		Password           string `json:"password"`
 		CoverDir           string `json:"coverDir"`
 		MusicDir           string `json:"musicDir"`
+		ComputeGain        bool   `json:"computeGain"`
 	}{
 		filepath.Join(t.TempDir, "last_update_info.json"),
 		t.serverURL,
@@ -127,6 +128,7 @@ func newTester(serverURL, binDir string) *Tester {
 		types.TestPassword,
 		t.CoverDir,
 		t.MusicDir,
+		true,
 	})
 
 	t.dumpConfigFile = writeConfig("dump_config.json", types.ClientConfig{
@@ -202,6 +204,9 @@ func (t *Tester) SongID(sha1 string) string {
 	panic(fmt.Sprintf("failed to find ID for %v", sha1))
 }
 
+// Flag to pass to update_music to use hardcoded gain info instead of calling mp3gain.
+var testGainInfoFlag = fmt.Sprintf("-test-gain-info=%f:%f:%f", TrackGain, AlbumGain, PeakAmp)
+
 func (t *Tester) ImportSongsFromJSONFile(path string, policy userDataPolicy) {
 	userDataValue := "false"
 	if policy == replaceUserData {
@@ -210,14 +215,18 @@ func (t *Tester) ImportSongsFromJSONFile(path string, policy userDataPolicy) {
 	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
 		"-config="+t.updateConfigFile,
 		"-import-json-file="+path,
-		"-import-user-data="+userDataValue); err != nil {
+		"-import-user-data="+userDataValue,
+		testGainInfoFlag,
+	); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
 }
 
 func (t *Tester) UpdateSongs() {
 	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
-		"-config="+t.updateConfigFile); err != nil {
+		"-config="+t.updateConfigFile,
+		testGainInfoFlag,
+	); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
 }
@@ -230,7 +239,9 @@ func (t *Tester) UpdateSongsFromList(path string, policy userDataPolicy) {
 	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
 		"-config="+t.updateConfigFile,
 		"-song-paths-file="+path,
-		"-import-user-data="+userDataValue); err != nil {
+		"-import-user-data="+userDataValue,
+		testGainInfoFlag,
+	); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
 }

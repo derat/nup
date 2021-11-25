@@ -26,6 +26,15 @@ type Info struct {
 // specified MP3 files, all of which should be from the same album.
 // Keys in the returned map are the supplied paths.
 func ComputeAlbum(paths []string) (map[string]Info, error) {
+	// Return hardcoded data for tests if instructed.
+	if infoForTest != nil {
+		m := make(map[string]Info)
+		for _, p := range paths {
+			m[p] = *infoForTest
+		}
+		return m, nil
+	}
+
 	out, err := exec.Command("mp3gain", append([]string{
 		"-o",      // "output is a database-friendly tab-delimited list"
 		"-q",      // "quiet mode: no status messages"
@@ -87,4 +96,13 @@ func parseMP3GainLine(ln string) (path string, gain, peakAmp float64, err error)
 	peakAmp = math.Round(peakAmp*100000) / 100000
 
 	return fields[0], gain, peakAmp, nil
+}
+
+// infoForTest contains hardcoded gain information to return.
+var infoForTest *Info
+
+// SetInfoForTest sets a hardcoded Info object to use instead of
+// actually running the mp3gain program.
+func SetInfoForTest(info *Info) {
+	infoForTest = info
 }
