@@ -136,7 +136,7 @@ func main() {
 		}
 	}
 
-	if *limit > numSongs {
+	if *limit > 0 && numSongs > *limit {
 		numSongs = *limit
 	}
 
