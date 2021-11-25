@@ -1,6 +1,7 @@
 // Copyright 2021 Daniel Erat.
 // All rights reserved.
 
+// Package mp3gain uses the mp3gain program to analyze MP3s and compute gain adjustments.
 package mp3gain
 
 import (

@@ -1,6 +1,7 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
+// Package test contains common functionality and data used by tests.
 package test
 
 import (
@@ -47,14 +48,16 @@ func CopySongs(dir string, filenames ...string) {
 		if err != nil {
 			panic(err)
 		}
-		defer d.Close()
-
-		if _, err = io.Copy(d, s); err != nil {
+		if _, err := io.Copy(d, s); err != nil {
+			d.Close()
+			panic(err)
+		}
+		if err := d.Close(); err != nil {
 			panic(err)
 		}
 
 		now := time.Now()
-		if err = os.Chtimes(dp, now, now); err != nil {
+		if err := os.Chtimes(dp, now, now); err != nil {
 			panic(err)
 		}
 	}

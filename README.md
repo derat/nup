@@ -154,8 +154,8 @@ First, from the base directory, run the `./dev.sh` script. This starts a local
 development App Engine instance listening at `http://localhost:8080`.
 
 *   End-to-end Go tests that exercise the App Engine server and the `dump_music`
-    and `update_music` commands can be run from the `test/` directory via `go
-    test`.
+    and `update_music` commands can be run from the `test/e2e/` directory via
+    `go test`.
 *   Selenium tests that exercise both the web client and the server can be run
     from the `test/web/` directory via `./tests.py`.
 *   For development, you can import example data and start a file server by

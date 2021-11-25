@@ -1,6 +1,7 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
+// Package main implements nup's App Engine server.
 package main
 
 import (
