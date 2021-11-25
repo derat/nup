@@ -260,7 +260,7 @@ func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info,
 // and asynchronously sends the resulting Song structs to ch.
 // The number of songs that will be sent to the channel is returned.
 func readSongList(listPath, musicDir string, ch chan types.SongOrErr,
-	computeGain bool, artistRewrites map[string]string) (numSongs int, err error) {
+	opts *scanOptions) (numSongs int, err error) {
 	f, err := os.Open(listPath)
 	if err != nil {
 		return 0, err
@@ -276,7 +276,7 @@ func readSongList(listPath, musicDir string, ch chan types.SongOrErr,
 		rel := sc.Text()
 		paths = append(paths, rel)
 
-		if computeGain {
+		if opts.computeGain {
 			// Scan the file's directory if we don't already have its gain info.
 			full := filepath.Join(musicDir, rel)
 			if _, ok := gains[full]; !ok {
@@ -304,7 +304,7 @@ func readSongList(listPath, musicDir string, ch chan types.SongOrErr,
 				if gi, ok := gains[full]; ok {
 					gain = &gi
 				}
-				s, err := readSong(full, rel, fi, gain, artistRewrites)
+				s, err := readSong(full, rel, fi, gain, opts.artistRewrites)
 				ch <- types.NewSongOrErr(s, err)
 			}
 		}(rel)
@@ -313,7 +313,8 @@ func readSongList(listPath, musicDir string, ch chan types.SongOrErr,
 	return len(paths), nil
 }
 
-// scanOptions contains options for scanForUpdatedSongs.
+// scanOptions contains options for scanForUpdatedSongs and readSongList.
+// Some of the options aren't used by readSongList.
 type scanOptions struct {
 	computeGain    bool              // use mp3gain to compute gain adjustments
 	forceGlob      string            // glob matching files to update even if unchanged

@@ -21,17 +21,18 @@ import (
 )
 
 const (
-	dumpBatchSize    = 2
-	androidBatchSize = 1
+	dumpBatchSize    = 2 // song/play batch size for dump_music
+	androidBatchSize = 1 // song batch size when exporting for Android
 )
 
-type userDataPolicy int
+type userDataPolicy int // what should happen to user data when running update_music
 
 const (
 	replaceUserData userDataPolicy = iota
 	keepUserData
 )
 
+// runCommand synchronously runs the executable at p with args and returns its output.
 func runCommand(p string, args ...string) (stdout, stderr string, err error) {
 	cmd := exec.Command(p, args...)
 	outPipe, err := cmd.StdoutPipe()
@@ -60,25 +61,37 @@ func runCommand(p string, args ...string) (stdout, stderr string, err error) {
 	return
 }
 
+// Tester helps tests send HTTP requests to a development server and
+// run commands like update_music and dump_music.
 type Tester struct {
-	TempDir  string
+	// TempDir is the base temporary directory created for holding test-related data.
+	TempDir string
+	// MusicDir is created within TempDir for storing songs.
 	MusicDir string
+	// CoverDir is created within TempDir for storing album art.
 	CoverDir string
 
-	updateConfigFile string
-	dumpConfigFile   string
-	serverURL        string
-	binDir           string
+	updateConfigFile string // path to update_music config file
+	dumpConfigFile   string // path to dump_music config file
+	serverURL        string // base URL for dev server
+	binDir           string // directory where update_music and dump_music are located
 	client           http.Client
 }
 
+// newTester creates a new Tester for the development server at serverURL.
+// binDir is the directory containing the update_music and dump_music commands
+// (e.g. $HOME/go/bin).
 func newTester(serverURL, binDir string) *Tester {
 	t := &Tester{
-		TempDir:   CreateTempDir(),
 		serverURL: serverURL,
 		binDir:    binDir,
 	}
 
+	var err error
+	t.TempDir, err = ioutil.TempDir("", "nup_test.")
+	if err != nil {
+		panic(err)
+	}
 	t.MusicDir = filepath.Join(t.TempDir, "music")
 	t.CoverDir = filepath.Join(t.MusicDir, ".covers")
 	if err := os.MkdirAll(t.CoverDir, 0700); err != nil {
@@ -125,18 +138,19 @@ func newTester(serverURL, binDir string) *Tester {
 	return t
 }
 
-func (t *Tester) CleanUp() {
+// Close deletes temporary files created by the test.
+func (t *Tester) Close() {
 	os.RemoveAll(t.TempDir)
 }
 
-type stripPolicy int
+type stripPolicy int // controls whether DumpSongs removes data from songs
 
 const (
-	stripIDs stripPolicy = iota
-	keepIDs
+	stripIDs stripPolicy = iota // clear SongID
+	keepIDs                     // preserve SongID
 )
 
-type coverPolicy int
+type coverPolicy int // controls whether DumpSongs returns cover filenames
 
 const (
 	skipCovers coverPolicy = iota
@@ -204,6 +218,19 @@ func (t *Tester) ImportSongsFromJSONFile(path string, policy userDataPolicy) {
 func (t *Tester) UpdateSongs() {
 	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
 		"-config="+t.updateConfigFile); err != nil {
+		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
+	}
+}
+
+func (t *Tester) UpdateSongsFromList(path string, policy userDataPolicy) {
+	userDataValue := "false"
+	if policy == replaceUserData {
+		userDataValue = "true"
+	}
+	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
+		"-config="+t.updateConfigFile,
+		"-song-paths-file="+path,
+		"-import-user-data="+userDataValue); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
 }
@@ -315,11 +342,11 @@ func (t *Tester) GetNowFromServer() time.Time {
 	return time.Unix(0, nsec)
 }
 
-type deletionPolicy int
+type deletionPolicy int // controls whether GetSongsForAndroid gets deleted songs
 
 const (
-	getRegularSongs deletionPolicy = iota
-	getDeletedSongs
+	getRegularSongs deletionPolicy = iota // get only regular songs
+	getDeletedSongs                       // get only deleted songs
 )
 
 func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted deletionPolicy) []types.Song {

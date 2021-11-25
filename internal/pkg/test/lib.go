@@ -18,14 +18,6 @@ import (
 	"github.com/derat/nup/server/types"
 )
 
-func CreateTempDir() string {
-	dir, err := ioutil.TempDir("", "nup_test.")
-	if err != nil {
-		panic(err)
-	}
-	return dir
-}
-
 // GetDataDir returns the test data dir relative to the caller.
 func GetDataDir() string {
 	_, p, _, ok := runtime.Caller(0)
@@ -77,22 +69,49 @@ func DeleteSongs(dir string, filenames ...string) {
 	}
 }
 
+// WriteSongsToJSONFile creates a file in dir containing JSON-marshaled songs.
 func WriteSongsToJSONFile(dir string, songs []types.Song) (path string) {
 	f, err := ioutil.TempFile(dir, "songs-json.")
 	if err != nil {
 		panic(err)
 	}
-	defer f.Close()
 
 	e := json.NewEncoder(f)
 	for _, s := range songs {
 		if err = e.Encode(s); err != nil {
+			f.Close()
 			panic(err)
 		}
+	}
+
+	if err := f.Close(); err != nil {
+		panic(err)
 	}
 	return f.Name()
 }
 
+// WriteSongPathsFile creates a file in dir listing filenames,
+// suitable for passing to update_music's -song-paths-file flag.
+func WriteSongPathsFile(dir string, filenames ...string) (path string) {
+	f, err := ioutil.TempFile(dir, "song-list.")
+	if err != nil {
+		panic(err)
+	}
+
+	for _, fn := range filenames {
+		if _, err := f.WriteString(fn + "\n"); err != nil {
+			f.Close()
+			panic(err)
+		}
+	}
+
+	if err := f.Close(); err != nil {
+		panic(err)
+	}
+	return f.Name()
+}
+
+// OrderPolicy specifies whether CompareSongs requires that songs appear in the specified order.
 type OrderPolicy int
 
 const (
@@ -100,6 +119,9 @@ const (
 	IgnoreOrder
 )
 
+// CompareSongs compares expected against actual.
+// A descriptive error is returned if the songs don't match.
+// TODO: Returning a multi-line error seems dumb.
 func CompareSongs(expected, actual []types.Song, order OrderPolicy) error {
 	if order == IgnoreOrder {
 		sort.Slice(expected, func(i, j int) bool { return expected[i].Filename < expected[j].Filename })
@@ -147,6 +169,8 @@ func CompareSongs(expected, actual []types.Song, order OrderPolicy) error {
 	return nil
 }
 
+// GetSongsFromChannel reads and returns num songs from ch.
+// If an error was sent to the channel, it is returned.
 func GetSongsFromChannel(ch chan types.SongOrErr, num int) ([]types.Song, error) {
 	songs := make([]types.Song, 0)
 	for i := 0; i < num; i++ {

@@ -53,7 +53,7 @@ func setUpTest() *Tester {
 
 func cleanUpTest(t *Tester) {
 	t.DoPost("config", nil)
-	t.CleanUp()
+	t.Close()
 }
 
 func compareQueryResults(expected, actual []types.Song, order OrderPolicy) error {
@@ -539,6 +539,20 @@ func TestJSONImport(tt *testing.T) {
 	us2.Tags = us.Tags
 	us2.Plays = us.Plays
 	if err := CompareSongs([]types.Song{us2, LegacySong2},
+		t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
+		tt.Error(err)
+	}
+}
+
+func TestUpdateList(tt *testing.T) {
+	t := setUpTest()
+	defer cleanUpTest(t)
+
+	CopySongs(t.MusicDir, Song0s.Filename, Song1s.Filename, Song5s.Filename)
+
+	log.Print("updating songs from list")
+	t.UpdateSongsFromList(WriteSongPathsFile(t.TempDir, Song0s.Filename, Song5s.Filename), replaceUserData)
+	if err := CompareSongs([]types.Song{Song0s, Song5s},
 		t.DumpSongs(stripIDs, skipCovers), IgnoreOrder); err != nil {
 		tt.Error(err)
 	}

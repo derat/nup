@@ -37,12 +37,17 @@ func main() {
 	configFile := flag.String("config", "", "Path to config file")
 	deleteSongID := flag.Int64("delete-song-id", 0, "Delete song with given ID")
 	dryRun := flag.Bool("dry-run", false, "Only print what would be updated")
-	forceGlob := flag.String("force-glob", "", "Glob pattern relative to music dir for files to scan and update even if they haven't changed")
-	importJSONFile := flag.String("import-json-file", "", "If non-empty, path to JSON file containing a stream of Song objects to import")
-	importUserData := flag.Bool("import-user-data", true, "When importing from JSON, replace user data (ratings, tags, plays, etc.)")
+	forceGlob := flag.String("force-glob", "",
+		"Glob pattern relative to music dir for files to scan and update even if they haven't changed")
+	importJSONFile := flag.String("import-json-file", "",
+		"If non-empty, path to JSON file containing a stream of Song objects to import")
+	importUserData := flag.Bool("import-user-data", true,
+		"When importing from JSON, replace user data (ratings, tags, plays, etc.)")
 	limit := flag.Int("limit", 0, "If positive, limits the number of songs to update (for testing)")
-	requireCovers := flag.Bool("require-covers", false, "Die if cover images aren't found for any songs that have album IDs")
-	songPathsFile := flag.String("song-paths-file", "", "Path to a file containing one relative path per line for songs to force updating")
+	requireCovers := flag.Bool("require-covers", false,
+		"Die if cover images aren't found for any songs that have album IDs")
+	songPathsFile := flag.String("song-paths-file", "",
+		"Path to a file containing one relative path per line for songs to force updating")
 	flag.Parse()
 
 	var cfg config
@@ -77,8 +82,17 @@ func main() {
 			log.Fatal("musicDir not set in config")
 		}
 
+		// Not all these options will necessarily be used (e.g. readSongList doesn't need forceGlob
+		// or logProgress), but it doesn't hurt to pass them.
+		opts := scanOptions{
+			computeGain:    cfg.ComputeGain,
+			forceGlob:      *forceGlob,
+			logProgress:    true,
+			artistRewrites: cfg.ArtistRewrites,
+		}
+
 		if len(*songPathsFile) > 0 {
-			numSongs, err = readSongList(*songPathsFile, cfg.MusicDir, readChan, cfg.ComputeGain, cfg.ArtistRewrites)
+			numSongs, err = readSongList(*songPathsFile, cfg.MusicDir, readChan, &opts)
 			if err != nil {
 				log.Fatal("Failed reading song list: ", err)
 			}
@@ -91,12 +105,6 @@ func main() {
 				log.Fatal("Unable to get last update info: ", err)
 			}
 			log.Printf("Scanning for songs in %v updated since %v", cfg.MusicDir, info.Time.Local())
-			opts := scanOptions{
-				computeGain:    cfg.ComputeGain,
-				forceGlob:      *forceGlob,
-				logProgress:    true,
-				artistRewrites: cfg.ArtistRewrites,
-			}
 			numSongs, scannedDirs, err = scanForUpdatedSongs(cfg.MusicDir, info.Time, info.Dirs, readChan, &opts)
 			if err != nil {
 				log.Fatal("Scanning failed: ", err)
