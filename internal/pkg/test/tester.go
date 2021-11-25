@@ -25,13 +25,6 @@ const (
 	androidBatchSize = 1 // song batch size when exporting for Android
 )
 
-type userDataPolicy int // what should happen to user data when running update_music
-
-const (
-	replaceUserData userDataPolicy = iota
-	keepUserData
-)
-
 // runCommand synchronously runs the executable at p with args and returns its output.
 func runCommand(p string, args ...string) (stdout, stderr string, err error) {
 	cmd := exec.Command(p, args...)
@@ -152,24 +145,15 @@ const (
 	keepIDs                     // preserve SongID
 )
 
-type coverPolicy int // controls whether DumpSongs returns cover filenames
+const dumpCoversFlag = "-covers=true"
 
-const (
-	skipCovers coverPolicy = iota
-	getCovers
-)
-
-func (t *Tester) DumpSongs(strip stripPolicy, covers coverPolicy) []types.Song {
-	coversValue := "false"
-	if covers == getCovers {
-		coversValue = "true"
-	}
-
-	stdout, stderr, err := runCommand(filepath.Join(t.binDir, "dump_music"),
-		"-config="+t.dumpConfigFile,
-		"-song-batch-size="+strconv.Itoa(dumpBatchSize),
-		"-play-batch-size="+strconv.Itoa(dumpBatchSize),
-		"-covers="+coversValue)
+func (t *Tester) DumpSongs(strip stripPolicy, flags ...string) []types.Song {
+	args := append([]string{
+		"-config=" + t.dumpConfigFile,
+		"-song-batch-size=" + strconv.Itoa(dumpBatchSize),
+		"-play-batch-size=" + strconv.Itoa(dumpBatchSize),
+	}, flags...)
+	stdout, stderr, err := runCommand(filepath.Join(t.binDir, "dump_music"), args...)
 	if err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
@@ -196,7 +180,7 @@ func (t *Tester) DumpSongs(strip stripPolicy, covers coverPolicy) []types.Song {
 }
 
 func (t *Tester) SongID(sha1 string) string {
-	for _, s := range t.DumpSongs(keepIDs, skipCovers) {
+	for _, s := range t.DumpSongs(keepIDs) {
 		if s.SHA1 == sha1 {
 			return s.SongID
 		}
@@ -204,46 +188,25 @@ func (t *Tester) SongID(sha1 string) string {
 	panic(fmt.Sprintf("failed to find ID for %v", sha1))
 }
 
-// Flag to pass to update_music to use hardcoded gain info instead of calling mp3gain.
-var testGainInfoFlag = fmt.Sprintf("-test-gain-info=%f:%f:%f", TrackGain, AlbumGain, PeakAmp)
+const keepUserDataFlag = "-import-user-data=false"
 
-func (t *Tester) ImportSongsFromJSONFile(path string, policy userDataPolicy) {
-	userDataValue := "false"
-	if policy == replaceUserData {
-		userDataValue = "true"
-	}
+func (t *Tester) UpdateSongs(flags ...string) {
+	args := append([]string{
+		"-config=" + t.updateConfigFile,
+		"-test-gain-info=" + fmt.Sprintf("%f:%f:%f", TrackGain, AlbumGain, PeakAmp),
+	}, flags...)
 	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
-		"-config="+t.updateConfigFile,
-		"-import-json-file="+path,
-		"-import-user-data="+userDataValue,
-		testGainInfoFlag,
-	); err != nil {
+		args...); err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
 }
 
-func (t *Tester) UpdateSongs() {
-	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
-		"-config="+t.updateConfigFile,
-		testGainInfoFlag,
-	); err != nil {
-		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
-	}
+func (t *Tester) UpdateSongsFromList(path string, flags ...string) {
+	t.UpdateSongs(append(flags, "-song-paths-file="+path)...)
 }
 
-func (t *Tester) UpdateSongsFromList(path string, policy userDataPolicy) {
-	userDataValue := "false"
-	if policy == replaceUserData {
-		userDataValue = "true"
-	}
-	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
-		"-config="+t.updateConfigFile,
-		"-song-paths-file="+path,
-		"-import-user-data="+userDataValue,
-		testGainInfoFlag,
-	); err != nil {
-		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
-	}
+func (t *Tester) ImportSongsFromJSONFile(path string, flags ...string) {
+	t.UpdateSongs(append(flags, "-import-json-file="+path)...)
 }
 
 func (t *Tester) DeleteSong(songID string) {
@@ -293,7 +256,7 @@ func (t *Tester) DoPost(pathAndQueryParams string, body io.Reader) {
 	}
 }
 
-func (t *Tester) PostSongs(songs []types.Song, userData userDataPolicy, updateDelay time.Duration) {
+func (t *Tester) PostSongs(songs []types.Song, replaceUserData bool, updateDelay time.Duration) {
 	var buf bytes.Buffer
 	e := json.NewEncoder(&buf)
 	for _, s := range songs {
@@ -302,7 +265,7 @@ func (t *Tester) PostSongs(songs []types.Song, userData userDataPolicy, updateDe
 		}
 	}
 	path := fmt.Sprintf("import?updateDelayNsec=%v", int64(updateDelay*time.Nanosecond))
-	if userData == replaceUserData {
+	if replaceUserData {
 		path += "&replaceUserData=1"
 	}
 	t.DoPost(path, &buf)
