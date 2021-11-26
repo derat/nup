@@ -84,6 +84,11 @@ address.
 *   `startTime` - Float seconds since the Unix epoch specifying when playback
     of the song started.
 
+### /presets (GET)
+
+Returns a JSON-marshaled array of [Preset] objects describing search presets
+for the web interface.
+
 ### /query (GET)
 
 Queries Datastore and returns a JSON-marshaled array of [Song]s.
@@ -139,3 +144,4 @@ Returns a JSON-marshaled array of strings containing known tags.
 [ServerConfig]: ./types/config.go
 [Play]: ./types/song.go
 [Song]: ./types/song.go
+[Preset]: ./types/config.go

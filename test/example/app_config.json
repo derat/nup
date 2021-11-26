@@ -1,5 +1,24 @@
 {
   "googleUsers": ["test@example.com"],
   "songBaseURL": "http://localhost:8123/music/",
-  "coverBaseURL": "http://localhost:8123/covers/"
+  "coverBaseURL": "http://localhost:8123/covers/",
+  "presets": [
+    {
+      "name": "old",
+      "minRating": 4,
+      "lastPlayed": 6,
+      "shuffle": true,
+      "play": true
+    },
+    {
+      "name": "new albums",
+      "firstPlayed": 3,
+      "firstTrack": true
+    },
+    {
+      "name": "unrated",
+      "unrated": true,
+      "play": true
+    }
+  ]
 }

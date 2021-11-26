@@ -107,12 +107,12 @@ class Page(object):
     FOUR_STARS = u'★★★★'
     FIVE_STARS = u'★★★★★'
 
-    # Text for PRESET_SELECT  options.
+    # Text for PRESET_SELECT options.
+    # These match the presets defined in Server.send_config().
     PRESET_INSTRUMENTAL_OLD = 'instrumental old'
     PRESET_MELLOW = 'mellow'
     PRESET_NEW_ALBUMS = 'new albums'
     PRESET_UNRATED = 'unrated'
-    PRESET_OLD = 'old'
 
     # Values for GAIN_TYPE_SELECT options.
     GAIN_ALBUM = '0'

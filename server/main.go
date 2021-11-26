@@ -57,6 +57,7 @@ func main() {
 	addHandler("/import", http.MethodPost, false, handleImport)
 	addHandler("/now", http.MethodGet, false, handleNow)
 	addHandler("/played", http.MethodPost, false, handlePlayed)
+	addHandler("/presets", http.MethodGet, false, handlePresets)
 	addHandler("/query", http.MethodGet, false, handleQuery)
 	addHandler("/rate_and_tag", http.MethodPost, false, handleRateAndTag)
 	addHandler("/song", http.MethodGet, false, handleSong)
@@ -399,6 +400,10 @@ func handlePlayed(ctx context.Context, cfg *types.ServerConfig, w http.ResponseW
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	writeTextResponse(w, "ok")
+}
+
+func handlePresets(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+	writeJSONResponse(w, cfg.Presets)
 }
 
 func handleQuery(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {

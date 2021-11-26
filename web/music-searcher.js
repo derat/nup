@@ -209,13 +209,6 @@ const template = createTemplate(`
       <div class="select-wrapper">
         <select id="preset-select">
           <option value="">...</option>
-          <option value="mr=3;t=instrumental;lp=6;s=1;play=1">
-            instrumental old
-          </option>
-          <option value="mr=3;t=mellow;s=1;play=1">mellow</option>
-          <option value="ft=1;fp=3">new albums</option>
-          <option value="u=1;play=1">unrated</option>
-          <option value="mr=3;lp=6;s=1;play=1">old</option>
         </select>
       </div>
     </label>
@@ -373,6 +366,9 @@ customElements.define(
       });
 
       this.waitingDiv_ = get('waiting');
+
+      this.presets_ = [];
+      this.getPresetsFromServer_();
     }
 
     set dialogManager(manager) {
@@ -397,6 +393,24 @@ customElements.define(
       this.reset_(null, null, null, true /* clearResults */);
     }
 
+    getPresetsFromServer_() {
+      fetch('presets', { method: 'GET' })
+        .then((res) => handleFetchError(res))
+        .then((res) => res.json())
+        .then((presets) => {
+          this.presets_ = presets;
+          for (const p of presets) {
+            const opt = document.createElement('option');
+            opt.text = p.name;
+            this.presetSelect_.add(opt);
+          }
+          console.log(`Loaded ${presets.length} preset(s)`);
+        })
+        .catch((err) => {
+          console.error(`Failed loading presets: ${err}`);
+        });
+    }
+
     submitQuery_(appendToQueue) {
       let terms = [];
       if (this.keywordsInput_.value.trim()) {
@@ -417,13 +431,17 @@ customElements.define(
       if (this.firstPlayedSelect_.value != 0) {
         terms.push(
           'minFirstPlayed=' +
-            (getCurrentTimeSec() - parseInt(this.firstPlayedSelect_.value))
+            parseInt(
+              getCurrentTimeSec() - parseInt(this.firstPlayedSelect_.value)
+            )
         );
       }
       if (this.lastPlayedSelect_.value != 0) {
         terms.push(
           'maxLastPlayed=' +
-            (getCurrentTimeSec() - parseInt(this.lastPlayedSelect_.value))
+            parseInt(
+              getCurrentTimeSec() - parseInt(this.lastPlayedSelect_.value)
+            )
         );
       }
 
@@ -532,36 +550,26 @@ customElements.define(
     }
 
     handlePresetSelectChanged_(event) {
-      if (this.presetSelect_.value == '') return;
-
       const index = this.presetSelect_.selectedIndex;
+      if (index === 0) return; // ignore '...' item
+
+      const preset = this.presets_[index - 1]; // skip '...' item
       this.reset_(null, null, null, false /* clearResults */);
       this.presetSelect_.selectedIndex = index;
 
-      let play = false;
-
-      const vals = this.presetSelect_.value.split(';');
-      for (let i = 0; i < vals.length; i++) {
-        const parts = vals[i].split('=');
-        if (parts[0] == 'fp') this.firstPlayedSelect_.selectedIndex = parts[1];
-        else if (parts[0] == 'ft')
-          this.firstTrackCheckbox_.checked = !!parts[1];
-        else if (parts[0] == 'lp')
-          this.lastPlayedSelect_.selectedIndex = parts[1];
-        else if (parts[0] == 'mr')
-          this.minRatingSelect_.selectedIndex = parts[1];
-        else if (parts[0] == 'play') play = !!parts[1];
-        else if (parts[0] == 's') this.shuffleCheckbox_.checked = !!parts[1];
-        else if (parts[0] == 't') this.tagsInput_.value = parts[1];
-        else if (parts[0] == 'u') this.unratedCheckbox_.checked = !!parts[1];
-        else console.log('Unknown preset setting ' + vals[i]);
-      }
+      this.tagsInput_.value = preset.tags;
+      this.minRatingSelect_.selectedIndex = Math.max(preset.minRating - 1, 0);
+      this.unratedCheckbox_.checked = preset.unrated;
+      this.firstPlayedSelect_.selectedIndex = preset.firstPlayed;
+      this.lastPlayedSelect_.selectedIndex = preset.lastPlayed;
+      this.firstTrackCheckbox_.checked = preset.firstTrack;
+      this.shuffleCheckbox_.checked = preset.shuffle;
 
       // Unfocus the element so that arrow keys or Page Up/Down won't select new
       // presets.
       this.presetSelect_.blur();
 
-      this.submitQuery_(play);
+      this.submitQuery_(preset.play);
     }
 
     handleBodyKeyDown_(e) {

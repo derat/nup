@@ -786,8 +786,6 @@ class Test(unittest.TestCase):
         self.wait_for_search_results(page, [song2])
         page.select(page.PRESET_SELECT, text=page.PRESET_UNRATED)
         self.wait_for_song(page, song1)
-        # TODO: Test PRESET_OLD? Not sure how to, since it shuffles and
-        # autoplays (i.e. either song4 or song5 will play)...
 
         if page.is_focused(page.PRESET_SELECT):
             self.fail('Preset select still focused after click')

@@ -21,6 +21,31 @@ type BasicAuthInfo struct {
 	Password string `json:"password"`
 }
 
+// Preset specifies a search preset to display in the web interface.
+type Preset struct {
+	// Name contains a human-readable name to display in the interface.
+	Name string `json:"name"`
+	// Tags contains a space-separated tag expression, e.g. "guitar -banjo".
+	Tags string `json:"tags"`
+	// MinRating contains a minimum rating as number of stars in [1, 5].
+	// 0 is treated the same as 1.
+	MinRating int `json:"minRating"`
+	// Unrated indicates that only unrated songs should be returned.
+	Unrated bool `json:"unrated"`
+	// FirstPlayed contains a 0-based index into the first-played dropdown:
+	// [empty], one day, one week, one month, three months, six months, one year, three years
+	FirstPlayed int `json:"firstPlayed"`
+	// LastPlayed contains a 0-based index into the last-played dropdown:
+	// [empty], one day, one week, one month, three months, six months, one year, three years
+	LastPlayed int `json:"lastPlayed"`
+	// FirstTrack indicates that only albums' first tracks should be returned.
+	FirstTrack bool `json:"firstTrack"`
+	// Shuffle indicates that the returned songs should be shuffled.
+	Shuffle bool `json:"shuffle"`
+	// Play indicates that returned songs should be played automatically.
+	Play bool `json:"play"`
+}
+
 // ServerConfig holds the App Engine server's configuration.
 type ServerConfig struct {
 	// GoogleUsers contains email addresses of Google accounts allowed to access
@@ -43,6 +68,9 @@ type ServerConfig struct {
 	// Exactly one of CoverBucket and CoverBaseURL must be set.
 	CoverBaseURL string `json:"coverBaseUrl"`
 
+	// Presets describes search presets for the web interface.
+	Presets []Preset `json:"presets"`
+
 	// ForceUpdateFailures is set by tests to indicate that failure be reported
 	// for all user data updates (ratings, tags, plays). Ignored for non-development servers.
 	ForceUpdateFailures bool `json:"forceUpdateFailures"`
@@ -50,24 +78,13 @@ type ServerConfig struct {
 
 // LoadServerConfig loads a JSON ServerConfig from the file at p.
 func LoadServerConfig(p string) (*ServerConfig, error) {
-	var cfg ServerConfig
-	if err := loadJSON(p, &cfg); err != nil {
-		return nil, err
-	}
-	return &cfg, nil
-}
-
-// loadJSON opens the specified file and unmarshals it into out.
-func loadJSON(path string, out interface{}) error {
-	f, err := os.Open(path)
+	f, err := os.Open(p)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer f.Close()
 
-	d := json.NewDecoder(f)
-	if err = d.Decode(out); err != nil {
-		return err
-	}
-	return nil
+	var cfg ServerConfig
+	err = json.NewDecoder(f).Decode(&cfg)
+	return &cfg, err
 }

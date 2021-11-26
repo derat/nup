@@ -25,6 +25,33 @@ class Server:
             'songBaseUrl': 'http://%s:%d/' % self.music_host_port,
             'coverBaseUrl': '',
             'forceUpdateFailures': force_update_failures,
+            'presets': [
+                {
+                    "name": "instrumental old",
+                    "tags": "instrumental",
+                    "minRating": 4,
+                    "lastPlayed": 6,
+                    "shuffle": True,
+                    "play": True,
+                },
+                {
+                    "name": "mellow",
+                    "tags": "mellow",
+                    "minRating": 4,
+                    "shuffle": True,
+                    "play": True,
+                },
+                {
+                    "name": "new albums",
+                    "firstPlayed": 3,
+                    "firstTrack": True,
+                },
+                {
+                    "name": "unrated",
+                    "unrated": True,
+                    "play": True,
+                },
+            ],
         }))
 
     def reset_config(self):
