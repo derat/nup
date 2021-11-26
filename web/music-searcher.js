@@ -178,6 +178,7 @@ const template = createTemplate(`
           <option value="15552000">six months</option>
           <option value="31536000">one year</option>
           <option value="94608000">three years</option>
+          <option value="157680000">five years</option>
         </select>
       </div>
       or less ago
@@ -197,6 +198,7 @@ const template = createTemplate(`
           <option value="15552000">six months</option>
           <option value="31536000">one year</option>
           <option value="94608000">three years</option>
+          <option value="157680000">five years</option>
         </select>
       </div>
       or longer ago

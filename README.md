@@ -157,7 +157,9 @@ development App Engine instance listening at `http://localhost:8080`.
     and `update_music` commands can be run from the `test/e2e/` directory via
     `go test`.
 *   Selenium tests that exercise both the web client and the server can be run
-    from the `test/web/` directory via `./tests.py`.
+    from the `test/web/` directory via `./tests.py`. A command like
+    `xvfb-run -s ':99 -ac -shmem -screen 0 1600x1200x16' ./tests.py`
+    can be used to run test headlessly using [Xvfb].
 *   For development, you can import example data and start a file server by
     running `./import_to_devserver.sh` in the `test/example/` directory. Use
     `test@example.com` to log in.
@@ -168,6 +170,8 @@ repository:
 ```sh
 go test ./...
 ```
+
+[Xvfb]: https://en.wikipedia.org/wiki/Xvfb
 
 ## Merging songs
 

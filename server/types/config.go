@@ -28,21 +28,30 @@ type Preset struct {
 	// Tags contains a space-separated tag expression, e.g. "guitar -banjo".
 	Tags string `json:"tags"`
 	// MinRating contains a minimum rating as number of stars in [1, 5].
-	// 0 is treated the same as 1.
+	// 0 is equivalent to 1, i.e. any rating is accepted.
 	MinRating int `json:"minRating"`
 	// Unrated indicates that only unrated songs should be returned.
 	Unrated bool `json:"unrated"`
-	// FirstPlayed contains a 0-based index into the first-played dropdown:
-	// [empty], one day, one week, one month, three months, six months, one year, three years
+	// FirstPlayed limits results to songs first played within the given interval:
+	//   0 - no restriction
+	//   1 - last day
+	//   2 - last week
+	//   3 - last month
+	//   4 - last three months
+	//   5 - last six months
+	//   6 - last year
+	//   7 - last three years
+	//   8 - last five years
 	FirstPlayed int `json:"firstPlayed"`
-	// LastPlayed contains a 0-based index into the last-played dropdown:
-	// [empty], one day, one week, one month, three months, six months, one year, three years
+	// LastPlayed limits results to songs last played before the given interval.
+	// See FirstPlayed for values.
 	LastPlayed int `json:"lastPlayed"`
 	// FirstTrack indicates that only albums' first tracks should be returned.
 	FirstTrack bool `json:"firstTrack"`
 	// Shuffle indicates that the returned songs should be shuffled.
 	Shuffle bool `json:"shuffle"`
 	// Play indicates that returned songs should be played automatically.
+	// The current playlist is replaced.
 	Play bool `json:"play"`
 }
 
