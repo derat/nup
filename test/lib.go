@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/server/db"
 )
 
 // GetDataDir returns the test data dir relative to the caller.
@@ -73,7 +73,7 @@ func DeleteSongs(dir string, filenames ...string) {
 }
 
 // WriteSongsToJSONFile creates a file in dir containing JSON-marshaled songs.
-func WriteSongsToJSONFile(dir string, songs []types.Song) (path string) {
+func WriteSongsToJSONFile(dir string, songs []db.Song) (path string) {
 	f, err := ioutil.TempFile(dir, "songs-json.")
 	if err != nil {
 		panic(err)
@@ -125,7 +125,7 @@ const (
 // CompareSongs compares expected against actual.
 // A descriptive error is returned if the songs don't match.
 // TODO: Returning a multi-line error seems dumb.
-func CompareSongs(expected, actual []types.Song, order OrderPolicy) error {
+func CompareSongs(expected, actual []db.Song, order OrderPolicy) error {
 	if order == IgnoreOrder {
 		sort.Slice(expected, func(i, j int) bool { return expected[i].Filename < expected[j].Filename })
 		sort.Slice(actual, func(i, j int) bool { return actual[i].Filename < actual[j].Filename })
@@ -133,7 +133,7 @@ func CompareSongs(expected, actual []types.Song, order OrderPolicy) error {
 
 	m := make([]string, 0)
 
-	stringify := func(s types.Song) string {
+	stringify := func(s db.Song) string {
 		if s.Plays != nil {
 			for j := range s.Plays {
 				s.Plays[j].StartTime = s.Plays[j].StartTime.UTC()
@@ -142,7 +142,7 @@ func CompareSongs(expected, actual []types.Song, order OrderPolicy) error {
 					s.Plays[j].IPAddress = "127.0.0.1"
 				}
 			}
-			sort.Sort(types.PlayArray(s.Plays))
+			sort.Sort(db.PlayArray(s.Plays))
 		}
 		b, err := json.Marshal(s)
 		if err != nil {
@@ -170,18 +170,4 @@ func CompareSongs(expected, actual []types.Song, order OrderPolicy) error {
 		return fmt.Errorf("actual songs didn't match expected:\n%v", strings.Join(m, "\n"))
 	}
 	return nil
-}
-
-// GetSongsFromChannel reads and returns num songs from ch.
-// If an error was sent to the channel, it is returned.
-func GetSongsFromChannel(ch chan types.SongOrErr, num int) ([]types.Song, error) {
-	songs := make([]types.Song, 0)
-	for i := 0; i < num; i++ {
-		s := <-ch
-		if s.Err != nil {
-			return nil, fmt.Errorf("got error at position %v instead of song: %v", i, s.Err)
-		}
-		songs = append(songs, *s.Song)
-	}
-	return songs, nil
 }

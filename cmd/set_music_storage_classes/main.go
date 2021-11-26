@@ -13,8 +13,7 @@ import (
 	"os"
 
 	"cloud.google.com/go/storage"
-
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/server/db"
 
 	"google.golang.org/api/iterator"
 )
@@ -58,7 +57,7 @@ func main() {
 	songClasses := make(map[string]storageClass)
 	d := json.NewDecoder(os.Stdin)
 	for {
-		var s types.Song
+		var s db.Song
 		if err := d.Decode(&s); err == io.EOF {
 			break
 		} else if err != nil {

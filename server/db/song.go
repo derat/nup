@@ -1,7 +1,7 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-package types
+package db
 
 import (
 	"time"
@@ -15,7 +15,7 @@ const (
 	DeletedSongKind = "DeletedSong"
 )
 
-// Song represents an audio file.
+// Song represents an audio file and holds metadata and user-generated data.
 //
 // When adding fields, be sure to update copySongFileFields() in server/update/update.go.
 type Song struct {
@@ -103,13 +103,6 @@ type Song struct {
 	// LastModifiedTime is the time that the song was modified.
 	LastModifiedTime time.Time `json:"-"`
 }
-
-type SongOrErr struct {
-	*Song
-	Err error
-}
-
-func NewSongOrErr(s *Song, err error) SongOrErr { return SongOrErr{s, err} }
 
 // Play represents one playback of a Song.
 type Play struct {

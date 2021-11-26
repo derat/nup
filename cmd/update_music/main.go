@@ -15,7 +15,7 @@ import (
 
 	"github.com/derat/nup/client"
 	"github.com/derat/nup/mp3gain"
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/server/db"
 )
 
 type config struct {
@@ -76,7 +76,7 @@ func main() {
 	var numSongs int
 	var scannedDirs []string
 	var replaceUserData, didFullScan bool
-	readChan := make(chan types.SongOrErr)
+	readChan := make(chan songOrErr)
 	startTime := time.Now()
 
 	if len(*testGainInfo) > 0 {
@@ -144,14 +144,19 @@ func main() {
 	log.Printf("Sending %v song(s)", numSongs)
 
 	// Look up covers and feed songs to the updater.
-	updateChan := make(chan types.Song)
+	updateChan := make(chan db.Song)
 	go func() {
 		for i := 0; i < numSongs; i++ {
-			s := <-readChan
-			if s.Err != nil {
-				log.Fatalf("Got error for %v: %v\n", s.Filename, s.Err)
+			soe := <-readChan
+			if soe.err != nil {
+				fn := "[unknown]"
+				if soe.song != nil {
+					fn = soe.song.Filename
+				}
+				log.Fatalf("Got error for %v: %v\n", fn, soe.err)
 			}
-			s.CoverFilename = getCoverFilename(cfg.CoverDir, s.Song)
+			s := *soe.song
+			s.CoverFilename = getCoverFilename(cfg.CoverDir, &s)
 			if *requireCovers && len(s.CoverFilename) == 0 &&
 				(len(s.AlbumID) > 0 || len(s.CoverID) > 0 || len(s.RecordingID) > 0) {
 				log.Fatalf("Failed to find cover for %v (album=%v, cover=%v, recording=%v)",
@@ -160,7 +165,7 @@ func main() {
 			s.RecordingID = ""
 
 			log.Print("Sending ", s.Filename)
-			updateChan <- *s.Song
+			updateChan <- s
 		}
 		close(updateChan)
 	}()
@@ -185,6 +190,11 @@ func main() {
 			}
 		}
 	}
+}
+
+type songOrErr struct {
+	song *db.Song
+	err  error
 }
 
 // lastUpdateInfo contains information about the last full update that was performed.
@@ -227,7 +237,7 @@ func writeLastUpdateInfo(p string, info lastUpdateInfo) error {
 }
 
 // getCoverFilename returns the relative path under dir for song's cover image.
-func getCoverFilename(dir string, song *types.Song) string {
+func getCoverFilename(dir string, song *db.Song) string {
 	for _, s := range []string{song.CoverID, song.AlbumID, song.RecordingID} {
 		if len(s) > 0 {
 			fn := s + ".jpg"
@@ -251,7 +261,7 @@ func readDumpedGains(p string) (map[string]mp3gain.Info, error) {
 	gains := make(map[string]mp3gain.Info)
 	d := json.NewDecoder(f)
 	for {
-		var s types.Song
+		var s db.Song
 		if err := d.Decode(&s); err == io.EOF {
 			break
 		} else if err != nil {

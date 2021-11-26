@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/derat/nup/server/cache"
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/server/db"
 
 	"google.golang.org/appengine/v2/datastore"
 	"google.golang.org/appengine/v2/log"
@@ -132,9 +132,9 @@ func Tags(ctx context.Context, requireCache bool) ([]string, error) {
 	if tags == nil {
 		startTime := time.Now()
 		tagMap := make(map[string]struct{})
-		it := datastore.NewQuery(types.SongKind).Project("Tags").Distinct().Run(ctx)
+		it := datastore.NewQuery(db.SongKind).Project("Tags").Distinct().Run(ctx)
 		for {
-			var song types.Song
+			var song db.Song
 			if _, err := it.Next(&song); err == datastore.Done {
 				break
 			} else if err != nil {
@@ -183,7 +183,7 @@ func Tags(ctx context.Context, requireCache bool) ([]string, error) {
 // Songs executes the supplied query and returns matching songs.
 // If cacheOnly is true, empty results are returned if the query's results
 // aren't cached.
-func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]types.Song, error) {
+func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]db.Song, error) {
 	var ids []int64
 	var err error
 
@@ -243,7 +243,7 @@ func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]types.Song,
 	}
 	ids = ids[:numResults]
 
-	songs := make([]types.Song, numResults)
+	songs := make([]db.Song, numResults)
 	if numResults == 0 {
 		return songs, nil
 	}
@@ -252,7 +252,7 @@ func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]types.Song,
 	startTime := time.Now()
 	keys := make([]*datastore.Key, 0, len(songs))
 	for _, id := range ids {
-		keys = append(keys, datastore.NewKey(ctx, types.SongKind, "", id, nil))
+		keys = append(keys, datastore.NewKey(ctx, db.SongKind, "", id, nil))
 	}
 	if err = datastore.GetMulti(ctx, keys, songs); err != nil {
 		return nil, err
@@ -364,7 +364,7 @@ func shufflePartial(a []int64, n int) {
 
 func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 	// First, build a base query with all of the equality filters.
-	bq := datastore.NewQuery(types.SongKind).KeysOnly()
+	bq := datastore.NewQuery(db.SongKind).KeysOnly()
 	if len(query.Artist) > 0 {
 		bq = bq.Filter("ArtistLower =", strings.ToLower(query.Artist))
 	}
@@ -443,7 +443,7 @@ func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 
 // CleanSong prepares s to be returned in results.
 // This is exported so it can be called by tests.
-func CleanSong(s *types.Song, id int64) {
+func CleanSong(s *db.Song, id int64) {
 	s.SongID = strconv.FormatInt(id, 10)
 
 	// Create an empty tags slice so that clients don't need to check for null.
@@ -458,7 +458,7 @@ func CleanSong(s *types.Song, id int64) {
 }
 
 // sortSongs sorts songs appropriately for the client.
-func sortSongs(songs []types.Song) {
+func sortSongs(songs []db.Song) {
 	sort.Slice(songs, func(i, j int) bool {
 		si := songs[i]
 		sj := songs[j]

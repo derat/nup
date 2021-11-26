@@ -21,11 +21,11 @@ import (
 
 	"github.com/derat/nup/server/cache"
 	"github.com/derat/nup/server/cover"
+	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/server/dump"
 	"github.com/derat/nup/server/query"
 	"github.com/derat/nup/server/storage"
 	"github.com/derat/nup/server/update"
-	"github.com/derat/nup/types"
 
 	"google.golang.org/appengine/v2"
 	"google.golang.org/appengine/v2/log"
@@ -234,7 +234,7 @@ func handleExport(ctx context.Context, cfg *config, w http.ResponseWriter, r *ht
 			}
 		}
 
-		var songs []types.Song
+		var songs []db.Song
 		songs, nextCursor, err = dump.Songs(ctx, max, r.FormValue("cursor"),
 			r.FormValue("deleted") == "1", minLastModified)
 		if err != nil {
@@ -262,7 +262,7 @@ func handleExport(ctx context.Context, cfg *config, w http.ResponseWriter, r *ht
 			objectPtrs[i] = s
 		}
 	case "play":
-		var plays []types.PlayDump
+		var plays []db.PlayDump
 		plays, nextCursor, err = dump.Plays(ctx, max, r.FormValue("cursor"))
 		if err != nil {
 			log.Errorf(ctx, "Dumping plays failed: %v", err)
@@ -324,7 +324,7 @@ func handleImport(ctx context.Context, cfg *config, w http.ResponseWriter, r *ht
 	replaceUserData := r.FormValue("replaceUserData") == "1"
 	d := json.NewDecoder(r.Body)
 	for true {
-		s := &types.Song{}
+		s := &db.Song{}
 		if err := d.Decode(s); err == io.EOF {
 			break
 		} else if err != nil {

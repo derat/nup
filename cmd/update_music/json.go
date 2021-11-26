@@ -8,12 +8,12 @@ import (
 	"io"
 	"os"
 
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/server/db"
 )
 
-// readSongsFromJSONFile JSON-unmarshals types.Song objects from path and sends
+// readSongsFromJSONFile JSON-unmarshals db.Song objects from path and sends
 // them to ch. The total number of sent songs is returned.
-func readSongsFromJSONFile(path string, ch chan types.SongOrErr) (numSongs int, err error) {
+func readSongsFromJSONFile(path string, ch chan songOrErr) (numSongs int, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, err
@@ -22,13 +22,13 @@ func readSongsFromJSONFile(path string, ch chan types.SongOrErr) (numSongs int, 
 
 	d := json.NewDecoder(f)
 	for {
-		s := types.Song{}
+		s := db.Song{}
 		if err = d.Decode(&s); err == io.EOF {
 			break
 		} else if err != nil {
 			return 0, err
 		}
-		go func() { ch <- types.NewSongOrErr(&s, nil) }()
+		go func() { ch <- songOrErr{&s, nil} }()
 		numSongs++
 	}
 	return numSongs, nil

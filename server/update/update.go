@@ -13,8 +13,8 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/server/query"
-	"github.com/derat/nup/types"
 
 	"google.golang.org/appengine/v2"
 	"google.golang.org/appengine/v2/datastore"
@@ -25,9 +25,9 @@ var errUnmodified = errors.New("object wasn't modified")
 
 // AddPlay adds a play report to the song identified by id in datastore.
 func AddPlay(ctx context.Context, id int64, startTime time.Time, ip string) error {
-	err := updateExistingSong(ctx, id, func(ctx context.Context, s *types.Song) error {
-		songKey := datastore.NewKey(ctx, types.SongKind, "", id, nil)
-		existingKeys, err := datastore.NewQuery(types.PlayKind).Ancestor(songKey).KeysOnly().
+	err := updateExistingSong(ctx, id, func(ctx context.Context, s *db.Song) error {
+		songKey := datastore.NewKey(ctx, db.SongKind, "", id, nil)
+		existingKeys, err := datastore.NewQuery(db.PlayKind).Ancestor(songKey).KeysOnly().
 			Filter("StartTime =", startTime).Filter("IpAddress =", ip).GetAll(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("querying for existing play failed: %v", err)
@@ -44,8 +44,8 @@ func AddPlay(ctx context.Context, id int64, startTime time.Time, ip string) erro
 			s.LastStartTime = startTime
 		}
 
-		newKey := datastore.NewIncompleteKey(ctx, types.PlayKind, songKey)
-		if _, err = datastore.Put(ctx, newKey, &types.Play{
+		newKey := datastore.NewIncompleteKey(ctx, db.PlayKind, songKey)
+		if _, err = datastore.Put(ctx, newKey, &db.Play{
 			StartTime: startTime,
 			IPAddress: ip,
 		}); err != nil {
@@ -65,7 +65,7 @@ func AddPlay(ctx context.Context, id int64, startTime time.Time, ip string) erro
 func SetRatingAndTags(ctx context.Context, id int64, hasRating bool, rating float64,
 	tags []string, updateDelay time.Duration) error {
 	var ut query.UpdateTypes
-	err := updateExistingSong(ctx, id, func(ctx context.Context, s *types.Song) error {
+	err := updateExistingSong(ctx, id, func(ctx context.Context, s *db.Song) error {
 		if hasRating && rating != s.Rating {
 			s.Rating = rating
 			ut |= query.RatingUpdate
@@ -106,10 +106,10 @@ func SetRatingAndTags(ctx context.Context, id int64, hasRating bool, rating floa
 // If replaceUserData is true, the existing song (if any) will have its ratings,
 // tags, and play history replaced by updatedSong's. If updateDelay is nonzero,
 // the server will wait before writing to datastore.
-func UpdateOrInsertSong(ctx context.Context, updatedSong *types.Song,
+func UpdateOrInsertSong(ctx context.Context, updatedSong *db.Song,
 	replaceUserData bool, updateDelay time.Duration) error {
 	sha1 := updatedSong.SHA1
-	queryKeys, err := datastore.NewQuery(types.SongKind).KeysOnly().Filter("Sha1 =", sha1).GetAll(ctx, nil)
+	queryKeys, err := datastore.NewQuery(db.SongKind).KeysOnly().Filter("Sha1 =", sha1).GetAll(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("querying for SHA1 %v failed: %v", sha1, err)
 	}
@@ -119,7 +119,7 @@ func UpdateOrInsertSong(ctx context.Context, updatedSong *types.Song,
 
 	return datastore.RunInTransaction(ctx, func(ctx context.Context) error {
 		var key *datastore.Key
-		song := &types.Song{}
+		song := &db.Song{}
 		if len(queryKeys) == 1 {
 			log.Debugf(ctx, "Updating %v with SHA1 %v", updatedSong.Filename, sha1)
 			key = queryKeys[0]
@@ -130,7 +130,7 @@ func UpdateOrInsertSong(ctx context.Context, updatedSong *types.Song,
 			}
 		} else {
 			log.Debugf(ctx, "Inserting %v with SHA1 %v", updatedSong.Filename, sha1)
-			key = datastore.NewIncompleteKey(ctx, types.SongKind, nil)
+			key = datastore.NewIncompleteKey(ctx, db.SongKind, nil)
 			song.Rating = -1.0
 		}
 
@@ -148,7 +148,7 @@ func UpdateOrInsertSong(ctx context.Context, updatedSong *types.Song,
 		if err != nil {
 			return fmt.Errorf("putting %v failed: %v", key.IntID(), err)
 		}
-		log.Debugf(ctx, "Put %v with key %v", types.SongKind, key.IntID())
+		log.Debugf(ctx, "Put %v with key %v", db.SongKind, key.IntID())
 
 		if replaceUserData {
 			if err = replacePlays(ctx, key, updatedSong.Plays); err != nil {
@@ -162,13 +162,13 @@ func UpdateOrInsertSong(ctx context.Context, updatedSong *types.Song,
 // DeleteSong deletes the song identified by id from datastore.
 func DeleteSong(ctx context.Context, id int64) error {
 	if err := datastore.RunInTransaction(ctx, func(ctx context.Context) error {
-		songKey := datastore.NewKey(ctx, types.SongKind, "", id, nil)
-		song := types.Song{}
+		songKey := datastore.NewKey(ctx, db.SongKind, "", id, nil)
+		song := db.Song{}
 		if err := datastore.Get(ctx, songKey, &song); err != nil {
 			return fmt.Errorf("getting song %v failed: %v", id, err)
 		}
-		plays := make([]types.Play, 0)
-		playKeys, err := datastore.NewQuery(types.PlayKind).Ancestor(songKey).GetAll(ctx, &plays)
+		plays := make([]db.Play, 0)
+		playKeys, err := datastore.NewQuery(db.PlayKind).Ancestor(songKey).GetAll(ctx, &plays)
 		if err != nil {
 			return fmt.Errorf("getting plays for song %v failed: %v", id, err)
 		}
@@ -183,13 +183,13 @@ func DeleteSong(ctx context.Context, id int64) error {
 
 		// Put the deleted song and plays.
 		song.LastModifiedTime = time.Now()
-		delSongKey := datastore.NewKey(ctx, types.DeletedSongKind, "", id, nil)
+		delSongKey := datastore.NewKey(ctx, db.DeletedSongKind, "", id, nil)
 		if _, err := datastore.Put(ctx, delSongKey, &song); err != nil {
 			return fmt.Errorf("putting deleted song %v failed: %v", id, err)
 		}
 		delPlayKeys := make([]*datastore.Key, len(plays))
 		for i := range plays {
-			delPlayKeys[i] = datastore.NewIncompleteKey(ctx, types.DeletedPlayKind, delSongKey)
+			delPlayKeys[i] = datastore.NewIncompleteKey(ctx, db.DeletedPlayKind, delSongKey)
 		}
 		if _, err = datastore.PutMulti(ctx, delPlayKeys, plays); err != nil {
 			return fmt.Errorf("putting %v deleted play(s) for song %v failed: %v", len(plays), id, err)
@@ -212,7 +212,7 @@ func ClearData(ctx context.Context) error {
 	}
 
 	log.Debugf(ctx, "Clearing all data")
-	for _, kind := range []string{types.SongKind, types.PlayKind} {
+	for _, kind := range []string{db.SongKind, db.PlayKind} {
 		keys, err := datastore.NewQuery(kind).KeysOnly().GetAll(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("getting all %v keys failed: %v", kind, err)
@@ -236,7 +236,7 @@ func sortedStringSlicesMatch(a, b []string) bool {
 	return true
 }
 
-func copySongFileFields(dest, src *types.Song) {
+func copySongFileFields(dest, src *db.Song) {
 	dest.SHA1 = src.SHA1
 	dest.Filename = src.Filename
 	dest.CoverFilename = src.CoverFilename
@@ -269,7 +269,7 @@ func copySongFileFields(dest, src *types.Song) {
 	}
 }
 
-func copySongUserFields(dest, src *types.Song) {
+func copySongUserFields(dest, src *db.Song) {
 	dest.Rating = src.Rating
 	dest.FirstStartTime = src.FirstStartTime
 	dest.LastStartTime = src.LastStartTime
@@ -278,7 +278,7 @@ func copySongUserFields(dest, src *types.Song) {
 	sort.Strings(dest.Tags)
 }
 
-func buildSongPlayStats(s *types.Song) {
+func buildSongPlayStats(s *db.Song) {
 	s.NumPlays = 0
 	s.FirstStartTime = time.Time{}
 	s.LastStartTime = time.Time{}
@@ -294,8 +294,8 @@ func buildSongPlayStats(s *types.Song) {
 	}
 }
 
-func replacePlays(ctx context.Context, songKey *datastore.Key, plays []types.Play) error {
-	playKeys, err := datastore.NewQuery(types.PlayKind).Ancestor(songKey).KeysOnly().GetAll(ctx, nil)
+func replacePlays(ctx context.Context, songKey *datastore.Key, plays []db.Play) error {
+	playKeys, err := datastore.NewQuery(db.PlayKind).Ancestor(songKey).KeysOnly().GetAll(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -305,7 +305,7 @@ func replacePlays(ctx context.Context, songKey *datastore.Key, plays []types.Pla
 
 	playKeys = make([]*datastore.Key, len(plays))
 	for i := range plays {
-		playKeys[i] = datastore.NewIncompleteKey(ctx, types.PlayKind, songKey)
+		playKeys[i] = datastore.NewIncompleteKey(ctx, db.PlayKind, songKey)
 	}
 	if _, err = datastore.PutMulti(ctx, playKeys, plays); err != nil {
 		return err
@@ -314,14 +314,14 @@ func replacePlays(ctx context.Context, songKey *datastore.Key, plays []types.Pla
 }
 
 func updateExistingSong(ctx context.Context, id int64,
-	f func(context.Context, *types.Song) error, updateDelay time.Duration) error {
+	f func(context.Context, *db.Song) error, updateDelay time.Duration) error {
 	if updateDelay > 0 {
 		time.Sleep(updateDelay)
 	}
 
 	return datastore.RunInTransaction(ctx, func(ctx context.Context) error {
-		key := datastore.NewKey(ctx, types.SongKind, "", id, nil)
-		song := &types.Song{}
+		key := datastore.NewKey(ctx, db.SongKind, "", id, nil)
+		song := &db.Song{}
 		if err := datastore.Get(ctx, key, song); err != nil {
 			return err
 		}

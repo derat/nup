@@ -10,7 +10,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/server/db"
 )
 
 const batchSize = 100 // updateSongs HTTP request batch size
@@ -21,7 +21,7 @@ const batchSize = 100 // updateSongs HTTP request batch size
 // are replaced with data from ch; otherwise the user data on the server
 // are preserved and only static fields (e.g. artist, title, album, etc.)
 // are replaced.
-func updateSongs(cfg *config, ch chan types.Song, replaceUserData bool) error {
+func updateSongs(cfg *config, ch chan db.Song, replaceUserData bool) error {
 	u := cfg.GetURL("/import")
 	if replaceUserData {
 		u.RawQuery = "replaceUserData=1"

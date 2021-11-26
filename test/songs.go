@@ -6,7 +6,7 @@ package test
 import (
 	"time"
 
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/server/db"
 )
 
 const (
@@ -18,7 +18,7 @@ const (
 	PeakAmp   = 1.05
 )
 
-var Song0s = types.Song{
+var Song0s = db.Song{
 	SHA1:        "fefac74a1d5928316d7131747107c8a61b71ffe4",
 	Filename:    "0s.mp3",
 	Artist:      "First Artist",
@@ -35,7 +35,7 @@ var Song0s = types.Song{
 	Rating:      -1,
 }
 
-var Song0sUpdated = types.Song{
+var Song0sUpdated = db.Song{
 	SHA1:        Song0s.SHA1,
 	Filename:    "0s-updated.mp3",
 	Artist:      Song0s.Artist,
@@ -52,7 +52,7 @@ var Song0sUpdated = types.Song{
 	Rating:      -1,
 }
 
-var Song1s = types.Song{
+var Song1s = db.Song{
 	SHA1:        "c6e3230b4ed5e1f25d92dd6b80bfc98736bbee62",
 	Filename:    "1s.mp3",
 	Artist:      "Second Artist",
@@ -69,7 +69,7 @@ var Song1s = types.Song{
 	Rating:      -1,
 }
 
-var Song5s = types.Song{
+var Song5s = db.Song{
 	SHA1:      "63afdde2b390804562d54788865fff1bfd11cf94",
 	Filename:  "5s.mp3",
 	Artist:    "Third Artist",
@@ -85,7 +85,7 @@ var Song5s = types.Song{
 	Rating:    -1,
 }
 
-var ID3V1Song = types.Song{
+var ID3V1Song = db.Song{
 	SHA1:      "fefac74a1d5928316d7131747107c8a61b71ffe4",
 	Filename:  "id3v1.mp3",
 	Artist:    "The Legacy Formats",
@@ -100,7 +100,7 @@ var ID3V1Song = types.Song{
 	Rating:    -1,
 }
 
-var LegacySong1 = types.Song{
+var LegacySong1 = db.Song{
 	SHA1:      "1977c91fea860245695dcceea0805c14cede7559",
 	Filename:  "arovane/atol_scrap/thaem_nue.mp3",
 	Artist:    "Arovane",
@@ -113,14 +113,14 @@ var LegacySong1 = types.Song{
 	AlbumGain: AlbumGain,
 	PeakAmp:   PeakAmp,
 	Rating:    0.75,
-	Plays: []types.Play{
-		types.NewPlay(time.Unix(1276057170, 0).UTC(), "127.0.0.1"),
-		types.NewPlay(time.Unix(1297316913, 0).UTC(), "1.2.3.4"),
+	Plays: []db.Play{
+		db.NewPlay(time.Unix(1276057170, 0).UTC(), "127.0.0.1"),
+		db.NewPlay(time.Unix(1297316913, 0).UTC(), "1.2.3.4"),
 	},
 	Tags: []string{"electronic", "instrumental"},
 }
 
-var LegacySong2 = types.Song{
+var LegacySong2 = db.Song{
 	SHA1:      "b70984a4ac5084999b70478cdf163218b90cefdb",
 	Filename:  "gary_hoey/animal_instinct/motown_fever.mp3",
 	Artist:    "Gary Hoey",
@@ -133,6 +133,6 @@ var LegacySong2 = types.Song{
 	AlbumGain: AlbumGain,
 	PeakAmp:   PeakAmp,
 	Rating:    0.5,
-	Plays:     []types.Play{types.NewPlay(time.Unix(1394773930, 0).UTC(), "8.8.8.8")},
+	Plays:     []db.Play{db.NewPlay(time.Unix(1394773930, 0).UTC(), "8.8.8.8")},
 	Tags:      []string{"instrumental", "rock"},
 }

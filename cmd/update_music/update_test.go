@@ -13,12 +13,12 @@ import (
 	"time"
 
 	"github.com/derat/nup/client"
+	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/test"
-	"github.com/derat/nup/types"
 )
 
 func TestUpdate(t *testing.T) {
-	recv := make([]types.Song, 0)
+	recv := make([]db.Song, 0)
 	replace := ""
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -27,7 +27,7 @@ func TestUpdate(t *testing.T) {
 		defer r.Body.Close()
 		d := json.NewDecoder(r.Body)
 		for true {
-			s := types.Song{}
+			s := db.Song{}
 			if err := d.Decode(&s); err == io.EOF {
 				break
 			} else if err != nil {
@@ -42,9 +42,9 @@ func TestUpdate(t *testing.T) {
 	defer server.Close()
 
 	cfg := &config{Config: client.Config{ServerURL: server.URL}}
-	ch := make(chan types.Song)
+	ch := make(chan db.Song)
 
-	s0 := types.Song{
+	s0 := db.Song{
 		SHA1:     "1977c91fea860245695dcceea0805c14cede7559",
 		Filename: "arovane/atol_scrap/thaem_nue.mp3",
 		Artist:   "Arovane",
@@ -54,13 +54,13 @@ func TestUpdate(t *testing.T) {
 		Disc:     1,
 		Length:   449,
 		Rating:   0.75,
-		Plays: []types.Play{
-			types.NewPlay(time.Unix(1276057170, 0), "127.0.0.1"),
-			types.NewPlay(time.Unix(1297316913, 0), "1.2.3.4"),
+		Plays: []db.Play{
+			db.NewPlay(time.Unix(1276057170, 0), "127.0.0.1"),
+			db.NewPlay(time.Unix(1297316913, 0), "1.2.3.4"),
 		},
 		Tags: []string{"electronic", "instrumental"},
 	}
-	s1 := types.Song{
+	s1 := db.Song{
 		SHA1:     "b70984a4ac5084999b70478cdf163218b90cefdb",
 		Filename: "gary_hoey/animal_instinct/motown_fever.mp3",
 		Artist:   "Gary Hoey",
@@ -70,7 +70,7 @@ func TestUpdate(t *testing.T) {
 		Disc:     1,
 		Length:   182,
 		Rating:   0.5,
-		Plays:    []types.Play{types.NewPlay(time.Unix(1394773930, 0), "8.8.8.8")},
+		Plays:    []db.Play{db.NewPlay(time.Unix(1394773930, 0), "8.8.8.8")},
 		Tags:     []string{"instrumental", "rock"},
 	}
 	go func() {
@@ -81,7 +81,7 @@ func TestUpdate(t *testing.T) {
 	if err := updateSongs(cfg, ch, true); err != nil {
 		t.Fatalf("Failed to send songs: %v", err)
 	}
-	if err := test.CompareSongs([]types.Song{s0, s1}, recv, test.CompareOrder); err != nil {
+	if err := test.CompareSongs([]db.Song{s0, s1}, recv, test.CompareOrder); err != nil {
 		t.Error(err)
 	}
 	if replace != "1" {
@@ -89,8 +89,8 @@ func TestUpdate(t *testing.T) {
 	}
 
 	recv = recv[:0]
-	sent := make([]types.Song, 250, 250)
-	ch = make(chan types.Song)
+	sent := make([]db.Song, 250, 250)
+	ch = make(chan db.Song)
 	go func() {
 		for i := range sent {
 			sent[i].SHA1 = strconv.Itoa(i)

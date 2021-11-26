@@ -11,8 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/derat/nup/types"
-
+	"github.com/derat/nup/server/db"
 	"google.golang.org/appengine/v2/datastore"
 )
 
@@ -27,10 +26,10 @@ const (
 // deleted specifies that only deleted (rather than only live) songs should be returned.
 // minLastModified specifies a minimum last-modified time for returned songs.
 func Songs(ctx context.Context, max int64, cursor string, deleted bool, minLastModified time.Time) (
-	songs []types.Song, nextCursor string, err error) {
-	kind := types.SongKind
+	songs []db.Song, nextCursor string, err error) {
+	kind := db.SongKind
 	if deleted {
-		kind = types.DeletedSongKind
+		kind = db.DeletedSongKind
 	}
 	query := datastore.NewQuery(kind)
 	if minLastModified.IsZero() {
@@ -40,7 +39,7 @@ func Songs(ctx context.Context, max int64, cursor string, deleted bool, minLastM
 		query = query.Filter("LastModifiedTime >= ", minLastModified)
 	}
 
-	songs = make([]types.Song, max)
+	songs = make([]db.Song, max)
 	songPtrs := make([]interface{}, max)
 	for i := range songs {
 		songPtrs[i] = &songs[i]
@@ -62,15 +61,15 @@ func Songs(ctx context.Context, max int64, cursor string, deleted bool, minLastM
 // max contains the maximum number of plays to return in this call.
 // If cursor is non-empty, it is used to resume an already-started query.
 func Plays(ctx context.Context, max int64, cursor string) (
-	plays []types.PlayDump, nextCursor string, err error) {
-	plays = make([]types.PlayDump, max)
+	plays []db.PlayDump, nextCursor string, err error) {
+	plays = make([]db.PlayDump, max)
 	playPtrs := make([]interface{}, max)
 	for i := range plays {
 		playPtrs[i] = &plays[i].Play
 	}
 
 	_, pids, nextCursor, err := getEntities(
-		ctx, datastore.NewQuery(types.PlayKind).Order(keyProperty), cursor, playPtrs)
+		ctx, datastore.NewQuery(db.PlayKind).Order(keyProperty), cursor, playPtrs)
 	if err != nil {
 		return nil, "", err
 	}
@@ -83,27 +82,27 @@ func Plays(ctx context.Context, max int64, cursor string) (
 }
 
 // SingleSong returns the song identified by id.
-func SingleSong(ctx context.Context, id int64) (*types.Song, error) {
-	sk := datastore.NewKey(ctx, types.SongKind, "", id, nil)
-	s := &types.Song{}
+func SingleSong(ctx context.Context, id int64) (*db.Song, error) {
+	sk := datastore.NewKey(ctx, db.SongKind, "", id, nil)
+	s := &db.Song{}
 	if err := datastore.Get(ctx, sk, s); err != nil {
 		return nil, err
 	}
 	s.SongID = strconv.FormatInt(id, 10)
 
-	plays := make([]types.PlayDump, maxPlaysForSongDump)
+	plays := make([]db.PlayDump, maxPlaysForSongDump)
 	playPtrs := make([]interface{}, maxPlaysForSongDump)
 	for i := range plays {
 		playPtrs[i] = &plays[i].Play
 	}
-	pids, _, _, err := getEntities(ctx, datastore.NewQuery(types.PlayKind).Ancestor(sk), "", playPtrs)
+	pids, _, _, err := getEntities(ctx, datastore.NewQuery(db.PlayKind).Ancestor(sk), "", playPtrs)
 	if err != nil {
 		return nil, err
 	}
 	for i := range pids {
 		s.Plays = append(s.Plays, plays[i].Play)
 	}
-	sort.Sort(types.PlayArray(s.Plays))
+	sort.Sort(db.PlayArray(s.Plays))
 
 	return s, nil
 }

@@ -14,7 +14,7 @@ import (
 	"sort"
 
 	"github.com/derat/nup/mp3gain"
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/server/db"
 )
 
 func main() {
@@ -31,10 +31,10 @@ func main() {
 	flag.Parse()
 
 	// Read the full song listing and group by album.
-	albumSongs := make(map[string][]*types.Song) // album IDs to songs in album
+	albumSongs := make(map[string][]*db.Song) // album IDs to songs in album
 	d := json.NewDecoder(os.Stdin)
 	for {
-		var s types.Song
+		var s db.Song
 		if err := d.Decode(&s); err == io.EOF {
 			break
 		} else if err != nil {

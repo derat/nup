@@ -18,7 +18,7 @@ import (
 	"strings"
 
 	"github.com/derat/nup/client"
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/server/db"
 )
 
 type checkSettings uint32
@@ -30,9 +30,9 @@ const (
 	checkSongCover
 )
 
-func checkSongs(songs []*types.Song, musicDir, coverDir string, settings checkSettings) {
-	fs := [](func(s *types.Song) error){
-		func(s *types.Song) error {
+func checkSongs(songs []*db.Song, musicDir, coverDir string, settings checkSettings) {
+	fs := [](func(s *db.Song) error){
+		func(s *db.Song) error {
 			if len(s.Filename) == 0 {
 				return errors.New("no song filename")
 			} else if _, err := os.Stat(filepath.Join(musicDir, s.Filename)); err != nil {
@@ -42,7 +42,7 @@ func checkSongs(songs []*types.Song, musicDir, coverDir string, settings checkSe
 		},
 	}
 	if settings&checkAlbumID != 0 {
-		fs = append(fs, func(s *types.Song) error {
+		fs = append(fs, func(s *db.Song) error {
 			if len(s.AlbumID) == 0 && s.Album != "[non-album tracks]" {
 				return errors.New("missing MusicBrainz album")
 			}
@@ -50,7 +50,7 @@ func checkSongs(songs []*types.Song, musicDir, coverDir string, settings checkSe
 		})
 	}
 	if settings&checkSongCover != 0 {
-		fs = append(fs, func(s *types.Song) error {
+		fs = append(fs, func(s *db.Song) error {
 			// Returns true if fn exists within coverDir.
 			fileExists := func(fn string) bool {
 				_, err := os.Stat(filepath.Join(coverDir, fn))
@@ -107,7 +107,7 @@ func checkSongs(songs []*types.Song, musicDir, coverDir string, settings checkSe
 	}
 }
 
-func checkCovers(songs []*types.Song, coverDir string, settings checkSettings) {
+func checkCovers(songs []*db.Song, coverDir string, settings checkSettings) {
 	dir, err := os.Open(coverDir)
 	if err != nil {
 		log.Fatal("Failed to open cover dir: ", err)
@@ -222,9 +222,9 @@ func main() {
 	}
 
 	d := json.NewDecoder(os.Stdin)
-	songs := make([]*types.Song, 0)
+	songs := make([]*db.Song, 0)
 	for {
-		var s types.Song
+		var s db.Song
 		if err := d.Decode(&s); err == io.EOF {
 			break
 		} else if err != nil {

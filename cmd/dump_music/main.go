@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/derat/nup/client"
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/server/db"
 )
 
 const (
@@ -70,14 +70,14 @@ func getEntities(cfg *client.Config, entityType string, extraArgs []string, batc
 	}
 }
 
-func getSongs(cfg *client.Config, batchSize int, includeCovers bool, ch chan *types.Song) {
+func getSongs(cfg *client.Config, batchSize int, includeCovers bool, ch chan *db.Song) {
 	var extraArgs []string
 	if !includeCovers {
 		extraArgs = append(extraArgs, "omit=coverFilename")
 	}
 
 	getEntities(cfg, "song", extraArgs, batchSize, func(b []byte) {
-		var s types.Song
+		var s db.Song
 		if err := json.Unmarshal(b, &s); err == nil {
 			ch <- &s
 		} else {
@@ -87,9 +87,9 @@ func getSongs(cfg *client.Config, batchSize int, includeCovers bool, ch chan *ty
 	ch <- nil
 }
 
-func getPlays(cfg *client.Config, batchSize int, ch chan *types.PlayDump) {
+func getPlays(cfg *client.Config, batchSize int, ch chan *db.PlayDump) {
 	getEntities(cfg, "play", nil, batchSize, func(b []byte) {
-		var pd types.PlayDump
+		var pd db.PlayDump
 		if err := json.Unmarshal(b, &pd); err == nil {
 			ch <- &pd
 		} else {
@@ -111,10 +111,10 @@ func main() {
 		log.Fatal("Unable to read config file: ", err)
 	}
 
-	songChan := make(chan *types.Song, chanSize)
+	songChan := make(chan *db.Song, chanSize)
 	go getSongs(&cfg, *songBatchSize, *includeCovers, songChan)
 
-	playChan := make(chan *types.PlayDump, chanSize)
+	playChan := make(chan *db.PlayDump, chanSize)
 	go getPlays(&cfg, *playBatchSize, playChan)
 
 	e := json.NewEncoder(os.Stdout)

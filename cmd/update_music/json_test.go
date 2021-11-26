@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/test"
-	"github.com/derat/nup/types"
 )
 
 func TestJSON(t *testing.T) {
@@ -19,13 +19,13 @@ func TestJSON(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	songs := []types.Song{test.LegacySong1, test.LegacySong2}
-	ch := make(chan types.SongOrErr)
+	songs := []db.Song{test.LegacySong1, test.LegacySong2}
+	ch := make(chan songOrErr)
 	num, err := readSongsFromJSONFile(test.WriteSongsToJSONFile(dir, songs), ch)
 	if err != nil {
 		t.Error(err)
 	}
-	actual, err := test.GetSongsFromChannel(ch, num)
+	actual, err := getSongsFromChannel(ch, num)
 	if err != nil {
 		t.Error(err)
 	}

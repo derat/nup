@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/server/db"
 	"github.com/derat/taglib-go/taglib"
 )
 
@@ -61,7 +61,7 @@ func readDumpFile(jsonPath string, coverDir string, maxSongs int) (albumIDs []st
 			break
 		}
 
-		s := types.Song{}
+		s := db.Song{}
 		if err = d.Decode(&s); err == io.EOF {
 			break
 		} else if err != nil {

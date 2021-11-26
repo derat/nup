@@ -20,7 +20,7 @@ import (
 
 	"github.com/derat/nup/client"
 	"github.com/derat/nup/mp3gain"
-	"github.com/derat/nup/types"
+	"github.com/derat/nup/server/db"
 
 	"github.com/derat/taglib-go/taglib"
 )
@@ -203,14 +203,14 @@ func computeDirGains(dir string) (map[string]mp3gain.Info, error) {
 
 // readSong creates a Song for the file at the supplied path.
 func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info,
-	artistRewrites map[string]string) (*types.Song, error) {
+	artistRewrites map[string]string) (*db.Song, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
-	s := types.Song{Filename: relPath}
+	s := db.Song{Filename: relPath}
 	var footerLength int64
 	footerLength, s.Artist, s.Title, s.Album, err = readID3Footer(f, fi)
 	if err != nil {
@@ -261,7 +261,7 @@ func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info,
 // readSongList reads a list of relative (to musicDir) paths from listPath
 // and asynchronously sends the resulting Song structs to ch.
 // The number of songs that will be sent to the channel is returned.
-func readSongList(listPath, musicDir string, ch chan types.SongOrErr,
+func readSongList(listPath, musicDir string, ch chan songOrErr,
 	opts *scanOptions) (numSongs int, err error) {
 	f, err := os.Open(listPath)
 	if err != nil {
@@ -308,14 +308,14 @@ func readSongList(listPath, musicDir string, ch chan types.SongOrErr,
 		go func(rel string) {
 			full := filepath.Join(musicDir, rel)
 			if fi, err := os.Stat(full); err != nil {
-				ch <- types.NewSongOrErr(nil, err)
+				ch <- songOrErr{nil, err}
 			} else {
 				var gain *mp3gain.Info
 				if gi, ok := gains[full]; ok {
 					gain = &gi
 				}
 				s, err := readSong(full, rel, fi, gain, opts.artistRewrites)
-				ch <- types.NewSongOrErr(s, err)
+				ch <- songOrErr{s, err}
 			}
 		}(rel)
 	}
@@ -338,7 +338,7 @@ type scanOptions struct {
 // to ch. The number of songs that will be sent to the channel and seen directories (relative to
 // musicDir) are returned.
 func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDirs []string,
-	ch chan types.SongOrErr, opts *scanOptions) (numUpdates int, seenDirs []string, err error) {
+	ch chan songOrErr, opts *scanOptions) (numUpdates int, seenDirs []string, err error) {
 	var numMP3s int                   // total number of songs under musicDir
 	var gains map[string]mp3gain.Info // keys are full paths
 	var gainsDir string               // directory for gains
@@ -422,7 +422,7 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDi
 
 		go func() {
 			s, err := readSong(path, relPath, fi, gain, opts.artistRewrites)
-			ch <- types.NewSongOrErr(s, err)
+			ch <- songOrErr{s, err}
 		}()
 		numUpdates++
 		return nil

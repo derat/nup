@@ -19,8 +19,8 @@ import (
 
 	"github.com/derat/nup/client"
 	"github.com/derat/nup/server/auth"
+	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/test"
-	"github.com/derat/nup/types"
 )
 
 const (
@@ -147,7 +147,7 @@ const (
 
 const dumpCoversFlag = "-covers=true"
 
-func (t *tester) dumpSongs(strip stripPolicy, flags ...string) []types.Song {
+func (t *tester) dumpSongs(strip stripPolicy, flags ...string) []db.Song {
 	args := append([]string{
 		"-config=" + t.dumpConfigFile,
 		"-song-batch-size=" + strconv.Itoa(dumpBatchSize),
@@ -157,14 +157,14 @@ func (t *tester) dumpSongs(strip stripPolicy, flags ...string) []types.Song {
 	if err != nil {
 		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
 	}
-	songs := make([]types.Song, 0)
+	songs := make([]db.Song, 0)
 
 	if len(stdout) == 0 {
 		return songs
 	}
 
 	for _, l := range strings.Split(strings.TrimSpace(stdout), "\n") {
-		s := types.Song{}
+		s := db.Song{}
 		if err = json.Unmarshal([]byte(l), &s); err != nil {
 			if err == io.EOF {
 				break
@@ -259,7 +259,7 @@ func (t *tester) doPost(pathAndQueryParams string, body io.Reader) {
 	}
 }
 
-func (t *tester) postSongs(songs []types.Song, replaceUserData bool, updateDelay time.Duration) {
+func (t *tester) postSongs(songs []db.Song, replaceUserData bool, updateDelay time.Duration) {
 	var buf bytes.Buffer
 	e := json.NewEncoder(&buf)
 	for _, s := range songs {
@@ -274,11 +274,11 @@ func (t *tester) postSongs(songs []types.Song, replaceUserData bool, updateDelay
 	t.doPost(path, &buf)
 }
 
-func (t *tester) querySongs(params ...string) []types.Song {
+func (t *tester) querySongs(params ...string) []db.Song {
 	resp := t.sendRequest(t.newRequest("GET", "query?"+strings.Join(params, "&"), nil))
 	defer resp.Body.Close()
 
-	songs := make([]types.Song, 0)
+	songs := make([]db.Song, 0)
 	d := json.NewDecoder(resp.Body)
 	if err := d.Decode(&songs); err != nil {
 		panic(err)
@@ -326,7 +326,7 @@ const (
 	getDeletedSongs                       // get only deleted songs
 )
 
-func (t *tester) getSongsForAndroid(minLastModified time.Time, deleted deletionPolicy) []types.Song {
+func (t *tester) getSongsForAndroid(minLastModified time.Time, deleted deletionPolicy) []db.Song {
 	params := []string{
 		"type=song",
 		"max=" + strconv.Itoa(androidBatchSize),
@@ -339,7 +339,7 @@ func (t *tester) getSongsForAndroid(minLastModified time.Time, deleted deletionP
 		params = append(params, fmt.Sprintf("minLastModifiedNsec=%d", minLastModified.UnixNano()))
 	}
 
-	songs := make([]types.Song, 0)
+	songs := make([]db.Song, 0)
 	var cursor string
 
 	for {
@@ -362,7 +362,7 @@ func (t *tester) getSongsForAndroid(minLastModified time.Time, deleted deletionP
 				panic(err)
 			}
 
-			var s types.Song
+			var s db.Song
 			if err := json.Unmarshal(msg, &s); err == nil {
 				songs = append(songs, s)
 			} else if err := json.Unmarshal(msg, &cursor); err == nil {

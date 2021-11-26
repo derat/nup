@@ -4,6 +4,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -11,22 +12,36 @@ import (
 	"testing"
 	"time"
 
+	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/test"
-	"github.com/derat/nup/types"
 )
 
+// getSongsFromChannel reads and returns num songs from ch.
+// If an error was sent to the channel, it is returned.
+func getSongsFromChannel(ch chan songOrErr, num int) ([]db.Song, error) {
+	songs := make([]db.Song, 0)
+	for i := 0; i < num; i++ {
+		s := <-ch
+		if s.err != nil {
+			return nil, fmt.Errorf("got error at position %v instead of song: %v", i, s.err)
+		}
+		songs = append(songs, *s.song)
+	}
+	return songs, nil
+}
+
 func scanAndCompareSongs(t *testing.T, desc, dir string, lastUpdateTime time.Time,
-	lastUpdateDirs []string, opts *scanOptions, expected []types.Song) (dirs []string) {
+	lastUpdateDirs []string, opts *scanOptions, expected []db.Song) (dirs []string) {
 	if opts == nil {
 		opts = &scanOptions{}
 	}
-	ch := make(chan types.SongOrErr)
+	ch := make(chan songOrErr)
 	num, dirs, err := scanForUpdatedSongs(dir, lastUpdateTime, lastUpdateDirs, ch, opts)
 	if err != nil {
 		t.Errorf("%v: %v", desc, err)
 		return dirs
 	}
-	actual, err := test.GetSongsFromChannel(ch, num)
+	actual, err := getSongsFromChannel(ch, num)
 	if err != nil {
 		t.Errorf("%v: %v", desc, err)
 		return dirs
@@ -69,19 +84,19 @@ func TestScanAndCompareSongs(t *testing.T) {
 
 	test.CopySongs(dir, test.Song0s.Filename, test.Song1s.Filename)
 	startTime := time.Now()
-	scanAndCompareSongs(t, "initial", dir, time.Time{}, nil, nil, []types.Song{test.Song0s, test.Song1s})
-	scanAndCompareSongs(t, "unchanged", dir, startTime, nil, nil, []types.Song{})
+	scanAndCompareSongs(t, "initial", dir, time.Time{}, nil, nil, []db.Song{test.Song0s, test.Song1s})
+	scanAndCompareSongs(t, "unchanged", dir, startTime, nil, nil, []db.Song{})
 
 	test.CopySongs(dir, test.Song5s.Filename)
 	addTime := time.Now()
-	scanAndCompareSongs(t, "add", dir, startTime, nil, nil, []types.Song{test.Song5s})
+	scanAndCompareSongs(t, "add", dir, startTime, nil, nil, []db.Song{test.Song5s})
 
 	if err = os.Remove(filepath.Join(dir, test.Song0s.Filename)); err != nil {
 		panic(err)
 	}
 	test.CopySongs(dir, test.Song0sUpdated.Filename)
 	updateTime := time.Now()
-	scanAndCompareSongs(t, "update", dir, addTime, nil, nil, []types.Song{test.Song0sUpdated})
+	scanAndCompareSongs(t, "update", dir, addTime, nil, nil, []db.Song{test.Song0sUpdated})
 
 	subdir := filepath.Join(dir, "foo")
 	if err = os.Mkdir(subdir, 0700); err != nil {
@@ -97,16 +112,16 @@ func TestScanAndCompareSongs(t *testing.T) {
 	}
 	renamedSong1s := test.Song1s
 	renamedSong1s.Filename = filepath.Join(filepath.Base(subdir), test.Song1s.Filename)
-	scanAndCompareSongs(t, "rename", dir, updateTime, nil, nil, []types.Song{renamedSong1s})
+	scanAndCompareSongs(t, "rename", dir, updateTime, nil, nil, []db.Song{renamedSong1s})
 
 	scanAndCompareSongs(t, "force exact", dir, updateTime, nil, &scanOptions{forceGlob: test.Song0sUpdated.Filename},
-		[]types.Song{test.Song0sUpdated})
+		[]db.Song{test.Song0sUpdated})
 	scanAndCompareSongs(t, "force wildcard", dir, updateTime, nil, &scanOptions{forceGlob: "foo/*"},
-		[]types.Song{renamedSong1s})
+		[]db.Song{renamedSong1s})
 
 	updateTime = time.Now()
 	test.CopySongs(dir, test.ID3V1Song.Filename)
-	scanAndCompareSongs(t, "id3v1", dir, updateTime, nil, nil, []types.Song{test.ID3V1Song})
+	scanAndCompareSongs(t, "id3v1", dir, updateTime, nil, nil, []db.Song{test.ID3V1Song})
 }
 
 func TestScanAndCompareSongs_Rewrite(t *testing.T) {
@@ -123,7 +138,7 @@ func TestScanAndCompareSongs_Rewrite(t *testing.T) {
 	test.CopySongs(dir, test.Song1s.Filename, test.Song5s.Filename)
 	scanAndCompareSongs(t, "initial", dir, time.Time{}, nil,
 		&scanOptions{artistRewrites: map[string]string{test.Song1s.Artist: newSong1s.Artist}},
-		[]types.Song{newSong1s, test.Song5s})
+		[]db.Song{newSong1s, test.Song5s})
 }
 
 func TestScanAndCompareSongs_NewFiles(t *testing.T) {
@@ -151,14 +166,14 @@ func TestScanAndCompareSongs_NewFiles(t *testing.T) {
 	test.CopySongs(filepath.Join(dir, newArtist, newAlbum), test.ID3V1Song.Filename)
 
 	// Updates the supplied song's filename to be under dir.
-	gs := func(s types.Song, dir string) types.Song {
+	gs := func(s db.Song, dir string) db.Song {
 		s.Filename = filepath.Join(dir, s.Filename)
 		return s
 	}
 
 	startTime := time.Now()
 	origDirs := scanAndCompareSongs(t, "initial", musicDir, time.Time{}, nil, nil,
-		[]types.Song{gs(test.Song0s, filepath.Join(oldArtist, oldAlbum))})
+		[]db.Song{gs(test.Song0s, filepath.Join(oldArtist, oldAlbum))})
 	if want := []string{filepath.Join(oldArtist, oldAlbum)}; !reflect.DeepEqual(origDirs, want) {
 		t.Errorf("scanAndCompareSongs(...) = %v; want %v", origDirs, want)
 	}
@@ -184,7 +199,7 @@ func TestScanAndCompareSongs_NewFiles(t *testing.T) {
 
 	// All three of the new songs should be seen.
 	updateTime := time.Now()
-	newDirs := scanAndCompareSongs(t, "updated", musicDir, startTime, origDirs, nil, []types.Song{
+	newDirs := scanAndCompareSongs(t, "updated", musicDir, startTime, origDirs, nil, []db.Song{
 		gs(test.Song1s, filepath.Join(oldArtist, oldAlbum)),
 		gs(test.Song5s, filepath.Join(oldArtist, newAlbum)),
 		gs(test.ID3V1Song, filepath.Join(newArtist, newAlbum)),
@@ -199,7 +214,7 @@ func TestScanAndCompareSongs_NewFiles(t *testing.T) {
 	}
 
 	// Do one more scan and check that no songs are returned.
-	newDirs = scanAndCompareSongs(t, "updated", musicDir, updateTime, newDirs, nil, []types.Song{})
+	newDirs = scanAndCompareSongs(t, "updated", musicDir, updateTime, newDirs, nil, []db.Song{})
 	if !reflect.DeepEqual(newDirs, allDirs) {
 		t.Errorf("scanAndCompareSongs(...) = %v; want %v", newDirs, allDirs)
 	}
