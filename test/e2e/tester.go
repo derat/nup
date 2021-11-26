@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/derat/nup/client"
 	"github.com/derat/nup/server/types"
 	"github.com/derat/nup/test"
 )
@@ -105,24 +106,24 @@ func newTester(serverURL, binDir string) *tester {
 
 	// Corresponds to Config in cmd/update_music/main.go.
 	t.updateConfigFile = writeConfig("update_config.json", struct {
-		LastUpdateInfoFile string `json:"lastUpdateInfoFile"`
-		ServerURL          string `json:"serverUrl"`
-		Username           string `json:"username"`
-		Password           string `json:"password"`
+		client.Config
 		CoverDir           string `json:"coverDir"`
 		MusicDir           string `json:"musicDir"`
+		LastUpdateInfoFile string `json:"lastUpdateInfoFile"`
 		ComputeGain        bool   `json:"computeGain"`
 	}{
-		filepath.Join(t.tempDir, "last_update_info.json"),
-		t.serverURL,
-		types.TestUsername,
-		types.TestPassword,
-		t.coverDir,
-		t.musicDir,
-		true,
+		Config: client.Config{
+			ServerURL: t.serverURL,
+			Username:  types.TestUsername,
+			Password:  types.TestPassword,
+		},
+		CoverDir:           t.coverDir,
+		MusicDir:           t.musicDir,
+		LastUpdateInfoFile: filepath.Join(t.tempDir, "last_update_info.json"),
+		ComputeGain:        true,
 	})
 
-	t.dumpConfigFile = writeConfig("dump_config.json", types.ClientConfig{
+	t.dumpConfigFile = writeConfig("dump_config.json", client.Config{
 		ServerURL: t.serverURL,
 		Username:  types.TestUsername,
 		Password:  types.TestPassword,

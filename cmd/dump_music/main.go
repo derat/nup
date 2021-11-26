@@ -13,6 +13,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/derat/nup/client"
 	"github.com/derat/nup/server/types"
 )
 
@@ -25,7 +26,7 @@ const (
 	chanSize             = 50
 )
 
-func getEntities(cfg *types.ClientConfig, entityType string, extraArgs []string, batchSize int, f func([]byte)) {
+func getEntities(cfg *client.Config, entityType string, extraArgs []string, batchSize int, f func([]byte)) {
 	u := cfg.GetURL("/export")
 	var cursor string
 	for {
@@ -69,7 +70,7 @@ func getEntities(cfg *types.ClientConfig, entityType string, extraArgs []string,
 	}
 }
 
-func getSongs(cfg *types.ClientConfig, batchSize int, includeCovers bool, ch chan *types.Song) {
+func getSongs(cfg *client.Config, batchSize int, includeCovers bool, ch chan *types.Song) {
 	var extraArgs []string
 	if !includeCovers {
 		extraArgs = append(extraArgs, "omit=coverFilename")
@@ -86,7 +87,7 @@ func getSongs(cfg *types.ClientConfig, batchSize int, includeCovers bool, ch cha
 	ch <- nil
 }
 
-func getPlays(cfg *types.ClientConfig, batchSize int, ch chan *types.PlayDump) {
+func getPlays(cfg *client.Config, batchSize int, ch chan *types.PlayDump) {
 	getEntities(cfg, "play", nil, batchSize, func(b []byte) {
 		var pd types.PlayDump
 		if err := json.Unmarshal(b, &pd); err == nil {
@@ -105,8 +106,8 @@ func main() {
 	includeCovers := flag.Bool("covers", false, "Include cover filenames")
 	flag.Parse()
 
-	var cfg types.ClientConfig
-	if err := types.LoadClientConfig(*configFile, &cfg); err != nil {
+	var cfg client.Config
+	if err := client.LoadConfig(*configFile, &cfg); err != nil {
 		log.Fatal("Unable to read config file: ", err)
 	}
 

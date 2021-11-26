@@ -13,12 +13,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/derat/nup/client"
 	"github.com/derat/nup/mp3gain"
 	"github.com/derat/nup/server/types"
 )
 
 type config struct {
-	types.ClientConfig
+	client.Config
 
 	// CoverDir is the base directory containing cover art.
 	CoverDir string `json:"coverDir"`
@@ -58,7 +59,7 @@ func main() {
 	flag.Parse()
 
 	var cfg config
-	if err := types.LoadClientConfig(*configFile, &cfg); err != nil {
+	if err := client.LoadConfig(*configFile, &cfg); err != nil {
 		log.Fatal("Unable to read config file: ", err)
 	}
 

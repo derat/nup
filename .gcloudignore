@@ -27,6 +27,9 @@
 # Stuff not needed by the App Engine server.
 *.md
 *.sh
+
+client/
 cmd/
+mp3gain/
 test/
 web/fontello/LICENSE.txt

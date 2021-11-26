@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/derat/nup/client"
 	"github.com/derat/nup/server/types"
 	"github.com/derat/nup/test"
 )
@@ -40,7 +41,7 @@ func TestUpdate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := &config{ClientConfig: types.ClientConfig{ServerURL: server.URL}}
+	cfg := &config{Config: client.Config{ServerURL: server.URL}}
 	ch := make(chan types.Song)
 
 	s0 := types.Song{
