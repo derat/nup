@@ -14,7 +14,7 @@ import (
 	"sort"
 
 	"github.com/derat/nup/mp3gain"
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/types"
 )
 
 func main() {

@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/derat/nup/client"
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/types"
 )
 
 const (

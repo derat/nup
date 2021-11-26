@@ -14,7 +14,7 @@ import (
 
 	"cloud.google.com/go/storage"
 
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/types"
 
 	"google.golang.org/api/iterator"
 )

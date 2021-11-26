@@ -6,7 +6,7 @@ package test
 import (
 	"time"
 
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/types"
 )
 
 const (

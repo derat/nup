@@ -1,12 +1,9 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-// Package types defines shared types.
 package types
 
 import (
-	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -17,16 +14,6 @@ const (
 	DeletedPlayKind = "DeletedPlay"
 	DeletedSongKind = "DeletedSong"
 )
-
-// Play represents one playback of a Song.
-type Play struct {
-	// StartTime is the time at which playback started.
-	StartTime time.Time `json:"t"`
-	// IPAddress is the IPv4 or IPv6 address of the client playing the song.
-	IPAddress string `datastore:"IpAddress" json:"ip"`
-}
-
-func NewPlay(t time.Time, ip string) Play { return Play{t, ip} }
 
 // Song represents an audio file.
 //
@@ -124,6 +111,16 @@ type SongOrErr struct {
 
 func NewSongOrErr(s *Song, err error) SongOrErr { return SongOrErr{s, err} }
 
+// Play represents one playback of a Song.
+type Play struct {
+	// StartTime is the time at which playback started.
+	StartTime time.Time `json:"t"`
+	// IPAddress is the IPv4 or IPv6 address of the client playing the song.
+	IPAddress string `datastore:"IpAddress" json:"ip"`
+}
+
+func NewPlay(t time.Time, ip string) Play { return Play{t, ip} }
+
 // PlayDump is used when dumping data.
 type PlayDump struct {
 	// Song entity's key ID from Datastore.
@@ -138,8 +135,3 @@ type PlayArray []Play
 func (a PlayArray) Len() int           { return len(a) }
 func (a PlayArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a PlayArray) Less(i, j int) bool { return a[i].StartTime.Before(a[j].StartTime) }
-
-// IsMusicPath returns true if path p has an extension suggesting that it's a music file.
-func IsMusicPath(p string) bool {
-	return strings.ToLower(filepath.Ext(p)) == ".mp3"
-}

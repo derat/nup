@@ -105,8 +105,8 @@ like to see detailed instructions for these steps.
 [gsutil]: https://cloud.google.com/storage/docs/gsutil
 
 Before deploying the App Engine app, create an `config.json` file in the same
-directory as `app.yaml` corresponding to the `ServerConfig` struct in
-[server/types/config.go](./server/types/config.go):
+directory as `app.yaml` corresponding to the `config` struct in
+[server/config.go](./server/config.go):
 
 ```json
 {

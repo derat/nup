@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/types"
 
 	"google.golang.org/appengine/v2/datastore"
 )

@@ -13,13 +13,15 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/derat/nup/server/cache"
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/server/query"
+	"github.com/derat/nup/types"
 
 	"google.golang.org/appengine/v2"
 	"google.golang.org/appengine/v2/datastore"
 	"google.golang.org/appengine/v2/log"
 )
+
+var errUnmodified = errors.New("object wasn't modified")
 
 // AddPlay adds a play report to the song identified by id in datastore.
 func AddPlay(ctx context.Context, id int64, startTime time.Time, ip string) error {
@@ -31,7 +33,7 @@ func AddPlay(ctx context.Context, id int64, startTime time.Time, ip string) erro
 			return fmt.Errorf("querying for existing play failed: %v", err)
 		} else if len(existingKeys) > 0 {
 			log.Debugf(ctx, "Already have play for song %v starting at %v from %v", id, startTime, ip)
-			return types.ErrUnmodified
+			return nil
 		}
 
 		s.NumPlays++
@@ -54,7 +56,7 @@ func AddPlay(ctx context.Context, id int64, startTime time.Time, ip string) erro
 	if err != nil {
 		return err
 	}
-	return cache.FlushForUpdate(ctx, types.PlaysUpdate)
+	return query.FlushCacheForUpdate(ctx, query.PlaysUpdate)
 }
 
 // SetRatingAndTags updates the rating and tags of the song identified by id in datastore.
@@ -62,11 +64,11 @@ func AddPlay(ctx context.Context, id int64, startTime time.Time, ip string) erro
 // If updateDelay is nonzero, the server will wait before writing to datastore.
 func SetRatingAndTags(ctx context.Context, id int64, hasRating bool, rating float64,
 	tags []string, updateDelay time.Duration) error {
-	var ut types.UpdateTypes
+	var ut query.UpdateTypes
 	err := updateExistingSong(ctx, id, func(ctx context.Context, s *types.Song) error {
 		if hasRating && rating != s.Rating {
 			s.Rating = rating
-			ut |= types.RatingUpdate
+			ut |= query.RatingUpdate
 		}
 		if tags != nil {
 			sort.Strings(tags)
@@ -80,14 +82,14 @@ func SetRatingAndTags(ctx context.Context, id int64, hasRating bool, rating floa
 			}
 			if !sortedStringSlicesMatch(uniqueTags, s.Tags) {
 				s.Tags = uniqueTags
-				ut |= types.TagsUpdate
+				ut |= query.TagsUpdate
 			}
 		}
 		if ut != 0 {
 			s.LastModifiedTime = time.Now()
 			return nil
 		} else {
-			return types.ErrUnmodified
+			return errUnmodified
 		}
 	}, updateDelay)
 
@@ -95,7 +97,7 @@ func SetRatingAndTags(ctx context.Context, id int64, hasRating bool, rating floa
 		return err
 	}
 	if ut != 0 {
-		return cache.FlushForUpdate(ctx, ut)
+		return query.FlushCacheForUpdate(ctx, ut)
 	}
 	return nil
 }
@@ -198,7 +200,7 @@ func DeleteSong(ctx context.Context, id int64) error {
 		return err
 	}
 
-	return cache.FlushForUpdate(ctx, types.MetadataUpdate)
+	return query.FlushCacheForUpdate(ctx, query.MetadataUpdate)
 }
 
 // ClearData deletes all song and play objects from datastore.
@@ -324,7 +326,7 @@ func updateExistingSong(ctx context.Context, id int64,
 			return err
 		}
 		if err := f(ctx, song); err != nil {
-			if err == types.ErrUnmodified {
+			if err == errUnmodified {
 				log.Debugf(ctx, "Song %v wasn't changed", id)
 				return nil
 			}

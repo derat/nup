@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/types"
 	"github.com/derat/taglib-go/taglib"
 )
 

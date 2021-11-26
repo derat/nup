@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/derat/nup/client"
-	"github.com/derat/nup/server/types"
 	"github.com/derat/nup/test"
+	"github.com/derat/nup/types"
 )
 
 func TestUpdate(t *testing.T) {

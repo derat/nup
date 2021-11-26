@@ -15,7 +15,7 @@ import (
 
 	"github.com/derat/nup/client"
 	"github.com/derat/nup/mp3gain"
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/types"
 )
 
 type config struct {

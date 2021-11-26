@@ -18,8 +18,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/derat/nup/client"
 	"github.com/derat/nup/mp3gain"
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/types"
+
 	"github.com/derat/taglib-go/taglib"
 )
 
@@ -351,7 +353,7 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDi
 		if err != nil {
 			return err
 		}
-		if !fi.Mode().IsRegular() || !types.IsMusicPath(path) {
+		if !fi.Mode().IsRegular() || !client.IsMusicPath(path) {
 			return nil
 		}
 		relPath, err := filepath.Rel(musicDir, path)

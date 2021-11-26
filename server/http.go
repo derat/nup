@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/server/auth"
 
 	"google.golang.org/appengine/v2"
 	"google.golang.org/appengine/v2/log"
@@ -38,59 +38,18 @@ func writeTextResponse(w http.ResponseWriter, s string) {
 	w.Write([]byte(s))
 }
 
-// hasAllowedGoogleAuth checks whether ctx contains credentials for a Google
-// user registered in cfg.
-func hasAllowedGoogleAuth(ctx context.Context, cfg *types.ServerConfig) (email string, allowed bool) {
-	u := user.Current(ctx)
-	if u == nil {
-		return "", false
-	}
-
-	for _, e := range cfg.GoogleUsers {
-		if u.Email == e {
-			return u.Email, true
-		}
-	}
-	return u.Email, false
-}
-
-// hasAllowedBasicAuth checks whether r is authorized via HTTP basic
-// authentication with a user registered in cfg. If basic auth was used, the
-// username return value is set regardless of the user is allowed or not.
-func hasAllowedBasicAuth(r *http.Request, cfg *types.ServerConfig) (username string, allowed bool) {
-	username, password, ok := r.BasicAuth()
-	if !ok {
-		return "", false
-	}
-	for _, u := range cfg.BasicAuthUsers {
-		if username == u.Username && password == u.Password {
-			return username, true
-		}
-	}
-	return username, false
-}
-
-// hasWebDriverCookie returns true if r contains a special cookie set by browser
-// tests that use WebDriver.
-func hasWebDriverCookie(r *http.Request) bool {
-	if _, err := r.Cookie("webdriver"); err != nil {
-		return false
-	}
-	return true
-}
-
 // checkRequest verifies that r is an authorized request using method.
 // If the request is unauthorized and redirectToLogin is true, the client
 // is redirected to the login screen. Otherwise, an appropriate error is
 // written to w.
-func checkRequest(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request,
+func checkRequest(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request,
 	method string, redirectToLogin bool) bool {
-	username, allowed := hasAllowedGoogleAuth(ctx, cfg)
+	username, allowed := auth.HasAllowedGoogleAuth(ctx, cfg.GoogleUsers)
 	if !allowed && len(username) == 0 {
-		username, allowed = hasAllowedBasicAuth(r, cfg)
+		username, allowed = auth.HasAllowedBasicAuth(r, cfg.BasicAuthUsers)
 	}
 	// Ugly hack since WebDriver doesn't support basic auth.
-	if !allowed && appengine.IsDevAppServer() && hasWebDriverCookie(r) {
+	if !allowed && appengine.IsDevAppServer() && auth.HasWebDriverCookie(r) {
 		allowed = true
 	}
 	if !allowed {
@@ -116,7 +75,7 @@ func checkRequest(ctx context.Context, cfg *types.ServerConfig, w http.ResponseW
 }
 
 // handlerFunc handles HTTP requests to a single endpoint.
-type handlerFunc func(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request)
+type handlerFunc func(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request)
 
 // addHandler registers fn to handle HTTP requests to the specified path.
 // Requests are verified to come from an authorized user and use the specified HTTP method before

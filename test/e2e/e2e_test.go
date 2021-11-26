@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/derat/nup/server/query"
-	"github.com/derat/nup/server/types"
 	"github.com/derat/nup/test"
+	"github.com/derat/nup/types"
 )
 
 const (
@@ -52,7 +52,11 @@ func setUpTest() *tester {
 	t.doPost("clear", nil)
 	t.doPost("flush_cache", nil)
 
-	b, err := json.Marshal(types.ServerConfig{
+	// This corresponds to the config struct from server/config.go.
+	b, err := json.Marshal(struct {
+		SongBucket  string `json:"songBucket"`
+		CoverBucket string `json:"coverBucket"`
+	}{
 		SongBucket:  songBucket,
 		CoverBucket: coverBucket,
 	})

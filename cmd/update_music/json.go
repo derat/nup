@@ -8,7 +8,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/types"
 )
 
 // readSongsFromJSONFile JSON-unmarshals types.Song objects from path and sends

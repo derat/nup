@@ -6,7 +6,11 @@ package query
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"math/rand"
 	"sort"
 	"strconv"
@@ -14,13 +18,89 @@ import (
 	"time"
 
 	"github.com/derat/nup/server/cache"
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/types"
 
 	"google.golang.org/appengine/v2/datastore"
 	"google.golang.org/appengine/v2/log"
 )
 
 const maxResults = 100 // max songs to return for query
+
+// SongQuery describes a query returning a list of Songs.
+type SongQuery struct {
+	Artist  string // Song.Artist
+	Title   string // Song.Title
+	Album   string // Song.Album
+	AlbumID string // Song.AlbumID
+
+	Keywords []string // Song.Keywords
+
+	MinRating    float64 // Song.Rating
+	HasMinRating bool    // MinRating is set
+	Unrated      bool    // Song.Rating is -1
+
+	MaxPlays    int64 // Song.NumPlays
+	HasMaxPlays bool  // MaxPlays is set
+
+	MinFirstStartTime time.Time // Song.FirstStartTime
+	MaxLastStartTime  time.Time // Song.LastStartTime
+
+	Track int64 // Song.Track
+	Disc  int64 // Song.Disc (may be 0 or 1 for single-disc albums)
+
+	MaxDisc    int64 // Song.Disc
+	HasMaxDisc bool  // MaxDisc is set
+
+	Tags    []string // present in Song.Tags
+	NotTags []string // not present in Song.Tags
+
+	Shuffle bool // randomize results set/order
+}
+
+// hash returns a unique string identifying q.
+func (q *SongQuery) hash() string {
+	b, err := json.Marshal(q)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to marshal query: %v", err))
+	}
+	s := sha1.Sum(b)
+	return hex.EncodeToString(s[:])
+}
+
+// canCache returns true if the query's results can be safely cached.
+func (q *SongQuery) canCache() bool {
+	return !q.HasMaxPlays && q.MinFirstStartTime.IsZero() && q.MaxLastStartTime.IsZero()
+}
+
+// resultsInvalidated returns true if the updates described by ut would
+// invalidate q's cached results.
+func (q *SongQuery) resultsInvalidated(ut UpdateTypes) bool {
+	if (ut & MetadataUpdate) != 0 {
+		return true
+	}
+	if (ut&RatingUpdate) != 0 && (q.HasMinRating || q.Unrated) {
+		return true
+	}
+	if (ut&TagsUpdate) != 0 && (len(q.Tags) > 0 || len(q.NotTags) > 0) {
+		return true
+	}
+	if (ut&PlaysUpdate) != 0 &&
+		(q.HasMaxPlays || !q.MinFirstStartTime.IsZero() || !q.MaxLastStartTime.IsZero()) {
+		return true
+	}
+	return false
+}
+
+// UpdateTypes is a bitfield describing what was changed by an update.
+// It is used for invalidating cached data.
+type UpdateTypes uint8
+
+const (
+	MetadataUpdate UpdateTypes = 1 << iota // song metadata
+	RatingUpdate
+	TagsUpdate
+	PlaysUpdate
+)
 
 // Tags returns the full set of tags present across all songs.
 // It attempts to return cached data before falling back to scanning all songs.
@@ -34,7 +114,7 @@ func Tags(ctx context.Context, requireCache bool) ([]string, error) {
 	var cacheWriteTypes []cache.Type // caches to write to
 	for _, t := range []cache.Type{cache.Memcache, cache.Datastore} {
 		startTime := time.Now()
-		if tags, err = cache.GetTags(ctx, t); err != nil {
+		if tags, err = getCachedTags(ctx, t); err != nil {
 			log.Errorf(ctx, "Got error while getting cached tags from %v: %v", t, err)
 		} else if tags == nil {
 			log.Debugf(ctx, "Cache miss from %v took %v ms", t, msecSince(startTime))
@@ -82,7 +162,7 @@ func Tags(ctx context.Context, requireCache bool) ([]string, error) {
 		for _, t := range cacheWriteTypes {
 			go func(t cache.Type) {
 				startTime := time.Now()
-				if err := cache.SetTags(ctx, tags, t); err != nil {
+				if err := setCachedTags(ctx, tags, t); err != nil {
 					log.Errorf(ctx, "Failed to cache tags to %v: %v", t, err)
 				} else {
 					log.Debugf(ctx, "Cached tags to %v in %v ms", t, msecSince(startTime))
@@ -103,7 +183,7 @@ func Tags(ctx context.Context, requireCache bool) ([]string, error) {
 // Songs executes the supplied query and returns matching songs.
 // If cacheOnly is true, empty results are returned if the query's results
 // aren't cached.
-func Songs(ctx context.Context, query *types.SongQuery, cacheOnly bool) ([]types.Song, error) {
+func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]types.Song, error) {
 	var ids []int64
 	var err error
 
@@ -111,7 +191,7 @@ func Songs(ctx context.Context, query *types.SongQuery, cacheOnly bool) ([]types
 	var cacheWriteTypes []cache.Type // caches to write to
 	for _, t := range []cache.Type{cache.Memcache, cache.Datastore} {
 		startTime := time.Now()
-		if ids, err = cache.GetQuery(ctx, query, t); err != nil {
+		if ids, err = getCachedResults(ctx, query, t); err != nil {
 			log.Errorf(ctx, "Got error while getting cached results from %v: %v", t, err)
 		} else if ids == nil {
 			log.Debugf(ctx, "Cache miss from %v took %v ms", t, msecSince(startTime))
@@ -137,13 +217,13 @@ func Songs(ctx context.Context, query *types.SongQuery, cacheOnly bool) ([]types
 
 	// Asynchronously cache the results.
 	cacheWriteDone := make(chan struct{}, len(cacheWriteTypes))
-	if !query.CanCache() {
+	if !query.canCache() {
 		cacheWriteTypes = nil
 	} else {
 		for _, t := range cacheWriteTypes {
 			go func(t cache.Type, ids []int64) {
 				startTime := time.Now()
-				if err = cache.SetQuery(ctx, query, ids, t); err != nil {
+				if err = setCachedResults(ctx, query, ids, t); err != nil {
 					log.Errorf(ctx, "Got error while caching results to %v: %v", t, err)
 				} else {
 					log.Debugf(ctx, "Cached results to %v in %v ms", t, msecSince(startTime))
@@ -282,7 +362,7 @@ func shufflePartial(a []int64, n int) {
 	}
 }
 
-func runQuery(ctx context.Context, query *types.SongQuery) ([]int64, error) {
+func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 	// First, build a base query with all of the equality filters.
 	bq := datastore.NewQuery(types.SongKind).KeysOnly()
 	if len(query.Artist) > 0 {

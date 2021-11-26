@@ -18,8 +18,9 @@ import (
 	"time"
 
 	"github.com/derat/nup/client"
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/server/auth"
 	"github.com/derat/nup/test"
+	"github.com/derat/nup/types"
 )
 
 const (
@@ -114,8 +115,8 @@ func newTester(serverURL, binDir string) *tester {
 	}{
 		Config: client.Config{
 			ServerURL: t.serverURL,
-			Username:  types.TestUsername,
-			Password:  types.TestPassword,
+			Username:  auth.TestUsername,
+			Password:  auth.TestPassword,
 		},
 		CoverDir:           t.coverDir,
 		MusicDir:           t.musicDir,
@@ -125,8 +126,8 @@ func newTester(serverURL, binDir string) *tester {
 
 	t.dumpConfigFile = writeConfig("dump_config.json", client.Config{
 		ServerURL: t.serverURL,
-		Username:  types.TestUsername,
-		Password:  types.TestPassword,
+		Username:  auth.TestUsername,
+		Password:  auth.TestPassword,
 	})
 
 	return t
@@ -224,7 +225,7 @@ func (t *tester) newRequest(method, path string, body io.Reader) *http.Request {
 	if err != nil {
 		panic(err)
 	}
-	req.SetBasicAuth(types.TestUsername, types.TestPassword)
+	req.SetBasicAuth(auth.TestUsername, auth.TestPassword)
 	return req
 }
 

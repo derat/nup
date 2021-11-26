@@ -24,8 +24,8 @@ import (
 	"github.com/derat/nup/server/dump"
 	"github.com/derat/nup/server/query"
 	"github.com/derat/nup/server/storage"
-	"github.com/derat/nup/server/types"
 	"github.com/derat/nup/server/update"
+	"github.com/derat/nup/types"
 
 	"google.golang.org/appengine/v2"
 	"google.golang.org/appengine/v2/log"
@@ -109,7 +109,7 @@ func main() {
 	appengine.Main()
 }
 
-func handleClear(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+func handleClear(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request) {
 	if err := update.ClearData(ctx); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -117,12 +117,12 @@ func handleClear(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWr
 	writeTextResponse(w, "ok")
 }
 
-func handleConfig(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+func handleConfig(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request) {
 	if !checkRequest(ctx, cfg, w, r, "POST", false) {
 		return
 	}
 
-	var newCfg types.ServerConfig
+	var newCfg config
 	if err := json.NewDecoder(r.Body).Decode(&newCfg); err == nil {
 		addTestUserToConfig(&newCfg)
 		saveTestConfig(ctx, &newCfg)
@@ -137,7 +137,7 @@ func handleConfig(ctx context.Context, cfg *types.ServerConfig, w http.ResponseW
 	writeTextResponse(w, "ok")
 }
 
-func handleCover(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+func handleCover(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request) {
 	fn := r.FormValue("filename")
 	if fn == "" {
 		log.Errorf(ctx, "Missing filename in cover request")
@@ -158,14 +158,15 @@ func handleCover(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWr
 
 	addLongCacheHeaders(w)
 	w.Header().Set("Content-Type", "image/jpeg")
-	if err := cover.Scale(ctx, cfg, fn, int(size), coverJPEGQuality, w); err != nil {
+	if err := cover.Scale(ctx, cfg.CoverBucket, cfg.CoverBaseURL, fn,
+		int(size), coverJPEGQuality, w); err != nil {
 		log.Errorf(ctx, "Failed to scale cover: %v", err)
 		http.Error(w, "Scaling failed", http.StatusInternalServerError)
 		return
 	}
 }
 
-func handleDeleteSong(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+func handleDeleteSong(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(ctx, w, r, "songId")
 	if !ok {
 		return
@@ -177,7 +178,7 @@ func handleDeleteSong(ctx context.Context, cfg *types.ServerConfig, w http.Respo
 	writeTextResponse(w, "ok")
 }
 
-func handleDumpSong(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+func handleDumpSong(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(ctx, w, r, "songId")
 	if !ok {
 		return
@@ -201,7 +202,7 @@ func handleDumpSong(ctx context.Context, cfg *types.ServerConfig, w http.Respons
 	writeTextResponse(w, out.String())
 }
 
-func handleExport(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+func handleExport(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request) {
 	var max int64 = defaultDumpBatchSize
 	if len(r.FormValue("max")) > 0 {
 		var ok bool
@@ -293,15 +294,15 @@ func handleExport(ctx context.Context, cfg *types.ServerConfig, w http.ResponseW
 	}
 }
 
-func handleFlushCache(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
-	if err := cache.Flush(ctx, cache.Memcache); err != nil {
-		log.Errorf(ctx, "Flushing memcache failed: %v", err)
+func handleFlushCache(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request) {
+	if err := query.FlushCache(ctx, cache.Memcache); err != nil {
+		log.Errorf(ctx, "Flushing query cache from memcache failed: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if r.FormValue("onlyMemcache") != "1" {
-		if err := cache.Flush(ctx, cache.Datastore); err != nil {
-			log.Errorf(ctx, "Flushing datastore failed: %v", err)
+		if err := query.FlushCache(ctx, cache.Datastore); err != nil {
+			log.Errorf(ctx, "Flushing query cache from datastore failed: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -309,7 +310,7 @@ func handleFlushCache(ctx context.Context, cfg *types.ServerConfig, w http.Respo
 	writeTextResponse(w, "ok")
 }
 
-func handleImport(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+func handleImport(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request) {
 	var updateDelayNsec int64
 	if len(r.FormValue("updateDelayNsec")) > 0 {
 		var ok bool
@@ -338,15 +339,15 @@ func handleImport(ctx context.Context, cfg *types.ServerConfig, w http.ResponseW
 		}
 		numSongs++
 	}
-	if err := cache.FlushForUpdate(ctx, types.MetadataUpdate); err != nil {
-		log.Errorf(ctx, "Failed to flush cached queries: %v", err)
+	if err := query.FlushCacheForUpdate(ctx, query.MetadataUpdate); err != nil {
+		log.Errorf(ctx, "Failed to flush query cache for update: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	log.Debugf(ctx, "Updated %v song(s)", numSongs)
 	writeTextResponse(w, "ok")
 }
 
-func handleIndex(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+func handleIndex(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return
@@ -366,11 +367,11 @@ func handleIndex(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWr
 	}
 }
 
-func handleNow(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+func handleNow(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request) {
 	writeTextResponse(w, strconv.FormatInt(time.Now().UnixNano(), 10))
 }
 
-func handlePlayed(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+func handlePlayed(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(ctx, w, r, "songId")
 	if !ok {
 		return
@@ -402,14 +403,14 @@ func handlePlayed(ctx context.Context, cfg *types.ServerConfig, w http.ResponseW
 	writeTextResponse(w, "ok")
 }
 
-func handlePresets(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+func handlePresets(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request) {
 	writeJSONResponse(w, cfg.Presets)
 }
 
-func handleQuery(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+func handleQuery(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request) {
 	cacheOnly := r.FormValue("cacheOnly") == "1"
 
-	q := types.SongQuery{
+	q := query.SongQuery{
 		Artist:   r.FormValue("artist"),
 		Title:    r.FormValue("title"),
 		Album:    r.FormValue("album"),
@@ -476,7 +477,7 @@ func handleQuery(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWr
 	writeJSONResponse(w, songs)
 }
 
-func handleRateAndTag(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+func handleRateAndTag(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request) {
 	id, ok := parseIntParam(ctx, w, r, "songId")
 	if !ok {
 		return
@@ -542,7 +543,7 @@ func handleRateAndTag(ctx context.Context, cfg *types.ServerConfig, w http.Respo
 //
 // The Web Audio part of this is particularly frustrating, as the JS doesn't actually need to look
 // at the audio data; it just need to amplify it.
-func handleSong(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, req *http.Request) {
+func handleSong(ctx context.Context, cfg *config, w http.ResponseWriter, req *http.Request) {
 	fn := req.FormValue("filename")
 	if fn == "" {
 		log.Errorf(ctx, "Missing filename in song data request")
@@ -576,7 +577,7 @@ func handleSong(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWri
 	}
 }
 
-func handleTags(ctx context.Context, cfg *types.ServerConfig, w http.ResponseWriter, r *http.Request) {
+func handleTags(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request) {
 	tags, err := query.Tags(ctx, r.FormValue("requireCache") == "1")
 	if err != nil {
 		log.Errorf(ctx, "Unable to query tags: %v", err)

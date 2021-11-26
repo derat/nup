@@ -10,7 +10,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/types"
 )
 
 const batchSize = 100 // updateSongs HTTP request batch size

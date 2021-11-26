@@ -17,7 +17,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/client"
+	"github.com/derat/nup/types"
 )
 
 type checkSettings uint32
@@ -88,7 +89,7 @@ func checkSongs(songs []*types.Song, musicDir, coverDir string, settings checkSe
 			if err != nil {
 				return err
 			}
-			if !fi.Mode().IsRegular() || !types.IsMusicPath(path) {
+			if !fi.Mode().IsRegular() || !client.IsMusicPath(path) {
 				return nil
 			}
 			pre := musicDir + "/"

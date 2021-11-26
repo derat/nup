@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/derat/nup/server/types"
+	"github.com/derat/nup/types"
 )
 
 // GetDataDir returns the test data dir relative to the caller.

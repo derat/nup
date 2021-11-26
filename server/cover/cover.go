@@ -16,16 +16,15 @@ import (
 	"io/ioutil"
 	"net/http"
 	"sync"
+	"time"
 
 	"cloud.google.com/go/storage"
-
-	"github.com/derat/nup/server/cache"
-	"github.com/derat/nup/server/types"
 
 	"golang.org/x/image/draw"
 
 	"google.golang.org/api/option"
 	"google.golang.org/appengine/v2/log"
+	"google.golang.org/appengine/v2/memcache"
 )
 
 // A single storage.Client is initialized in response to the first load() call
@@ -40,23 +39,38 @@ var clientOnce sync.Once
 // More superstition: https://github.com/googleapis/google-cloud-go/issues/530
 const grpcPoolSize = 4
 
+const (
+	cacheKeyPrefix  = "cover"        // memcache key prefix
+	cacheExpiration = 24 * time.Hour // memcache expiration
+)
+
+// cacheKey returns the memcache key that should be used for caching a
+// cover image with the supplied filename and size (i.e. width/height).
+func cacheKey(fn string, size int) string {
+	// TODO: Hash the filename?
+	// https://godoc.org/google.golang.org/appengine/memcache#Get says that the
+	// key can be at most 250 bytes.
+	return fmt.Sprintf("%s-%d-%s", cacheKeyPrefix, size, fn)
+}
+
 // Scale reads the cover image at fn (corresponding to Song.CoverFilename),
 // scales and crops it to be a square image with the supplied width and height
 // size, and writes it in JPEG format to w. If size is zero or negative, the
 // original (possibly non-square) cover data is written.
-func Scale(ctx context.Context, cfg *types.ServerConfig, fn string,
+// The bucket and baseURL args correspond to CoverBucket and CoverBaseURL in ServerConfig.
+func Scale(ctx context.Context, bucket, baseURL, fn string,
 	size, quality int, w io.Writer) error {
 	var data []byte
 	var err error
 
 	log.Debugf(ctx, "Checking cache for scaled cover")
-	if data, err = cache.GetCover(ctx, fn, size); len(data) > 0 {
+	if data, err = getCachedCover(ctx, fn, size); len(data) > 0 {
 		log.Debugf(ctx, "Writing %d-byte cached scaled cover", len(data))
 		_, err = w.Write(data)
 		return err
 	}
 	log.Debugf(ctx, "Checking cache for original cover")
-	if data, err = cache.GetCover(ctx, fn, 0); len(data) > 0 {
+	if data, err = getCachedCover(ctx, fn, 0); len(data) > 0 {
 		log.Debugf(ctx, "Got %d-byte cached original cover", len(data))
 	} else if err != nil {
 		log.Errorf(ctx, "Cache lookup failed: %v", err) // swallow error
@@ -64,11 +78,11 @@ func Scale(ctx context.Context, cfg *types.ServerConfig, fn string,
 
 	if len(data) == 0 {
 		log.Debugf(ctx, "Loading original cover")
-		if data, err = load(ctx, cfg, fn); err != nil {
+		if data, err = load(ctx, bucket, baseURL, fn); err != nil {
 			return fmt.Errorf("failed to read cover: %v", err)
 		}
 		log.Debugf(ctx, "Caching %v-byte original cover", len(data))
-		if err = cache.SetCover(ctx, fn, 0, data); err != nil {
+		if err = setCachedCover(ctx, fn, 0, data); err != nil {
 			log.Errorf(ctx, "Cache write failed: %v", err) // swallow error
 		}
 	}
@@ -112,7 +126,7 @@ func Scale(ctx context.Context, cfg *types.ServerConfig, fn string,
 		return err
 	}
 	log.Debugf(ctx, "Caching %v-byte scaled cover", b.Len())
-	if err := cache.SetCover(ctx, fn, size, b.Bytes()); err != nil {
+	if err := setCachedCover(ctx, fn, size, b.Bytes()); err != nil {
 		log.Errorf(ctx, "Cache write failed: %v", err) // swallow error
 	}
 	return nil
@@ -120,9 +134,9 @@ func Scale(ctx context.Context, cfg *types.ServerConfig, fn string,
 
 // load loads and returns the cover image with the supplied original
 // filename (see Song.CoverFilename).
-func load(ctx context.Context, cfg *types.ServerConfig, fn string) ([]byte, error) {
+func load(ctx context.Context, bucket, baseURL, fn string) ([]byte, error) {
 	var r io.ReadCloser
-	if cfg.CoverBucket != "" {
+	if bucket != "" {
 		// It would seem more reasonable to call NewClient from an init()
 		// function instead, but that produces an error like the following:
 		//
@@ -143,12 +157,12 @@ func load(ctx context.Context, cfg *types.ServerConfig, fn string) ([]byte, erro
 		if err != nil {
 			return nil, err
 		}
-		log.Debugf(ctx, "Opening object %q from bucket %q", fn, cfg.CoverBucket)
-		if r, err = client.Bucket(cfg.CoverBucket).Object(fn).NewReader(ctx); err != nil {
+		log.Debugf(ctx, "Opening object %q from bucket %q", fn, bucket)
+		if r, err = client.Bucket(bucket).Object(fn).NewReader(ctx); err != nil {
 			return nil, err
 		}
-	} else if cfg.CoverBaseURL != "" {
-		url := cfg.CoverBaseURL + fn
+	} else if baseURL != "" {
+		url := baseURL + fn
 		log.Debugf(ctx, "Opening %v", url)
 		resp, err := http.Get(url)
 		if err != nil {
@@ -162,4 +176,27 @@ func load(ctx context.Context, cfg *types.ServerConfig, fn string) ([]byte, erro
 
 	log.Debugf(ctx, "Reading cover data")
 	return ioutil.ReadAll(r)
+}
+
+// setCachedCover caches a cover image with the supplied filename, requested size, and
+// raw data. size should be 0 when caching the original image.
+func setCachedCover(ctx context.Context, fn string, size int, data []byte) error {
+	return memcache.Set(ctx, &memcache.Item{
+		Key:        cacheKey(fn, size),
+		Value:      data,
+		Expiration: cacheExpiration,
+	})
+}
+
+// getCachedCover attempts to look up raw data for the cover image with the supplied
+// filename and size. If the image isn't present, both the returned byte slice
+// and the error are nil.
+func getCachedCover(ctx context.Context, fn string, size int) ([]byte, error) {
+	item, err := memcache.Get(ctx, cacheKey(fn, size))
+	if err == memcache.ErrCacheMiss {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return item.Value, nil
 }
