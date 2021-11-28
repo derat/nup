@@ -60,6 +60,9 @@ type searchPreset struct {
 
 // config holds the App Engine server's configuration.
 type config struct {
+	// ProjectID is the Google Cloud project ID.
+	ProjectID string `json:"projectId"`
+
 	// GoogleUsers contains email addresses of Google accounts allowed to access
 	// the web interface.
 	GoogleUsers []string `json:"googleUsers"`
@@ -116,7 +119,9 @@ func loadConfig() error {
 	defer f.Close()
 
 	var cfg config
-	if err := json.NewDecoder(f).Decode(&cfg); err != nil {
+	dec := json.NewDecoder(f)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&cfg); err != nil {
 		return err
 	}
 	baseCfg = &cfg
