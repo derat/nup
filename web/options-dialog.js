@@ -8,6 +8,7 @@ const template = createTemplate(`
 <style>
   @import 'common.css';
   @import 'dialog.css';
+
   hr.title {
     margin-bottom: 12px;
   }

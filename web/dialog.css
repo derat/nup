@@ -3,6 +3,16 @@
 
 @import 'common.css';
 
+:host(.dialog) {
+  /* Override style set by overlay-manager to prevent a flash of unstyled
+   * content (FOUC) due to the dialog being displayed before its contents'
+   * stylesheets have been loaded. I tried to find a way to do this without
+   * !important, but for some reason the .dialog rule in overlay-manager seems
+   * to be more specific than e.g. :host(.dialog.ready) here. */
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
 div.title {
   color: var(--dialog-title-color);
   font-size: 18px;

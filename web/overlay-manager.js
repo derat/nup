@@ -50,6 +50,11 @@ const template = createTemplate(`
     padding: var(--margin);
     pointer-events: auto;
     text-align: left;
+
+    /* Prevent a flash of unstyled content (FOUC) before the dialog's contents
+     * have been styled. dialog.css overrides this. */
+    opacity: 0;
+    visibility: hidden;
   }
   .message-dialog {
     width: 400px;
@@ -158,6 +163,9 @@ customElements.define(
     // it by passing it to closeChild(). Escape keypresses will also close the
     // dialog. The caller should listen for a 'close' event on the container if
     // any actions need to be performed when the dialog is closed.
+    //
+    // Note that a shadow DOM importing dialog.css must to be created to
+    // override the FOUC hack in the .dialog rule above.
     createDialog() {
       const dialog = createElement('span', 'dialog', this.container_);
       this.updateLightbox_();
