@@ -9,13 +9,17 @@ import {
   formatTime,
   getCurrentTimeSec,
   getDumpSongUrl,
+  getRatingString,
   getScaledCoverUrl,
   getSongUrl,
   handleFetchError,
+  numStarsToRating,
+  ratingToNumStars,
   updateTitleAttributeForTruncation,
 } from './common.js';
 import Config from './config.js';
 import OptionsDialog from './options-dialog.js';
+import { showSongDetails } from './song-details.js';
 import Updater from './updater.js';
 
 const template = createTemplate(`
@@ -301,13 +305,13 @@ customElements.define(
         this.dispatchEvent(new CustomEvent('field', { detail: e.detail }));
       });
       this.playlistTable_.addEventListener('menu', (e) => {
-        if (!this.dialogManager_) throw new Error('No <dialog-manager>');
+        if (!this.overlayManager_) throw new Error('No overlay manager');
 
         const idx = e.detail.index;
         const orig = e.detail.orig;
         orig.preventDefault();
 
-        const menu = this.dialogManager_.createMenu(orig.pageX, orig.pageY, [
+        const menu = this.overlayManager_.createMenu(orig.pageX, orig.pageY, [
           {
             id: 'play',
             text: 'Play',
@@ -322,6 +326,11 @@ customElements.define(
             id: 'truncate',
             text: 'Truncate',
             cb: () => this.removeSongs_(idx, this.songs_.length - idx),
+          },
+          {
+            id: 'details',
+            text: 'Details',
+            cb: () => showSongDetails(this.overlayManager_, this.songs_[idx]),
           },
           {
             id: 'debug',
@@ -414,8 +423,8 @@ customElements.define(
       });
     }
 
-    set dialogManager(manager) {
-      this.dialogManager_ = manager;
+    set overlayManager(manager) {
+      this.overlayManager_ = manager;
     }
 
     // Requests known tags from the server and updates the internal list.
@@ -612,17 +621,16 @@ customElements.define(
         return;
       }
 
-      let text = getRatingString(song.rating, true, true);
+      let text = getRatingString(song.rating, '★', '☆', 'Unrated', 'Rating: ');
       if (song.tags.length > 0) text += '\nTags: ' + song.tags.sort().join(' ');
       this.coverImage_.title = text;
     }
 
     updateRatingOverlay_() {
       const song = this.currentSong_;
-      this.ratingOverlayDiv_.innerText =
-        song && song.rating >= 0.0
-          ? getRatingString(song.rating, false, false)
-          : '';
+      this.ratingOverlayDiv_.innerText = song
+        ? getRatingString(song.rating, '★', '', '', '')
+        : '';
     }
 
     updateMediaSessionMetadata_(imageLoaded) {
@@ -996,18 +1004,18 @@ customElements.define(
       const numStars = ratingToNumStars(rating);
       for (let i = 1; i <= 5; ++i) {
         this.ratingSpan_.childNodes[i - 1].innerText =
-          i <= numStars ? '\u2605' : '\u2606';
+          i <= numStars ? '★' : '☆';
       }
     }
 
     showOptions_() {
       if (this.optionsDialog_) return;
       if (!this.config_) throw new Error('No config');
-      if (!this.dialogManager_) throw new Error('No <dialog-manager>');
+      if (!this.overlayManager_) throw new Error('No overlay manager');
 
       this.optionsDialog_ = new OptionsDialog(
         this.config_,
-        this.dialogManager_,
+        this.overlayManager_,
         () => {
           this.optionsDialog_ = null;
         }
@@ -1050,7 +1058,9 @@ customElements.define(
     }
 
     processAccelerator_(e) {
-      if (this.dialogManager_ && this.dialogManager_.numChildren) return false;
+      if (this.overlayManager_ && this.overlayManager_.numChildren) {
+        return false;
+      }
 
       if (e.altKey && e.key == 'd') {
         const song = this.currentSong_;
@@ -1122,24 +1132,3 @@ customElements.define(
     }
   }
 );
-
-function numStarsToRating(numStars) {
-  return numStars <= 0 ? -1.0 : (Math.min(numStars, 5) - 1) / 4.0;
-}
-
-function ratingToNumStars(rating) {
-  return rating < 0.0 ? 0 : 1 + Math.round(Math.min(rating, 1.0) * 4.0);
-}
-
-function getRatingString(rating, withLabel, includeEmpty) {
-  if (rating < 0.0) return 'Unrated';
-
-  let ratingString = withLabel ? 'Rating: ' : '';
-  const numStars = ratingToNumStars(rating);
-  for (let i = 1; i <= 5; ++i) {
-    if (i <= numStars) ratingString += '★';
-    else if (includeEmpty) ratingString += '☆';
-    else break;
-  }
-  return ratingString;
-}

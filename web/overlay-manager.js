@@ -95,10 +95,10 @@ const messageDialogTemplate = createTemplate(`
 </div>
 `);
 
-// <dialog-manager> manages dialog windows and context menus. It dims the rest
+// <overlay-manager> manages dialog windows and context menus. It dims the rest
 // of the page behind dialogs and blocks mouse events.
 customElements.define(
-  'dialog-manager',
+  'overlay-manager',
   class extends HTMLElement {
     constructor() {
       super();
@@ -117,8 +117,17 @@ customElements.define(
       this.container_ = $('container', this.shadow_);
 
       // Close all menus if the Escape key is pressed.
+      // If there are no menus, close the first dialog (if any).
       document.body.addEventListener('keydown', (e) => {
-        if (e.key == 'Escape') this.menus_.forEach((m) => this.closeChild(m));
+        if (e.key == 'Escape') {
+          if (this.menus_.length) {
+            this.menus_.forEach((m) => this.closeChild(m));
+            e.stopPropagation();
+          } else if (this.numChildren) {
+            this.closeChild(this.container_.children.item(0));
+            e.stopPropagation();
+          }
+        }
       });
     }
 
@@ -132,9 +141,13 @@ customElements.define(
       );
     }
 
-    // Creates, displays, and returns an empty dialog window container. The
-    // caller should add content within the returned container and is
-    // responsible for closing the dialog by passing it to closeChild().
+    // Creates, displays, and returns an empty dialog window container,
+    // additionally dimming the rest of the screen.
+    //
+    // The caller should add content within the returned container and can close
+    // it by passing it to closeChild(). Escape keypresses will also close the
+    // dialog. The caller should listen for a 'close' event on the container if
+    // any actions need to be performed when the dialog is closed.
     createDialog() {
       const dialog = createElement('span', 'dialog', this.container_);
       this.updateLightbox_();
@@ -145,20 +158,15 @@ customElements.define(
     // title and text.
     createMessageDialog(titleText, messageText) {
       const dialog = this.createDialog();
-      dialog.addEventListener('keydown', (e) => {
-        if (e.key == 'Escape') {
-          e.preventDefault();
-          this.closeChild(dialog);
-        }
-      });
-
       dialog.classList.add('message-dialog');
+
       const shadow = dialog.attachShadow({ mode: 'open' });
       shadow.appendChild(messageDialogTemplate.content.cloneNode(true));
       $('title', shadow).innerText = titleText;
       $('message', shadow).innerText = messageText;
+
       const button = $('ok-button', shadow);
-      button.addEventListener('click', () => this.closeChild(dialog), false);
+      button.addEventListener('click', () => this.closeChild(dialog));
       button.focus();
     }
 

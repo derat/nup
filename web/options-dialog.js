@@ -106,27 +106,18 @@ export default class OptionsDialog {
     this.preAmpSpan_ = $('pre-amp-span', this.shadow_);
     this.updatePreAmpSpan_(preAmp);
 
-    $('ok-button', this.shadow_).addEventListener('click', () => this.close());
+    $('ok-button', this.shadow_).addEventListener('click', () =>
+      this.manager_.closeChild(this.container_)
+    );
 
-    this.keyListener_ = (e) => {
-      if (e.key == 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        this.close();
-      }
-    };
-    document.body.addEventListener('keydown', this.keyListener_);
+    this.container_.addEventListener('close', () => {
+      this.config_.save();
+      if (this.closeCallback_) this.closeCallback_();
+    });
   }
 
   updatePreAmpSpan_(preAmp) {
     const prefix = preAmp > 0 ? '+' : '';
     this.preAmpSpan_.innerText = `${prefix}${preAmp} dB`;
-  }
-
-  close() {
-    document.body.removeEventListener('keydown', this.keyListener_, false);
-    this.config_.save();
-    this.manager_.closeChild(this.container_);
-    if (this.closeCallback_) this.closeCallback_();
   }
 }

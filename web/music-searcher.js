@@ -9,6 +9,7 @@ import {
   getDumpSongUrl,
   handleFetchError,
 } from './common.js';
+import { showSongDetails } from './song-details.js';
 
 const template = createTemplate(`
 <style>
@@ -347,12 +348,21 @@ customElements.define(
             !checked;
       });
       this.resultsTable_.addEventListener('menu', (e) => {
-        if (!this.dialogManager_) throw new Error('No <dialog-manager>');
+        if (!this.overlayManager_) throw new Error('No overlay manager');
 
         const idx = e.detail.index;
         const orig = e.detail.orig;
         orig.preventDefault();
-        const menu = this.dialogManager_.createMenu(orig.pageX, orig.pageY, [
+        const menu = this.overlayManager_.createMenu(orig.pageX, orig.pageY, [
+          {
+            id: 'details',
+            text: 'Details',
+            cb: () =>
+              showSongDetails(
+                this.overlayManager_,
+                this.resultsTable_.getSong(idx)
+              ),
+          },
           {
             id: 'debug',
             text: 'Debug',
@@ -373,8 +383,8 @@ customElements.define(
       this.getPresetsFromServer_();
     }
 
-    set dialogManager(manager) {
-      this.dialogManager_ = manager;
+    set overlayManager(manager) {
+      this.overlayManager_ = manager;
     }
     set musicPlayer(player) {
       this.musicPlayer_ = player;
@@ -575,7 +585,7 @@ customElements.define(
     }
 
     handleBodyKeyDown_(e) {
-      if (this.dialogManager_ && this.dialogManager_.numChildren) return;
+      if (this.overlayManager_ && this.overlayManager_.numChildren) return;
 
       if (e.key == '/') {
         this.keywordsInput_.focus();
@@ -586,8 +596,8 @@ customElements.define(
 
     // Displays a dialog with the supplied title and message.
     showMessage_(title, message) {
-      if (!this.dialogManager_) return;
-      this.dialogManager_.createMessageDialog(title, message);
+      if (!this.overlayManager_) return;
+      this.overlayManager_.createMessageDialog(title, message);
     }
   }
 );

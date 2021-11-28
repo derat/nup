@@ -285,6 +285,11 @@ customElements.define(
       if (this.useCheckboxes_) this.setAllCheckboxes(false);
     }
 
+    // Returns the song at |index|.
+    getSong(index) {
+      return this.songRows_[index].song;
+    }
+
     // Emits a |name| CustomEvent with its 'detail' property set to |detail|.
     emitEvent_(name, detail) {
       this.dispatchEvent(new CustomEvent(name, { detail }));

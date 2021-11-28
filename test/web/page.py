@@ -31,16 +31,16 @@ class Page(object):
     # Locators for various elements.
     BODY = (By.TAG_NAME, 'body')
 
-    DIALOG_MANAGER = (By.TAG_NAME, 'dialog-manager')
-    OPTIONS_DIALOG = DIALOG_MANAGER + (By.CSS_SELECTOR, '.dialog')
+    OVERLAY_MANAGER = (By.TAG_NAME, 'overlay-manager')
+    OPTIONS_DIALOG = OVERLAY_MANAGER + (By.CSS_SELECTOR, '.dialog')
     OPTIONS_OK_BUTTON = OPTIONS_DIALOG + (By.ID, 'ok-button')
     GAIN_TYPE_SELECT = OPTIONS_DIALOG + (By.ID, 'gain-type-select')
     PRE_AMP_RANGE = OPTIONS_DIALOG + (By.ID, 'pre-amp-range')
     PRE_AMP_SPAN = OPTIONS_DIALOG + (By.ID, 'pre-amp-span')
-    MENU_PLAY = DIALOG_MANAGER + (By.ID, 'play')
-    MENU_REMOVE = DIALOG_MANAGER + (By.ID, 'remove')
-    MENU_TRUNCATE = DIALOG_MANAGER + (By.ID, 'truncate')
-    MENU_DEBUG = DIALOG_MANAGER + (By.ID, 'debug')
+    MENU_PLAY = OVERLAY_MANAGER + (By.ID, 'play')
+    MENU_REMOVE = OVERLAY_MANAGER + (By.ID, 'remove')
+    MENU_TRUNCATE = OVERLAY_MANAGER + (By.ID, 'truncate')
+    MENU_DEBUG = OVERLAY_MANAGER + (By.ID, 'debug')
 
     MUSIC_PLAYER = (By.TAG_NAME, 'music-player')
     ALBUM_DIV = MUSIC_PLAYER + (By.ID, 'album')

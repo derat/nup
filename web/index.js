@@ -5,14 +5,14 @@ import { $, scaledCoverSize } from './common.js';
 import Config from './config.js';
 
 const config = new Config();
-const dialogManager = document.querySelector('dialog-manager');
 const musicPlayer = document.querySelector('music-player');
 const musicSearcher = document.querySelector('music-searcher');
+const overlayManager = document.querySelector('overlay-manager');
 
 // Wire up dependencies between components.
 musicPlayer.config = config;
-musicPlayer.dialogManager = dialogManager;
-musicSearcher.dialogManager = dialogManager;
+musicPlayer.overlayManager = overlayManager;
+musicSearcher.overlayManager = overlayManager;
 musicSearcher.musicPlayer = musicPlayer;
 
 // Watch for theme changes.
