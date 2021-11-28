@@ -10,6 +10,7 @@ const template = createTemplate(`
   :host {
     pointer-events: none;
   }
+
   .lightbox {
     background-color: #000;
     display: none;
@@ -26,6 +27,7 @@ const template = createTemplate(`
   .lightbox.dimming {
     opacity: 0.1;
   }
+
   .outer-container {
     display: table;
     height: 100%;
@@ -39,6 +41,7 @@ const template = createTemplate(`
     text-align: center;
     vertical-align: middle;
   }
+
   .dialog {
     background-color: var(--bg-color);
     border: solid 1px var(--frame-border-color);
@@ -51,6 +54,7 @@ const template = createTemplate(`
   .message-dialog {
     width: 400px;
   }
+
   .menu {
     background-color: var(--bg-color);
     border: solid 1px var(--frame-border-color);
@@ -71,6 +75,12 @@ const template = createTemplate(`
   }
   .menu .item:last-child {
     padding-bottom: 8px;
+  }
+  .menu hr {
+    background-color: var(--border-color);
+    border: 0;
+    height: 1px;
+    margin: 4px 0;
   }
 </style>
 <div id="lightbox" class="lightbox"></div>
@@ -171,19 +181,27 @@ customElements.define(
     }
 
     // Creates and displays a simple context menu at the specified location.
-    // |items| is an array of objects with 'text' properties containing the menu
-    // item text and 'cb' properties containing the corresponding callback.
+    //
+    // |items| is an array of objects with the following properties:
+    // - text - menu item text, or '-' to insert separator instead
+    // - cb   - callback to run when clicked
+    // - id   - optional ID for element (used in tests)
     createMenu(x, y, items) {
       const menu = createElement('span', 'menu', this.container_);
-      menu.addEventListener('click', (e) => {
-        this.closeChild(menu);
-      });
       this.updateLightbox_();
 
       for (const item of items) {
-        const el = createElement('div', 'item', menu, item.text);
-        el.id = item.id;
-        el.addEventListener('click', (e) => item.cb());
+        if (item.text === '-') {
+          createElement('hr', null, menu, null);
+        } else {
+          const el = createElement('div', 'item', menu, item.text);
+          if (item.id) el.id = item.id;
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.closeChild(menu);
+            item.cb();
+          });
+        }
       }
 
       // Keep the menu onscreen.

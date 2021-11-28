@@ -327,6 +327,7 @@ customElements.define(
             text: 'Truncate',
             cb: () => this.removeSongs_(idx, this.songs_.length - idx),
           },
+          { text: '-' },
           {
             id: 'details',
             text: 'Details',
