@@ -186,7 +186,7 @@ func (p *page) getSongsFromTable(table selenium.WebElement) []songInfo {
 }
 
 // waitForSearchResults waits for the search results table to contain the songs in want.
-func (p *page) waitForSearchResults(want []db.Song) {
+func (p *page) waitForSearchResults(want []db.Song, desc string) {
 	table := p.getOrFail(searchResultsTable)
 	if err := wait(func() error {
 		got := p.getSongsFromTable(table)
@@ -195,8 +195,20 @@ func (p *page) waitForSearchResults(want []db.Song) {
 		}
 		return nil
 	}); err != nil {
-		// TODO: Log the actual (and expected?) results.
-		p.t.Fatalf("Incorrect search results for %v", testInfo())
+		got := p.getSongsFromTable(table)
+		msg := fmt.Sprintf("Bad search results for %v", testInfo())
+		if desc != "" {
+			msg += fmt.Sprintf(" (%v)", desc)
+		}
+		msg += "\nGot:\n"
+		for _, s := range got {
+			msg += fmt.Sprintf("  %q %q %q\n", s.artist, s.title, s.album)
+		}
+		msg += "\nWant:\n"
+		for _, s := range want {
+			msg += fmt.Sprintf("  [%q %q %q]\n", s.Artist, s.Title, s.Album)
+		}
+		p.t.Fatal(msg)
 	}
 }
 

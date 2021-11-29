@@ -78,23 +78,23 @@ func TestKeywordQuery(t *testing.T) {
 	page := initWebTest(t)
 
 	album1 := []db.Song{
-		newSong("ar1", "ti1", "al1", 1),
-		newSong("ar1", "ti2", "al1", 2),
-		newSong("ar1", "ti3", "al1", 3),
+		newSong("ar1", "ti1", "al1", withTrack(1)),
+		newSong("ar1", "ti2", "al1", withTrack(2)),
+		newSong("ar1", "ti3", "al1", withTrack(3)),
 	}
 	album2 := []db.Song{
-		newSong("ar2", "ti1", "al2", 1),
-		newSong("ar2", "ti2", "al2", 2),
+		newSong("ar2", "ti1", "al2", withTrack(1)),
+		newSong("ar2", "ti2", "al2", withTrack(2)),
 	}
 	album3 := []db.Song{
-		newSong("artist with space", "ti1", "al3", 1),
+		newSong("artist with space", "ti1", "al3", withTrack(1)),
 	}
 
 	var allSongs []db.Song
 	allSongs = append(allSongs, album1...)
 	allSongs = append(allSongs, album2...)
 	allSongs = append(allSongs, album3...)
-	tester.PostSongs(allSongs, true /* replaceUserData */, 0)
+	tester.PostSongs(allSongs, true, 0)
 
 	for _, tc := range []struct {
 		kw   string
@@ -110,6 +110,29 @@ func TestKeywordQuery(t *testing.T) {
 	} {
 		page.setText(keywordsInput, tc.kw)
 		page.click(searchButton)
-		page.waitForSearchResults(tc.want)
+		page.waitForSearchResults(tc.want, tc.kw)
+	}
+}
+
+func TestTagQuery(t *testing.T) {
+	page := initWebTest(t)
+
+	song1 := newSong("ar1", "ti1", "al1", withTags("electronic", "instrumental"))
+	song2 := newSong("ar2", "ti2", "al2", withTags("rock", "guitar"))
+	song3 := newSong("ar3", "ti3", "al3", withTags("instrumental", "rock"))
+	tester.PostSongs([]db.Song{song1, song2, song3}, true, 0)
+
+	for _, tc := range []struct {
+		tags string
+		want []db.Song
+	}{
+		{"electronic", []db.Song{song1}},
+		{"guitar rock", []db.Song{song2}},
+		{"instrumental", []db.Song{song1, song3}},
+		{"instrumental -electronic", []db.Song{song3}},
+	} {
+		page.setText(tagsInput, tc.tags)
+		page.click(searchButton)
+		page.waitForSearchResults(tc.want, tc.tags)
 	}
 }

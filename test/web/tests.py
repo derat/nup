@@ -216,48 +216,6 @@ class Test(unittest.TestCase):
             self.fail('Timed out waiting for songs.\nReceived ' +
                       str(page.get_presentation_songs()))
 
-    def test_keyword_query(self):
-        album1 = [
-            Song('ar1', 'ti1', 'al1', 1),
-            Song('ar1', 'ti2', 'al1', 2),
-            Song('ar1', 'ti3', 'al1', 3),
-        ]
-        album2 = [
-            Song('ar2', 'ti1', 'al2', 1),
-            Song('ar2', 'ti2', 'al2', 2),
-        ]
-        album3 = [
-            Song('artist with space', 'ti1', 'al3', 1),
-        ]
-        server.import_songs(album1 + album2 + album3)
-
-        page = Page(driver)
-        for kw, res in (('album:al1', album1),
-                        ('album:al2', album2),
-                        ('artist:ar1', album1),
-                        ('artist:"artist with space"', album3),
-                        ('ti2', [album1[1], album2[1]]),
-                        ('AR2 ti1', [album2[0]]),
-                        ('ar1 bogus', [])):
-            page.keywords = kw
-            page.click(page.SEARCH_BUTTON)
-            self.wait_for_search_results(page, res, msg=kw)
-
-    def test_tag_query(self):
-        song1 = Song('ar1', 'ti1', 'al1', tags=['electronic', 'instrumental'])
-        song2 = Song('ar2', 'ti2', 'al2', tags=['rock', 'guitar'])
-        song3 = Song('ar3', 'ti3', 'al3', tags=['instrumental', 'rock'])
-        server.import_songs([song1, song2, song3])
-
-        page = Page(driver)
-        for tags, res in (('electronic', [song1]),
-                          ('guitar rock', [song2]),
-                          ('instrumental', [song1, song3]),
-                          ('instrumental -electronic', [song3])):
-            page.tags = tags
-            page.click(page.SEARCH_BUTTON)
-            self.wait_for_search_results(page, res, msg=tags)
-
     def test_rating_query(self):
         song1 = Song('a', 't', 'al1', rating=0.0)
         song2 = Song('a', 't', 'al2', rating=0.25)
