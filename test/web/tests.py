@@ -216,20 +216,6 @@ class Test(unittest.TestCase):
             self.fail('Timed out waiting for songs.\nReceived ' +
                       str(page.get_presentation_songs()))
 
-    def test_display_time_while_playing(self):
-        song = Song('ar', 't', 'al', 1, filename=Song.FILE_5S, length=5.0)
-        server.import_songs([song])
-
-        page = Page(driver)
-        page.keywords = song.artist
-        page.click(page.LUCKY_BUTTON)
-        self.wait_for_song(page, song, False, time='[ 0:00 / 0:05 ]')
-        self.wait_for_song(page, song, False, time='[ 0:01 / 0:05 ]')
-        self.wait_for_song(page, song, False, time='[ 0:02 / 0:05 ]')
-        self.wait_for_song(page, song, False, time='[ 0:03 / 0:05 ]')
-        self.wait_for_song(page, song, False, time='[ 0:04 / 0:05 ]')
-        self.wait_for_song(page, song, True, time='[ 0:05 / 0:05 ]')
-
     def test_report_played(self):
         song1 = Song('ar', 't1', 'al', 1, filename=Song.FILE_5S, length=5.0)
         song2 = Song('ar', 't2', 'al', 2, filename=Song.FILE_1S, length=1.0)

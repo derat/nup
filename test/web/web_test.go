@@ -456,3 +456,18 @@ func TestContextMenu(t *testing.T) {
 	page.checkSong(song2, songPaused)
 	page.checkPlaylist(joinSongs(song2), playlistActive(0))
 }
+
+func TestDisplayTimeWhilePlaying(t *testing.T) {
+	page := initWebTest(t)
+	song := newSong("ar", "t", "al", withFilename(song5s.Filename))
+	tester.PostSongs(joinSongs(song), true, 0)
+
+	page.setText(keywordsInput, song.Artist)
+	page.click(luckyButton)
+	page.checkSong(song, songNotPaused, songTime("[ 0:00 / 0:05 ]"))
+	page.checkSong(song, songNotPaused, songTime("[ 0:01 / 0:05 ]"))
+	page.checkSong(song, songNotPaused, songTime("[ 0:02 / 0:05 ]"))
+	page.checkSong(song, songNotPaused, songTime("[ 0:03 / 0:05 ]"))
+	page.checkSong(song, songNotPaused, songTime("[ 0:04 / 0:05 ]"))
+	page.checkSong(song, songEnded|songPaused, songTime("[ 0:05 / 0:05 ]"))
+}

@@ -19,7 +19,7 @@ var (
 	song10s = test.Song10s
 )
 
-func newSong(artist, title, album string, opts ...songOpt) db.Song {
+func newSong(artist, title, album string, fields ...songField) db.Song {
 	s := db.Song{
 		Artist:   artist,
 		Title:    title,
@@ -28,8 +28,8 @@ func newSong(artist, title, album string, opts ...songOpt) db.Song {
 		AlbumID:  artist + "-" + album,
 		Filename: song10s.Filename,
 	}
-	for _, opt := range opts {
-		opt(&s)
+	for _, f := range fields {
+		f(&s)
 	}
 	// Gross hack: infer the length from the filename.
 	if s.Length == 0 {
@@ -42,18 +42,18 @@ func newSong(artist, title, album string, opts ...songOpt) db.Song {
 	return s
 }
 
-type songOpt func(*db.Song)
+// songField describes a field that should be set by newSong.
+type songField func(*db.Song)
 
-func withDisc(d int) songOpt        { return func(s *db.Song) { s.Disc = d } }
-func withFilename(f string) songOpt { return func(s *db.Song) { s.Filename = f } }
-func withLength(l float64) songOpt  { return func(s *db.Song) { s.Length = l } }
-func withRating(r float64) songOpt  { return func(s *db.Song) { s.Rating = r } }
-func withTags(t ...string) songOpt  { return func(s *db.Song) { s.Tags = t } }
-func withTrack(t int) songOpt       { return func(s *db.Song) { s.Track = t } }
-
-func withPlays(times ...int64) songOpt {
+func withDisc(d int) songField        { return func(s *db.Song) { s.Disc = d } }
+func withFilename(f string) songField { return func(s *db.Song) { s.Filename = f } }
+func withLength(l float64) songField  { return func(s *db.Song) { s.Length = l } }
+func withRating(r float64) songField  { return func(s *db.Song) { s.Rating = r } }
+func withTags(t ...string) songField  { return func(s *db.Song) { s.Tags = t } }
+func withTrack(t int) songField       { return func(s *db.Song) { s.Track = t } }
+func withPlays(ts ...int64) songField {
 	return func(s *db.Song) {
-		for _, t := range times {
+		for _, t := range ts {
 			s.Plays = append(s.Plays, db.NewPlay(time.Unix(t, 0), ""))
 		}
 	}
@@ -77,9 +77,10 @@ func joinSongs(songs ...interface{}) []db.Song {
 // songInfo contains information about a song in the web interface.
 type songInfo struct {
 	artist, title, album  string
-	active, checked, menu bool // song row is active, checked, or has context menu
-	paused, ended         bool // audio element is paused or ended
-	src                   string
+	active, checked, menu bool   // song row is active, checked, or has context menu
+	paused, ended         bool   // audio element is paused or ended
+	src                   string // audio element src attribute
+	time                  string // displayed time, e.g. "[ 0:00 / 0:05 ]"
 }
 
 func (s songInfo) String() string {
@@ -97,6 +98,9 @@ func (s songInfo) String() string {
 		if f.val {
 			str += " " + f.name
 		}
+	}
+	if s.time != "" {
+		str += fmt.Sprintf(" %q", s.time)
 	}
 	return "[" + str + "]"
 }
@@ -116,7 +120,7 @@ const (
 	songNotPaused
 )
 
-func compareSongInfo(got songInfo, want db.Song, flags songFlags) bool {
+func compareSongInfo(got songInfo, want db.Song, flags songFlags, cfg *songConfig) bool {
 	if got.artist != want.Artist || got.title != want.Title || got.album != want.Album {
 		return false
 	}
@@ -131,6 +135,11 @@ func compareSongInfo(got songInfo, want db.Song, flags songFlags) bool {
 		{songPaused, songNotPaused, got.paused},
 	} {
 		if (flags&f.pos != 0 && !f.val) || (flags&f.neg != 0 && f.val) {
+			return false
+		}
+	}
+	if cfg != nil {
+		if cfg.time != "" && cfg.time != got.time {
 			return false
 		}
 	}
@@ -161,6 +170,9 @@ func compareSongInfos(got []songInfo, want []db.Song, checked []bool, active, me
 			flags |= songMenu
 		} else {
 			flags |= songNoMenu
+		}
+		if !compareSongInfo(got[i], want[i], flags, nil) {
+			return false
 		}
 	}
 	return true

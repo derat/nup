@@ -47,6 +47,7 @@ var (
 	artistDiv       = joinLocs(musicPlayer, loc{selenium.ByID, "artist"})
 	titleDiv        = joinLocs(musicPlayer, loc{selenium.ByID, "title"})
 	albumDiv        = joinLocs(musicPlayer, loc{selenium.ByID, "album"})
+	timeDiv         = joinLocs(musicPlayer, loc{selenium.ByID, "time"})
 	prevButton      = joinLocs(musicPlayer, loc{selenium.ByID, "prev"})
 	playPauseButton = joinLocs(musicPlayer, loc{selenium.ByID, "play-pause"})
 	nextButton      = joinLocs(musicPlayer, loc{selenium.ByID, "next"})
@@ -458,14 +459,31 @@ func (p *page) rightClickPlaylistSong(idx int) {
 	}
 }
 
+// songOpt is an option for checkSong.
+type songOpt func(cfg *songConfig)
+
+// songTime indicates the playback time that should be displayed, e.g. "[ 0:00 / 0:05 ]".
+func songTime(s string) songOpt {
+	return func(cfg *songConfig) { cfg.time = s }
+}
+
+type songConfig struct {
+	time string
+}
+
 // checkSong verifies that the current song matches want.
-func (p *page) checkSong(want db.Song, flags songFlags) {
+func (p *page) checkSong(want db.Song, flags songFlags, opts ...songOpt) {
+	var cfg songConfig
+	for _, o := range opts {
+		o(&cfg)
+	}
 	getSong := func() songInfo {
 		au := p.getOrFail(audio)
 		return songInfo{
-			artist: p.getTextOrFail(p.getOrFail(artistDiv), true),
-			title:  p.getTextOrFail(p.getOrFail(titleDiv), true),
-			album:  p.getTextOrFail(p.getOrFail(albumDiv), true),
+			artist: p.getTextOrFail(p.getOrFail(artistDiv), false),
+			title:  p.getTextOrFail(p.getOrFail(titleDiv), false),
+			album:  p.getTextOrFail(p.getOrFail(albumDiv), false),
+			time:   p.getTextOrFail(p.getOrFail(timeDiv), false),
 			paused: p.getAttrOrFail(au, "paused", true) != "",
 			ended:  p.getAttrOrFail(au, "ended", true) != "",
 			src:    p.getAttrOrFail(au, "src", true),
@@ -474,15 +492,15 @@ func (p *page) checkSong(want db.Song, flags songFlags) {
 
 	if err := wait(func() error {
 		got := getSong()
-		if !compareSongInfo(got, want, flags) {
+		if !compareSongInfo(got, want, flags, &cfg) {
 			return errors.New("songs don't match")
 		}
 		return nil
 	}); err != nil {
 		got := getSong()
 		msg := fmt.Sprintf("Bad song for %v", testInfo())
-		msg += "\nGot: " + got.String() + "\n"
-		msg += "Want:  "
+		msg += "\nGot:  " + got.String() + "\n"
+		msg += "Want: "
 		// This matches songInfo.String().
 		str := fmt.Sprintf("%q %q %q", want.Artist, want.Title, want.Album)
 		if flags&songEnded != 0 {
@@ -490,6 +508,9 @@ func (p *page) checkSong(want db.Song, flags songFlags) {
 		}
 		if flags&songPaused != 0 {
 			str += " paused"
+		}
+		if cfg.time != "" {
+			str += fmt.Sprintf(" %q", cfg.time)
 		}
 		msg += "[" + str + "]\n"
 		p.t.Fatal(msg)
