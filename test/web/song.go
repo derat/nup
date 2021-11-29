@@ -53,12 +53,27 @@ func joinSongs(songs ...interface{}) []db.Song {
 	return all
 }
 
+// songInfo contains information about a song in the web interface.
 type songInfo struct {
 	artist, title, album  string
-	active, menu, checked bool
+	active, checked, menu bool
 }
 
-func compareSongInfos(got []songInfo, want []db.Song) bool {
+func (s songInfo) String() string {
+	str := fmt.Sprintf("%q %q %q", s.artist, s.title, s.album)
+	if s.active {
+		str += " active"
+	}
+	if s.checked {
+		str += " checked"
+	}
+	if s.menu {
+		str += " menu"
+	}
+	return "[" + str + "]"
+}
+
+func compareSongInfos(got []songInfo, want []db.Song, checked []bool) bool {
 	if len(got) != len(want) {
 		return false
 	}
@@ -66,6 +81,9 @@ func compareSongInfos(got []songInfo, want []db.Song) bool {
 		if got[i].artist != want[i].Artist ||
 			got[i].title != want[i].Title ||
 			got[i].album != want[i].Album {
+			return false
+		}
+		if checked != nil && got[i].checked != checked[i] {
 			return false
 		}
 	}

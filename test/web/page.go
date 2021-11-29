@@ -48,7 +48,11 @@ var (
 	lastPlayedSelect   = joinLocs(musicSearcher, loc{selenium.ByID, "last-played-select"})
 	searchButton       = joinLocs(musicSearcher, loc{selenium.ByID, "search-button"})
 	resetButton        = joinLocs(musicSearcher, loc{selenium.ByID, "reset-button"})
-	searchResultsTable = joinLocs(musicSearcher, loc{selenium.ByID, "results-table"}, loc{selenium.ByCSSSelector, "table"})
+
+	searchResultsCheckbox = joinLocs(musicSearcher, loc{selenium.ByID, "results-table"},
+		loc{selenium.ByCSSSelector, `th input[type="checkbox"]`})
+	searchResultsTable = joinLocs(musicSearcher, loc{selenium.ByID, "results-table"},
+		loc{selenium.ByCSSSelector, "table"})
 )
 
 const (
@@ -180,6 +184,18 @@ func (p *page) getAttrOrFail(el selenium.WebElement, name string, ignoreStale bo
 	return val
 }
 
+// getSelectedOrFail returns whether el is selected, failing the test on error.
+// If ignoreStale is true, errors caused by the element no longer existing are ignored.
+func (p *page) getSelectedOrFail(el selenium.WebElement, ignoreStale bool) bool {
+	sel, err := el.IsSelected()
+	if ignoreStale && isStaleElementError(err) {
+		return false
+	} else if err != nil {
+		p.t.Fatalf("Failed getting selected state for %v: %v", testInfo(), err)
+	}
+	return sel
+}
+
 // getSongsFromTable returns songInfos describing the supplied <table> within a <song-table>.
 func (p *page) getSongsFromTable(table selenium.WebElement) []songInfo {
 	var songs []songInfo
@@ -207,17 +223,26 @@ func (p *page) getSongsFromTable(table selenium.WebElement) []songInfo {
 		class := p.getAttrOrFail(row, "class", true)
 		song.active = strings.Contains(class, "active")
 		song.menu = strings.Contains(class, "menu")
+		if len(cols) == 5 {
+			el, err := cols[0].FindElement(selenium.ByTagName, "input")
+			if err == nil {
+				song.checked = p.getSelectedOrFail(el, true)
+			} else if !isStaleElementError(err) {
+				p.t.Fatalf("Failed getting checkbox for %v: %v", testInfo(), err)
+			}
+		}
 		songs = append(songs, song)
 	}
 	return songs
 }
 
 // checkSearchResults waits for the search results table to contain the songs in want.
-func (p *page) checkSearchResults(want []db.Song, desc string) {
+// If checked is non-nil, it contains the expected checkbox state for each song.
+func (p *page) checkSearchResults(want []db.Song, checked []bool, desc string) {
 	table := p.getOrFail(searchResultsTable)
 	if err := wait(func() error {
 		got := p.getSongsFromTable(table)
-		if !compareSongInfos(got, want) {
+		if !compareSongInfos(got, want, checked) {
 			return errors.New("songs don't match")
 		}
 		return nil
@@ -229,11 +254,16 @@ func (p *page) checkSearchResults(want []db.Song, desc string) {
 		}
 		msg += "\nGot:\n"
 		for _, s := range got {
-			msg += fmt.Sprintf("  %q %q %q\n", s.artist, s.title, s.album)
+			msg += "  " + s.String() + "\n"
 		}
-		msg += "\nWant:\n"
-		for _, s := range want {
-			msg += fmt.Sprintf("  [%q %q %q]\n", s.Artist, s.Title, s.Album)
+		msg += "Want:\n"
+		for i, s := range want {
+			// This matches songInfo.String().
+			str := fmt.Sprintf("%q %q %q", s.Artist, s.Title, s.Album)
+			if checked != nil && checked[i] {
+				str += " checked"
+			}
+			msg += "  [" + str + "]\n"
 		}
 		p.t.Fatal(msg)
 	}
@@ -272,4 +302,49 @@ func (p *page) clickOption(sel []loc, option string) {
 		}
 	}
 	p.t.Fatalf("Failed finding %v option %q for %v: %v", sel, option, testInfo(), err)
+}
+
+type checkboxState uint32
+
+const (
+	checked     checkboxState = 1 << iota
+	transparent               // has "transparent" class
+)
+
+// checkCheckbox verifies that the checkbox element matched by locs has the specified state.
+// TODO: The "check" in this name is ambiguous.
+func (p *page) checkCheckbox(locs []loc, state checkboxState) {
+	el := p.getOrFail(locs)
+	if got, want := p.getSelectedOrFail(el, false), state&checked != 0; got != want {
+		p.t.Fatalf("Checkbox %v has checked state %v for %v; want %v", locs, got, testInfo(), want)
+	}
+	class := p.getAttrOrFail(el, "class", false)
+	if got, want := strings.Contains(class, "transparent"), state&transparent != 0; got != want {
+		p.t.Fatalf("Checkbox %v has transparent state %v for %v; want %v", locs, got, testInfo(), want)
+	}
+}
+
+// clickSearchResultsSongCheckbox clicks the checkbox for the song at 0-based index
+// idx in the search results table. If key (e.g. selenium.ShiftKey) is non-empty,
+// it is held while performing the click.
+func (p *page) clickSearchResultsSongCheckbox(idx int, key string) {
+	table := p.getOrFail(searchResultsTable)
+	sel := fmt.Sprintf("tr:nth-child(%d) td:first-child input", idx+1)
+	cb, err := table.FindElement(selenium.ByCSSSelector, sel)
+	if err != nil {
+		p.t.Fatalf("Failed finding checkbox %d (%q) for %v: %v", idx, sel, testInfo(), err)
+	}
+	if key != "" {
+		if err := p.wd.KeyDown(key); err != nil {
+			p.t.Fatalf("Failed pressing key before clicking checkbox %d for %v: %v", idx, testInfo(), err)
+		}
+		defer func() {
+			if err := p.wd.KeyUp(key); err != nil {
+				p.t.Fatalf("Failed releasing key after clicking checkbox %d for %v: %v", idx, testInfo(), err)
+			}
+		}()
+	}
+	if err := cb.Click(); err != nil {
+		p.t.Fatalf("Failed clicking checkbox %d for %v: %v", idx, testInfo(), err)
+	}
 }

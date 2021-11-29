@@ -77,7 +77,6 @@ func initWebTest(t *testing.T) *page {
 
 func TestKeywordQuery(t *testing.T) {
 	page := initWebTest(t)
-
 	album1 := joinSongs(
 		newSong("ar1", "ti1", "al1", withTrack(1)),
 		newSong("ar1", "ti2", "al1", withTrack(2)),
@@ -106,13 +105,12 @@ func TestKeywordQuery(t *testing.T) {
 	} {
 		page.setText(keywordsInput, tc.kw)
 		page.click(searchButton)
-		page.checkSearchResults(tc.want, tc.kw)
+		page.checkSearchResults(tc.want, nil, tc.kw)
 	}
 }
 
 func TestTagQuery(t *testing.T) {
 	page := initWebTest(t)
-
 	song1 := newSong("ar1", "ti1", "al1", withTags("electronic", "instrumental"))
 	song2 := newSong("ar2", "ti2", "al2", withTags("rock", "guitar"))
 	song3 := newSong("ar3", "ti3", "al3", withTags("instrumental", "rock"))
@@ -129,13 +127,12 @@ func TestTagQuery(t *testing.T) {
 	} {
 		page.setText(tagsInput, tc.tags)
 		page.click(searchButton)
-		page.checkSearchResults(tc.want, tc.tags)
+		page.checkSearchResults(tc.want, nil, tc.tags)
 	}
 }
 
 func TestRatingQuery(t *testing.T) {
 	page := initWebTest(t)
-
 	song1 := newSong("a", "t", "al1", withRating(0.0))
 	song2 := newSong("a", "t", "al2", withRating(0.25))
 	song3 := newSong("a", "t", "al3", withRating(0.5))
@@ -147,7 +144,7 @@ func TestRatingQuery(t *testing.T) {
 
 	page.setText(keywordsInput, "t") // need to set at least one search term
 	page.click(searchButton)
-	page.checkSearchResults(allSongs, "one star")
+	page.checkSearchResults(allSongs, nil, "one star")
 
 	page.click(resetButton)
 	for _, tc := range []struct {
@@ -161,18 +158,17 @@ func TestRatingQuery(t *testing.T) {
 	} {
 		page.clickOption(minRatingSelect, tc.option)
 		page.click(searchButton)
-		page.checkSearchResults(tc.want, tc.option)
+		page.checkSearchResults(tc.want, nil, tc.option)
 	}
 
 	page.click(resetButton)
 	page.click(unratedCheckbox)
 	page.click(searchButton)
-	page.checkSearchResults(joinSongs(song6), "unrated")
+	page.checkSearchResults(joinSongs(song6), nil, "unrated")
 }
 
 func TestFirstTrackQuery(t *testing.T) {
 	page := initWebTest(t)
-
 	album1 := joinSongs(
 		newSong("ar1", "ti1", "al1", withTrack(1), withDisc(1)),
 		newSong("ar1", "ti2", "al1", withTrack(2), withDisc(1)),
@@ -186,12 +182,11 @@ func TestFirstTrackQuery(t *testing.T) {
 
 	page.click(firstTrackCheckbox)
 	page.click(searchButton)
-	page.checkSearchResults(joinSongs(album1[0], album2[0]), "first tracks")
+	page.checkSearchResults(joinSongs(album1[0], album2[0]), nil, "first tracks")
 }
 
 func TestMaxPlaysQuery(t *testing.T) {
 	page := initWebTest(t)
-
 	song1 := newSong("ar1", "ti1", "al1", withPlays(1, 2))
 	song2 := newSong("ar2", "ti2", "al2", withPlays(1, 2, 3))
 	song3 := newSong("ar3", "ti3", "al3")
@@ -207,7 +202,7 @@ func TestMaxPlaysQuery(t *testing.T) {
 	} {
 		page.setText(maxPlaysInput, tc.plays)
 		page.click(searchButton)
-		page.checkSearchResults(tc.want, tc.plays)
+		page.checkSearchResults(tc.want, nil, tc.plays)
 	}
 }
 
@@ -234,6 +229,61 @@ func TestPlayTimeQuery(t *testing.T) {
 		page.clickOption(firstPlayedSelect, tc.first)
 		page.clickOption(lastPlayedSelect, tc.last)
 		page.click(searchButton)
-		page.checkSearchResults(tc.want, fmt.Sprintf("%s / %s", tc.first, tc.last))
+		page.checkSearchResults(tc.want, nil, fmt.Sprintf("%s / %s", tc.first, tc.last))
 	}
+}
+
+func TestSearchResultCheckboxes(t *testing.T) {
+	page := initWebTest(t)
+	songs := joinSongs(
+		newSong("a", "t1", "al", withTrack(1)),
+		newSong("a", "t2", "al", withTrack(2)),
+		newSong("a", "t3", "al", withTrack(3)),
+	)
+	tester.PostSongs(songs, true, 0)
+
+	// All songs should be selected by default after a search.
+	page.setText(keywordsInput, songs[0].Artist)
+	page.click(searchButton)
+	page.checkSearchResults(songs, []bool{true, true, true}, "")
+	page.checkCheckbox(searchResultsCheckbox, checked)
+
+	// Click the top checkbox to deselect all songs.
+	page.click(searchResultsCheckbox)
+	page.checkSearchResults(songs, []bool{false, false, false}, "")
+	page.checkCheckbox(searchResultsCheckbox, 0)
+
+	// Click it again to select all songs.
+	page.click(searchResultsCheckbox)
+	page.checkSearchResults(songs, []bool{true, true, true}, "")
+	page.checkCheckbox(searchResultsCheckbox, checked)
+
+	// Click the first song to deselect it.
+	page.clickSearchResultsSongCheckbox(0, "")
+	page.checkSearchResults(songs, []bool{false, true, true}, "")
+	page.checkCheckbox(searchResultsCheckbox, checked|transparent)
+
+	// Click the top checkbox to deselect all songs.
+	page.click(searchResultsCheckbox)
+	page.checkSearchResults(songs, []bool{false, false, false}, "")
+	page.checkCheckbox(searchResultsCheckbox, 0)
+
+	// Click the first and second songs individually to select them.
+	page.clickSearchResultsSongCheckbox(0, "")
+	page.clickSearchResultsSongCheckbox(1, "")
+	page.checkSearchResults(songs, []bool{true, true, false}, "")
+	page.checkCheckbox(searchResultsCheckbox, checked|transparent)
+
+	// Click the third song to select it as well.
+	page.clickSearchResultsSongCheckbox(2, "")
+	page.checkSearchResults(songs, []bool{true, true, true}, "")
+	page.checkCheckbox(searchResultsCheckbox, checked)
+
+	// Shift-click from the first to third song to select all songs.
+	page.click(searchResultsCheckbox)
+	page.checkSearchResults(songs, []bool{false, false, false}, "")
+	page.clickSearchResultsSongCheckbox(0, selenium.ShiftKey)
+	page.clickSearchResultsSongCheckbox(2, selenium.ShiftKey)
+	page.checkSearchResults(songs, []bool{true, true, true}, "")
+	page.checkCheckbox(searchResultsCheckbox, checked)
 }
