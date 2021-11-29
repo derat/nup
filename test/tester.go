@@ -1,7 +1,7 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-package e2e
+package test
 
 import (
 	"bytes"
@@ -20,7 +20,6 @@ import (
 	"github.com/derat/nup/client"
 	"github.com/derat/nup/server/auth"
 	"github.com/derat/nup/server/db"
-	"github.com/derat/nup/test"
 )
 
 const (
@@ -57,12 +56,12 @@ func runCommand(p string, args ...string) (stdout, stderr string, err error) {
 	return
 }
 
-// tester helps tests send HTTP requests to a development server and
+// Tester helps tests send HTTP requests to a development server and
 // run the update_music and dump_music commands.
-type tester struct {
-	tempDir  string // base temp dir created for holding test-related data
-	musicDir string // created within tempDir for songs
-	coverDir string // created within musicDir for album art images
+type Tester struct {
+	TempDir  string // base temp dir created for holding test-related data
+	MusicDir string // created within TempDir for songs
+	CoverDir string // created within MusicDir for album art images
 
 	updateConfigFile string // path to update_music config file
 	dumpConfigFile   string // path to dump_music config file
@@ -71,28 +70,28 @@ type tester struct {
 	client           http.Client
 }
 
-// newTester creates a new tester for the development server at serverURL.
+// NewTester creates a new tester for the development server at serverURL.
 // binDir is the directory containing the update_music and dump_music commands
 // (e.g. $HOME/go/bin).
-func newTester(serverURL, binDir string) *tester {
-	t := &tester{
+func NewTester(serverURL, binDir string) *Tester {
+	t := &Tester{
 		serverURL: serverURL,
 		binDir:    binDir,
 	}
 
 	var err error
-	t.tempDir, err = ioutil.TempDir("", "nup_test.")
+	t.TempDir, err = ioutil.TempDir("", "nup_test.")
 	if err != nil {
 		panic(err)
 	}
-	t.musicDir = filepath.Join(t.tempDir, "music")
-	t.coverDir = filepath.Join(t.musicDir, ".covers")
-	if err := os.MkdirAll(t.coverDir, 0700); err != nil {
+	t.MusicDir = filepath.Join(t.TempDir, "music")
+	t.CoverDir = filepath.Join(t.MusicDir, ".covers")
+	if err := os.MkdirAll(t.CoverDir, 0700); err != nil {
 		panic(err)
 	}
 
 	writeConfig := func(fn string, d interface{}) (path string) {
-		path = filepath.Join(t.tempDir, fn)
+		path = filepath.Join(t.TempDir, fn)
 		f, err := os.Create(path)
 		if err != nil {
 			panic(err)
@@ -118,9 +117,9 @@ func newTester(serverURL, binDir string) *tester {
 			Username:  auth.TestUsername,
 			Password:  auth.TestPassword,
 		},
-		CoverDir:           t.coverDir,
-		MusicDir:           t.musicDir,
-		LastUpdateInfoFile: filepath.Join(t.tempDir, "last_update_info.json"),
+		CoverDir:           t.CoverDir,
+		MusicDir:           t.MusicDir,
+		LastUpdateInfoFile: filepath.Join(t.TempDir, "last_update_info.json"),
 		ComputeGain:        true,
 	})
 
@@ -133,21 +132,21 @@ func newTester(serverURL, binDir string) *tester {
 	return t
 }
 
-// close deletes temporary files created by the test.
-func (t *tester) close() {
-	os.RemoveAll(t.tempDir)
+// Close deletes temporary files created by the test.
+func (t *Tester) Close() {
+	os.RemoveAll(t.TempDir)
 }
 
-type stripPolicy int // controls whether dumpSongs removes data from songs
+type StripPolicy int // controls whether DumpSongs removes data from songs
 
 const (
-	stripIDs stripPolicy = iota // clear SongID
-	keepIDs                     // preserve SongID
+	StripIDs StripPolicy = iota // clear SongID
+	KeepIDs                     // preserve SongID
 )
 
-const dumpCoversFlag = "-covers=true"
+const DumpCoversFlag = "-covers=true"
 
-func (t *tester) dumpSongs(strip stripPolicy, flags ...string) []db.Song {
+func (t *Tester) DumpSongs(strip StripPolicy, flags ...string) []db.Song {
 	args := append([]string{
 		"-config=" + t.dumpConfigFile,
 		"-song-batch-size=" + strconv.Itoa(dumpBatchSize),
@@ -171,7 +170,7 @@ func (t *tester) dumpSongs(strip stripPolicy, flags ...string) []db.Song {
 			}
 			panic(fmt.Sprintf("unable to unmarshal song %q: %v", l, err))
 		}
-		if strip == stripIDs {
+		if strip == StripIDs {
 			s.SongID = ""
 		}
 		songs = append(songs, s)
@@ -179,8 +178,8 @@ func (t *tester) dumpSongs(strip stripPolicy, flags ...string) []db.Song {
 	return songs
 }
 
-func (t *tester) SongID(sha1 string) string {
-	for _, s := range t.dumpSongs(keepIDs) {
+func (t *Tester) SongID(sha1 string) string {
+	for _, s := range t.DumpSongs(KeepIDs) {
 		if s.SHA1 == sha1 {
 			return s.SongID
 		}
@@ -188,15 +187,15 @@ func (t *tester) SongID(sha1 string) string {
 	panic(fmt.Sprintf("failed to find ID for %v", sha1))
 }
 
-const keepUserDataFlag = "-import-user-data=false"
+const KeepUserDataFlag = "-import-user-data=false"
 
-func dumpedGainsFlag(p string) string  { return "-dumped-gains-file=" + p }
-func forceGlobFlag(glob string) string { return "-force-glob=" + glob }
+func DumpedGainsFlag(p string) string  { return "-dumped-gains-file=" + p }
+func ForceGlobFlag(glob string) string { return "-force-glob=" + glob }
 
-func (t *tester) updateSongs(flags ...string) {
+func (t *Tester) UpdateSongs(flags ...string) {
 	args := append([]string{
 		"-config=" + t.updateConfigFile,
-		"-test-gain-info=" + fmt.Sprintf("%f:%f:%f", test.TrackGain, test.AlbumGain, test.PeakAmp),
+		"-test-gain-info=" + fmt.Sprintf("%f:%f:%f", TrackGain, AlbumGain, PeakAmp),
 	}, flags...)
 	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
 		args...); err != nil {
@@ -204,15 +203,15 @@ func (t *tester) updateSongs(flags ...string) {
 	}
 }
 
-func (t *tester) updateSongsFromList(path string, flags ...string) {
-	t.updateSongs(append(flags, "-song-paths-file="+path)...)
+func (t *Tester) UpdateSongsFromList(path string, flags ...string) {
+	t.UpdateSongs(append(flags, "-song-paths-file="+path)...)
 }
 
-func (t *tester) importSongsFromJSONFile(path string, flags ...string) {
-	t.updateSongs(append(flags, "-import-json-file="+path)...)
+func (t *Tester) ImportSongsFromJSONFile(path string, flags ...string) {
+	t.UpdateSongs(append(flags, "-import-json-file="+path)...)
 }
 
-func (t *tester) deleteSong(songID string) {
+func (t *Tester) DeleteSong(songID string) {
 	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
 		"-config="+t.updateConfigFile,
 		"-delete-song-id="+songID); err != nil {
@@ -220,7 +219,7 @@ func (t *tester) deleteSong(songID string) {
 	}
 }
 
-func (t *tester) newRequest(method, path string, body io.Reader) *http.Request {
+func (t *Tester) newRequest(method, path string, body io.Reader) *http.Request {
 	req, err := http.NewRequest(method, t.serverURL+path, body)
 	if err != nil {
 		panic(err)
@@ -229,7 +228,7 @@ func (t *tester) newRequest(method, path string, body io.Reader) *http.Request {
 	return req
 }
 
-func (t *tester) sendRequest(req *http.Request) *http.Response {
+func (t *Tester) sendRequest(req *http.Request) *http.Response {
 	resp, err := t.client.Do(req)
 	if err != nil {
 		panic(err)
@@ -240,7 +239,7 @@ func (t *tester) sendRequest(req *http.Request) *http.Response {
 	return resp
 }
 
-func (t *tester) pingServer() error {
+func (t *Tester) PingServer() error {
 	if resp, err := t.client.Do(t.newRequest("HEAD", "", nil)); err != nil {
 		return err
 	} else {
@@ -249,7 +248,7 @@ func (t *tester) pingServer() error {
 	}
 }
 
-func (t *tester) doPost(pathAndQueryParams string, body io.Reader) {
+func (t *Tester) DoPost(pathAndQueryParams string, body io.Reader) {
 	req := t.newRequest("POST", pathAndQueryParams, body)
 	req.Header.Set("Content-Type", "text/plain")
 	resp := t.sendRequest(req)
@@ -259,7 +258,7 @@ func (t *tester) doPost(pathAndQueryParams string, body io.Reader) {
 	}
 }
 
-func (t *tester) postSongs(songs []db.Song, replaceUserData bool, updateDelay time.Duration) {
+func (t *Tester) PostSongs(songs []db.Song, replaceUserData bool, updateDelay time.Duration) {
 	var buf bytes.Buffer
 	e := json.NewEncoder(&buf)
 	for _, s := range songs {
@@ -271,10 +270,10 @@ func (t *tester) postSongs(songs []db.Song, replaceUserData bool, updateDelay ti
 	if replaceUserData {
 		path += "&replaceUserData=1"
 	}
-	t.doPost(path, &buf)
+	t.DoPost(path, &buf)
 }
 
-func (t *tester) querySongs(params ...string) []db.Song {
+func (t *Tester) QuerySongs(params ...string) []db.Song {
 	resp := t.sendRequest(t.newRequest("GET", "query?"+strings.Join(params, "&"), nil))
 	defer resp.Body.Close()
 
@@ -286,7 +285,11 @@ func (t *tester) querySongs(params ...string) []db.Song {
 	return songs
 }
 
-func (t *tester) getTags(requireCache bool) string {
+func (t *Tester) ClearData() {
+	t.sendRequest(t.newRequest("POST", "clear", nil))
+}
+
+func (t *Tester) GetTags(requireCache bool) string {
 	path := "tags"
 	if requireCache {
 		path += "?requireCache=1"
@@ -302,7 +305,7 @@ func (t *tester) getTags(requireCache bool) string {
 	return strings.Join(tags, ",")
 }
 
-func (t *tester) getNowFromServer() time.Time {
+func (t *Tester) GetNowFromServer() time.Time {
 	resp := t.sendRequest(t.newRequest("GET", "now", nil))
 	defer resp.Body.Close()
 
@@ -319,20 +322,20 @@ func (t *tester) getNowFromServer() time.Time {
 	return time.Unix(0, nsec)
 }
 
-type deletionPolicy int // controls whether GetSongsForAndroid gets deleted songs
+type DeletionPolicy int // controls whether GetSongsForAndroid gets deleted songs
 
 const (
-	getRegularSongs deletionPolicy = iota // get only regular songs
-	getDeletedSongs                       // get only deleted songs
+	GetRegularSongs DeletionPolicy = iota // get only regular songs
+	GetDeletedSongs                       // get only deleted songs
 )
 
-func (t *tester) getSongsForAndroid(minLastModified time.Time, deleted deletionPolicy) []db.Song {
+func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted DeletionPolicy) []db.Song {
 	params := []string{
 		"type=song",
 		"max=" + strconv.Itoa(androidBatchSize),
 		"omit=plays,sha1",
 	}
-	if deleted == getDeletedSongs {
+	if deleted == GetDeletedSongs {
 		params = append(params, "deleted=1")
 	}
 	if !minLastModified.IsZero() {

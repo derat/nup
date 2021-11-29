@@ -14,6 +14,9 @@ const (
 	// TestUsername and TestPassword are accepted for basic HTTP authentication by development servers.
 	TestUsername = "testuser"
 	TestPassword = "testpass"
+
+	// WebDriverCookie is set by web tests to skip authentication.
+	WebDriverCookie = "webdriver"
 )
 
 // BasicAuthInfo contains information used for validating HTTP basic authentication.
@@ -56,7 +59,7 @@ func HasAllowedBasicAuth(r *http.Request, infos []BasicAuthInfo) (username strin
 // auth.HasWebDriverCookie returns true if r contains a special cookie set by browser
 // tests that use WebDriver.
 func HasWebDriverCookie(r *http.Request) bool {
-	if _, err := r.Cookie("webdriver"); err != nil {
+	if _, err := r.Cookie(WebDriverCookie); err != nil {
 		return false
 	}
 	return true
