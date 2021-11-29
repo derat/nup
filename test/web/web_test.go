@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/derat/nup/server/auth"
 	"github.com/derat/nup/server/db"
@@ -77,24 +78,19 @@ func initWebTest(t *testing.T) *page {
 func TestKeywordQuery(t *testing.T) {
 	page := initWebTest(t)
 
-	album1 := []db.Song{
+	album1 := joinSongs(
 		newSong("ar1", "ti1", "al1", withTrack(1)),
 		newSong("ar1", "ti2", "al1", withTrack(2)),
 		newSong("ar1", "ti3", "al1", withTrack(3)),
-	}
-	album2 := []db.Song{
+	)
+	album2 := joinSongs(
 		newSong("ar2", "ti1", "al2", withTrack(1)),
 		newSong("ar2", "ti2", "al2", withTrack(2)),
-	}
-	album3 := []db.Song{
+	)
+	album3 := joinSongs(
 		newSong("artist with space", "ti1", "al3", withTrack(1)),
-	}
-
-	var allSongs []db.Song
-	allSongs = append(allSongs, album1...)
-	allSongs = append(allSongs, album2...)
-	allSongs = append(allSongs, album3...)
-	tester.PostSongs(allSongs, true, 0)
+	)
+	tester.PostSongs(joinSongs(album1, album2, album3), true, 0)
 
 	for _, tc := range []struct {
 		kw   string
@@ -104,13 +100,13 @@ func TestKeywordQuery(t *testing.T) {
 		{"album:al2", album2},
 		{"artist:ar1", album1},
 		{"artist:\"artist with space\"", album3},
-		{"ti2", []db.Song{album1[1], album2[1]}},
-		{"AR2 ti1", []db.Song{album2[0]}},
-		{"ar1 bogus", []db.Song{}},
+		{"ti2", joinSongs(album1[1], album2[1])},
+		{"AR2 ti1", joinSongs(album2[0])},
+		{"ar1 bogus", nil},
 	} {
 		page.setText(keywordsInput, tc.kw)
 		page.click(searchButton)
-		page.waitForSearchResults(tc.want, tc.kw)
+		page.checkSearchResults(tc.want, tc.kw)
 	}
 }
 
@@ -120,19 +116,124 @@ func TestTagQuery(t *testing.T) {
 	song1 := newSong("ar1", "ti1", "al1", withTags("electronic", "instrumental"))
 	song2 := newSong("ar2", "ti2", "al2", withTags("rock", "guitar"))
 	song3 := newSong("ar3", "ti3", "al3", withTags("instrumental", "rock"))
-	tester.PostSongs([]db.Song{song1, song2, song3}, true, 0)
+	tester.PostSongs(joinSongs(song1, song2, song3), true, 0)
 
 	for _, tc := range []struct {
 		tags string
 		want []db.Song
 	}{
-		{"electronic", []db.Song{song1}},
-		{"guitar rock", []db.Song{song2}},
-		{"instrumental", []db.Song{song1, song3}},
-		{"instrumental -electronic", []db.Song{song3}},
+		{"electronic", joinSongs(song1)},
+		{"guitar rock", joinSongs(song2)},
+		{"instrumental", joinSongs(song1, song3)},
+		{"instrumental -electronic", joinSongs(song3)},
 	} {
 		page.setText(tagsInput, tc.tags)
 		page.click(searchButton)
-		page.waitForSearchResults(tc.want, tc.tags)
+		page.checkSearchResults(tc.want, tc.tags)
+	}
+}
+
+func TestRatingQuery(t *testing.T) {
+	page := initWebTest(t)
+
+	song1 := newSong("a", "t", "al1", withRating(0.0))
+	song2 := newSong("a", "t", "al2", withRating(0.25))
+	song3 := newSong("a", "t", "al3", withRating(0.5))
+	song4 := newSong("a", "t", "al4", withRating(0.75))
+	song5 := newSong("a", "t", "al5", withRating(1.0))
+	song6 := newSong("a", "t", "al6", withRating(-1.0))
+	allSongs := joinSongs(song1, song2, song3, song4, song5, song6)
+	tester.PostSongs(allSongs, true, 0)
+
+	page.setText(keywordsInput, "t") // need to set at least one search term
+	page.click(searchButton)
+	page.checkSearchResults(allSongs, "one star")
+
+	page.click(resetButton)
+	for _, tc := range []struct {
+		option string
+		want   []db.Song
+	}{
+		{twoStars, joinSongs(song2, song3, song4, song5)},
+		{threeStars, joinSongs(song3, song4, song5)},
+		{fourStars, joinSongs(song4, song5)},
+		{fiveStars, joinSongs(song5)},
+	} {
+		page.clickOption(minRatingSelect, tc.option)
+		page.click(searchButton)
+		page.checkSearchResults(tc.want, tc.option)
+	}
+
+	page.click(resetButton)
+	page.click(unratedCheckbox)
+	page.click(searchButton)
+	page.checkSearchResults(joinSongs(song6), "unrated")
+}
+
+func TestFirstTrackQuery(t *testing.T) {
+	page := initWebTest(t)
+
+	album1 := joinSongs(
+		newSong("ar1", "ti1", "al1", withTrack(1), withDisc(1)),
+		newSong("ar1", "ti2", "al1", withTrack(2), withDisc(1)),
+		newSong("ar1", "ti3", "al1", withTrack(3), withDisc(1)),
+	)
+	album2 := joinSongs(
+		newSong("ar2", "ti1", "al2", withTrack(1), withDisc(1)),
+		newSong("ar2", "ti2", "al2", withTrack(2), withDisc(1)),
+	)
+	tester.PostSongs(joinSongs(album1, album2), true, 0)
+
+	page.click(firstTrackCheckbox)
+	page.click(searchButton)
+	page.checkSearchResults(joinSongs(album1[0], album2[0]), "first tracks")
+}
+
+func TestMaxPlaysQuery(t *testing.T) {
+	page := initWebTest(t)
+
+	song1 := newSong("ar1", "ti1", "al1", withPlays(1, 2))
+	song2 := newSong("ar2", "ti2", "al2", withPlays(1, 2, 3))
+	song3 := newSong("ar3", "ti3", "al3")
+	tester.PostSongs(joinSongs(song1, song2, song3), true, 0)
+
+	for _, tc := range []struct {
+		plays string
+		want  []db.Song
+	}{
+		{"2", joinSongs(song1, song3)},
+		{"3", joinSongs(song1, song2, song3)},
+		{"0", joinSongs(song3)},
+	} {
+		page.setText(maxPlaysInput, tc.plays)
+		page.click(searchButton)
+		page.checkSearchResults(tc.want, tc.plays)
+	}
+}
+
+func TestPlayTimeQuery(t *testing.T) {
+	page := initWebTest(t)
+
+	const day = 86400
+	now := time.Now().Unix()
+	song1 := newSong("ar1", "ti1", "al1", withPlays(now-5*day))
+	song2 := newSong("ar2", "ti2", "al2", withPlays(now-90*day))
+	tester.PostSongs(joinSongs(song1, song2), true, 0)
+
+	for _, tc := range []struct {
+		first, last string
+		want        []db.Song
+	}{
+		{oneDay, unsetTime, nil},
+		{oneWeek, unsetTime, joinSongs(song1)},
+		{oneYear, unsetTime, joinSongs(song1, song2)},
+		{unsetTime, oneYear, nil},
+		{unsetTime, oneMonth, joinSongs(song2)},
+		{unsetTime, oneDay, joinSongs(song1, song2)},
+	} {
+		page.clickOption(firstPlayedSelect, tc.first)
+		page.clickOption(lastPlayedSelect, tc.last)
+		page.click(searchButton)
+		page.checkSearchResults(tc.want, fmt.Sprintf("%s / %s", tc.first, tc.last))
 	}
 }

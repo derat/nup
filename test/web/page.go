@@ -40,8 +40,35 @@ var (
 	musicSearcher      = joinLocs(loc{selenium.ByTagName, "music-searcher"})
 	keywordsInput      = joinLocs(musicSearcher, loc{selenium.ByID, "keywords-input"})
 	tagsInput          = joinLocs(musicSearcher, loc{selenium.ByID, "tags-input"})
+	firstTrackCheckbox = joinLocs(musicSearcher, loc{selenium.ByID, "first-track-checkbox"})
+	unratedCheckbox    = joinLocs(musicSearcher, loc{selenium.ByID, "unrated-checkbox"})
+	minRatingSelect    = joinLocs(musicSearcher, loc{selenium.ByID, "min-rating-select"})
+	maxPlaysInput      = joinLocs(musicSearcher, loc{selenium.ByID, "max-plays-input"})
+	firstPlayedSelect  = joinLocs(musicSearcher, loc{selenium.ByID, "first-played-select"})
+	lastPlayedSelect   = joinLocs(musicSearcher, loc{selenium.ByID, "last-played-select"})
 	searchButton       = joinLocs(musicSearcher, loc{selenium.ByID, "search-button"})
+	resetButton        = joinLocs(musicSearcher, loc{selenium.ByID, "reset-button"})
 	searchResultsTable = joinLocs(musicSearcher, loc{selenium.ByID, "results-table"}, loc{selenium.ByCSSSelector, "table"})
+)
+
+const (
+	// Text for minRatingSelect options and ratingOverlayDiv.
+	oneStar    = "★"
+	twoStars   = "★★"
+	threeStars = "★★★"
+	fourStars  = "★★★★"
+	fiveStars  = "★★★★★"
+
+	// Text for firstPlayedSelect and lastPlayedSelect options.
+	unsetTime   = "..."
+	oneDay      = "one day"
+	oneWeek     = "one week"
+	oneMonth    = "one month"
+	threeMonths = "three months"
+	sixMonths   = "six months"
+	oneYear     = "one year"
+	threeYears  = "three years"
+	fiveYears   = "five years"
 )
 
 // isMissingAttrError returns true if err was returned by calling
@@ -185,8 +212,8 @@ func (p *page) getSongsFromTable(table selenium.WebElement) []songInfo {
 	return songs
 }
 
-// waitForSearchResults waits for the search results table to contain the songs in want.
-func (p *page) waitForSearchResults(want []db.Song, desc string) {
+// checkSearchResults waits for the search results table to contain the songs in want.
+func (p *page) checkSearchResults(want []db.Song, desc string) {
 	table := p.getOrFail(searchResultsTable)
 	if err := wait(func() error {
 		got := p.getSongsFromTable(table)
@@ -228,4 +255,21 @@ func (p *page) click(locs []loc) {
 	if err := p.getOrFail(locs).Click(); err != nil {
 		p.t.Fatalf("Failed clicking %v for %v: %v", locs, testInfo(), err)
 	}
+}
+
+// clickOption clicks the <option> with the supplied text in the <select> matched by sel.
+func (p *page) clickOption(sel []loc, option string) {
+	opts, err := p.getOrFail(sel).FindElements(selenium.ByTagName, "option")
+	if err != nil {
+		p.t.Fatalf("Failed getting %v options for %v: %v", sel, testInfo(), err)
+	}
+	for _, opt := range opts {
+		if strings.TrimSpace(p.getTextOrFail(opt, false)) == option {
+			if err := opt.Click(); err != nil {
+				p.t.Fatalf("Failed clicking %v option %q for %v: %v", sel, option, testInfo(), err)
+			}
+			return
+		}
+	}
+	p.t.Fatalf("Failed finding %v option %q for %v: %v", sel, option, testInfo(), err)
 }

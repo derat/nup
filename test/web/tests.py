@@ -216,93 +216,11 @@ class Test(unittest.TestCase):
             self.fail('Timed out waiting for songs.\nReceived ' +
                       str(page.get_presentation_songs()))
 
-    def test_rating_query(self):
-        song1 = Song('a', 't', 'al1', rating=0.0)
-        song2 = Song('a', 't', 'al2', rating=0.25)
-        song3 = Song('a', 't', 'al3', rating=0.5)
-        song4 = Song('a', 't', 'al4', rating=0.75)
-        song5 = Song('a', 't', 'al5', rating=1.0)
-        song6 = Song('a', 't', 'al6', rating=-1.0)
-        server.import_songs([song1, song2, song3, song4, song5, song6])
-
-        page = Page(driver)
-        # Need to set something to avoid an alert.
-        page.keywords = 't'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(
-            page, [song1, song2, song3, song4, song5, song6])
-
-        page.click(page.RESET_BUTTON)
-        for rating, res in ((page.TWO_STARS, [song2, song3, song4, song5]),
-                            (page.THREE_STARS, [song3, song4, song5]),
-                            (page.FOUR_STARS, [song4, song5]),
-                            (page.FIVE_STARS, [song5])):
-            page.select(page.MIN_RATING_SELECT, text=rating)
-            page.click(page.SEARCH_BUTTON)
-            self.wait_for_search_results(page, res, msg=rating)
-
-        page.click(page.RESET_BUTTON)
-        page.click(page.UNRATED_CHECKBOX)
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song6])
-
-    def test_first_track_query(self):
-        album1 = [
-            Song('ar1', 'ti1', 'al1', 1, 1),
-            Song('ar1', 'ti2', 'al1', 2, 1),
-            Song('ar1', 'ti3', 'al1', 3, 1),
-        ]
-        album2 = [
-            Song('ar2', 'ti1', 'al2', 1, 1),
-            Song('ar2', 'ti2', 'al2', 2, 1),
-        ]
-        server.import_songs(album1 + album2)
-
-        page = Page(driver)
-        page.click(page.FIRST_TRACK_CHECKBOX)
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [album1[0], album2[0]])
-
-    def test_max_plays_query(self):
-        song1 = Song('ar1', 'ti1', 'al1', plays=[(1, ''), (2, '')])
-        song2 = Song('ar2', 'ti2', 'al2', plays=[(1, ''), (2, ''), (3, '')])
-        song3 = Song('ar3', 'ti3', 'al3', plays=[])
-        server.import_songs([song1, song2, song3])
-
-        page = Page(driver)
-        for plays, res in (('2', [song1, song3]),
-                           ('3', [song1, song2, song3]),
-                           ('0', [song3])):
-            page.max_plays = plays
-            page.click(page.SEARCH_BUTTON)
-            self.wait_for_search_results(page, res, msg=plays)
-
-    def test_play_time_query(self):
-        now = time.time()
-        day = 86400
-        song1 = Song('ar1', 'ti1', 'al1', plays=[(now - 5 * day, '')])
-        song2 = Song('ar2', 'ti2', 'al2', plays=[(now - 90 * day, '')])
-        server.import_songs([song1, song2])
-
-        page = Page(driver)
-        for first, last, res in \
-                ((page.ONE_DAY, page.UNSET_TIME, []),
-                 (page.ONE_WEEK, page.UNSET_TIME, [song1]),
-                 (page.ONE_YEAR, page.UNSET_TIME, [song1, song2]),
-                 (page.UNSET_TIME, page.ONE_YEAR, []),
-                 (page.UNSET_TIME, page.ONE_MONTH, [song2]),
-                 (page.UNSET_TIME, page.ONE_DAY, [song1, song2])):
-            page.select(page.FIRST_PLAYED_SELECT, text=first)
-            page.select(page.LAST_PLAYED_SELECT, text=last)
-            page.click(page.SEARCH_BUTTON)
-            self.wait_for_search_results(page, res, msg='%s/%s' % (first, last))
-
     def test_search_result_checkboxes(self):
         songs = [Song('a', 't1', 'al1', 1),
                  Song('a', 't2', 'al1', 2),
                  Song('a', 't3', 'al1', 3)]
         server.import_songs(songs)
-
 
         page = Page(driver)
 
