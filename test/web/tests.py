@@ -216,45 +216,6 @@ class Test(unittest.TestCase):
             self.fail('Timed out waiting for songs.\nReceived ' +
                       str(page.get_presentation_songs()))
 
-    def test_context_menu(self):
-        song1 = Song('a', 't1', 'al', track=1, filename=Song.FILE_10S)
-        song2 = Song('a', 't2', 'al', track=2, filename=Song.FILE_10S)
-        song3 = Song('a', 't3', 'al', track=3, filename=Song.FILE_10S)
-        song4 = Song('a', 't4', 'al', track=4, filename=Song.FILE_10S)
-        song5 = Song('a', 't5', 'al', track=5, filename=Song.FILE_10S)
-        songs = [song1, song2, song3, song4, song5]
-        server.import_songs(songs)
-
-        page = Page(driver)
-        page.keywords = song1.album
-        page.click(page.LUCKY_BUTTON)
-        self.wait_for_song(page, song1, False)
-        self.wait_for_playlist(page, songs, 0, -1)
-
-        page.right_click_playlist_song(3)
-        self.wait_for_playlist(page, songs, menu_index=3)
-        page.click(page.MENU_PLAY)
-        self.wait_for_song(page, song4, False)
-        self.wait_for_playlist(page, songs, 3, -1)
-
-        page.right_click_playlist_song(2)
-        self.wait_for_playlist(page, songs, menu_index=2)
-        page.click(page.MENU_PLAY)
-        self.wait_for_song(page, song3, False)
-        self.wait_for_playlist(page, songs, 2, -1)
-
-        page.right_click_playlist_song(0)
-        self.wait_for_playlist(page, songs, menu_index=0)
-        page.click(page.MENU_REMOVE)
-        self.wait_for_song(page, song3, False)
-        self.wait_for_playlist(page, [song2, song3, song4, song5], 1, -1)
-
-        page.right_click_playlist_song(1)
-        self.wait_for_playlist(page, [song2, song3, song4, song5], menu_index=1)
-        page.click(page.MENU_TRUNCATE)
-        self.wait_for_song(page, song2, True)
-        self.wait_for_playlist(page, [song2], 0, -1)
-
     def test_display_time_while_playing(self):
         song = Song('ar', 't', 'al', 1, filename=Song.FILE_5S, length=5.0)
         server.import_songs([song])

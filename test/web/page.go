@@ -37,6 +37,11 @@ func joinLocs(locs ...interface{}) []loc {
 var (
 	body = joinLocs(loc{selenium.ByTagName, "body"})
 
+	overlayManager = joinLocs(loc{selenium.ByTagName, "overlay-manager"})
+	menuPlay       = joinLocs(overlayManager, loc{selenium.ByID, "play"})
+	menuRemove     = joinLocs(overlayManager, loc{selenium.ByID, "remove"})
+	menuTruncate   = joinLocs(overlayManager, loc{selenium.ByID, "truncate"})
+
 	musicPlayer     = joinLocs(loc{selenium.ByTagName, "music-player"})
 	audio           = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "audio"})
 	artistDiv       = joinLocs(musicPlayer, loc{selenium.ByID, "artist"})
@@ -252,21 +257,42 @@ func (p *page) getSongsFromTable(table selenium.WebElement) []songInfo {
 	return songs
 }
 
+// searchResultsOpt is an option for checkSearchResults.
+type searchResultsOpt func(cfg *searchResultsConfig)
+
+// searchResultsChecked checks that songs' checkboxes match vals.
+func searchResultsChecked(vals ...bool) searchResultsOpt {
+	return func(cfg *searchResultsConfig) { cfg.checked = vals }
+}
+
+// searchResultsDesc supplied a descriptive string to be included in failure messages.
+func searchResultsDesc(d string) searchResultsOpt {
+	return func(cfg *searchResultsConfig) { cfg.desc = d }
+}
+
+type searchResultsConfig struct {
+	desc    string
+	checked []bool // checked state of each song
+}
+
 // checkSearchResults waits for the search results table to contain the songs in want.
-// If checked is non-nil, it contains the expected checkbox state for each song.
-func (p *page) checkSearchResults(want []db.Song, checked []bool, desc string) {
+func (p *page) checkSearchResults(want []db.Song, opts ...searchResultsOpt) {
+	var cfg searchResultsConfig
+	for _, o := range opts {
+		o(&cfg)
+	}
 	table := p.getOrFail(searchResultsTable)
 	if err := wait(func() error {
 		got := p.getSongsFromTable(table)
-		if !compareSongInfos(got, want, checked, -1) {
+		if !compareSongInfos(got, want, cfg.checked, -1 /* active */, -1 /* menu */) {
 			return errors.New("songs don't match")
 		}
 		return nil
 	}); err != nil {
 		got := p.getSongsFromTable(table)
 		msg := fmt.Sprintf("Bad search results for %v", testInfo())
-		if desc != "" {
-			msg += fmt.Sprintf(" (%v)", desc)
+		if cfg.desc != "" {
+			msg += fmt.Sprintf(" (%v)", cfg.desc)
 		}
 		msg += "\nGot:\n"
 		for _, s := range got {
@@ -276,7 +302,7 @@ func (p *page) checkSearchResults(want []db.Song, checked []bool, desc string) {
 		for i, s := range want {
 			// This matches songInfo.String().
 			str := fmt.Sprintf("%q %q %q", s.Artist, s.Title, s.Album)
-			if checked != nil && checked[i] {
+			if cfg.checked != nil && cfg.checked[i] {
 				str += " checked"
 			}
 			msg += "  [" + str + "]\n"
@@ -285,21 +311,40 @@ func (p *page) checkSearchResults(want []db.Song, checked []bool, desc string) {
 	}
 }
 
+// playlistOpt is an option for checkPlaylist.
+type playlistOpt func(cfg *playlistConfig)
+
+// playlistActive indicates that the song at idx should be active.
+func playlistActive(idx int) playlistOpt {
+	return func(cfg *playlistConfig) { cfg.active = idx }
+}
+
+// playlistMenu indicates that a context menu should be shown for the song at idx.
+func playlistMenu(idx int) playlistOpt {
+	return func(cfg *playlistConfig) { cfg.menu = idx }
+}
+
+type playlistConfig struct {
+	active int // 0-based index of active song
+	menu   int // 0-based index of song with context menu
+}
+
 // checkPlaylist waits for the playlist table to contain the songs in want.
-func (p *page) checkPlaylist(want []db.Song, active int, desc string) {
+func (p *page) checkPlaylist(want []db.Song, opts ...playlistOpt) {
+	cfg := playlistConfig{active: -1, menu: -1}
+	for _, o := range opts {
+		o(&cfg)
+	}
 	table := p.getOrFail(playlistTable)
 	if err := wait(func() error {
 		got := p.getSongsFromTable(table)
-		if !compareSongInfos(got, want, nil, active) {
+		if !compareSongInfos(got, want, nil /* checked */, cfg.active, cfg.menu) {
 			return errors.New("songs don't match")
 		}
 		return nil
 	}); err != nil {
 		got := p.getSongsFromTable(table)
 		msg := fmt.Sprintf("Bad playlist for %v", testInfo())
-		if desc != "" {
-			msg += fmt.Sprintf(" (%v)", desc)
-		}
 		msg += "\nGot:\n"
 		for _, s := range got {
 			msg += "  " + s.String() + "\n"
@@ -308,7 +353,7 @@ func (p *page) checkPlaylist(want []db.Song, active int, desc string) {
 		for i, s := range want {
 			// This matches songInfo.String().
 			str := fmt.Sprintf("%q %q %q", s.Artist, s.Title, s.Album)
-			if active >= 0 && active == i {
+			if cfg.active >= 0 && cfg.active == i {
 				str += " active"
 			}
 			msg += "  [" + str + "]\n"
@@ -397,8 +442,24 @@ func (p *page) clickSearchResultsSongCheckbox(idx int, key string) {
 	}
 }
 
+// rightClickPlaylistSong right-clicks on the playlist song at the specified index.
+func (p *page) rightClickPlaylistSong(idx int) {
+	table := p.getOrFail(playlistTable)
+	sel := fmt.Sprintf("tbody tr:nth-child(%d)", idx+1)
+	row, err := table.FindElement(selenium.ByCSSSelector, sel)
+	if err != nil {
+		p.t.Fatalf("Failed finding playlist song %d (%q) for %v: %v", idx, sel, testInfo(), err)
+	}
+	if err := row.MoveTo(3, 3); err != nil {
+		p.t.Fatalf("Failed moving mouse to playlist song for %v: %v", testInfo(), err)
+	}
+	if err := p.wd.Click(selenium.RightButton); err != nil {
+		p.t.Fatalf("Failed right-clicking on playlist song for %v: %v", testInfo(), err)
+	}
+}
+
 // checkSong verifies that the current song matches want.
-func (p *page) checkSong(want db.Song, flags songFlags, desc string) {
+func (p *page) checkSong(want db.Song, flags songFlags) {
 	getSong := func() songInfo {
 		au := p.getOrFail(audio)
 		return songInfo{
@@ -420,9 +481,6 @@ func (p *page) checkSong(want db.Song, flags songFlags, desc string) {
 	}); err != nil {
 		got := getSong()
 		msg := fmt.Sprintf("Bad song for %v", testInfo())
-		if desc != "" {
-			msg += fmt.Sprintf(" (%v)", desc)
-		}
 		msg += "\nGot: " + got.String() + "\n"
 		msg += "Want:  "
 		// This matches songInfo.String().

@@ -137,7 +137,7 @@ func TestKeywordQuery(t *testing.T) {
 	} {
 		page.setText(keywordsInput, tc.kw)
 		page.click(searchButton)
-		page.checkSearchResults(tc.want, nil, tc.kw)
+		page.checkSearchResults(tc.want, searchResultsDesc(tc.kw))
 	}
 }
 
@@ -159,7 +159,7 @@ func TestTagQuery(t *testing.T) {
 	} {
 		page.setText(tagsInput, tc.tags)
 		page.click(searchButton)
-		page.checkSearchResults(tc.want, nil, tc.tags)
+		page.checkSearchResults(tc.want, searchResultsDesc(tc.tags))
 	}
 }
 
@@ -176,7 +176,7 @@ func TestRatingQuery(t *testing.T) {
 
 	page.setText(keywordsInput, "t") // need to set at least one search term
 	page.click(searchButton)
-	page.checkSearchResults(allSongs, nil, "one star")
+	page.checkSearchResults(allSongs, searchResultsDesc("one star"))
 
 	page.click(resetButton)
 	for _, tc := range []struct {
@@ -190,13 +190,13 @@ func TestRatingQuery(t *testing.T) {
 	} {
 		page.clickOption(minRatingSelect, tc.option)
 		page.click(searchButton)
-		page.checkSearchResults(tc.want, nil, tc.option)
+		page.checkSearchResults(tc.want, searchResultsDesc(tc.option))
 	}
 
 	page.click(resetButton)
 	page.click(unratedCheckbox)
 	page.click(searchButton)
-	page.checkSearchResults(joinSongs(song6), nil, "unrated")
+	page.checkSearchResults(joinSongs(song6), searchResultsDesc("unrated"))
 }
 
 func TestFirstTrackQuery(t *testing.T) {
@@ -214,7 +214,7 @@ func TestFirstTrackQuery(t *testing.T) {
 
 	page.click(firstTrackCheckbox)
 	page.click(searchButton)
-	page.checkSearchResults(joinSongs(album1[0], album2[0]), nil, "first tracks")
+	page.checkSearchResults(joinSongs(album1[0], album2[0]))
 }
 
 func TestMaxPlaysQuery(t *testing.T) {
@@ -234,7 +234,7 @@ func TestMaxPlaysQuery(t *testing.T) {
 	} {
 		page.setText(maxPlaysInput, tc.plays)
 		page.click(searchButton)
-		page.checkSearchResults(tc.want, nil, tc.plays)
+		page.checkSearchResults(tc.want, searchResultsDesc(tc.plays))
 	}
 }
 
@@ -261,7 +261,7 @@ func TestPlayTimeQuery(t *testing.T) {
 		page.clickOption(firstPlayedSelect, tc.first)
 		page.clickOption(lastPlayedSelect, tc.last)
 		page.click(searchButton)
-		page.checkSearchResults(tc.want, nil, fmt.Sprintf("%s / %s", tc.first, tc.last))
+		page.checkSearchResults(tc.want, searchResultsDesc(fmt.Sprintf("%s / %s", tc.first, tc.last)))
 	}
 }
 
@@ -277,46 +277,46 @@ func TestSearchResultCheckboxes(t *testing.T) {
 	// All songs should be selected by default after a search.
 	page.setText(keywordsInput, songs[0].Artist)
 	page.click(searchButton)
-	page.checkSearchResults(songs, []bool{true, true, true}, "")
+	page.checkSearchResults(songs, searchResultsChecked(true, true, true))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked)
 
 	// Click the top checkbox to deselect all songs.
 	page.click(searchResultsCheckbox)
-	page.checkSearchResults(songs, []bool{false, false, false}, "")
+	page.checkSearchResults(songs, searchResultsChecked(false, false, false))
 	page.checkCheckbox(searchResultsCheckbox, 0)
 
 	// Click it again to select all songs.
 	page.click(searchResultsCheckbox)
-	page.checkSearchResults(songs, []bool{true, true, true}, "")
+	page.checkSearchResults(songs, searchResultsChecked(true, true, true))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked)
 
 	// Click the first song to deselect it.
 	page.clickSearchResultsSongCheckbox(0, "")
-	page.checkSearchResults(songs, []bool{false, true, true}, "")
+	page.checkSearchResults(songs, searchResultsChecked(false, true, true))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked|checkboxTransparent)
 
 	// Click the top checkbox to deselect all songs.
 	page.click(searchResultsCheckbox)
-	page.checkSearchResults(songs, []bool{false, false, false}, "")
+	page.checkSearchResults(songs, searchResultsChecked(false, false, false))
 	page.checkCheckbox(searchResultsCheckbox, 0)
 
 	// Click the first and second songs individually to select them.
 	page.clickSearchResultsSongCheckbox(0, "")
 	page.clickSearchResultsSongCheckbox(1, "")
-	page.checkSearchResults(songs, []bool{true, true, false}, "")
+	page.checkSearchResults(songs, searchResultsChecked(true, true, false))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked|checkboxTransparent)
 
 	// Click the third song to select it as well.
 	page.clickSearchResultsSongCheckbox(2, "")
-	page.checkSearchResults(songs, []bool{true, true, true}, "")
+	page.checkSearchResults(songs, searchResultsChecked(true, true, true))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked)
 
 	// Shift-click from the first to third song to select all songs.
 	page.click(searchResultsCheckbox)
-	page.checkSearchResults(songs, []bool{false, false, false}, "")
+	page.checkSearchResults(songs, searchResultsChecked(false, false, false))
 	page.clickSearchResultsSongCheckbox(0, selenium.ShiftKey)
 	page.clickSearchResultsSongCheckbox(2, selenium.ShiftKey)
-	page.checkSearchResults(songs, []bool{true, true, true}, "")
+	page.checkSearchResults(songs, searchResultsChecked(true, true, true))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked)
 }
 
@@ -332,45 +332,45 @@ func TestAddToPlaylist(t *testing.T) {
 
 	page.setText(keywordsInput, "al1")
 	page.click(searchButton)
-	page.checkSearchResults(joinSongs(song1, song2), nil, "")
+	page.checkSearchResults(joinSongs(song1, song2))
 	page.click(appendButton)
-	page.checkPlaylist(joinSongs(song1, song2), 0, "")
+	page.checkPlaylist(joinSongs(song1, song2), playlistActive(0))
 
 	// Pause so we don't advance through the playlist mid-test.
-	page.checkSong(song1, songNotPaused, "")
+	page.checkSong(song1, songNotPaused)
 	page.click(playPauseButton)
-	page.checkSong(song1, songPaused, "")
+	page.checkSong(song1, songPaused)
 
 	// Inserting should leave the current track paused.
 	page.setText(keywordsInput, "al2")
 	page.click(searchButton)
-	page.checkSearchResults(joinSongs(song3, song4), []bool{true, true}, "")
+	page.checkSearchResults(joinSongs(song3, song4))
 	page.click(insertButton)
-	page.checkPlaylist(joinSongs(song1, song3, song4, song2), 0, "")
-	page.checkSong(song1, songPaused, "")
+	page.checkPlaylist(joinSongs(song1, song3, song4, song2), playlistActive(0))
+	page.checkSong(song1, songPaused)
 
 	// Replacing should result in the new first track being played.
 	page.setText(keywordsInput, "al3")
 	page.click(searchButton)
-	page.checkSearchResults(joinSongs(song5, song6), []bool{true, true}, "")
+	page.checkSearchResults(joinSongs(song5, song6))
 	page.click(replaceButton)
-	page.checkPlaylist(joinSongs(song5, song6), 0, "")
-	page.checkSong(song5, songNotPaused, "")
+	page.checkPlaylist(joinSongs(song5, song6), playlistActive(0))
+	page.checkSong(song5, songNotPaused)
 
 	// Appending should leave the first track playing.
 	page.setText(keywordsInput, "al1")
 	page.click(searchButton)
-	page.checkSearchResults(joinSongs(song1, song2), []bool{true, true}, "")
+	page.checkSearchResults(joinSongs(song1, song2))
 	page.click(appendButton)
-	page.checkPlaylist(joinSongs(song5, song6, song1, song2), 0, "")
-	page.checkSong(song5, songNotPaused, "")
+	page.checkPlaylist(joinSongs(song5, song6, song1, song2), playlistActive(0))
+	page.checkSong(song5, songNotPaused)
 
 	// The "I'm feeling lucky" button should replace the current playlist and
 	// start playing the new first song.
 	page.setText(keywordsInput, "al2")
 	page.click(luckyButton)
-	page.checkPlaylist(joinSongs(song3, song4), 0, "")
-	page.checkSong(song3, songNotPaused, "")
+	page.checkPlaylist(joinSongs(song3, song4), playlistActive(0))
+	page.checkSong(song3, songNotPaused)
 }
 
 func TestPlaybackButtons(t *testing.T) {
@@ -382,37 +382,77 @@ func TestPlaybackButtons(t *testing.T) {
 	// We should start playing automatically when the 'lucky' button is clicked.
 	page.setText(keywordsInput, song1.Artist)
 	page.click(luckyButton)
-	page.checkSong(song1, songNotPaused, "")
-	page.checkPlaylist(joinSongs(song1, song2), 0, "")
+	page.checkSong(song1, songNotPaused)
+	page.checkPlaylist(joinSongs(song1, song2), playlistActive(0))
 
 	// Pausing and playing should work.
 	page.click(playPauseButton)
-	page.checkSong(song1, songPaused, "")
-	page.checkPlaylist(joinSongs(song1, song2), 0, "")
+	page.checkSong(song1, songPaused)
+	page.checkPlaylist(joinSongs(song1, song2), playlistActive(0))
 	page.click(playPauseButton)
-	page.checkSong(song1, songNotPaused, "")
+	page.checkSong(song1, songNotPaused)
 
 	// Clicking the 'next' button should go to the second song.
 	page.click(nextButton)
-	page.checkSong(song2, songNotPaused, "")
-	page.checkPlaylist(joinSongs(song1, song2), 1, "")
+	page.checkSong(song2, songNotPaused)
+	page.checkPlaylist(joinSongs(song1, song2), playlistActive(1))
 
 	// Clicking it again shouldn't do anything.
 	page.click(nextButton)
-	page.checkSong(song2, songNotPaused, "")
-	page.checkPlaylist(joinSongs(song1, song2), 1, "")
+	page.checkSong(song2, songNotPaused)
+	page.checkPlaylist(joinSongs(song1, song2), playlistActive(1))
 
 	// Clicking the 'prev' button should go back to the first song.
 	page.click(prevButton)
-	page.checkSong(song1, songNotPaused, "")
-	page.checkPlaylist(joinSongs(song1, song2), 0, "")
+	page.checkSong(song1, songNotPaused)
+	page.checkPlaylist(joinSongs(song1, song2), playlistActive(0))
 
 	// Clicking it again shouldn't do anything.
 	page.click(prevButton)
-	page.checkSong(song1, songNotPaused, "")
-	page.checkPlaylist(joinSongs(song1, song2), 0, "")
+	page.checkSong(song1, songNotPaused)
+	page.checkPlaylist(joinSongs(song1, song2), playlistActive(0))
 
 	// We should eventually play through to the second song.
-	page.checkSong(song2, songNotPaused, "")
-	page.checkPlaylist(joinSongs(song1, song2), 1, "")
+	page.checkSong(song2, songNotPaused)
+	page.checkPlaylist(joinSongs(song1, song2), playlistActive(1))
+}
+
+func TestContextMenu(t *testing.T) {
+	page := initWebTest(t)
+	song1 := newSong("a", "t1", "al", withTrack(1))
+	song2 := newSong("a", "t2", "al", withTrack(2))
+	song3 := newSong("a", "t3", "al", withTrack(3))
+	song4 := newSong("a", "t4", "al", withTrack(4))
+	song5 := newSong("a", "t5", "al", withTrack(5))
+	songs := joinSongs(song1, song2, song3, song4, song5)
+	tester.PostSongs(songs, true, 0)
+
+	page.setText(keywordsInput, song1.Album)
+	page.click(luckyButton)
+	page.checkSong(song1, songNotPaused)
+	page.checkPlaylist(songs, playlistActive(0))
+
+	page.rightClickPlaylistSong(3)
+	page.checkPlaylist(songs, playlistMenu(3))
+	page.click(menuPlay)
+	page.checkSong(song4, songNotPaused)
+	page.checkPlaylist(songs, playlistActive(3))
+
+	page.rightClickPlaylistSong(2)
+	page.checkPlaylist(songs, playlistMenu(2))
+	page.click(menuPlay)
+	page.checkSong(song3, songNotPaused)
+	page.checkPlaylist(songs, playlistActive(2))
+
+	page.rightClickPlaylistSong(0)
+	page.checkPlaylist(songs, playlistMenu(0))
+	page.click(menuRemove)
+	page.checkSong(song3, songNotPaused)
+	page.checkPlaylist(joinSongs(song2, song3, song4, song5), playlistActive(1))
+
+	page.rightClickPlaylistSong(1)
+	page.checkPlaylist(joinSongs(song2, song3, song4, song5), playlistMenu(1))
+	page.click(menuTruncate)
+	page.checkSong(song2, songPaused)
+	page.checkPlaylist(joinSongs(song2), playlistActive(0))
 }

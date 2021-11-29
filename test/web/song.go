@@ -137,7 +137,7 @@ func compareSongInfo(got songInfo, want db.Song, flags songFlags) bool {
 	return true
 }
 
-func compareSongInfos(got []songInfo, want []db.Song, checked []bool, active int) bool {
+func compareSongInfos(got []songInfo, want []db.Song, checked []bool, active, menu int) bool {
 	if len(got) != len(want) {
 		return false
 	}
@@ -156,6 +156,11 @@ func compareSongInfos(got []songInfo, want []db.Song, checked []bool, active int
 			} else {
 				flags |= songNotActive
 			}
+		}
+		if menu == i {
+			flags |= songMenu
+		} else {
+			flags |= songNoMenu
 		}
 	}
 	return true
