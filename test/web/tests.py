@@ -216,58 +216,6 @@ class Test(unittest.TestCase):
             self.fail('Timed out waiting for songs.\nReceived ' +
                       str(page.get_presentation_songs()))
 
-    def test_add_to_playlist(self):
-        song1 = Song('a', 't1', 'al1', 1)
-        song2 = Song('a', 't2', 'al1', 2)
-        song3 = Song('a', 't3', 'al2', 1)
-        song4 = Song('a', 't4', 'al2', 2)
-        song5 = Song('a', 't5', 'al3', 1)
-        song6 = Song('a', 't6', 'al3', 2)
-        server.import_songs([song1, song2, song3, song4, song5, song6])
-
-        page = Page(driver)
-        page.keywords = 'al1'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song1, song2])
-        page.click(page.APPEND_BUTTON)
-        self.wait_for_playlist(page, [song1, song2], 0)
-
-        # Pause so we don't advance through the playlist mid-test.
-        self.wait_for_song(page, song1, False)
-        page.click(page.PLAY_PAUSE_BUTTON)
-        self.wait_for_song(page, song1, True)
-
-        # Inserting should leave the current track paused.
-        page.keywords = 'al2'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song3, song4])
-        page.click(page.INSERT_BUTTON)
-        self.wait_for_playlist(page, [song1, song3, song4, song2], 0)
-        self.wait_for_song(page, song1, True)
-
-        # Replacing should result in the new first track being played.
-        page.keywords = 'al3'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song5, song6])
-        page.click(page.REPLACE_BUTTON)
-        self.wait_for_playlist(page, [song5, song6], 0)
-        self.wait_for_song(page, song5, False)
-
-        # Appending should leave the first track playing.
-        page.keywords = 'al1'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song1, song2])
-        page.click(page.APPEND_BUTTON)
-        self.wait_for_playlist(page, [song5, song6, song1, song2], 0)
-        self.wait_for_song(page, song5, False)
-
-        # The "I'm feeling lucky" button should replace the current playlist and
-        # start playing the new first song.
-        page.keywords = 'al2'
-        page.click(page.LUCKY_BUTTON)
-        self.wait_for_playlist(page, [song3, song4], 0)
-        self.wait_for_song(page, song3, False)
-
     def test_playback_buttons(self):
         song1 = Song('artist', 'track1', 'album', 1, filename=Song.FILE_5S)
         song2 = Song('artist', 'track2', 'album', 2, filename=Song.FILE_1S)

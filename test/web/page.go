@@ -37,6 +37,16 @@ func joinLocs(locs ...interface{}) []loc {
 var (
 	body = joinLocs(loc{selenium.ByTagName, "body"})
 
+	musicPlayer     = joinLocs(loc{selenium.ByTagName, "music-player"})
+	audio           = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "audio"})
+	artistDiv       = joinLocs(musicPlayer, loc{selenium.ByID, "artist"})
+	titleDiv        = joinLocs(musicPlayer, loc{selenium.ByID, "title"})
+	albumDiv        = joinLocs(musicPlayer, loc{selenium.ByID, "album"})
+	playPauseButton = joinLocs(musicPlayer, loc{selenium.ByID, "play-pause"})
+
+	playlistTable = joinLocs(musicPlayer, loc{selenium.ByID, "playlist"},
+		loc{selenium.ByCSSSelector, "table"})
+
 	musicSearcher      = joinLocs(loc{selenium.ByTagName, "music-searcher"})
 	keywordsInput      = joinLocs(musicSearcher, loc{selenium.ByID, "keywords-input"})
 	tagsInput          = joinLocs(musicSearcher, loc{selenium.ByID, "tags-input"})
@@ -48,6 +58,10 @@ var (
 	lastPlayedSelect   = joinLocs(musicSearcher, loc{selenium.ByID, "last-played-select"})
 	searchButton       = joinLocs(musicSearcher, loc{selenium.ByID, "search-button"})
 	resetButton        = joinLocs(musicSearcher, loc{selenium.ByID, "reset-button"})
+	luckyButton        = joinLocs(musicSearcher, loc{selenium.ByID, "lucky-button"})
+	appendButton       = joinLocs(musicSearcher, loc{selenium.ByID, "append-button"})
+	insertButton       = joinLocs(musicSearcher, loc{selenium.ByID, "insert-button"})
+	replaceButton      = joinLocs(musicSearcher, loc{selenium.ByID, "replace-button"})
 
 	searchResultsCheckbox = joinLocs(musicSearcher, loc{selenium.ByID, "results-table"},
 		loc{selenium.ByCSSSelector, `th input[type="checkbox"]`})
@@ -242,7 +256,7 @@ func (p *page) checkSearchResults(want []db.Song, checked []bool, desc string) {
 	table := p.getOrFail(searchResultsTable)
 	if err := wait(func() error {
 		got := p.getSongsFromTable(table)
-		if !compareSongInfos(got, want, checked) {
+		if !compareSongInfos(got, want, checked, -1) {
 			return errors.New("songs don't match")
 		}
 		return nil
@@ -262,6 +276,38 @@ func (p *page) checkSearchResults(want []db.Song, checked []bool, desc string) {
 			str := fmt.Sprintf("%q %q %q", s.Artist, s.Title, s.Album)
 			if checked != nil && checked[i] {
 				str += " checked"
+			}
+			msg += "  [" + str + "]\n"
+		}
+		p.t.Fatal(msg)
+	}
+}
+
+// checkPlaylist waits for the playlist table to contain the songs in want.
+func (p *page) checkPlaylist(want []db.Song, active int, desc string) {
+	table := p.getOrFail(playlistTable)
+	if err := wait(func() error {
+		got := p.getSongsFromTable(table)
+		if !compareSongInfos(got, want, nil, active) {
+			return errors.New("songs don't match")
+		}
+		return nil
+	}); err != nil {
+		got := p.getSongsFromTable(table)
+		msg := fmt.Sprintf("Bad playlist for %v", testInfo())
+		if desc != "" {
+			msg += fmt.Sprintf(" (%v)", desc)
+		}
+		msg += "\nGot:\n"
+		for _, s := range got {
+			msg += "  " + s.String() + "\n"
+		}
+		msg += "Want:\n"
+		for i, s := range want {
+			// This matches songInfo.String().
+			str := fmt.Sprintf("%q %q %q", s.Artist, s.Title, s.Album)
+			if active >= 0 && active == i {
+				str += " active"
 			}
 			msg += "  [" + str + "]\n"
 		}
@@ -307,19 +353,19 @@ func (p *page) clickOption(sel []loc, option string) {
 type checkboxState uint32
 
 const (
-	checked     checkboxState = 1 << iota
-	transparent               // has "transparent" class
+	checkboxChecked     checkboxState = 1 << iota
+	checkboxTransparent               // has "transparent" class
 )
 
 // checkCheckbox verifies that the checkbox element matched by locs has the specified state.
 // TODO: The "check" in this name is ambiguous.
 func (p *page) checkCheckbox(locs []loc, state checkboxState) {
 	el := p.getOrFail(locs)
-	if got, want := p.getSelectedOrFail(el, false), state&checked != 0; got != want {
+	if got, want := p.getSelectedOrFail(el, false), state&checkboxChecked != 0; got != want {
 		p.t.Fatalf("Checkbox %v has checked state %v for %v; want %v", locs, got, testInfo(), want)
 	}
 	class := p.getAttrOrFail(el, "class", false)
-	if got, want := strings.Contains(class, "transparent"), state&transparent != 0; got != want {
+	if got, want := strings.Contains(class, "transparent"), state&checkboxTransparent != 0; got != want {
 		p.t.Fatalf("Checkbox %v has transparent state %v for %v; want %v", locs, got, testInfo(), want)
 	}
 }
@@ -346,5 +392,46 @@ func (p *page) clickSearchResultsSongCheckbox(idx int, key string) {
 	}
 	if err := cb.Click(); err != nil {
 		p.t.Fatalf("Failed clicking checkbox %d for %v: %v", idx, testInfo(), err)
+	}
+}
+
+// checkSong verifies that the current song matches want.
+func (p *page) checkSong(want db.Song, flags songFlags, desc string) {
+	getSong := func() songInfo {
+		au := p.getOrFail(audio)
+		return songInfo{
+			artist: p.getTextOrFail(p.getOrFail(artistDiv), true),
+			title:  p.getTextOrFail(p.getOrFail(titleDiv), true),
+			album:  p.getTextOrFail(p.getOrFail(albumDiv), true),
+			paused: p.getAttrOrFail(au, "paused", true) != "",
+			ended:  p.getAttrOrFail(au, "ended", true) != "",
+			src:    p.getAttrOrFail(au, "src", true),
+		}
+	}
+
+	if err := wait(func() error {
+		got := getSong()
+		if !compareSongInfo(got, want, flags) {
+			return errors.New("songs don't match")
+		}
+		return nil
+	}); err != nil {
+		got := getSong()
+		msg := fmt.Sprintf("Bad song for %v", testInfo())
+		if desc != "" {
+			msg += fmt.Sprintf(" (%v)", desc)
+		}
+		msg += "\nGot: " + got.String() + "\n"
+		msg += "Want:  "
+		// This matches songInfo.String().
+		str := fmt.Sprintf("%q %q %q", want.Artist, want.Title, want.Album)
+		if flags&songEnded != 0 {
+			str += " ended"
+		}
+		if flags&songPaused != 0 {
+			str += " paused"
+		}
+		msg += "[" + str + "]\n"
+		p.t.Fatal(msg)
 	}
 }

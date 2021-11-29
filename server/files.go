@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/derat/nup/server/config"
 	"github.com/derat/nup/server/storage"
 
 	"google.golang.org/appengine/v2/log"
@@ -22,7 +23,7 @@ import (
 const maxFileRangeSize = maxResponseSize - 32*1024 // save space for headers
 
 // openSong opens the song at fn.
-func openSong(ctx context.Context, cfg *config, fn string) (io.ReadCloser, error) {
+func openSong(ctx context.Context, cfg *config.Config, fn string) (io.ReadCloser, error) {
 	if cfg.SongBucket != "" {
 		return storage.NewObjectReader(ctx, cfg.SongBucket, fn)
 	} else if cfg.SongBaseURL != "" {

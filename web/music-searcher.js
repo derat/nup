@@ -410,6 +410,7 @@ customElements.define(
         .then((res) => handleFetchError(res))
         .then((res) => res.json())
         .then((presets) => {
+          if (!presets) return;
           this.presets_ = presets;
           for (const p of presets) {
             const opt = document.createElement('option');

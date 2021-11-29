@@ -5,8 +5,6 @@
 package e2e
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/url"
@@ -18,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/derat/nup/server/config"
 	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/server/query"
 	"github.com/derat/nup/test"
@@ -51,25 +50,15 @@ func setUpTest() *test.Tester {
 	log.Printf("clearing all data on %v", server)
 	t.DoPost("clear", nil)
 	t.DoPost("flush_cache", nil)
-
-	// This corresponds to the config struct from server/config.go.
-	b, err := json.Marshal(struct {
-		SongBucket  string `json:"songBucket"`
-		CoverBucket string `json:"coverBucket"`
-	}{
+	t.SendConfig(&config.Config{
 		SongBucket:  songBucket,
 		CoverBucket: coverBucket,
 	})
-	if err != nil {
-		panic(err)
-	}
-	t.DoPost("config", bytes.NewBuffer(b))
-
 	return t
 }
 
 func cleanUpTest(t *test.Tester) {
-	t.DoPost("config", nil)
+	t.SendConfig(nil)
 	t.Close()
 }
 

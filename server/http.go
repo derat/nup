@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/derat/nup/server/auth"
+	"github.com/derat/nup/server/config"
 
 	"google.golang.org/appengine/v2"
 	"google.golang.org/appengine/v2/log"
@@ -42,14 +42,14 @@ func writeTextResponse(w http.ResponseWriter, s string) {
 // If the request is unauthorized and redirectToLogin is true, the client
 // is redirected to the login screen. Otherwise, an appropriate error is
 // written to w.
-func checkRequest(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request,
+func checkRequest(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request,
 	method string, redirectToLogin bool) bool {
-	username, allowed := auth.HasAllowedGoogleAuth(ctx, cfg.GoogleUsers)
+	username, allowed := cfg.HasAllowedGoogleAuth(ctx)
 	if !allowed && len(username) == 0 {
-		username, allowed = auth.HasAllowedBasicAuth(r, cfg.BasicAuthUsers)
+		username, allowed = cfg.HasAllowedBasicAuth(r)
 	}
 	// Ugly hack since WebDriver doesn't support basic auth.
-	if !allowed && appengine.IsDevAppServer() && auth.HasWebDriverCookie(r) {
+	if !allowed && appengine.IsDevAppServer() && config.RequestHasWebDriverCookie(r) {
 		allowed = true
 	}
 	if !allowed {
@@ -75,7 +75,7 @@ func checkRequest(ctx context.Context, cfg *config, w http.ResponseWriter, r *ht
 }
 
 // handlerFunc handles HTTP requests to a single endpoint.
-type handlerFunc func(ctx context.Context, cfg *config, w http.ResponseWriter, r *http.Request)
+type handlerFunc func(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request)
 
 // addHandler registers fn to handle HTTP requests to the specified path.
 // Requests are verified to come from an authorized user and use the specified HTTP method before
@@ -84,7 +84,7 @@ type handlerFunc func(ctx context.Context, cfg *config, w http.ResponseWriter, r
 func addHandler(path, method string, redirectToLogin bool, fn handlerFunc) {
 	http.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		ctx := appengine.NewContext(r)
-		cfg := getConfig(ctx)
+		cfg := config.GetConfig(ctx)
 		if !checkRequest(ctx, cfg, w, r, method, redirectToLogin) {
 			return
 		}

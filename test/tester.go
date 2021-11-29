@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -18,7 +19,7 @@ import (
 	"time"
 
 	"github.com/derat/nup/client"
-	"github.com/derat/nup/server/auth"
+	"github.com/derat/nup/server/config"
 	"github.com/derat/nup/server/db"
 )
 
@@ -82,6 +83,7 @@ func NewTester(serverURL, binDir string) *Tester {
 	var err error
 	t.TempDir, err = ioutil.TempDir("", "nup_test.")
 	if err != nil {
+		// TODO: Switch this and other panics to log.Fatal.
 		panic(err)
 	}
 	t.MusicDir = filepath.Join(t.TempDir, "music")
@@ -114,8 +116,8 @@ func NewTester(serverURL, binDir string) *Tester {
 	}{
 		Config: client.Config{
 			ServerURL: t.serverURL,
-			Username:  auth.TestUsername,
-			Password:  auth.TestPassword,
+			Username:  config.TestUsername,
+			Password:  config.TestPassword,
 		},
 		CoverDir:           t.CoverDir,
 		MusicDir:           t.MusicDir,
@@ -125,8 +127,8 @@ func NewTester(serverURL, binDir string) *Tester {
 
 	t.dumpConfigFile = writeConfig("dump_config.json", client.Config{
 		ServerURL: t.serverURL,
-		Username:  auth.TestUsername,
-		Password:  auth.TestPassword,
+		Username:  config.TestUsername,
+		Password:  config.TestPassword,
 	})
 
 	return t
@@ -135,6 +137,19 @@ func NewTester(serverURL, binDir string) *Tester {
 // Close deletes temporary files created by the test.
 func (t *Tester) Close() {
 	os.RemoveAll(t.TempDir)
+}
+
+// SendConfig sends cfg to the server.
+// If cfg is nil, the server's config is cleared.
+func (t *Tester) SendConfig(cfg *config.Config) {
+	var b []byte
+	if cfg != nil {
+		var err error
+		if b, err = json.Marshal(cfg); err != nil {
+			log.Fatal("Failed marshaling config: ", err)
+		}
+	}
+	t.DoPost("config", bytes.NewBuffer(b))
 }
 
 type StripPolicy int // controls whether DumpSongs removes data from songs
@@ -224,7 +239,7 @@ func (t *Tester) newRequest(method, path string, body io.Reader) *http.Request {
 	if err != nil {
 		panic(err)
 	}
-	req.SetBasicAuth(auth.TestUsername, auth.TestPassword)
+	req.SetBasicAuth(config.TestUsername, config.TestPassword)
 	return req
 }
 

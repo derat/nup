@@ -12,11 +12,12 @@ import (
 
 func newSong(artist, title, album string, opts ...songOpt) db.Song {
 	s := db.Song{
-		Artist:  artist,
-		Title:   title,
-		Album:   album,
-		SHA1:    fmt.Sprintf("%s-%s-%s", artist, title, album),
-		AlbumID: artist + "-" + album,
+		Artist:   artist,
+		Title:    title,
+		Album:    album,
+		SHA1:     fmt.Sprintf("%s-%s-%s", artist, title, album),
+		AlbumID:  artist + "-" + album,
+		Filename: "10s.mp3", // TODO: add 10s.mp3 to ../songs.go
 	}
 	for _, opt := range opts {
 		opt(&s)
@@ -26,10 +27,11 @@ func newSong(artist, title, album string, opts ...songOpt) db.Song {
 
 type songOpt func(*db.Song)
 
-func withDisc(d int) songOpt       { return func(s *db.Song) { s.Disc = d } }
-func withRating(r float64) songOpt { return func(s *db.Song) { s.Rating = r } }
-func withTags(t ...string) songOpt { return func(s *db.Song) { s.Tags = t } }
-func withTrack(t int) songOpt      { return func(s *db.Song) { s.Track = t } }
+func withDisc(d int) songOpt        { return func(s *db.Song) { s.Disc = d } }
+func withFilename(f string) songOpt { return func(s *db.Song) { s.Filename = f } }
+func withRating(r float64) songOpt  { return func(s *db.Song) { s.Rating = r } }
+func withTags(t ...string) songOpt  { return func(s *db.Song) { s.Tags = t } }
+func withTrack(t int) songOpt       { return func(s *db.Song) { s.Track = t } }
 func withPlays(times ...int64) songOpt {
 	return func(s *db.Song) {
 		for _, t := range times {
@@ -56,35 +58,85 @@ func joinSongs(songs ...interface{}) []db.Song {
 // songInfo contains information about a song in the web interface.
 type songInfo struct {
 	artist, title, album  string
-	active, checked, menu bool
+	active, checked, menu bool // song row is active, checked, or has context menu
+	paused, ended         bool // audio element is paused or ended
+	src                   string
 }
 
 func (s songInfo) String() string {
 	str := fmt.Sprintf("%q %q %q", s.artist, s.title, s.album)
-	if s.active {
-		str += " active"
-	}
-	if s.checked {
-		str += " checked"
-	}
-	if s.menu {
-		str += " menu"
+	for _, f := range []struct {
+		name string
+		val  bool
+	}{
+		{"active", s.active},
+		{"checked", s.checked},
+		{"ended", s.ended},
+		{"menu", s.menu},
+		{"paused", s.paused},
+	} {
+		if f.val {
+			str += " " + f.name
+		}
 	}
 	return "[" + str + "]"
 }
 
-func compareSongInfos(got []songInfo, want []db.Song, checked []bool) bool {
+type songFlags uint32
+
+const (
+	songActive songFlags = 1 << iota
+	songNotActive
+	songChecked
+	songNotChecked
+	songEnded
+	songNotEnded
+	songMenu
+	songNoMenu
+	songPaused
+	songNotPaused
+)
+
+func compareSongInfo(got songInfo, want db.Song, flags songFlags) bool {
+	if got.artist != want.Artist || got.title != want.Title || got.album != want.Album {
+		return false
+	}
+	for _, f := range []struct {
+		pos, neg songFlags
+		val      bool
+	}{
+		{songActive, songNotActive, got.active},
+		{songChecked, songNotChecked, got.checked},
+		{songEnded, songNotEnded, got.ended},
+		{songMenu, songNoMenu, got.menu},
+		{songPaused, songNotPaused, got.paused},
+	} {
+		if (flags&f.pos != 0 && !f.val) || (flags&f.neg != 0 && f.val) {
+			return false
+		}
+	}
+	return true
+}
+
+func compareSongInfos(got []songInfo, want []db.Song, checked []bool, active int) bool {
 	if len(got) != len(want) {
 		return false
 	}
 	for i := range got {
-		if got[i].artist != want[i].Artist ||
-			got[i].title != want[i].Title ||
-			got[i].album != want[i].Album {
-			return false
+		var flags songFlags
+		if checked != nil {
+			if checked[i] {
+				flags |= songChecked
+			} else {
+				flags |= songNotChecked
+			}
 		}
-		if checked != nil && got[i].checked != checked[i] {
-			return false
+		if active >= 0 {
+			if active == i {
+				flags |= songActive
+			} else {
+				flags |= songNotActive
+			}
 		}
 	}
 	return true

@@ -1,21 +1,29 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-package main
+// Package config contains types and constants related to server configuration.
+package config
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"os"
 
 	"google.golang.org/appengine/v2"
 	"google.golang.org/appengine/v2/datastore"
-
-	"github.com/derat/nup/server/auth"
+	"google.golang.org/appengine/v2/user"
 )
 
 const (
+	// TestUsername and TestPassword are accepted for basic HTTP authentication by development servers.
+	TestUsername = "testuser"
+	TestPassword = "testpass"
+
+	// WebDriverCookie is set by web tests to skip authentication.
+	WebDriverCookie = "webdriver"
+
 	// Config file path relative to base directory.
 	configPath = "config.json"
 
@@ -24,8 +32,17 @@ const (
 	configKeyID = "config"
 )
 
-// searchPreset specifies a search preset to display in the web interface.
-type searchPreset struct {
+// Singleton loaded from disk by LoadConfig().
+var baseCfg *Config
+
+// BasicAuthInfo contains information used for validating HTTP basic authentication.
+type BasicAuthInfo struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// SearchPreset specifies a search preset to display in the web interface.
+type SearchPreset struct {
 	// Name contains a human-readable name to display in the interface.
 	Name string `json:"name"`
 	// Tags contains a space-separated tag expression, e.g. "guitar -banjo".
@@ -58,8 +75,8 @@ type searchPreset struct {
 	Play bool `json:"play"`
 }
 
-// config holds the App Engine server's configuration.
-type config struct {
+// Config holds the App Engine server's configuration.
+type Config struct {
 	// ProjectID is the Google Cloud project ID.
 	ProjectID string `json:"projectId"`
 
@@ -69,7 +86,7 @@ type config struct {
 
 	// BasicAuthUsers contains for accounts using HTTP basic authentication
 	// (i.e. command-line tools or the Android client).
-	BasicAuthUsers []auth.BasicAuthInfo `json:"basicAuthUsers"`
+	BasicAuthUsers []BasicAuthInfo `json:"basicAuthUsers"`
 
 	// SongBucket contains the name of the Google Cloud Storage bucket holding song files.
 	SongBucket string `json:"songBucket"`
@@ -84,21 +101,58 @@ type config struct {
 	CoverBaseURL string `json:"coverBaseUrl"`
 
 	// Presets describes search presets for the web interface.
-	Presets []searchPreset `json:"presets"`
+	Presets []SearchPreset `json:"presets"`
 
 	// ForceUpdateFailures is set by tests to indicate that failure be reported
 	// for all user data updates (ratings, tags, plays). Ignored for non-development servers.
 	ForceUpdateFailures bool `json:"forceUpdateFailures"`
 }
 
-// Singleton loaded from disk by loadConfig().
-var baseCfg *config
+// HasAllowedGoogleAuth checks whether ctx contains credentials for an authorized Google user.
+func (cfg *Config) HasAllowedGoogleAuth(ctx context.Context) (email string, allowed bool) {
+	u := user.Current(ctx)
+	if u == nil {
+		return "", false
+	}
 
-func addTestUserToConfig(cfg *config) {
-	cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, auth.BasicAuthInfo{
-		Username: auth.TestUsername,
-		Password: auth.TestPassword,
+	for _, e := range cfg.GoogleUsers {
+		if u.Email == e {
+			return u.Email, true
+		}
+	}
+	return u.Email, false
+}
+
+// HasAllowedBasicAuth checks whether r is authorized via HTTP basic
+// authentication with a username and password. If basic auth was used in r,
+// the username return value is set regardless of the user is actually allowed or not.
+func (cfg *Config) HasAllowedBasicAuth(r *http.Request) (username string, allowed bool) {
+	username, password, ok := r.BasicAuth()
+	if !ok {
+		return "", false
+	}
+	for _, u := range cfg.BasicAuthUsers {
+		if username == u.Username && password == u.Password {
+			return username, true
+		}
+	}
+	return username, false
+}
+
+func (cfg *Config) AddTestUser() {
+	cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, BasicAuthInfo{
+		Username: TestUsername,
+		Password: TestPassword,
 	})
+}
+
+// RequestHasWebDriverCookie returns true if r contains a special cookie set by browser
+// tests that use WebDriver.
+func RequestHasWebDriverCookie(r *http.Request) bool {
+	if _, err := r.Cookie(WebDriverCookie); err != nil {
+		return false
+	}
+	return true
 }
 
 // cleanBaseURL appends a trailing slash to u if not already present.
@@ -109,16 +163,16 @@ func cleanBaseURL(u *string) {
 	}
 }
 
-// loadConfig loads the server configuration from disk.
+// LoadConfig loads the server configuration from disk.
 // It should be called once at the start of main().
-func loadConfig() error {
+func LoadConfig() error {
 	f, err := os.Open(configPath)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	var cfg config
+	var cfg Config
 	dec := json.NewDecoder(f)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&cfg); err != nil {
@@ -141,7 +195,7 @@ func loadConfig() error {
 	}
 
 	if appengine.IsDevAppServer() {
-		addTestUserToConfig(baseCfg)
+		baseCfg.AddTestUser()
 	}
 	return nil
 }
@@ -150,10 +204,10 @@ func testConfigKey(ctx context.Context) *datastore.Key {
 	return datastore.NewKey(ctx, configKind, configKeyID, 0, nil)
 }
 
-// getConfig returns the currently-in-use config.
-func getConfig(ctx context.Context) *config {
+// GetConfig returns the currently-in-use Config.
+func GetConfig(ctx context.Context) *Config {
 	if appengine.IsDevAppServer() {
-		var testCfg config
+		var testCfg Config
 		if err := datastore.Get(ctx, testConfigKey(ctx), &testCfg); err == nil {
 			return &testCfg
 		} else if err != datastore.ErrNoSuchEntity {
@@ -162,18 +216,18 @@ func getConfig(ctx context.Context) *config {
 	}
 
 	if baseCfg == nil {
-		panic("loadConfig() not called")
+		panic("LoadConfig() not called")
 	}
 	return baseCfg
 }
 
-func saveTestConfig(ctx context.Context, cfg *config) {
+func SaveTestConfig(ctx context.Context, cfg *Config) {
 	if _, err := datastore.Put(ctx, testConfigKey(ctx), cfg); err != nil {
 		panic(err)
 	}
 }
 
-func clearTestConfig(ctx context.Context) {
+func ClearTestConfig(ctx context.Context) {
 	if err := datastore.Delete(ctx, testConfigKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
 		panic(err)
 	}
