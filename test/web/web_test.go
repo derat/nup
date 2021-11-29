@@ -27,6 +27,7 @@ const (
 	serverURL        = "http://localhost:8080/"
 )
 
+// Globals shared across all tests.
 var wd selenium.WebDriver
 var tester *test.Tester
 
@@ -57,8 +58,7 @@ func TestMain(m *testing.M) {
 		defer tester.Close()
 
 		// Serve music files in the background.
-		// TODO: Add 10s.mp3 to ../songs.go.
-		test.CopySongs(tester.MusicDir, test.Song1s.Filename, test.Song5s.Filename, "10s.mp3")
+		test.CopySongs(tester.MusicDir, song1s.Filename, song5s.Filename, song10s.Filename)
 		fs := http.FileServer(http.Dir(tester.MusicDir))
 		ms := &http.Server{
 			Addr: musicServerAddr,
@@ -371,4 +371,48 @@ func TestAddToPlaylist(t *testing.T) {
 	page.click(luckyButton)
 	page.checkPlaylist(joinSongs(song3, song4), 0, "")
 	page.checkSong(song3, songNotPaused, "")
+}
+
+func TestPlaybackButtons(t *testing.T) {
+	page := initWebTest(t)
+	song1 := newSong("artist", "track1", "album", withTrack(1), withFilename(song5s.Filename))
+	song2 := newSong("artist", "track2", "album", withTrack(2), withFilename(song1s.Filename))
+	tester.PostSongs(joinSongs(song1, song2), true, 0)
+
+	// We should start playing automatically when the 'lucky' button is clicked.
+	page.setText(keywordsInput, song1.Artist)
+	page.click(luckyButton)
+	page.checkSong(song1, songNotPaused, "")
+	page.checkPlaylist(joinSongs(song1, song2), 0, "")
+
+	// Pausing and playing should work.
+	page.click(playPauseButton)
+	page.checkSong(song1, songPaused, "")
+	page.checkPlaylist(joinSongs(song1, song2), 0, "")
+	page.click(playPauseButton)
+	page.checkSong(song1, songNotPaused, "")
+
+	// Clicking the 'next' button should go to the second song.
+	page.click(nextButton)
+	page.checkSong(song2, songNotPaused, "")
+	page.checkPlaylist(joinSongs(song1, song2), 1, "")
+
+	// Clicking it again shouldn't do anything.
+	page.click(nextButton)
+	page.checkSong(song2, songNotPaused, "")
+	page.checkPlaylist(joinSongs(song1, song2), 1, "")
+
+	// Clicking the 'prev' button should go back to the first song.
+	page.click(prevButton)
+	page.checkSong(song1, songNotPaused, "")
+	page.checkPlaylist(joinSongs(song1, song2), 0, "")
+
+	// Clicking it again shouldn't do anything.
+	page.click(prevButton)
+	page.checkSong(song1, songNotPaused, "")
+	page.checkPlaylist(joinSongs(song1, song2), 0, "")
+
+	// We should eventually play through to the second song.
+	page.checkSong(song2, songNotPaused, "")
+	page.checkPlaylist(joinSongs(song1, song2), 1, "")
 }

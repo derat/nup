@@ -85,6 +85,19 @@ var Song5s = db.Song{
 	Rating:    -1,
 }
 
+var Song10s = db.Song{
+	SHA1:      "dfc21dbdf2056184fa3bbe9688a2050f8f2c5dff",
+	Filename:  "10s.mp3",
+	Artist:    "Boring Artist",
+	Title:     "Ten Seconds",
+	Album:     "Music for Waiting Rooms",
+	Length:    10.031,
+	TrackGain: TrackGain,
+	AlbumGain: AlbumGain,
+	PeakAmp:   PeakAmp,
+	Rating:    -1,
+}
+
 var ID3V1Song = db.Song{
 	SHA1:      "fefac74a1d5928316d7131747107c8a61b71ffe4",
 	Filename:  "id3v1.mp3",

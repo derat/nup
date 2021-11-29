@@ -42,7 +42,9 @@ var (
 	artistDiv       = joinLocs(musicPlayer, loc{selenium.ByID, "artist"})
 	titleDiv        = joinLocs(musicPlayer, loc{selenium.ByID, "title"})
 	albumDiv        = joinLocs(musicPlayer, loc{selenium.ByID, "album"})
+	prevButton      = joinLocs(musicPlayer, loc{selenium.ByID, "prev"})
 	playPauseButton = joinLocs(musicPlayer, loc{selenium.ByID, "play-pause"})
+	nextButton      = joinLocs(musicPlayer, loc{selenium.ByID, "next"})
 
 	playlistTable = joinLocs(musicPlayer, loc{selenium.ByID, "playlist"},
 		loc{selenium.ByCSSSelector, "table"})

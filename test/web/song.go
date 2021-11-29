@@ -8,6 +8,15 @@ import (
 	"time"
 
 	"github.com/derat/nup/server/db"
+	"github.com/derat/nup/test"
+)
+
+var (
+	// Pull some stuff into our namespace for convenience.
+	song0s  = test.Song0s
+	song1s  = test.Song1s
+	song5s  = test.Song5s
+	song10s = test.Song10s
 )
 
 func newSong(artist, title, album string, opts ...songOpt) db.Song {
@@ -17,10 +26,18 @@ func newSong(artist, title, album string, opts ...songOpt) db.Song {
 		Album:    album,
 		SHA1:     fmt.Sprintf("%s-%s-%s", artist, title, album),
 		AlbumID:  artist + "-" + album,
-		Filename: "10s.mp3", // TODO: add 10s.mp3 to ../songs.go
+		Filename: song10s.Filename,
 	}
 	for _, opt := range opts {
 		opt(&s)
+	}
+	// Gross hack: infer the length from the filename.
+	if s.Length == 0 {
+		for _, ks := range []db.Song{song0s, song1s, song5s, song10s} {
+			if s.Filename == ks.Filename {
+				s.Length = ks.Length
+			}
+		}
 	}
 	return s
 }
@@ -29,9 +46,11 @@ type songOpt func(*db.Song)
 
 func withDisc(d int) songOpt        { return func(s *db.Song) { s.Disc = d } }
 func withFilename(f string) songOpt { return func(s *db.Song) { s.Filename = f } }
+func withLength(l float64) songOpt  { return func(s *db.Song) { s.Length = l } }
 func withRating(r float64) songOpt  { return func(s *db.Song) { s.Rating = r } }
 func withTags(t ...string) songOpt  { return func(s *db.Song) { s.Tags = t } }
 func withTrack(t int) songOpt       { return func(s *db.Song) { s.Track = t } }
+
 func withPlays(times ...int64) songOpt {
 	return func(s *db.Song) {
 		for _, t := range times {
