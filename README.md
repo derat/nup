@@ -151,25 +151,31 @@ discussion.
 ## Development and testing
 
 First, from the base directory, run the `./dev.sh` script. This starts a local
-development App Engine instance listening at `http://localhost:8080`.
+development App Engine instance listening at `http://localhost:8080/`.
 
 *   End-to-end Go tests that exercise the App Engine server and the `dump_music`
     and `update_music` commands can be run from the `test/e2e/` directory via
     `go test`.
-*   Selenium tests that exercise both the web client and the server can be run
-    from the `test/web/` directory via `./tests.py`. The `run_tests_in_xvfb.sh`
-    script can be used to run test headlessly using [Xvfb].
+*   [Selenium] Go tests that exercise both the web interface (in Chrome) and the
+    server can be run from the `test/web/` directory via `go test`. By default,
+    Chrome runs headlessly using [Xvfb]. Run `go test -args -help` to see
+    available flags.
 *   For development, you can import example data and start a file server by
     running `./import_to_devserver.sh` in the `test/example/` directory. Use
     `test@example.com` to log in.
 
-Go unit tests can be executed by running the following from the root of this
-repository:
+All Go tests (including unit tests) can be executed by running the following
+from the root of this repository:
 
 ```sh
-go test ./...
+go test -p 1 ./...
 ```
 
+The tests in `test/e2e/` and `test/web/` both make use of the dev App Engine
+instance, so `-p 1` is needed to prevent them from running simultaneously. See
+`go help build` for more about the `-p` flag.
+
+[Selenium]: https://www.selenium.dev/
 [Xvfb]: https://en.wikipedia.org/wiki/Xvfb
 
 ## Merging songs
