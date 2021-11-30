@@ -216,68 +216,6 @@ class Test(unittest.TestCase):
             self.fail('Timed out waiting for songs.\nReceived ' +
                       str(page.get_presentation_songs()))
 
-    def test_options(self):
-        page = Page(driver)
-        page.show_options()
-
-        def get_gain_type():
-            return page.get(page.GAIN_TYPE_SELECT).get_attribute('value')
-        def get_pre_amp():
-            return page.get(page.PRE_AMP_RANGE).get_attribute('value')
-
-        self.assertEqual(get_gain_type(), page.GAIN_ALBUM)
-        page.select(page.GAIN_TYPE_SELECT, value=page.GAIN_TRACK)
-        self.assertEqual(get_gain_type(), page.GAIN_TRACK)
-
-        # I *think* that this clicks the middle of the range. This might be a
-        # no-op since it should be 0, which is the default. :-/
-        page.get(page.PRE_AMP_RANGE).click()
-        orig_pre_amp = get_pre_amp()
-
-        page.click(page.OPTIONS_OK_BUTTON)
-        page.wait_until_gone(page.OPTIONS_OK_BUTTON)
-
-        # Escape should dismiss the dialog.
-        page.show_options()
-        ESCAPE = u'\ue00c'
-        page.get(page.BODY).send_keys(ESCAPE)
-        page.wait_until_gone(page.OPTIONS_OK_BUTTON)
-
-        # Now that we're using GainNode instead of setting the <audio> element's
-        # volume, I'm not sure how to check that the setting was actually
-        # applied. Just check that it was saved, since that seems better than
-        # nothing.
-        page.reload()
-        page.show_options()
-        self.assertEqual(get_gain_type(), page.GAIN_TRACK)
-        self.assertEqual(get_pre_amp(), orig_pre_amp)
-        page.click(page.OPTIONS_OK_BUTTON)
-
-    def test_presets(self):
-        song1 = Song('a', 't1', 'unrated')
-        song2 = Song('a', 't1', 'new', rating=0.25, track=1, disc=1,
-                     plays=[(time.time(), '')])
-        song3 = Song('a', 't2', 'new', rating=1.0, track=2, disc=1,
-                     plays=[(time.time(), '')])
-        song4 = Song('a', 't1', 'old', rating=0.75, plays=[(1, '')])
-        song5 = Song('a', 't2', 'old', rating=0.75, tags=['instrumental'],
-                     plays=[(1, '')])
-        song6 = Song('a', 't1', 'mellow', rating=0.75, tags=['mellow'])
-        server.import_songs([song1, song2, song3, song4, song5, song6])
-
-        page = Page(driver)
-        page.select(page.PRESET_SELECT, text=page.PRESET_INSTRUMENTAL_OLD)
-        self.wait_for_song(page, song5)
-        page.select(page.PRESET_SELECT, text=page.PRESET_MELLOW)
-        self.wait_for_song(page, song6)
-        page.select(page.PRESET_SELECT, text=page.PRESET_NEW_ALBUMS)
-        self.wait_for_search_results(page, [song2])
-        page.select(page.PRESET_SELECT, text=page.PRESET_UNRATED)
-        self.wait_for_song(page, song1)
-
-        if page.is_focused(page.PRESET_SELECT):
-            self.fail('Preset select still focused after click')
-
     def test_presentation(self):
         song1 = Song('artist', 'track1', 'album1', track=1, filename=Song.FILE_5S)
         song2 = Song('artist', 'track2', 'album1', track=2, filename=Song.FILE_5S)

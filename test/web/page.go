@@ -37,12 +37,16 @@ func joinLocs(locs ...interface{}) []loc {
 }
 
 var (
-	body = joinLocs(loc{selenium.ByTagName, "body"})
-
 	overlayManager = joinLocs(loc{selenium.ByTagName, "overlay-manager"})
-	menuPlay       = joinLocs(overlayManager, loc{selenium.ByID, "play"})
-	menuRemove     = joinLocs(overlayManager, loc{selenium.ByID, "remove"})
-	menuTruncate   = joinLocs(overlayManager, loc{selenium.ByID, "truncate"})
+
+	optionsDialog   = joinLocs(overlayManager, loc{selenium.ByCSSSelector, ".dialog"})
+	optionsOKButton = joinLocs(optionsDialog, loc{selenium.ByID, "ok-button"})
+	gainTypeSelect  = joinLocs(optionsDialog, loc{selenium.ByID, "gain-type-select"})
+	preAmpRange     = joinLocs(optionsDialog, loc{selenium.ByID, "pre-amp-range"})
+
+	menuPlay     = joinLocs(overlayManager, loc{selenium.ByID, "play"})
+	menuRemove   = joinLocs(overlayManager, loc{selenium.ByID, "remove"})
+	menuTruncate = joinLocs(overlayManager, loc{selenium.ByID, "truncate"})
 
 	musicPlayer       = joinLocs(loc{selenium.ByTagName, "music-player"})
 	audio             = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "audio"})
@@ -76,6 +80,7 @@ var (
 	maxPlaysInput      = joinLocs(musicSearcher, loc{selenium.ByID, "max-plays-input"})
 	firstPlayedSelect  = joinLocs(musicSearcher, loc{selenium.ByID, "first-played-select"})
 	lastPlayedSelect   = joinLocs(musicSearcher, loc{selenium.ByID, "last-played-select"})
+	presetSelect       = joinLocs(musicSearcher, loc{selenium.ByID, "preset-select"})
 	searchButton       = joinLocs(musicSearcher, loc{selenium.ByID, "search-button"})
 	resetButton        = joinLocs(musicSearcher, loc{selenium.ByID, "reset-button"})
 	luckyButton        = joinLocs(musicSearcher, loc{selenium.ByID, "lucky-button"})
@@ -107,6 +112,21 @@ const (
 	oneYear     = "one year"
 	threeYears  = "three years"
 	fiveYears   = "five years"
+
+	// Text and values for gainTypeSelect options.
+	gainAlbum      = "Album"
+	gainTrack      = "Track"
+	gainNone       = "None"
+	gainAlbumValue = "0"
+	gainTrackValue = "1"
+	gainNoneValue  = "2"
+
+	// Text for presetSelect options.
+	// These match the presets defined in sendConfig() in web_test.go.
+	presetInstrumentalOld = "instrumental old"
+	presetMellow          = "mellow"
+	presetNewAlbums       = "new albums"
+	presetUnrated         = "unrated"
 )
 
 // isMissingAttrError returns true if err was returned by calling
@@ -226,6 +246,19 @@ func (p *page) getNoWait(locs []loc, base selenium.WebElement) (selenium.WebElem
 		return nil, err
 	}
 	return p.wd.DecodeElement(res)
+}
+
+// checkGone waits for the element described by locs to disappear.
+func (p *page) checkGone(locs []loc) {
+	if err := wait(func() error {
+		_, err := p.getNoWait(locs, nil)
+		if err == nil {
+			return errors.New("still exists")
+		}
+		return nil
+	}); err != nil {
+		p.t.Fatalf("Failed waiting for element to disappear for %v: %v", p.desc(), err)
+	}
 }
 
 // getTextOrFail returns el's text, failing the test on error.
@@ -402,6 +435,18 @@ func (p *page) setText(locs []loc, text string) {
 	p.sendKeys(locs, text, true /* clearFirst */)
 }
 
+// emitKeyDown emits a 'keydown' JavaScript event with the supplied data.
+// This avoids the ChromeDriver bug described in sendKeys.
+func (p *page) emitKeyDown(key string, keyCode int, alt bool) {
+	s := fmt.Sprintf(
+		"document.body.dispatchEvent("+
+			"new KeyboardEvent('keydown', { key: '%s', keyCode: %d, altKey: %v }))",
+		key, keyCode, alt)
+	if _, err := p.wd.ExecuteScript(s, nil); err != nil {
+		p.t.Fatalf("Failed emitting %q key down event for %v: %v", key, p.desc(), err)
+	}
+}
+
 // click clicks on the element matched by locs.
 func (p *page) click(locs []loc) {
 	if err := p.getOrFail(locs).Click(); err != nil {
@@ -424,6 +469,11 @@ func (p *page) clickOption(sel []loc, option string) {
 		}
 	}
 	p.t.Fatalf("Failed finding %v option %q for %v: %v", sel, option, p.desc(), err)
+}
+
+// getAttr returns the current value of attr from the element matched by locs.
+func (p *page) getAttr(locs []loc, attr string) string {
+	return p.getAttrOrFail(p.getOrFail(locs), attr, false)
 }
 
 // checkText checks that text of the element matched by locs is matched by want.

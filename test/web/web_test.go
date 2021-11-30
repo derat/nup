@@ -135,6 +135,33 @@ func sendConfig(p updatePolicy) {
 		SongBaseURL:         fmt.Sprintf("http://%s/", musicServerAddr),
 		CoverBaseURL:        "",
 		ForceUpdateFailures: bool(p),
+		Presets: []config.SearchPreset{
+			{
+				Name:       "instrumental old",
+				Tags:       "instrumental",
+				MinRating:  4,
+				LastPlayed: 6,
+				Shuffle:    true,
+				Play:       true,
+			},
+			{
+				Name:      "mellow",
+				Tags:      "mellow",
+				MinRating: 4,
+				Shuffle:   true,
+				Play:      true,
+			},
+			{
+				Name:        "new albums",
+				FirstPlayed: 3,
+				FirstTrack:  true,
+			},
+			{
+				Name:    "unrated",
+				Unrated: true,
+				Play:    true,
+			},
+		},
 	})
 }
 
@@ -318,8 +345,9 @@ func TestFirstTrackQuery(t *testing.T) {
 
 func TestMaxPlaysQuery(t *testing.T) {
 	page := initWebTest(t)
-	song1 := newSong("ar1", "ti1", "al1", withPlays(1, 2))
-	song2 := newSong("ar2", "ti2", "al2", withPlays(1, 2, 3))
+	t1, t2, t3 := time.Unix(1, 0), time.Unix(2, 0), time.Unix(3, 0)
+	song1 := newSong("ar1", "ti1", "al1", withPlays(t1, t2))
+	song2 := newSong("ar2", "ti2", "al2", withPlays(t1, t2, t3))
 	song3 := newSong("ar3", "ti3", "al3")
 	importSongs(song1, song2, song3)
 
@@ -340,11 +368,9 @@ func TestMaxPlaysQuery(t *testing.T) {
 
 func TestPlayTimeQuery(t *testing.T) {
 	page := initWebTest(t)
-
-	const day = 86400
-	now := time.Now().Unix()
-	song1 := newSong("ar1", "ti1", "al1", withPlays(now-5*day))
-	song2 := newSong("ar2", "ti2", "al2", withPlays(now-90*day))
+	now := time.Now()
+	song1 := newSong("ar1", "ti1", "al1", withPlays(now.Add(-5*24*time.Hour)))
+	song2 := newSong("ar2", "ti2", "al2", withPlays(now.Add(-90*24*time.Hour)))
 	importSongs(song1, song2)
 
 	for _, tc := range []struct {
@@ -752,4 +778,62 @@ func TestEditTagsAutocomplete(t *testing.T) {
 
 	page.sendKeys(editTagsTextarea, "1"+selenium.TabKey, false)
 	page.checkAttr(editTagsTextarea, "value", "a0 a1 b d c1 ")
+}
+
+func TestOptions(t *testing.T) {
+	page := initWebTest(t)
+	showOptions := func() { page.emitKeyDown("o", 79, true /* alt */) }
+
+	showOptions()
+	page.checkAttr(gainTypeSelect, "value", gainAlbumValue)
+	page.clickOption(gainTypeSelect, gainTrack)
+	page.checkAttr(gainTypeSelect, "value", gainTrackValue)
+
+	// I *think* that this clicks the middle of the range. This might be a
+	// no-op since it should be 0, which is the default. :-/
+	page.click(preAmpRange)
+	origPreAmp := page.getAttr(preAmpRange, "value")
+
+	page.click(optionsOKButton)
+	page.checkGone(optionsOKButton)
+
+	// Escape should dismiss the dialog.
+	showOptions()
+	page.sendKeys(optionsOKButton, selenium.EscapeKey, false)
+	page.checkGone(optionsOKButton)
+
+	page.reload()
+	showOptions()
+	page.checkAttr(gainTypeSelect, "value", gainTrackValue)
+	page.checkAttr(preAmpRange, "value", origPreAmp)
+	page.click(optionsOKButton)
+	page.checkGone(optionsOKButton)
+}
+
+func TestPresets(t *testing.T) {
+	page := initWebTest(t)
+	now := time.Now()
+	old := now.Add(-2 * 365 * 24 * time.Hour)
+	song1 := newSong("a", "t1", "unrated")
+	song2 := newSong("a", "t1", "new", withRating(0.25), withTrack(1), withDisc(1), withPlays(now))
+	song3 := newSong("a", "t2", "new", withRating(1.0), withTrack(2), withDisc(1), withPlays(now))
+	song4 := newSong("a", "t1", "old", withRating(0.75), withPlays(old))
+	song5 := newSong("a", "t2", "old", withRating(0.75), withTags("instrumental"), withPlays(old))
+	song6 := newSong("a", "t1", "mellow", withRating(0.75), withTags("mellow"))
+	importSongs(song1, song2, song3, song4, song5, song6)
+
+	page.clickOption(presetSelect, presetInstrumentalOld)
+	page.checkSong(song5)
+	page.clickOption(presetSelect, presetMellow)
+	page.checkSong(song6)
+	page.clickOption(presetSelect, presetNewAlbums)
+	page.checkSearchResults(joinSongs(song2))
+	page.clickOption(presetSelect, presetUnrated)
+	page.checkSong(song1)
+
+	if active, err := page.wd.ActiveElement(); err != nil {
+		t.Error("Failed getting active element: ", err)
+	} else if reflect.DeepEqual(active, page.getOrFail(presetSelect)) {
+		t.Error("Preset select still focused after click")
+	}
 }

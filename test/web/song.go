@@ -44,10 +44,10 @@ func withLength(l float64) songField  { return func(s *db.Song) { s.Length = l }
 func withRating(r float64) songField  { return func(s *db.Song) { s.Rating = r } }
 func withTags(t ...string) songField  { return func(s *db.Song) { s.Tags = t } }
 func withTrack(t int) songField       { return func(s *db.Song) { s.Track = t } }
-func withPlays(ts ...int64) songField {
+func withPlays(ts ...time.Time) songField {
 	return func(s *db.Song) {
 		for _, t := range ts {
-			s.Plays = append(s.Plays, db.NewPlay(time.Unix(t, 0), ""))
+			s.Plays = append(s.Plays, db.NewPlay(t, ""))
 		}
 	}
 }
