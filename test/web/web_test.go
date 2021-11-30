@@ -10,6 +10,8 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -54,7 +56,7 @@ func TestMain(m *testing.M) {
 		}
 		defer wd.Quit()
 
-		tester = test.NewTester(serverURL, "")
+		tester = test.NewTester(serverURL, "") // TODO: Pass binary path?
 		defer tester.Close()
 
 		// Serve music files in the background.
@@ -105,6 +107,61 @@ func TestMain(m *testing.M) {
 func initWebTest(t *testing.T) *page {
 	tester.ClearData()
 	return newPage(t, wd)
+}
+
+type songUserData struct {
+	rating float64
+	tags   []string
+	plays  [][2]time.Time // lower/upper bounds for timestamps
+}
+
+func newSongUserData(rating float64, tags []string, plays ...[2]time.Time) songUserData {
+	return songUserData{rating, tags, plays}
+}
+
+func checkServerUserData(t *testing.T, want map[string]songUserData) {
+	getData := func() map[string]songUserData {
+		m := make(map[string]songUserData)
+		for _, s := range tester.DumpSongs(test.KeepIDs) {
+			data := newSongUserData(s.Rating, s.Tags)
+			for _, p := range s.Plays {
+				data.plays = append(data.plays, [2]time.Time{p.StartTime, p.StartTime})
+			}
+			m[s.SHA1] = data
+		}
+		return m
+	}
+	if err := wait(func() error {
+		got := getData()
+		for sha1, wd := range want {
+			gd, ok := got[sha1]
+			if !ok {
+				return fmt.Errorf("%v missing from server", sha1)
+			}
+			if gd.rating != wd.rating {
+				return fmt.Errorf("%v rating is %.2f; want %.2f", sha1, gd.rating, wd.rating)
+			}
+			sort.Strings(gd.tags)
+			sort.Strings(wd.tags)
+			if !reflect.DeepEqual(gd.tags, wd.tags) {
+				return fmt.Errorf("%v tags are %v; want %v", sha1, gd.tags, wd.tags)
+			}
+			if len(gd.plays) != len(wd.plays) {
+				return fmt.Errorf("%v has %v play(s); want %v", sha1, len(gd.plays), len(wd.plays))
+			}
+			for i := range gd.plays {
+				if gp, wp := gd.plays[i], wd.plays[i]; gp[0].Before(wp[0]) || gp[0].After(wp[1]) {
+					return fmt.Errorf("%v play %d has time %v outside of [%v, %v]",
+						sha1, i, gp[0], wp[0], wp[1])
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		// TODO: Consider dumping all data.
+		msg := fmt.Sprintf("Bad server user data for %v: %v\n", testInfo(), err)
+		t.Fatal(msg)
+	}
 }
 
 func TestKeywordQuery(t *testing.T) {
@@ -470,4 +527,66 @@ func TestDisplayTimeWhilePlaying(t *testing.T) {
 	page.checkSong(song, songNotPaused, songTime("[ 0:03 / 0:05 ]"))
 	page.checkSong(song, songNotPaused, songTime("[ 0:04 / 0:05 ]"))
 	page.checkSong(song, songEnded|songPaused, songTime("[ 0:05 / 0:05 ]"))
+}
+
+func TestReportPlayed(t *testing.T) {
+	page := initWebTest(t)
+	song1 := newSong("a", "t1", "al", withTrack(1), withFilename(song5s.Filename))
+	song2 := newSong("a", "t2", "al", withTrack(2), withFilename(song1s.Filename))
+	tester.PostSongs(joinSongs(song1, song2), true, 0)
+
+	// Skip the first song early on, but listen to all of the second song.
+	page.setText(keywordsInput, song1.Artist)
+	page.click(luckyButton)
+	page.checkSong(song1, songNotPaused)
+	song2Lower := time.Now()
+	page.click(nextButton)
+	page.checkSong(song2, songEnded)
+	song2Upper := time.Now()
+
+	// Only the second song should've been reported.
+	checkServerUserData(t, map[string]songUserData{
+		song1.SHA1: newSongUserData(-1.0, nil),
+		song2.SHA1: newSongUserData(-1.0, nil, [2]time.Time{song2Lower, song2Upper}),
+	})
+
+	// Go back to the first song but pause it immediately.
+	song1Lower := time.Now()
+	page.click(prevButton)
+	page.checkSong(song1, songNotPaused)
+	song1Upper := time.Now()
+	page.click(playPauseButton)
+	page.checkSong(song1, songPaused)
+
+	// After more than half of the first song has played, it should be reported.
+	page.click(playPauseButton)
+	page.checkSong(song1, songNotPaused)
+	checkServerUserData(t, map[string]songUserData{
+		song1.SHA1: newSongUserData(-1.0, nil, [2]time.Time{song1Lower, song1Upper}),
+		song2.SHA1: newSongUserData(-1.0, nil, [2]time.Time{song2Lower, song2Upper}),
+	})
+}
+
+func TestReportReplay(t *testing.T) {
+	page := initWebTest(t)
+	song := newSong("a", "t1", "al", withFilename(song1s.Filename))
+	tester.PostSongs(joinSongs(song), true, 0)
+
+	// Play the song to completion.
+	page.setText(keywordsInput, song.Artist)
+	firstLower := time.Now()
+	page.click(luckyButton)
+	page.checkSong(song, songEnded)
+
+	// Replay the song.
+	secondLower := time.Now()
+	page.click(playPauseButton)
+
+	// Both playbacks should be reported.
+	checkServerUserData(t, map[string]songUserData{
+		song.SHA1: newSongUserData(-1.0, nil,
+			[2]time.Time{firstLower, secondLower},
+			[2]time.Time{secondLower, secondLower.Add(2 * time.Second)},
+		),
+	})
 }

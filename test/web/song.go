@@ -5,6 +5,8 @@ package web
 
 import (
 	"fmt"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/derat/nup/server/db"
@@ -27,6 +29,7 @@ func newSong(artist, title, album string, fields ...songField) db.Song {
 		SHA1:     fmt.Sprintf("%s-%s-%s", artist, title, album),
 		AlbumID:  artist + "-" + album,
 		Filename: song10s.Filename,
+		Rating:   -1.0,
 	}
 	for _, f := range fields {
 		f(&s)
@@ -99,6 +102,9 @@ func (s songInfo) String() string {
 			str += " " + f.name
 		}
 	}
+	if s.src != "" {
+		str += fmt.Sprintf(" %q", path.Base(s.src))
+	}
 	if s.time != "" {
 		str += fmt.Sprintf(" %q", s.time)
 	}
@@ -140,6 +146,9 @@ func compareSongInfo(got songInfo, want db.Song, flags songFlags, cfg *songConfi
 	}
 	if cfg != nil {
 		if cfg.time != "" && cfg.time != got.time {
+			return false
+		}
+		if cfg.filename != "" && !strings.HasSuffix(got.src, "/"+cfg.filename) {
 			return false
 		}
 	}

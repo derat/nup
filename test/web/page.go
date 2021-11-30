@@ -345,8 +345,8 @@ func (p *page) checkPlaylist(want []db.Song, opts ...playlistOpt) {
 		return nil
 	}); err != nil {
 		got := p.getSongsFromTable(table)
-		msg := fmt.Sprintf("Bad playlist for %v", testInfo())
-		msg += "\nGot:\n"
+		msg := fmt.Sprintf("Bad playlist for %v\n", testInfo())
+		msg += "Got:\n"
 		for _, s := range got {
 			msg += "  " + s.String() + "\n"
 		}
@@ -467,8 +467,13 @@ func songTime(s string) songOpt {
 	return func(cfg *songConfig) { cfg.time = s }
 }
 
+// songFilename contains the filename from the audio element's src property.
+func songFilename(fn string) songOpt {
+	return func(cfg *songConfig) { cfg.filename = fn }
+}
+
 type songConfig struct {
-	time string
+	time, filename string
 }
 
 // checkSong verifies that the current song matches want.
@@ -508,6 +513,9 @@ func (p *page) checkSong(want db.Song, flags songFlags, opts ...songOpt) {
 		}
 		if flags&songPaused != 0 {
 			str += " paused"
+		}
+		if cfg.filename != "" {
+			str += fmt.Sprintf(" %q", cfg.filename)
 		}
 		if cfg.time != "" {
 			str += fmt.Sprintf(" %q", cfg.time)
