@@ -717,6 +717,8 @@ customElements.define(
     // If |delay| is true, waits a bit before loading media and playing;
     // otherwise starts playing immediately.
     play_(delay) {
+      if (!this.currentSong_) return;
+
       if (this.playTimeoutId_ !== undefined) {
         window.clearTimeout(this.playTimeoutId_);
         this.playTimeoutId_ = undefined;
@@ -736,6 +738,8 @@ customElements.define(
     // Internal method called by play_().
     playInternal_() {
       const song = this.currentSong_;
+      if (!song) return;
+
       // Get an absolute URL since that's what we'll get from the <audio>
       // element: https://stackoverflow.com/a/44547904
       const url = getSongUrl(song.filename);
