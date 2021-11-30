@@ -76,11 +76,19 @@ func joinSongs(songs ...interface{}) []db.Song {
 }
 
 // songInfo contains information about a song in the web interface.
+//
+// I've made a few attempts to get rid of the use of db.Song in this code
+// (other than when posting songs to the server), but it's harder than it
+// seems: for example, songs always need filenames when they're sent to the
+// server, but we don't want to check filenames when we're inspecting the
+// playlist or search results.
 type songInfo struct {
-	artist, title, album  string
+	artist, title, album  string  // metadata from either <song-table> row or <music-player>
 	active, checked, menu *bool   // song row is active, checked, or has context menu
 	paused, ended         *bool   // audio element is paused or ended
 	filename              *string // filename from audio element src attribute
+	rating                *string // rating string from cover image, e.g. "★★★"
+	imgTitle              *string // cover image title attr, e.g. "Rating: ★★★☆☆\nTags: guitar rock"
 	time                  *string // displayed time, e.g. "[ 0:00 / 0:05 ]"
 }
 
@@ -122,24 +130,20 @@ func (s songInfo) String() string {
 	return "[" + str + "]"
 }
 
-// songOpt specifies a check to perform on a song.
-type songOpt func(*songInfo)
+// songCheck specifies a check to perform on a song.
+type songCheck func(*songInfo)
 
-// songPaused indicates that the song should be paused or not paused.
-func songPaused(p bool) songOpt { return func(i *songInfo) { i.paused = &p } }
+// See equivalently-named fields in songInfo for more info.
+func isPaused(p bool) songCheck      { return func(i *songInfo) { i.paused = &p } }
+func isEnded(e bool) songCheck       { return func(i *songInfo) { i.ended = &e } }
+func hasFilename(f string) songCheck { return func(i *songInfo) { i.filename = &f } }
+func hasRating(r string) songCheck   { return func(i *songInfo) { i.rating = &r } }
+func hasImgTitle(t string) songCheck { return func(i *songInfo) { i.imgTitle = &t } }
+func hasTime(s string) songCheck     { return func(i *songInfo) { i.time = &s } }
 
-// songEnded indicates that the song should be ended or not ended.
-func songEnded(e bool) songOpt { return func(i *songInfo) { i.ended = &e } }
-
-// songTime indicates the playback time that should be displayed, e.g. "[ 0:00 / 0:05 ]".
-func songTime(s string) songOpt { return func(i *songInfo) { i.time = &s } }
-
-// songFilename contains the filename from the audio element's src property.
-func songFilename(f string) songOpt { return func(i *songInfo) { i.filename = &f } }
-
-// compareSongInfo returns true if want and got have the same artist, title, and album
+// songInfosEqual returns true if want and got have the same artist, title, and album
 // and any additional optional fields specified in want also match.
-func compareSongInfo(want, got songInfo) bool {
+func songInfosEqual(want, got songInfo) bool {
 	if want.artist != got.artist || want.title != got.title || want.album != got.album {
 		return false
 	}
@@ -157,20 +161,26 @@ func compareSongInfo(want, got songInfo) bool {
 			return false
 		}
 	}
-	if want.time != nil && (got.time == nil || *want.time != *got.time) {
+	if want.filename != nil && (got.filename == nil || *want.filename != *got.filename) {
 		return false
 	}
-	if want.filename != nil && (got.filename == nil || *want.filename != *got.filename) {
+	if want.rating != nil && (got.rating == nil || *want.rating != *got.rating) {
+		return false
+	}
+	if want.imgTitle != nil && (got.imgTitle == nil || *want.imgTitle != *got.imgTitle) {
+		return false
+	}
+	if want.time != nil && (got.time == nil || *want.time != *got.time) {
 		return false
 	}
 	return true
 }
 
-// songListOpt specifies a check to perform on a list of songs.
-type songListOpt func([]songInfo)
+// songListCheck specifies a check to perform on a list of songs.
+type songListCheck func([]songInfo)
 
-// songListChecked checks that songs' checkboxes match vals.
-func songListChecked(vals ...bool) songListOpt {
+// hasChecked checks that songs' checkboxes match vals.
+func hasChecked(vals ...bool) songListCheck {
 	return func(infos []songInfo) {
 		for i := range infos {
 			infos[i].checked = &vals[i]
@@ -178,8 +188,8 @@ func songListChecked(vals ...bool) songListOpt {
 	}
 }
 
-// songListActive indicates that the song at idx should be active.
-func songListActive(idx int) songListOpt {
+// hasActive indicates that the song at idx should be active.
+func hasActive(idx int) songListCheck {
 	return func(infos []songInfo) {
 		for i := range infos {
 			v := i == idx
@@ -188,8 +198,8 @@ func songListActive(idx int) songListOpt {
 	}
 }
 
-// songListMenu indicates that a context menu should be shown for the song at idx.
-func songListMenu(idx int) songListOpt {
+// hasMenu indicates that a context menu should be shown for the song at idx.
+func hasMenu(idx int) songListCheck {
 	return func(infos []songInfo) {
 		for i := range infos {
 			v := i == idx
@@ -198,14 +208,14 @@ func songListMenu(idx int) songListOpt {
 	}
 }
 
-// compareSongInfos returns true if want and got are the same length
-// compareSongInfo returns true for corresponding elements.
-func compareSongInfos(want, got []songInfo) bool {
+// songInfoSlicesEqual returns true if want and got are the same length
+// and songInfosEqual returns true for corresponding elements.
+func songInfoSlicesEqual(want, got []songInfo) bool {
 	if len(want) != len(got) {
 		return false
 	}
 	for i := range want {
-		if !compareSongInfo(want[i], got[i]) {
+		if !songInfosEqual(want[i], got[i]) {
 			return false
 		}
 	}

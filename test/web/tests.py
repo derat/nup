@@ -216,35 +216,6 @@ class Test(unittest.TestCase):
             self.fail('Timed out waiting for songs.\nReceived ' +
                       str(page.get_presentation_songs()))
 
-    def test_rate_and_tag(self):
-        song = Song('ar', 't1', 'al', rating=0.5, tags=['rock', 'guitar'])
-        server.import_songs([song])
-
-        page = Page(driver)
-        page.refresh_tags()
-        page.keywords = song.artist
-        page.click(page.LUCKY_BUTTON)
-        self.wait_for_song(page, song, rating=page.THREE_STARS,
-                           title=u'Rating: ★★★☆☆\nTags: guitar rock')
-
-        page.show_update_div()
-        page.click_rating(4)
-        page.click(page.UPDATE_CLOSE_IMAGE)
-        self.wait_for_song(page, song, rating=page.FOUR_STARS,
-                           title=u'Rating: ★★★★☆\nTags: guitar rock')
-        self.wait_for_server_user_data({
-            song.sha1: (0.75, ['guitar', 'rock'], None),
-        })
-
-        page.show_update_div()
-        page.get(page.EDIT_TAGS_TEXTAREA).send_keys(' +metal')
-        page.click(page.UPDATE_CLOSE_IMAGE)
-        self.wait_for_server_user_data({
-            song.sha1: (0.75, ['guitar', 'metal', 'rock'], None),
-        })
-        self.wait_for_song(page, song, rating=page.FOUR_STARS,
-                           title=u'Rating: ★★★★☆\nTags: guitar metal rock')
-
     def test_retry_updates(self):
         song = Song('ar', 't1', 'al', rating=0.5, tags=['rock', 'guitar'])
         server.import_songs([song])

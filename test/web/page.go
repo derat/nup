@@ -43,15 +43,24 @@ var (
 	menuRemove     = joinLocs(overlayManager, loc{selenium.ByID, "remove"})
 	menuTruncate   = joinLocs(overlayManager, loc{selenium.ByID, "truncate"})
 
-	musicPlayer     = joinLocs(loc{selenium.ByTagName, "music-player"})
-	audio           = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "audio"})
-	artistDiv       = joinLocs(musicPlayer, loc{selenium.ByID, "artist"})
-	titleDiv        = joinLocs(musicPlayer, loc{selenium.ByID, "title"})
-	albumDiv        = joinLocs(musicPlayer, loc{selenium.ByID, "album"})
-	timeDiv         = joinLocs(musicPlayer, loc{selenium.ByID, "time"})
-	prevButton      = joinLocs(musicPlayer, loc{selenium.ByID, "prev"})
-	playPauseButton = joinLocs(musicPlayer, loc{selenium.ByID, "play-pause"})
-	nextButton      = joinLocs(musicPlayer, loc{selenium.ByID, "next"})
+	musicPlayer      = joinLocs(loc{selenium.ByTagName, "music-player"})
+	audio            = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "audio"})
+	coverImage       = joinLocs(musicPlayer, loc{selenium.ByID, "cover-img"})
+	ratingOverlayDiv = joinLocs(musicPlayer, loc{selenium.ByID, "rating-overlay"})
+	ratingOneStar    = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(1)"})
+	ratingTwoStars   = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(2)"})
+	ratingThreeStars = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(3)"})
+	ratingFourStars  = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(4)"})
+	ratingFiveStars  = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(5)"})
+	editTagsTextarea = joinLocs(musicPlayer, loc{selenium.ByID, "edit-tags"})
+	updateCloseImage = joinLocs(musicPlayer, loc{selenium.ByID, "update-close"})
+	artistDiv        = joinLocs(musicPlayer, loc{selenium.ByID, "artist"})
+	titleDiv         = joinLocs(musicPlayer, loc{selenium.ByID, "title"})
+	albumDiv         = joinLocs(musicPlayer, loc{selenium.ByID, "album"})
+	timeDiv          = joinLocs(musicPlayer, loc{selenium.ByID, "time"})
+	prevButton       = joinLocs(musicPlayer, loc{selenium.ByID, "prev"})
+	playPauseButton  = joinLocs(musicPlayer, loc{selenium.ByID, "play-pause"})
+	nextButton       = joinLocs(musicPlayer, loc{selenium.ByID, "next"})
 
 	playlistTable = joinLocs(musicPlayer, loc{selenium.ByID, "playlist"},
 		loc{selenium.ByCSSSelector, "table"})
@@ -280,19 +289,19 @@ func (p *page) getSongsFromTable(table selenium.WebElement) []songInfo {
 }
 
 // checkSearchResults waits for the search results table to contain songs.
-func (p *page) checkSearchResults(songs []db.Song, opts ...songListOpt) {
+func (p *page) checkSearchResults(songs []db.Song, checks ...songListCheck) {
 	want := make([]songInfo, len(songs))
 	for i := range songs {
 		want[i] = makeSongInfo(songs[i])
 	}
-	for _, o := range opts {
-		o(want)
+	for _, c := range checks {
+		c(want)
 	}
 
 	table := p.getOrFail(searchResultsTable)
 	if err := wait(func() error {
 		got := p.getSongsFromTable(table)
-		if !compareSongInfos(want, got) {
+		if !songInfoSlicesEqual(want, got) {
 			return errors.New("songs don't match")
 		}
 		return nil
@@ -312,19 +321,19 @@ func (p *page) checkSearchResults(songs []db.Song, opts ...songListOpt) {
 }
 
 // checkPlaylist waits for the playlist table to contain songs.
-func (p *page) checkPlaylist(songs []db.Song, opts ...songListOpt) {
+func (p *page) checkPlaylist(songs []db.Song, checks ...songListCheck) {
 	want := make([]songInfo, len(songs))
 	for i := range songs {
 		want[i] = makeSongInfo(songs[i])
 	}
-	for _, o := range opts {
-		o(want)
+	for _, c := range checks {
+		c(want)
 	}
 
 	table := p.getOrFail(playlistTable)
 	if err := wait(func() error {
 		got := p.getSongsFromTable(table)
-		if !compareSongInfos(want, got) {
+		if !songInfoSlicesEqual(want, got) {
 			return errors.New("songs don't match")
 		}
 		return nil
@@ -343,15 +352,22 @@ func (p *page) checkPlaylist(songs []db.Song, opts ...songListOpt) {
 	}
 }
 
-// setText clears the element matched by locs and types text into it.
-func (p *page) setText(locs []loc, text string) {
+// sendKeys sends text to the element matched by locs.
+func (p *page) sendKeys(locs []loc, text string, clearFirst bool) {
 	el := p.getOrFail(locs)
-	if err := el.Clear(); err != nil {
-		p.t.Fatalf("Failed clearing %v for %v: %v", locs, p.desc(), err)
+	if clearFirst {
+		if err := el.Clear(); err != nil {
+			p.t.Fatalf("Failed clearing %v for %v: %v", locs, p.desc(), err)
+		}
 	}
 	if err := el.SendKeys(text); err != nil {
 		p.t.Fatalf("Failed sending keys to %v for %v: %v", locs, p.desc(), err)
 	}
+}
+
+// setText clears the element matched by locs and types text into it.
+func (p *page) setText(locs []loc, text string) {
+	p.sendKeys(locs, text, true /* clearFirst */)
 }
 
 // click clicks on the element matched by locs.
@@ -439,14 +455,16 @@ func (p *page) rightClickPlaylistSong(idx int) {
 	}
 }
 
-// checkSong verifies that the current song matches s plus any supplied options.
-func (p *page) checkSong(s db.Song, opts ...songOpt) {
+// checkSong verifies that the current song matches s with any additional supplied checks.
+func (p *page) checkSong(s db.Song, checks ...songCheck) {
 	want := makeSongInfo(s)
-	for _, o := range opts {
-		o(&want)
+	for _, c := range checks {
+		c(&want)
 	}
 
 	getSong := func() songInfo {
+		imgTitle := p.getAttrOrFail(p.getOrFail(coverImage), "title", false)
+		rating := p.getTextOrFail(p.getOrFail(ratingOverlayDiv), false)
 		time := p.getTextOrFail(p.getOrFail(timeDiv), false)
 		au := p.getOrFail(audio)
 		paused := p.getAttrOrFail(au, "paused", true) != ""
@@ -465,13 +483,15 @@ func (p *page) checkSong(s db.Song, opts ...songOpt) {
 			paused:   &paused,
 			ended:    &ended,
 			filename: &filename,
+			rating:   &rating,
+			imgTitle: &imgTitle,
 			time:     &time,
 		}
 	}
 
 	if err := wait(func() error {
 		got := getSong()
-		if !compareSongInfo(want, got) {
+		if !songInfosEqual(want, got) {
 			return errors.New("songs don't match")
 		}
 		return nil
