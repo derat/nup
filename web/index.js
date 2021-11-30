@@ -66,6 +66,7 @@ document.test = {
   reset: () => {
     musicPlayer.resetForTesting();
     musicSearcher.resetForTesting();
+    overlayManager.resetForTesting();
   },
   setPlayDelayMs: (delayMs) => (musicPlayer.playDelayMs_ = delayMs),
   showOptions: () => musicPlayer.showOptions_(),

@@ -5,9 +5,8 @@ package web
 
 import (
 	"fmt"
-	"path/filepath"
-	"runtime"
-	"strings"
+	"log"
+	"net"
 	"time"
 )
 
@@ -31,17 +30,12 @@ func waitFull(f func() error, timeout time.Duration, sleep time.Duration) error 
 	}
 }
 
-// caller walks down the call stack and returns the first test file
-// that it sees as e.g. "foo_test.go:53".
-func caller() string {
-	for skip := 1; true; skip++ {
-		_, file, line, ok := runtime.Caller(skip)
-		if !ok {
-			break
-		}
-		if strings.HasSuffix(file, "_test.go") {
-			return fmt.Sprintf("%s:%d", filepath.Base(file), line)
-		}
+// findUnusedPort returns an unused TCP port.
+func findUnusedPort() int {
+	ls, err := net.Listen("tcp", ":0")
+	if err != nil {
+		log.Fatal("Failed finding unused port: ", err)
 	}
-	return "unknown"
+	defer ls.Close()
+	return ls.Addr().(*net.TCPAddr).Port
 }

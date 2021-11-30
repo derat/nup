@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/derat/nup/server/db"
+	"github.com/derat/nup/test"
 	"github.com/tebeka/selenium"
 )
 
@@ -182,7 +183,7 @@ func (p *page) setStage(stage string) {
 }
 
 func (p *page) desc() string {
-	s := caller()
+	s := test.Caller()
 	if p.stage != "" {
 		s += " (" + p.stage + ")"
 	}
@@ -204,28 +205,44 @@ func (p *page) refreshTags() {
 	}
 }
 
-// get returns the element matched by locs.
-func (p *page) get(locs []loc) (selenium.WebElement, error) {
-	if err := wait(func() error {
-		_, err := p.getNoWait(locs, nil)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-	return p.getNoWait(locs, nil)
-}
-
-// getOrFails calls get and fails the test on error.
+// getOrFail waits until getNoWait returns the first element matched by locs.
+// If the element isn't found in a reasonable amount of time, it fails the test.
 func (p *page) getOrFail(locs []loc) selenium.WebElement {
-	el, err := p.get(locs)
-	if err != nil {
+	var el selenium.WebElement
+	if err := wait(func() error {
+		var err error
+		if el, err = p.getNoWait(locs); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
 		p.t.Fatalf("Failed getting %v for %v: %v", locs, p.desc(), err)
 	}
 	return el
 }
 
-// getNoWait is called by get.
-func (p *page) getNoWait(locs []loc, base selenium.WebElement) (selenium.WebElement, error) {
+// getNoWait returns the first element matched by locs.
+//
+// If there is more than one element in locs, they will be used successively, e.g.
+// loc[1] is used to search inside the element matched by loc[0].
+// If an element has a shadow root (per its 'shadowRoot' property),
+// the shadow root will be used for the next search.
+//
+// This is based on Python code that initially used the 'return arguments[0].shadowRoot' approach
+// described at https://stackoverflow.com/a/37253205/6882947, but that seems to have broken as a
+// result of either upgrading to python-selenium 3.14.1 (from 3.8.0, I think) or upgrading to Chrome
+// (and chromedriver) 96.0.4664.45 (from 94, I think).
+//
+// After upgrading, I would get back a dictionary like {u'shadow-6066-11e4-a52e-4f735466cecf':
+// u'9ab4aaee-8108-45c2-9341-c232a9685355'} when evaluating shadowRoot. Trying to recursively call
+// find_element() on it as before yielded "AttributeError: 'dict' object has no attribute
+// 'find_element'". (For all I know, the version of Selenium that I was using was just too old for
+// the current chromedriver, or this was a bug in python-selenium.)
+//
+// So, what we have instead here is an approximate JavaScript reimplementation of Selenium's
+// element-finding code. :-/ It's possible that this could be switched back to using Selenium to
+// find elements, but the current approach seems to work for now.
+func (p *page) getNoWait(locs []loc) (selenium.WebElement, error) {
 	var query string
 	for len(locs) > 0 {
 		if query != "" {
@@ -258,10 +275,11 @@ func (p *page) getNoWait(locs []loc, base selenium.WebElement) (selenium.WebElem
 	return p.wd.DecodeElement(res)
 }
 
-// checkGone waits for the element described by locs to disappear.
+// checkGone waits for the element described by locs to not be found.
+// It fails the test if the element remains present.
 func (p *page) checkGone(locs []loc) {
 	if err := wait(func() error {
-		_, err := p.getNoWait(locs, nil)
+		_, err := p.getNoWait(locs)
 		if err == nil {
 			return errors.New("still exists")
 		}
@@ -271,8 +289,33 @@ func (p *page) checkGone(locs []loc) {
 	}
 }
 
+// click clicks on the element matched by locs.
+func (p *page) click(locs []loc) {
+	if err := p.getOrFail(locs).Click(); err != nil {
+		p.t.Fatalf("Failed clicking %v for %v: %v", locs, p.desc(), err)
+	}
+}
+
+// clickOption clicks the <option> with the supplied text in the <select> matched by sel.
+func (p *page) clickOption(sel []loc, option string) {
+	opts, err := p.getOrFail(sel).FindElements(selenium.ByTagName, "option")
+	if err != nil {
+		p.t.Fatalf("Failed getting %v options for %v: %v", sel, p.desc(), err)
+	}
+	for _, opt := range opts {
+		if strings.TrimSpace(p.getTextOrFail(opt, false)) == option {
+			if err := opt.Click(); err != nil {
+				p.t.Fatalf("Failed clicking %v option %q for %v: %v", sel, option, p.desc(), err)
+			}
+			return
+		}
+	}
+	p.t.Fatalf("Failed finding %v option %q for %v: %v", sel, option, p.desc(), err)
+}
+
 // getTextOrFail returns el's text, failing the test on error.
 // If ignoreStale is true, errors caused by the element no longer existing are ignored.
+// Tests should consider calling checkText instead.
 func (p *page) getTextOrFail(el selenium.WebElement, ignoreStale bool) string {
 	text, err := el.Text()
 	if ignoreStale && isStaleElementError(err) {
@@ -283,8 +326,9 @@ func (p *page) getTextOrFail(el selenium.WebElement, ignoreStale bool) string {
 	return text
 }
 
-// getTextOrFail returns the named attribute from el, failing the test on error.
+// getAttrOrFail returns the named attribute from el, failing the test on error.
 // If ignoreStale is true, errors caused by the element no longer existing are ignored.
+// Tests should consider calling checkAttr instead.
 func (p *page) getAttrOrFail(el selenium.WebElement, name string, ignoreStale bool) string {
 	val, err := el.GetAttribute(name)
 	if isMissingAttrError(err) {
@@ -307,6 +351,137 @@ func (p *page) getSelectedOrFail(el selenium.WebElement, ignoreStale bool) bool 
 		p.t.Fatalf("Failed getting selected state for %v: %v", p.desc(), err)
 	}
 	return sel
+}
+
+// sendKeys sends text to the element matched by locs.
+//
+// Note that this doesn't work right on systems without a US Qwerty layout due to a ChromeDriver bug
+// that will never be fixed:
+//
+//  https://bugs.chromium.org/p/chromedriver/issues/detail?id=553
+//  https://chromedriver.chromium.org/help/keyboard-support
+//  https://github.com/SeleniumHQ/selenium/issues/4523
+//
+// Specifically, the requested text is sent to the element, but JavaScript key events contain
+// incorrect values (e.g. when sending 'z' with Dvorak, the JS event will contain '/').
+func (p *page) sendKeys(locs []loc, text string, clearFirst bool) {
+	el := p.getOrFail(locs)
+	if clearFirst {
+		if err := el.Clear(); err != nil {
+			p.t.Fatalf("Failed clearing %v for %v: %v", locs, p.desc(), err)
+		}
+	}
+	if err := el.SendKeys(text); err != nil {
+		p.t.Fatalf("Failed sending keys to %v for %v: %v", locs, p.desc(), err)
+	}
+}
+
+// setText clears the element matched by locs and types text into it.
+func (p *page) setText(locs []loc, text string) {
+	p.sendKeys(locs, text, true /* clearFirst */)
+}
+
+// emitKeyDown emits a 'keydown' JavaScript event with the supplied data.
+// This avoids the ChromeDriver bug described in sendKeys.
+func (p *page) emitKeyDown(key string, keyCode int, alt bool) {
+	s := fmt.Sprintf(
+		"document.body.dispatchEvent("+
+			"new KeyboardEvent('keydown', { key: '%s', keyCode: %d, altKey: %v }))",
+		key, keyCode, alt)
+	if _, err := p.wd.ExecuteScript(s, nil); err != nil {
+		p.t.Fatalf("Failed emitting %q key down event for %v: %v", key, p.desc(), err)
+	}
+}
+
+// clickSongRowCheckbox clicks the checkbox for the song at 0-based index
+// idx in the table matched by locs. If key (e.g. selenium.ShiftKey) is non-empty,
+// it is held while performing the click.
+func (p *page) clickSongRowCheckbox(locs []loc, idx int, key string) {
+	table := p.getOrFail(locs)
+	sel := fmt.Sprintf("tr:nth-child(%d) td:first-child input", idx+1)
+	cb, err := table.FindElement(selenium.ByCSSSelector, sel)
+	if err != nil {
+		p.t.Fatalf("Failed finding checkbox %d (%q) for %v: %v", idx, sel, p.desc(), err)
+	}
+	if key != "" {
+		if err := p.wd.KeyDown(key); err != nil {
+			p.t.Fatalf("Failed pressing key before clicking checkbox %d for %v: %v", idx, p.desc(), err)
+		}
+		defer func() {
+			if err := p.wd.KeyUp(key); err != nil {
+				p.t.Fatalf("Failed releasing key after clicking checkbox %d for %v: %v", idx, p.desc(), err)
+			}
+		}()
+	}
+	if err := cb.Click(); err != nil {
+		p.t.Fatalf("Failed clicking checkbox %d for %v: %v", idx, p.desc(), err)
+	}
+}
+
+// rightClickSongRow right-clicks on the playlist song at the specified index
+// in the table matched by locs.
+func (p *page) rightClickSongRow(locs []loc, idx int) {
+	table := p.getOrFail(playlistTable)
+	sel := fmt.Sprintf("tbody tr:nth-child(%d)", idx+1)
+	row, err := table.FindElement(selenium.ByCSSSelector, sel)
+	if err != nil {
+		p.t.Fatalf("Failed finding song %d (%q) for %v: %v", idx, sel, p.desc(), err)
+	}
+	// These coordinates are apparently relative to the element's upper-left corner.
+	if err := row.MoveTo(3, 3); err != nil {
+		p.t.Fatalf("Failed moving mouse to song for %v: %v", p.desc(), err)
+	}
+	if err := p.wd.Click(selenium.RightButton); err != nil {
+		p.t.Fatalf("Failed right-clicking on song for %v: %v", p.desc(), err)
+	}
+}
+
+type checkboxState uint32
+
+const (
+	checkboxChecked     checkboxState = 1 << iota
+	checkboxTransparent               // has "transparent" class
+)
+
+// checkText checks that text of the element matched by locs is matched by wantRegexp.
+// Spacing can be weird if the text is spread across multiple child nodes.
+func (p *page) checkText(locs []loc, wantRegexp string) {
+	el := p.getOrFail(locs)
+	want := regexp.MustCompile(wantRegexp)
+	if err := wait(func() error {
+		if got := p.getTextOrFail(el, false); !want.MatchString(got) {
+			return fmt.Errorf("got %q; want %q", got, want)
+		}
+		return nil
+	}); err != nil {
+		p.t.Fatalf("Bad text in element for %v: %v", p.desc(), err)
+	}
+}
+
+// checkAttr checks that attribute attr of the element matched by locs equals want.
+func (p *page) checkAttr(locs []loc, attr, want string) {
+	el := p.getOrFail(locs)
+	if err := wait(func() error {
+		if got := p.getAttrOrFail(el, attr, false); got != want {
+			return fmt.Errorf("got %q; want %q", got, want)
+		}
+		return nil
+	}); err != nil {
+		p.t.Fatalf("Bad %v attribute for %v: %v", attr, p.desc(), err)
+	}
+}
+
+// checkCheckbox verifies that the checkbox element matched by locs has the specified state.
+// TODO: The "check" in this name is ambiguous.
+func (p *page) checkCheckbox(locs []loc, state checkboxState) {
+	el := p.getOrFail(locs)
+	if got, want := p.getSelectedOrFail(el, false), state&checkboxChecked != 0; got != want {
+		p.t.Fatalf("Checkbox %v has checked state %v for %v; want %v", locs, got, p.desc(), want)
+	}
+	class := p.getAttrOrFail(el, "class", false)
+	if got, want := strings.Contains(class, "transparent"), state&checkboxTransparent != 0; got != want {
+		p.t.Fatalf("Checkbox %v has transparent state %v for %v; want %v", locs, got, p.desc(), want)
+	}
 }
 
 // getSongsFromTable returns songInfos describing the supplied <table> within a <song-table>.
@@ -479,171 +654,17 @@ func (p *page) checkPresentation(cur, next *db.Song) {
 	}
 }
 
-// sendKeys sends text to the element matched by locs.
-//
-// Note that this doesn't work right on systems without a US Qwerty layout
-// due to a ChromeDriver bug that will never be fixed:
-//  https://bugs.chromium.org/p/chromedriver/issues/detail?id=553
-//  https://chromedriver.chromium.org/help/keyboard-support
-//  https://github.com/SeleniumHQ/selenium/issues/4523
-// Specifically, the requested text is sent to the element,
-// but JavaScript key events contain incorrect values
-// (e.g. when sending 'z' with Dvorak, the JS event will contain '/').
-func (p *page) sendKeys(locs []loc, text string, clearFirst bool) {
-	el := p.getOrFail(locs)
-	if clearFirst {
-		if err := el.Clear(); err != nil {
-			p.t.Fatalf("Failed clearing %v for %v: %v", locs, p.desc(), err)
-		}
-	}
-	if err := el.SendKeys(text); err != nil {
-		p.t.Fatalf("Failed sending keys to %v for %v: %v", locs, p.desc(), err)
-	}
-}
-
-// setText clears the element matched by locs and types text into it.
-func (p *page) setText(locs []loc, text string) {
-	p.sendKeys(locs, text, true /* clearFirst */)
-}
-
-// emitKeyDown emits a 'keydown' JavaScript event with the supplied data.
-// This avoids the ChromeDriver bug described in sendKeys.
-func (p *page) emitKeyDown(key string, keyCode int, alt bool) {
-	s := fmt.Sprintf(
-		"document.body.dispatchEvent("+
-			"new KeyboardEvent('keydown', { key: '%s', keyCode: %d, altKey: %v }))",
-		key, keyCode, alt)
-	if _, err := p.wd.ExecuteScript(s, nil); err != nil {
-		p.t.Fatalf("Failed emitting %q key down event for %v: %v", key, p.desc(), err)
-	}
-}
-
-// click clicks on the element matched by locs.
-func (p *page) click(locs []loc) {
-	if err := p.getOrFail(locs).Click(); err != nil {
-		p.t.Fatalf("Failed clicking %v for %v: %v", locs, p.desc(), err)
-	}
-}
-
-// clickOption clicks the <option> with the supplied text in the <select> matched by sel.
-func (p *page) clickOption(sel []loc, option string) {
-	opts, err := p.getOrFail(sel).FindElements(selenium.ByTagName, "option")
-	if err != nil {
-		p.t.Fatalf("Failed getting %v options for %v: %v", sel, p.desc(), err)
-	}
-	for _, opt := range opts {
-		if strings.TrimSpace(p.getTextOrFail(opt, false)) == option {
-			if err := opt.Click(); err != nil {
-				p.t.Fatalf("Failed clicking %v option %q for %v: %v", sel, option, p.desc(), err)
-			}
-			return
-		}
-	}
-	p.t.Fatalf("Failed finding %v option %q for %v: %v", sel, option, p.desc(), err)
-}
-
-// getAttr returns the current value of attr from the element matched by locs.
-func (p *page) getAttr(locs []loc, attr string) string {
-	return p.getAttrOrFail(p.getOrFail(locs), attr, false)
-}
-
-// checkText checks that text of the element matched by locs is matched by want.
-// Spacing can be weird if the text is spread across multiple child nodes.
-func (p *page) checkText(locs []loc, wantRegexp string) {
-	el := p.getOrFail(locs)
-	want := regexp.MustCompile(wantRegexp)
-	if err := wait(func() error {
-		if got := p.getTextOrFail(el, false); !want.MatchString(got) {
-			return fmt.Errorf("got %q; want %q", got, want)
-		}
-		return nil
-	}); err != nil {
-		p.t.Fatalf("Bad text in element for %v: %v", p.desc(), err)
-	}
-}
-
-// checkAttr checks that attribute attr of the element matched by locs equals want.
-func (p *page) checkAttr(locs []loc, attr, want string) {
-	el := p.getOrFail(locs)
-	if err := wait(func() error {
-		if got := p.getAttrOrFail(el, attr, false); got != want {
-			return fmt.Errorf("got %q; want %q", got, want)
-		}
-		return nil
-	}); err != nil {
-		p.t.Fatalf("Bad %v attribute for %v: %v", attr, p.desc(), err)
-	}
-}
-
-type checkboxState uint32
-
-const (
-	checkboxChecked     checkboxState = 1 << iota
-	checkboxTransparent               // has "transparent" class
-)
-
-// checkCheckbox verifies that the checkbox element matched by locs has the specified state.
-// TODO: The "check" in this name is ambiguous.
-func (p *page) checkCheckbox(locs []loc, state checkboxState) {
-	el := p.getOrFail(locs)
-	if got, want := p.getSelectedOrFail(el, false), state&checkboxChecked != 0; got != want {
-		p.t.Fatalf("Checkbox %v has checked state %v for %v; want %v", locs, got, p.desc(), want)
-	}
-	class := p.getAttrOrFail(el, "class", false)
-	if got, want := strings.Contains(class, "transparent"), state&checkboxTransparent != 0; got != want {
-		p.t.Fatalf("Checkbox %v has transparent state %v for %v; want %v", locs, got, p.desc(), want)
-	}
-}
-
-// clickSearchResultsSongCheckbox clicks the checkbox for the song at 0-based index
-// idx in the search results table. If key (e.g. selenium.ShiftKey) is non-empty,
-// it is held while performing the click.
-func (p *page) clickSearchResultsSongCheckbox(idx int, key string) {
-	table := p.getOrFail(searchResultsTable)
-	sel := fmt.Sprintf("tr:nth-child(%d) td:first-child input", idx+1)
-	cb, err := table.FindElement(selenium.ByCSSSelector, sel)
-	if err != nil {
-		p.t.Fatalf("Failed finding checkbox %d (%q) for %v: %v", idx, sel, p.desc(), err)
-	}
-	if key != "" {
-		if err := p.wd.KeyDown(key); err != nil {
-			p.t.Fatalf("Failed pressing key before clicking checkbox %d for %v: %v", idx, p.desc(), err)
-		}
-		defer func() {
-			if err := p.wd.KeyUp(key); err != nil {
-				p.t.Fatalf("Failed releasing key after clicking checkbox %d for %v: %v", idx, p.desc(), err)
-			}
-		}()
-	}
-	if err := cb.Click(); err != nil {
-		p.t.Fatalf("Failed clicking checkbox %d for %v: %v", idx, p.desc(), err)
-	}
-}
-
-// rightClickPlaylistSong right-clicks on the playlist song at the specified index.
-func (p *page) rightClickPlaylistSong(idx int) {
-	table := p.getOrFail(playlistTable)
-	sel := fmt.Sprintf("tbody tr:nth-child(%d)", idx+1)
-	row, err := table.FindElement(selenium.ByCSSSelector, sel)
-	if err != nil {
-		p.t.Fatalf("Failed finding playlist song %d (%q) for %v: %v", idx, sel, p.desc(), err)
-	}
-	if err := row.MoveTo(3, 3); err != nil {
-		p.t.Fatalf("Failed moving mouse to playlist song for %v: %v", p.desc(), err)
-	}
-	if err := p.wd.Click(selenium.RightButton); err != nil {
-		p.t.Fatalf("Failed right-clicking on playlist song for %v: %v", p.desc(), err)
-	}
-}
-
-// checkSong verifies that the current song matches s with any additional supplied checks.
+// checkSong verifies that the current song matches s.
+// By default, just the artist, title, and album are examined,
+// but additional checks can be specified.
 func (p *page) checkSong(s db.Song, checks ...songCheck) {
 	want := makeSongInfo(s)
 	for _, c := range checks {
 		c(&want)
 	}
 
-	getSong := func() songInfo {
+	var got songInfo
+	if err := wait(func() error {
 		imgTitle := p.getAttrOrFail(p.getOrFail(coverImage), "title", false)
 		rating := p.getTextOrFail(p.getOrFail(ratingOverlayDiv), false)
 		time := p.getTextOrFail(p.getOrFail(timeDiv), false)
@@ -657,7 +678,7 @@ func (p *page) checkSong(s db.Song, checks ...songCheck) {
 			filename = u.Query().Get("filename")
 		}
 
-		return songInfo{
+		got = songInfo{
 			artist:   p.getTextOrFail(p.getOrFail(artistDiv), false),
 			title:    p.getTextOrFail(p.getOrFail(titleDiv), false),
 			album:    p.getTextOrFail(p.getOrFail(albumDiv), false),
@@ -668,17 +689,12 @@ func (p *page) checkSong(s db.Song, checks ...songCheck) {
 			imgTitle: &imgTitle,
 			time:     &time,
 		}
-	}
-
-	if err := wait(func() error {
-		got := getSong()
 		if !songInfosEqual(want, got) {
 			return errors.New("songs don't match")
 		}
 		return nil
 	}); err != nil {
-		got := getSong()
-		msg := fmt.Sprintf("Bad song for %v\n", p.desc())
+		msg := fmt.Sprintf("Bad song for %v: %v\n", p.desc(), err)
 		msg += "Want: " + want.String() + "\n"
 		msg += "Got:  " + got.String()
 		p.t.Fatal(msg)

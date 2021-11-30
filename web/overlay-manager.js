@@ -156,6 +156,11 @@ customElements.define(
       );
     }
 
+    // Closes all children. Can be called between tests.
+    resetForTesting() {
+      Array.from(this.container_.children).forEach((c) => this.closeChild(c));
+    }
+
     // Creates, displays, and returns an empty dialog window container,
     // additionally dimming the rest of the screen.
     //

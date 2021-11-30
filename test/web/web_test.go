@@ -1,17 +1,21 @@
 // Copyright 2021 Daniel Erat.
 // All rights reserved.
 
+// Package web contains Selenium-based tests of the web interface.
 package web
 
 import (
-	"context"
+	"flag"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"reflect"
-	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,20 +25,17 @@ import (
 
 	"github.com/tebeka/selenium"
 	"github.com/tebeka/selenium/chrome"
+	slog "github.com/tebeka/selenium/log"
 )
-
-const (
-	// TODO: Choose unused ports dynamically.
-	chromeDriverPort = 8088
-	musicServerAddr  = "localhost:8089"
-	serverURL        = "http://localhost:8080/"
-)
-
-// Globals shared across all tests.
-var wd selenium.WebDriver
-var tester *test.Tester
 
 var (
+	// Globals shared across all tests.
+	serverURL  string             // slash-terminated URL of App Engine server
+	musicSrv   *httptest.Server   // HTTP server for music files
+	webDrv     selenium.WebDriver // talks to browser using ChromeDriver
+	tester     *test.Tester       // interacts with App Engine server
+	browserLog *os.File           // contains log messages from browser
+
 	// Pull some stuff into our namespace for convenience.
 	file0s  = test.Song0s.Filename
 	file1s  = test.Song1s.Filename
@@ -43,13 +44,25 @@ var (
 )
 
 func TestMain(m *testing.M) {
+	binDir := flag.String("bin-dir", "", "Directory containing dump_music (empty to search $PATH)")
+	debug := flag.Bool("debug", false, "Print Selenium debug logs to stderr")
+	headless := flag.Bool("headless", true, "Run Chrome headlessly using Xvfb")
+	flag.StringVar(&serverURL, "server", "http://localhost:8080/", "Slash-terminated URL of dev_appserver.py instance")
+	flag.Parse()
+
 	os.Exit(func() int {
-		//selenium.SetDebug(true)
-		opts := []selenium.ServiceOption{
-			//selenium.StartFrameBuffer(),
-			//selenium.Output(os.Stderr),
+		opts := []selenium.ServiceOption{}
+		if *debug {
+			selenium.SetDebug(true)
+			opts = append(opts, selenium.Output(os.Stderr))
 		}
-		svc, err := selenium.NewChromeDriverService("/usr/local/bin/chromedriver", chromeDriverPort, opts...)
+		if *headless {
+			opts = append(opts, selenium.StartFrameBuffer())
+		}
+
+		chromeDrvPort := findUnusedPort()
+		svc, err := selenium.NewChromeDriverService("/usr/local/bin/chromedriver",
+			chromeDrvPort, opts...)
 		if err != nil {
 			log.Fatal("Failed starting ChromeDriver service: ", err)
 		}
@@ -59,32 +72,37 @@ func TestMain(m *testing.M) {
 		caps.AddChrome(chrome.Capabilities{
 			Args: []string{"--autoplay-policy=no-user-gesture-required"},
 		})
-		wd, err = selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", chromeDriverPort))
+		caps.SetLogLevel(slog.Browser, slog.All)
+		webDrv, err = selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", chromeDrvPort))
 		if err != nil {
 			log.Fatal("Failed connecting to Selenium: ", err)
 		}
-		defer wd.Quit()
+		defer webDrv.Quit()
 
-		tester = test.NewTester(serverURL, "") // TODO: Pass binary path?
+		// Create a file containing messages logged by the web interface.
+		if browserLog, err = ioutil.TempFile("", "nup_web_test-*.txt"); err != nil {
+			log.Fatal("Failed creating browser log: ", err)
+		}
+		fmt.Fprintf(os.Stderr, "Writing browser logs to %v\n", browserLog.Name())
+		defer browserLog.Close()
+		writeLogHeader("Running web tests against " + serverURL)
+		defer writeBrowserLogs()
+
+		tester = test.NewTester(serverURL, *binDir)
 		defer tester.Close()
+		if err := tester.PingServer(); err != nil {
+			log.Fatal("Failed pinging server (is dev_appserver.py running?): ", err)
+		}
 
 		// Serve music files in the background.
 		test.CopySongs(tester.MusicDir, file0s, file1s, file5s, file10s)
 		fs := http.FileServer(http.Dir(tester.MusicDir))
-		ms := &http.Server{
-			Addr: musicServerAddr,
-			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Access-Control-Allow-Credentials", "true")
-				w.Header().Set("Access-Control-Allow-Origin", serverURL)
-				fs.ServeHTTP(w, r)
-			}),
-		}
-		go func() {
-			if err := ms.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Fatal("Failed starting music server")
-			}
-		}()
-		defer ms.Shutdown(context.Background())
+		musicSrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Access-Control-Allow-Origin", serverURL)
+			fs.ServeHTTP(w, r)
+		}))
+		defer musicSrv.Close()
 
 		sendConfig(updatesSucceed)
 		defer tester.SendConfig(nil)
@@ -92,17 +110,17 @@ func TestMain(m *testing.M) {
 		// WebDriver only allows setting cookies for the currently-loaded page,
 		// so we need to load the site before setting the cookie that lets us
 		// skip authentication.
-		if err := wd.Get(serverURL); err != nil {
+		if err := webDrv.Get(serverURL); err != nil {
 			log.Fatalf("Failed loading %v: %v", serverURL, err)
 		}
-		if err := wd.AddCookie(&selenium.Cookie{
+		if err := webDrv.AddCookie(&selenium.Cookie{
 			Name:   config.WebDriverCookie,
 			Value:  "1", // arbitrary
 			Expiry: math.MaxUint32,
 		}); err != nil {
 			log.Fatalf("Failed setting %q cookie: %v", config.WebDriverCookie, err)
 		}
-		if err := wd.Get(serverURL); err != nil {
+		if err := webDrv.Get(serverURL); err != nil {
 			log.Fatalf("Failed reloading %v: %v", serverURL, err)
 		}
 
@@ -110,15 +128,46 @@ func TestMain(m *testing.M) {
 	}())
 }
 
-func initWebTest(t *testing.T) *page {
-	tester.ClearData()
-	return newPage(t, wd)
+// writeLogHeader writes s and a line of dashes to browserLog.
+func writeLogHeader(s string) {
+	fmt.Fprintf(browserLog, "%s\n%s\n", s, strings.Repeat("-", 80))
 }
 
-type songUserData struct {
-	rating float64
-	tags   []string
-	plays  [][2]time.Time // lower/upper bounds for timestamps
+// writeBrowserLogs gets new log messages from the browser and writes them to browserLog.
+func writeBrowserLogs() {
+	msgs, err := webDrv.Log(slog.Browser)
+	if err != nil {
+		fmt.Fprintf(browserLog, "Failed getting browser logs: %v\n", err)
+		return
+	}
+
+	for _, msg := range msgs {
+		ts := msg.Timestamp.Format("15:04:05.000")
+
+		// Log messages usually look like this:
+		//  music-searcher.js 478:18 "Got response with 1 song(s)"
+		// Try to make them more readable by dropping the server URL from the
+		// beginning of the filename and lining up the actual messages.
+		text := strings.TrimPrefix(msg.Message, serverURL)
+		if parts := strings.SplitN(text, " ", 3); len(parts) == 3 &&
+			strings.HasSuffix(parts[0], ".js") && strings.Contains(parts[1], ":") {
+			text = fmt.Sprintf("%-30s %s", parts[0]+" "+parts[1], strings.Trim(parts[2], `"`))
+		}
+
+		fmt.Fprintf(browserLog, "%s %-7s %s\n", ts, msg.Level, text)
+	}
+}
+
+// initWebTest should be called at the beginning of each test.
+// The returned object is used to interact with the web interface via Selenium.
+func initWebTest(t *testing.T) *page {
+	// Copy any browser logs from the previous test and write a header.
+	writeBrowserLogs()
+	io.WriteString(browserLog, "\n")
+	writeLogHeader(t.Name())
+
+	tester.ClearData()
+	return newPage(t, webDrv)
 }
 
 // updatePolicy is passed to sendConfig to control the server's handling of updates.
@@ -130,9 +179,10 @@ const (
 	updatesFail    updatePolicy = true
 )
 
+// sendConfig updates the server's configuration.
 func sendConfig(p updatePolicy) {
 	tester.SendConfig(&config.Config{
-		SongBaseURL:         fmt.Sprintf("http://%s/", musicServerAddr),
+		SongBaseURL:         musicSrv.URL + "/",
 		CoverBaseURL:        "",
 		ForceUpdateFailures: bool(p),
 		Presets: []config.SearchPreset{
@@ -168,64 +218,6 @@ func sendConfig(p updatePolicy) {
 // importSongs posts the supplied db.Song or []db.Song args to the server.
 func importSongs(songs ...interface{}) {
 	tester.PostSongs(joinSongs(songs...), true, 0)
-}
-
-func newSongUserData(rating float64, tags []string, plays ...[2]time.Time) songUserData {
-	d := songUserData{rating, tags, plays}
-	sort.Slice(d.plays, func(i, j int) bool { return d.plays[i][0].Before(d.plays[j][0]) })
-	return d
-}
-
-func checkServerUserData(t *testing.T, want map[string]songUserData) {
-	getData := func() map[string]songUserData {
-		m := make(map[string]songUserData)
-		for _, s := range tester.DumpSongs(test.KeepIDs) {
-			var plays [][2]time.Time
-			for _, p := range s.Plays {
-				plays = append(plays, [2]time.Time{p.StartTime, p.StartTime})
-			}
-			data := newSongUserData(s.Rating, s.Tags, plays...)
-			m[s.SHA1] = data
-		}
-		return m
-	}
-	if err := wait(func() error {
-		got := getData()
-		for sha1, wd := range want {
-			gd, ok := got[sha1]
-			if !ok {
-				return fmt.Errorf("%v missing from server", sha1)
-			}
-			if gd.rating != wd.rating {
-				return fmt.Errorf("%v rating is %.2f; want %.2f", sha1, gd.rating, wd.rating)
-			}
-
-			if wd.tags != nil {
-				sort.Strings(gd.tags)
-				sort.Strings(wd.tags)
-				if !reflect.DeepEqual(gd.tags, wd.tags) {
-					return fmt.Errorf("%v tags are %v; want %v", sha1, gd.tags, wd.tags)
-				}
-			}
-
-			if wd.plays != nil {
-				if len(gd.plays) != len(wd.plays) {
-					return fmt.Errorf("%v has %v play(s); want %v", sha1, len(gd.plays), len(wd.plays))
-				}
-				for i := range gd.plays {
-					if gp, wp := gd.plays[i], wd.plays[i]; gp[0].Before(wp[0]) || gp[0].After(wp[1]) {
-						return fmt.Errorf("%v play %d has time %v outside of [%v, %v]",
-							sha1, i, gp[0], wp[0], wp[1])
-					}
-				}
-			}
-		}
-		return nil
-	}); err != nil {
-		// TODO: Consider dumping all data.
-		msg := fmt.Sprintf("Bad server user data for %v: %v\n", caller(), err)
-		t.Fatal(msg)
-	}
 }
 
 func TestKeywordQuery(t *testing.T) {
@@ -418,7 +410,7 @@ func TestSearchResultCheckboxes(t *testing.T) {
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked)
 
 	// Click the first song to deselect it.
-	page.clickSearchResultsSongCheckbox(0, "")
+	page.clickSongRowCheckbox(searchResultsTable, 0, "")
 	page.checkSearchResults(songs, hasChecked(false, true, true))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked|checkboxTransparent)
 
@@ -428,21 +420,21 @@ func TestSearchResultCheckboxes(t *testing.T) {
 	page.checkCheckbox(searchResultsCheckbox, 0)
 
 	// Click the first and second songs individually to select them.
-	page.clickSearchResultsSongCheckbox(0, "")
-	page.clickSearchResultsSongCheckbox(1, "")
+	page.clickSongRowCheckbox(searchResultsTable, 0, "")
+	page.clickSongRowCheckbox(searchResultsTable, 1, "")
 	page.checkSearchResults(songs, hasChecked(true, true, false))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked|checkboxTransparent)
 
 	// Click the third song to select it as well.
-	page.clickSearchResultsSongCheckbox(2, "")
+	page.clickSongRowCheckbox(searchResultsTable, 2, "")
 	page.checkSearchResults(songs, hasChecked(true, true, true))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked)
 
 	// Shift-click from the first to third song to select all songs.
 	page.click(searchResultsCheckbox)
 	page.checkSearchResults(songs, hasChecked(false, false, false))
-	page.clickSearchResultsSongCheckbox(0, selenium.ShiftKey)
-	page.clickSearchResultsSongCheckbox(2, selenium.ShiftKey)
+	page.clickSongRowCheckbox(searchResultsTable, 0, selenium.ShiftKey)
+	page.clickSongRowCheckbox(searchResultsTable, 2, selenium.ShiftKey)
 	page.checkSearchResults(songs, hasChecked(true, true, true))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked)
 }
@@ -559,25 +551,25 @@ func TestContextMenu(t *testing.T) {
 	page.checkSong(song1, isPaused(false))
 	page.checkPlaylist(songs, hasActive(0))
 
-	page.rightClickPlaylistSong(3)
+	page.rightClickSongRow(playlistTable, 3)
 	page.checkPlaylist(songs, hasMenu(3))
 	page.click(menuPlay)
 	page.checkSong(song4, isPaused(false))
 	page.checkPlaylist(songs, hasActive(3))
 
-	page.rightClickPlaylistSong(2)
+	page.rightClickSongRow(playlistTable, 2)
 	page.checkPlaylist(songs, hasMenu(2))
 	page.click(menuPlay)
 	page.checkSong(song3, isPaused(false))
 	page.checkPlaylist(songs, hasActive(2))
 
-	page.rightClickPlaylistSong(0)
+	page.rightClickSongRow(playlistTable, 0)
 	page.checkPlaylist(songs, hasMenu(0))
 	page.click(menuRemove)
 	page.checkSong(song3, isPaused(false))
 	page.checkPlaylist(joinSongs(song2, song3, song4, song5), hasActive(1))
 
-	page.rightClickPlaylistSong(1)
+	page.rightClickSongRow(playlistTable, 1)
 	page.checkPlaylist(joinSongs(song2, song3, song4, song5), hasMenu(1))
 	page.click(menuTruncate)
 	page.checkSong(song2, isPaused(true))
@@ -668,6 +660,7 @@ func TestRateAndTag(t *testing.T) {
 
 	page.setText(keywordsInput, song.Artist)
 	page.click(luckyButton)
+	page.checkSong(song, isPaused(false))
 	page.click(playPauseButton)
 	page.checkSong(song, isPaused(true), hasRating(threeStars),
 		hasImgTitle("Rating: ★★★☆☆\nTags: guitar rock"))
@@ -792,14 +785,14 @@ func TestOptions(t *testing.T) {
 	// I *think* that this clicks the middle of the range. This might be a
 	// no-op since it should be 0, which is the default. :-/
 	page.click(preAmpRange)
-	origPreAmp := page.getAttr(preAmpRange, "value")
+	origPreAmp := page.getAttrOrFail(page.getOrFail(preAmpRange), "value", false)
 
 	page.click(optionsOKButton)
 	page.checkGone(optionsOKButton)
 
 	// Escape should dismiss the dialog.
 	show()
-	page.sendKeys(optionsOKButton, selenium.EscapeKey, false)
+	page.sendKeys(body, selenium.EscapeKey, false)
 	page.checkGone(optionsOKButton)
 
 	page.reload()

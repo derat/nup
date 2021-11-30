@@ -19,6 +19,21 @@ import (
 	"github.com/derat/nup/server/db"
 )
 
+// Caller walks down the call stack and returns the first test file
+// that it sees as e.g. "foo_test.go:53".
+func Caller() string {
+	for skip := 1; true; skip++ {
+		_, file, line, ok := runtime.Caller(skip)
+		if !ok {
+			break
+		}
+		if strings.HasSuffix(file, "_test.go") {
+			return fmt.Sprintf("%s:%d", filepath.Base(file), line)
+		}
+	}
+	return "unknown"
+}
+
 // GetDataDir returns the test data dir relative to the caller.
 func GetDataDir() string {
 	_, p, _, ok := runtime.Caller(0)

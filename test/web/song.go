@@ -5,6 +5,10 @@ package web
 
 import (
 	"fmt"
+	"reflect"
+	"sort"
+	"strings"
+	"testing"
 	"time"
 
 	"github.com/derat/nup/server/db"
@@ -215,4 +219,99 @@ func songInfoSlicesEqual(want, got []songInfo) bool {
 		}
 	}
 	return true
+}
+
+// songUserData holds expected user data from the server for a single song.
+type songUserData struct {
+	rating float64
+	tags   []string       // nil means don't check
+	plays  [][2]time.Time // lower/upper bounds for timestamps, nil means don't check
+}
+
+func newSongUserData(rating float64, tags []string, plays ...[2]time.Time) songUserData {
+	d := songUserData{rating, tags, plays}
+	sort.Slice(d.plays, func(i, j int) bool { return d.plays[i][0].Before(d.plays[j][0]) })
+	return d
+}
+
+const timeFmt = "2006-01-02-15:04:05"
+
+func (d *songUserData) String() string {
+	s := fmt.Sprintf("rating=%.2f", d.rating)
+	if d.tags != nil {
+		s += fmt.Sprintf(" tags=%q", d.tags)
+	}
+	if d.plays != nil {
+		var ps []string
+		for _, p := range d.plays {
+			if p[0].Equal(p[1]) {
+				ps = append(ps, p[0].Local().Format(timeFmt))
+			} else {
+				ps = append(ps, p[0].Local().Format(timeFmt)+"/"+p[1].Local().Format(timeFmt))
+			}
+		}
+		s += fmt.Sprintf(" plays=[%s]", strings.Join(ps, " "))
+	}
+	return s
+}
+
+// checkServerUserData verifies that for every song in want (keyed by SHA1),
+// the server contains the expected user data. The tested is failed if any
+// mismatches are found.
+func checkServerUserData(t *testing.T, want map[string]songUserData) {
+	var got map[string]songUserData
+	if err := wait(func() error {
+		got = make(map[string]songUserData)
+		for _, s := range tester.DumpSongs(test.KeepIDs) {
+			var plays [][2]time.Time
+			for _, p := range s.Plays {
+				plays = append(plays, [2]time.Time{p.StartTime, p.StartTime})
+			}
+			data := newSongUserData(s.Rating, s.Tags, plays...)
+			got[s.SHA1] = data
+		}
+
+		for sha1, wd := range want {
+			gd, ok := got[sha1]
+			if !ok {
+				return fmt.Errorf("%v missing from server", sha1)
+			}
+			if gd.rating != wd.rating {
+				return fmt.Errorf("%v rating is %.2f; want %.2f", sha1, gd.rating, wd.rating)
+			}
+
+			if wd.tags != nil {
+				sort.Strings(gd.tags)
+				sort.Strings(wd.tags)
+				if !reflect.DeepEqual(gd.tags, wd.tags) {
+					return fmt.Errorf("%v tags are %v; want %v", sha1, gd.tags, wd.tags)
+				}
+			}
+
+			if wd.plays != nil {
+				if len(gd.plays) != len(wd.plays) {
+					return fmt.Errorf("%v has %v play(s); want %v", sha1, len(gd.plays), len(wd.plays))
+				}
+				for i := range gd.plays {
+					if gp, wp := gd.plays[i], wd.plays[i]; gp[0].Before(wp[0]) || gp[0].After(wp[1]) {
+						return fmt.Errorf("%v play %d has time %v outside of [%v, %v]",
+							sha1, i, gp[0], wp[0], wp[1])
+					}
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		msg := fmt.Sprintf("Bad server user data for %v: %v\n", test.Caller(), err)
+		for sha1, wd := range want {
+			msg += fmt.Sprintf("Song %q:\n", sha1)
+			msg += "  Want: " + wd.String() + "\n"
+			if gd, ok := got[sha1]; ok {
+				msg += "  Got:  " + gd.String() + "\n"
+			} else {
+				msg += "  Got:  [missing]\n"
+			}
+		}
+		t.Fatal(msg)
+	}
 }
