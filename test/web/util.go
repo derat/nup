@@ -11,10 +11,12 @@ import (
 	"time"
 )
 
+// wait calls waitFull with reasonable defaults.
 func wait(f func() error) error {
 	return waitFull(f, 10*time.Second, 10*time.Millisecond)
 }
 
+// waitFull waits up to timeout for f to return nil, sleeping sleep between attempts.
 func waitFull(f func() error, timeout time.Duration, sleep time.Duration) error {
 	start := time.Now()
 	for {
@@ -29,7 +31,9 @@ func waitFull(f func() error, timeout time.Duration, sleep time.Duration) error 
 	}
 }
 
-func testInfo() string {
+// caller walks down the call stack and returns the first test file
+// that it sees as e.g. "foo_test.go:53".
+func caller() string {
 	for skip := 1; true; skip++ {
 		_, file, line, ok := runtime.Caller(skip)
 		if !ok {

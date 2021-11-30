@@ -5,8 +5,6 @@ package web
 
 import (
 	"fmt"
-	"path"
-	"strings"
 	"time"
 
 	"github.com/derat/nup/server/db"
@@ -80,107 +78,134 @@ func joinSongs(songs ...interface{}) []db.Song {
 // songInfo contains information about a song in the web interface.
 type songInfo struct {
 	artist, title, album  string
-	active, checked, menu bool   // song row is active, checked, or has context menu
-	paused, ended         bool   // audio element is paused or ended
-	src                   string // audio element src attribute
-	time                  string // displayed time, e.g. "[ 0:00 / 0:05 ]"
+	active, checked, menu *bool   // song row is active, checked, or has context menu
+	paused, ended         *bool   // audio element is paused or ended
+	filename              *string // filename from audio element src attribute
+	time                  *string // displayed time, e.g. "[ 0:00 / 0:05 ]"
+}
+
+// makeSongInfo constructs a basic songInfo using data from s.
+func makeSongInfo(s db.Song) songInfo {
+	return songInfo{
+		artist: s.Artist,
+		title:  s.Title,
+		album:  s.Album,
+	}
 }
 
 func (s songInfo) String() string {
 	str := fmt.Sprintf("%q %q %q", s.artist, s.title, s.album)
 	for _, f := range []struct {
-		name string
-		val  bool
+		pos, neg string
+		val      *bool
 	}{
-		{"active", s.active},
-		{"checked", s.checked},
-		{"ended", s.ended},
-		{"menu", s.menu},
-		{"paused", s.paused},
+		{"active", "inactive", s.active},
+		{"checked", "unchecked", s.checked},
+		{"ended", "unended", s.ended},
+		{"menu", "no-menu", s.menu},
+		{"paused", "playing", s.paused},
 	} {
-		if f.val {
-			str += " " + f.name
+		if f.val != nil {
+			if *f.val {
+				str += " " + f.pos
+			} else {
+				str += " " + f.neg
+			}
 		}
 	}
-	if s.src != "" {
-		str += fmt.Sprintf(" %q", path.Base(s.src))
+	if s.filename != nil {
+		str += " filename=" + *s.filename
 	}
-	if s.time != "" {
-		str += fmt.Sprintf(" %q", s.time)
+	if s.time != nil {
+		str += " time=" + *s.time
 	}
 	return "[" + str + "]"
 }
 
-type songFlags uint32
+// songOpt specifies a check to perform on a song.
+type songOpt func(*songInfo)
 
-const (
-	songActive songFlags = 1 << iota
-	songNotActive
-	songChecked
-	songNotChecked
-	songEnded
-	songNotEnded
-	songMenu
-	songNoMenu
-	songPaused
-	songNotPaused
-)
+// songPaused indicates that the song should be paused or not paused.
+func songPaused(p bool) songOpt { return func(i *songInfo) { i.paused = &p } }
 
-func compareSongInfo(got songInfo, want db.Song, flags songFlags, cfg *songConfig) bool {
-	if got.artist != want.Artist || got.title != want.Title || got.album != want.Album {
+// songEnded indicates that the song should be ended or not ended.
+func songEnded(e bool) songOpt { return func(i *songInfo) { i.ended = &e } }
+
+// songTime indicates the playback time that should be displayed, e.g. "[ 0:00 / 0:05 ]".
+func songTime(s string) songOpt { return func(i *songInfo) { i.time = &s } }
+
+// songFilename contains the filename from the audio element's src property.
+func songFilename(f string) songOpt { return func(i *songInfo) { i.filename = &f } }
+
+// compareSongInfo returns true if want and got have the same artist, title, and album
+// and any additional optional fields specified in want also match.
+func compareSongInfo(want, got songInfo) bool {
+	if want.artist != got.artist || want.title != got.title || want.album != got.album {
 		return false
 	}
-	for _, f := range []struct {
-		pos, neg songFlags
-		val      bool
+	for _, t := range []struct {
+		want *bool
+		got  *bool
 	}{
-		{songActive, songNotActive, got.active},
-		{songChecked, songNotChecked, got.checked},
-		{songEnded, songNotEnded, got.ended},
-		{songMenu, songNoMenu, got.menu},
-		{songPaused, songNotPaused, got.paused},
+		{want.active, got.active},
+		{want.checked, got.checked},
+		{want.ended, got.ended},
+		{want.menu, got.menu},
+		{want.paused, got.paused},
 	} {
-		if (flags&f.pos != 0 && !f.val) || (flags&f.neg != 0 && f.val) {
+		if t.want != nil && (t.got == nil || *t.got != *t.want) {
 			return false
 		}
 	}
-	if cfg != nil {
-		if cfg.time != "" && cfg.time != got.time {
-			return false
-		}
-		if cfg.filename != "" && !strings.HasSuffix(got.src, "/"+cfg.filename) {
-			return false
-		}
+	if want.time != nil && (got.time == nil || *want.time != *got.time) {
+		return false
+	}
+	if want.filename != nil && (got.filename == nil || *want.filename != *got.filename) {
+		return false
 	}
 	return true
 }
 
-func compareSongInfos(got []songInfo, want []db.Song, checked []bool, active, menu int) bool {
-	if len(got) != len(want) {
+// songListOpt specifies a check to perform on a list of songs.
+type songListOpt func([]songInfo)
+
+// songListChecked checks that songs' checkboxes match vals.
+func songListChecked(vals ...bool) songListOpt {
+	return func(infos []songInfo) {
+		for i := range infos {
+			infos[i].checked = &vals[i]
+		}
+	}
+}
+
+// songListActive indicates that the song at idx should be active.
+func songListActive(idx int) songListOpt {
+	return func(infos []songInfo) {
+		for i := range infos {
+			v := i == idx
+			infos[i].active = &v
+		}
+	}
+}
+
+// songListMenu indicates that a context menu should be shown for the song at idx.
+func songListMenu(idx int) songListOpt {
+	return func(infos []songInfo) {
+		for i := range infos {
+			v := i == idx
+			infos[i].menu = &v
+		}
+	}
+}
+
+// compareSongInfos returns true if want and got are the same length
+// compareSongInfo returns true for corresponding elements.
+func compareSongInfos(want, got []songInfo) bool {
+	if len(want) != len(got) {
 		return false
 	}
-	for i := range got {
-		var flags songFlags
-		if checked != nil {
-			if checked[i] {
-				flags |= songChecked
-			} else {
-				flags |= songNotChecked
-			}
-		}
-		if active >= 0 {
-			if active == i {
-				flags |= songActive
-			} else {
-				flags |= songNotActive
-			}
-		}
-		if menu == i {
-			flags |= songMenu
-		} else {
-			flags |= songNoMenu
-		}
-		if !compareSongInfo(got[i], want[i], flags, nil) {
+	for i := range want {
+		if !compareSongInfo(want[i], got[i]) {
 			return false
 		}
 	}

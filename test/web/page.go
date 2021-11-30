@@ -6,6 +6,7 @@ package web
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -112,8 +113,9 @@ func isStaleElementError(err error) bool {
 
 // page is used by tests to interact with the web interface.
 type page struct {
-	t  *testing.T
-	wd selenium.WebDriver
+	t     *testing.T
+	wd    selenium.WebDriver
+	stage string
 }
 
 func newPage(t *testing.T, wd selenium.WebDriver) *page {
@@ -123,7 +125,21 @@ func newPage(t *testing.T, wd selenium.WebDriver) *page {
 	if _, err := wd.ExecuteScript("document.test.reset()", nil); err != nil {
 		t.Fatal("Failed resetting page: ", err)
 	}
-	return &page{t, wd}
+	return &page{t, wd, ""}
+}
+
+// setStage sets a short human-readable string that will be included in failure messages.
+// This is useful for tests that iterate over multiple cases.
+func (p *page) setStage(stage string) {
+	p.stage = stage
+}
+
+func (p *page) desc() string {
+	s := caller()
+	if p.stage != "" {
+		s += " (" + p.stage + ")"
+	}
+	return s
 }
 
 // get returns the element matched by locs.
@@ -141,7 +157,7 @@ func (p *page) get(locs []loc) (selenium.WebElement, error) {
 func (p *page) getOrFail(locs []loc) selenium.WebElement {
 	el, err := p.get(locs)
 	if err != nil {
-		p.t.Fatalf("Failed getting %v for %v: %v", locs, testInfo(), err)
+		p.t.Fatalf("Failed getting %v for %v: %v", locs, p.desc(), err)
 	}
 	return el
 }
@@ -187,7 +203,7 @@ func (p *page) getTextOrFail(el selenium.WebElement, ignoreStale bool) string {
 	if ignoreStale && isStaleElementError(err) {
 		return ""
 	} else if err != nil {
-		p.t.Fatalf("Failed getting element text for %v: %v", testInfo(), err)
+		p.t.Fatalf("Failed getting element text for %v: %v", p.desc(), err)
 	}
 	return text
 }
@@ -201,7 +217,7 @@ func (p *page) getAttrOrFail(el selenium.WebElement, name string, ignoreStale bo
 	} else if ignoreStale && isStaleElementError(err) {
 		return ""
 	} else if err != nil {
-		p.t.Fatalf("Failed getting attribute %q for %v: %v", name, testInfo(), err)
+		p.t.Fatalf("Failed getting attribute %q for %v: %v", name, p.desc(), err)
 	}
 	return val
 }
@@ -213,7 +229,7 @@ func (p *page) getSelectedOrFail(el selenium.WebElement, ignoreStale bool) bool 
 	if ignoreStale && isStaleElementError(err) {
 		return false
 	} else if err != nil {
-		p.t.Fatalf("Failed getting selected state for %v: %v", testInfo(), err)
+		p.t.Fatalf("Failed getting selected state for %v: %v", p.desc(), err)
 	}
 	return sel
 }
@@ -223,7 +239,7 @@ func (p *page) getSongsFromTable(table selenium.WebElement) []songInfo {
 	var songs []songInfo
 	rows, err := table.FindElements(selenium.ByTagName, "tr")
 	if err != nil {
-		p.t.Fatalf("Failed getting song rows for %v: %v", testInfo(), err)
+		p.t.Fatalf("Failed getting song rows for %v: %v", p.desc(), err)
 	}
 	if len(rows) == 0 {
 		return nil
@@ -233,7 +249,7 @@ func (p *page) getSongsFromTable(table selenium.WebElement) []songInfo {
 		if isStaleElementError(err) {
 			break // table was modified while we were reading it
 		} else if err != nil {
-			p.t.Fatalf("Failed getting song columns for %v: %v", testInfo(), err)
+			p.t.Fatalf("Failed getting song columns for %v: %v", p.desc(), err)
 		}
 		// Final column is time; first column may be checkbox.
 		song := songInfo{
@@ -241,16 +257,21 @@ func (p *page) getSongsFromTable(table selenium.WebElement) []songInfo {
 			title:  p.getTextOrFail(cols[len(cols)-3], true),
 			album:  p.getTextOrFail(cols[len(cols)-2], true),
 		}
+
 		// TODO: Copy time from last column.
 		class := p.getAttrOrFail(row, "class", true)
-		song.active = strings.Contains(class, "active")
-		song.menu = strings.Contains(class, "menu")
+		active := strings.Contains(class, "active")
+		song.active = &active
+		menu := strings.Contains(class, "menu")
+		song.menu = &menu
+
 		if len(cols) == 5 {
 			el, err := cols[0].FindElement(selenium.ByTagName, "input")
 			if err == nil {
-				song.checked = p.getSelectedOrFail(el, true)
+				checked := p.getSelectedOrFail(el, true)
+				song.checked = &checked
 			} else if !isStaleElementError(err) {
-				p.t.Fatalf("Failed getting checkbox for %v: %v", testInfo(), err)
+				p.t.Fatalf("Failed getting checkbox for %v: %v", p.desc(), err)
 			}
 		}
 		songs = append(songs, song)
@@ -258,106 +279,65 @@ func (p *page) getSongsFromTable(table selenium.WebElement) []songInfo {
 	return songs
 }
 
-// searchResultsOpt is an option for checkSearchResults.
-type searchResultsOpt func(cfg *searchResultsConfig)
-
-// searchResultsChecked checks that songs' checkboxes match vals.
-func searchResultsChecked(vals ...bool) searchResultsOpt {
-	return func(cfg *searchResultsConfig) { cfg.checked = vals }
-}
-
-// searchResultsDesc supplied a descriptive string to be included in failure messages.
-func searchResultsDesc(d string) searchResultsOpt {
-	return func(cfg *searchResultsConfig) { cfg.desc = d }
-}
-
-type searchResultsConfig struct {
-	desc    string
-	checked []bool // checked state of each song
-}
-
-// checkSearchResults waits for the search results table to contain the songs in want.
-func (p *page) checkSearchResults(want []db.Song, opts ...searchResultsOpt) {
-	var cfg searchResultsConfig
-	for _, o := range opts {
-		o(&cfg)
+// checkSearchResults waits for the search results table to contain songs.
+func (p *page) checkSearchResults(songs []db.Song, opts ...songListOpt) {
+	want := make([]songInfo, len(songs))
+	for i := range songs {
+		want[i] = makeSongInfo(songs[i])
 	}
+	for _, o := range opts {
+		o(want)
+	}
+
 	table := p.getOrFail(searchResultsTable)
 	if err := wait(func() error {
 		got := p.getSongsFromTable(table)
-		if !compareSongInfos(got, want, cfg.checked, -1 /* active */, -1 /* menu */) {
+		if !compareSongInfos(want, got) {
 			return errors.New("songs don't match")
 		}
 		return nil
 	}); err != nil {
 		got := p.getSongsFromTable(table)
-		msg := fmt.Sprintf("Bad search results for %v", testInfo())
-		if cfg.desc != "" {
-			msg += fmt.Sprintf(" (%v)", cfg.desc)
-		}
-		msg += "\nGot:\n"
-		for _, s := range got {
+		msg := fmt.Sprintf("Bad search results for %v\n", p.desc())
+		msg += "Want:\n"
+		for _, s := range want {
 			msg += "  " + s.String() + "\n"
 		}
-		msg += "Want:\n"
-		for i, s := range want {
-			// This matches songInfo.String().
-			str := fmt.Sprintf("%q %q %q", s.Artist, s.Title, s.Album)
-			if cfg.checked != nil && cfg.checked[i] {
-				str += " checked"
-			}
-			msg += "  [" + str + "]\n"
+		msg += "Got:\n"
+		for _, s := range got {
+			msg += "  " + s.String() + "\n"
 		}
 		p.t.Fatal(msg)
 	}
 }
 
-// playlistOpt is an option for checkPlaylist.
-type playlistOpt func(cfg *playlistConfig)
-
-// playlistActive indicates that the song at idx should be active.
-func playlistActive(idx int) playlistOpt {
-	return func(cfg *playlistConfig) { cfg.active = idx }
-}
-
-// playlistMenu indicates that a context menu should be shown for the song at idx.
-func playlistMenu(idx int) playlistOpt {
-	return func(cfg *playlistConfig) { cfg.menu = idx }
-}
-
-type playlistConfig struct {
-	active int // 0-based index of active song
-	menu   int // 0-based index of song with context menu
-}
-
-// checkPlaylist waits for the playlist table to contain the songs in want.
-func (p *page) checkPlaylist(want []db.Song, opts ...playlistOpt) {
-	cfg := playlistConfig{active: -1, menu: -1}
-	for _, o := range opts {
-		o(&cfg)
+// checkPlaylist waits for the playlist table to contain songs.
+func (p *page) checkPlaylist(songs []db.Song, opts ...songListOpt) {
+	want := make([]songInfo, len(songs))
+	for i := range songs {
+		want[i] = makeSongInfo(songs[i])
 	}
+	for _, o := range opts {
+		o(want)
+	}
+
 	table := p.getOrFail(playlistTable)
 	if err := wait(func() error {
 		got := p.getSongsFromTable(table)
-		if !compareSongInfos(got, want, nil /* checked */, cfg.active, cfg.menu) {
+		if !compareSongInfos(want, got) {
 			return errors.New("songs don't match")
 		}
 		return nil
 	}); err != nil {
 		got := p.getSongsFromTable(table)
-		msg := fmt.Sprintf("Bad playlist for %v\n", testInfo())
+		msg := fmt.Sprintf("Bad playlist for %v\n", p.desc())
+		msg += "Want:\n"
+		for _, s := range want {
+			msg += "  " + s.String() + "\n"
+		}
 		msg += "Got:\n"
 		for _, s := range got {
 			msg += "  " + s.String() + "\n"
-		}
-		msg += "Want:\n"
-		for i, s := range want {
-			// This matches songInfo.String().
-			str := fmt.Sprintf("%q %q %q", s.Artist, s.Title, s.Album)
-			if cfg.active >= 0 && cfg.active == i {
-				str += " active"
-			}
-			msg += "  [" + str + "]\n"
 		}
 		p.t.Fatal(msg)
 	}
@@ -367,17 +347,17 @@ func (p *page) checkPlaylist(want []db.Song, opts ...playlistOpt) {
 func (p *page) setText(locs []loc, text string) {
 	el := p.getOrFail(locs)
 	if err := el.Clear(); err != nil {
-		p.t.Fatalf("Failed clearing %v for %v: %v", locs, testInfo(), err)
+		p.t.Fatalf("Failed clearing %v for %v: %v", locs, p.desc(), err)
 	}
 	if err := el.SendKeys(text); err != nil {
-		p.t.Fatalf("Failed sending keys to %v for %v: %v", locs, testInfo(), err)
+		p.t.Fatalf("Failed sending keys to %v for %v: %v", locs, p.desc(), err)
 	}
 }
 
 // click clicks on the element matched by locs.
 func (p *page) click(locs []loc) {
 	if err := p.getOrFail(locs).Click(); err != nil {
-		p.t.Fatalf("Failed clicking %v for %v: %v", locs, testInfo(), err)
+		p.t.Fatalf("Failed clicking %v for %v: %v", locs, p.desc(), err)
 	}
 }
 
@@ -385,17 +365,17 @@ func (p *page) click(locs []loc) {
 func (p *page) clickOption(sel []loc, option string) {
 	opts, err := p.getOrFail(sel).FindElements(selenium.ByTagName, "option")
 	if err != nil {
-		p.t.Fatalf("Failed getting %v options for %v: %v", sel, testInfo(), err)
+		p.t.Fatalf("Failed getting %v options for %v: %v", sel, p.desc(), err)
 	}
 	for _, opt := range opts {
 		if strings.TrimSpace(p.getTextOrFail(opt, false)) == option {
 			if err := opt.Click(); err != nil {
-				p.t.Fatalf("Failed clicking %v option %q for %v: %v", sel, option, testInfo(), err)
+				p.t.Fatalf("Failed clicking %v option %q for %v: %v", sel, option, p.desc(), err)
 			}
 			return
 		}
 	}
-	p.t.Fatalf("Failed finding %v option %q for %v: %v", sel, option, testInfo(), err)
+	p.t.Fatalf("Failed finding %v option %q for %v: %v", sel, option, p.desc(), err)
 }
 
 type checkboxState uint32
@@ -410,11 +390,11 @@ const (
 func (p *page) checkCheckbox(locs []loc, state checkboxState) {
 	el := p.getOrFail(locs)
 	if got, want := p.getSelectedOrFail(el, false), state&checkboxChecked != 0; got != want {
-		p.t.Fatalf("Checkbox %v has checked state %v for %v; want %v", locs, got, testInfo(), want)
+		p.t.Fatalf("Checkbox %v has checked state %v for %v; want %v", locs, got, p.desc(), want)
 	}
 	class := p.getAttrOrFail(el, "class", false)
 	if got, want := strings.Contains(class, "transparent"), state&checkboxTransparent != 0; got != want {
-		p.t.Fatalf("Checkbox %v has transparent state %v for %v; want %v", locs, got, testInfo(), want)
+		p.t.Fatalf("Checkbox %v has transparent state %v for %v; want %v", locs, got, p.desc(), want)
 	}
 }
 
@@ -426,20 +406,20 @@ func (p *page) clickSearchResultsSongCheckbox(idx int, key string) {
 	sel := fmt.Sprintf("tr:nth-child(%d) td:first-child input", idx+1)
 	cb, err := table.FindElement(selenium.ByCSSSelector, sel)
 	if err != nil {
-		p.t.Fatalf("Failed finding checkbox %d (%q) for %v: %v", idx, sel, testInfo(), err)
+		p.t.Fatalf("Failed finding checkbox %d (%q) for %v: %v", idx, sel, p.desc(), err)
 	}
 	if key != "" {
 		if err := p.wd.KeyDown(key); err != nil {
-			p.t.Fatalf("Failed pressing key before clicking checkbox %d for %v: %v", idx, testInfo(), err)
+			p.t.Fatalf("Failed pressing key before clicking checkbox %d for %v: %v", idx, p.desc(), err)
 		}
 		defer func() {
 			if err := p.wd.KeyUp(key); err != nil {
-				p.t.Fatalf("Failed releasing key after clicking checkbox %d for %v: %v", idx, testInfo(), err)
+				p.t.Fatalf("Failed releasing key after clicking checkbox %d for %v: %v", idx, p.desc(), err)
 			}
 		}()
 	}
 	if err := cb.Click(); err != nil {
-		p.t.Fatalf("Failed clicking checkbox %d for %v: %v", idx, testInfo(), err)
+		p.t.Fatalf("Failed clicking checkbox %d for %v: %v", idx, p.desc(), err)
 	}
 }
 
@@ -449,78 +429,57 @@ func (p *page) rightClickPlaylistSong(idx int) {
 	sel := fmt.Sprintf("tbody tr:nth-child(%d)", idx+1)
 	row, err := table.FindElement(selenium.ByCSSSelector, sel)
 	if err != nil {
-		p.t.Fatalf("Failed finding playlist song %d (%q) for %v: %v", idx, sel, testInfo(), err)
+		p.t.Fatalf("Failed finding playlist song %d (%q) for %v: %v", idx, sel, p.desc(), err)
 	}
 	if err := row.MoveTo(3, 3); err != nil {
-		p.t.Fatalf("Failed moving mouse to playlist song for %v: %v", testInfo(), err)
+		p.t.Fatalf("Failed moving mouse to playlist song for %v: %v", p.desc(), err)
 	}
 	if err := p.wd.Click(selenium.RightButton); err != nil {
-		p.t.Fatalf("Failed right-clicking on playlist song for %v: %v", testInfo(), err)
+		p.t.Fatalf("Failed right-clicking on playlist song for %v: %v", p.desc(), err)
 	}
 }
 
-// songOpt is an option for checkSong.
-type songOpt func(cfg *songConfig)
-
-// songTime indicates the playback time that should be displayed, e.g. "[ 0:00 / 0:05 ]".
-func songTime(s string) songOpt {
-	return func(cfg *songConfig) { cfg.time = s }
-}
-
-// songFilename contains the filename from the audio element's src property.
-func songFilename(fn string) songOpt {
-	return func(cfg *songConfig) { cfg.filename = fn }
-}
-
-type songConfig struct {
-	time, filename string
-}
-
-// checkSong verifies that the current song matches want.
-func (p *page) checkSong(want db.Song, flags songFlags, opts ...songOpt) {
-	var cfg songConfig
+// checkSong verifies that the current song matches s plus any supplied options.
+func (p *page) checkSong(s db.Song, opts ...songOpt) {
+	want := makeSongInfo(s)
 	for _, o := range opts {
-		o(&cfg)
+		o(&want)
 	}
+
 	getSong := func() songInfo {
+		time := p.getTextOrFail(p.getOrFail(timeDiv), false)
 		au := p.getOrFail(audio)
+		paused := p.getAttrOrFail(au, "paused", true) != ""
+		ended := p.getAttrOrFail(au, "ended", true) != ""
+
+		var filename string
+		src := p.getAttrOrFail(au, "src", true)
+		if u, err := url.Parse(src); err == nil {
+			filename = u.Query().Get("filename")
+		}
+
 		return songInfo{
-			artist: p.getTextOrFail(p.getOrFail(artistDiv), false),
-			title:  p.getTextOrFail(p.getOrFail(titleDiv), false),
-			album:  p.getTextOrFail(p.getOrFail(albumDiv), false),
-			time:   p.getTextOrFail(p.getOrFail(timeDiv), false),
-			paused: p.getAttrOrFail(au, "paused", true) != "",
-			ended:  p.getAttrOrFail(au, "ended", true) != "",
-			src:    p.getAttrOrFail(au, "src", true),
+			artist:   p.getTextOrFail(p.getOrFail(artistDiv), false),
+			title:    p.getTextOrFail(p.getOrFail(titleDiv), false),
+			album:    p.getTextOrFail(p.getOrFail(albumDiv), false),
+			paused:   &paused,
+			ended:    &ended,
+			filename: &filename,
+			time:     &time,
 		}
 	}
 
 	if err := wait(func() error {
 		got := getSong()
-		if !compareSongInfo(got, want, flags, &cfg) {
+		if !compareSongInfo(want, got) {
 			return errors.New("songs don't match")
 		}
 		return nil
 	}); err != nil {
 		got := getSong()
-		msg := fmt.Sprintf("Bad song for %v", testInfo())
-		msg += "\nGot:  " + got.String() + "\n"
-		msg += "Want: "
-		// This matches songInfo.String().
-		str := fmt.Sprintf("%q %q %q", want.Artist, want.Title, want.Album)
-		if flags&songEnded != 0 {
-			str += " ended"
-		}
-		if flags&songPaused != 0 {
-			str += " paused"
-		}
-		if cfg.filename != "" {
-			str += fmt.Sprintf(" %q", cfg.filename)
-		}
-		if cfg.time != "" {
-			str += fmt.Sprintf(" %q", cfg.time)
-		}
-		msg += "[" + str + "]\n"
+		msg := fmt.Sprintf("Bad song for %v\n", p.desc())
+		msg += "Want: " + want.String() + "\n"
+		msg += "Got:  " + got.String()
 		p.t.Fatal(msg)
 	}
 }

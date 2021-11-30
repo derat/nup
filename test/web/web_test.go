@@ -116,17 +116,20 @@ type songUserData struct {
 }
 
 func newSongUserData(rating float64, tags []string, plays ...[2]time.Time) songUserData {
-	return songUserData{rating, tags, plays}
+	d := songUserData{rating, tags, plays}
+	sort.Slice(d.plays, func(i, j int) bool { return d.plays[i][0].Before(d.plays[j][0]) })
+	return d
 }
 
 func checkServerUserData(t *testing.T, want map[string]songUserData) {
 	getData := func() map[string]songUserData {
 		m := make(map[string]songUserData)
 		for _, s := range tester.DumpSongs(test.KeepIDs) {
-			data := newSongUserData(s.Rating, s.Tags)
+			var plays [][2]time.Time
 			for _, p := range s.Plays {
-				data.plays = append(data.plays, [2]time.Time{p.StartTime, p.StartTime})
+				plays = append(plays, [2]time.Time{p.StartTime, p.StartTime})
 			}
+			data := newSongUserData(s.Rating, s.Tags, plays...)
 			m[s.SHA1] = data
 		}
 		return m
@@ -146,6 +149,7 @@ func checkServerUserData(t *testing.T, want map[string]songUserData) {
 			if !reflect.DeepEqual(gd.tags, wd.tags) {
 				return fmt.Errorf("%v tags are %v; want %v", sha1, gd.tags, wd.tags)
 			}
+
 			if len(gd.plays) != len(wd.plays) {
 				return fmt.Errorf("%v has %v play(s); want %v", sha1, len(gd.plays), len(wd.plays))
 			}
@@ -159,7 +163,7 @@ func checkServerUserData(t *testing.T, want map[string]songUserData) {
 		return nil
 	}); err != nil {
 		// TODO: Consider dumping all data.
-		msg := fmt.Sprintf("Bad server user data for %v: %v\n", testInfo(), err)
+		msg := fmt.Sprintf("Bad server user data for %v: %v\n", caller(), err)
 		t.Fatal(msg)
 	}
 }
@@ -192,9 +196,10 @@ func TestKeywordQuery(t *testing.T) {
 		{"AR2 ti1", joinSongs(album2[0])},
 		{"ar1 bogus", nil},
 	} {
+		page.setStage(tc.kw)
 		page.setText(keywordsInput, tc.kw)
 		page.click(searchButton)
-		page.checkSearchResults(tc.want, searchResultsDesc(tc.kw))
+		page.checkSearchResults(tc.want)
 	}
 }
 
@@ -214,9 +219,10 @@ func TestTagQuery(t *testing.T) {
 		{"instrumental", joinSongs(song1, song3)},
 		{"instrumental -electronic", joinSongs(song3)},
 	} {
+		page.setStage(tc.tags)
 		page.setText(tagsInput, tc.tags)
 		page.click(searchButton)
-		page.checkSearchResults(tc.want, searchResultsDesc(tc.tags))
+		page.checkSearchResults(tc.want)
 	}
 }
 
@@ -231,9 +237,10 @@ func TestRatingQuery(t *testing.T) {
 	allSongs := joinSongs(song1, song2, song3, song4, song5, song6)
 	tester.PostSongs(allSongs, true, 0)
 
+	page.setStage(oneStar)
 	page.setText(keywordsInput, "t") // need to set at least one search term
 	page.click(searchButton)
-	page.checkSearchResults(allSongs, searchResultsDesc("one star"))
+	page.checkSearchResults(allSongs)
 
 	page.click(resetButton)
 	for _, tc := range []struct {
@@ -245,15 +252,17 @@ func TestRatingQuery(t *testing.T) {
 		{fourStars, joinSongs(song4, song5)},
 		{fiveStars, joinSongs(song5)},
 	} {
+		page.setStage(tc.option)
 		page.clickOption(minRatingSelect, tc.option)
 		page.click(searchButton)
-		page.checkSearchResults(tc.want, searchResultsDesc(tc.option))
+		page.checkSearchResults(tc.want)
 	}
 
+	page.setStage("unrated")
 	page.click(resetButton)
 	page.click(unratedCheckbox)
 	page.click(searchButton)
-	page.checkSearchResults(joinSongs(song6), searchResultsDesc("unrated"))
+	page.checkSearchResults(joinSongs(song6))
 }
 
 func TestFirstTrackQuery(t *testing.T) {
@@ -289,9 +298,10 @@ func TestMaxPlaysQuery(t *testing.T) {
 		{"3", joinSongs(song1, song2, song3)},
 		{"0", joinSongs(song3)},
 	} {
+		page.setStage(tc.plays)
 		page.setText(maxPlaysInput, tc.plays)
 		page.click(searchButton)
-		page.checkSearchResults(tc.want, searchResultsDesc(tc.plays))
+		page.checkSearchResults(tc.want)
 	}
 }
 
@@ -315,10 +325,11 @@ func TestPlayTimeQuery(t *testing.T) {
 		{unsetTime, oneMonth, joinSongs(song2)},
 		{unsetTime, oneDay, joinSongs(song1, song2)},
 	} {
+		page.setStage(fmt.Sprintf("%s / %s", tc.first, tc.last))
 		page.clickOption(firstPlayedSelect, tc.first)
 		page.clickOption(lastPlayedSelect, tc.last)
 		page.click(searchButton)
-		page.checkSearchResults(tc.want, searchResultsDesc(fmt.Sprintf("%s / %s", tc.first, tc.last)))
+		page.checkSearchResults(tc.want)
 	}
 }
 
@@ -334,46 +345,46 @@ func TestSearchResultCheckboxes(t *testing.T) {
 	// All songs should be selected by default after a search.
 	page.setText(keywordsInput, songs[0].Artist)
 	page.click(searchButton)
-	page.checkSearchResults(songs, searchResultsChecked(true, true, true))
+	page.checkSearchResults(songs, songListChecked(true, true, true))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked)
 
 	// Click the top checkbox to deselect all songs.
 	page.click(searchResultsCheckbox)
-	page.checkSearchResults(songs, searchResultsChecked(false, false, false))
+	page.checkSearchResults(songs, songListChecked(false, false, false))
 	page.checkCheckbox(searchResultsCheckbox, 0)
 
 	// Click it again to select all songs.
 	page.click(searchResultsCheckbox)
-	page.checkSearchResults(songs, searchResultsChecked(true, true, true))
+	page.checkSearchResults(songs, songListChecked(true, true, true))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked)
 
 	// Click the first song to deselect it.
 	page.clickSearchResultsSongCheckbox(0, "")
-	page.checkSearchResults(songs, searchResultsChecked(false, true, true))
+	page.checkSearchResults(songs, songListChecked(false, true, true))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked|checkboxTransparent)
 
 	// Click the top checkbox to deselect all songs.
 	page.click(searchResultsCheckbox)
-	page.checkSearchResults(songs, searchResultsChecked(false, false, false))
+	page.checkSearchResults(songs, songListChecked(false, false, false))
 	page.checkCheckbox(searchResultsCheckbox, 0)
 
 	// Click the first and second songs individually to select them.
 	page.clickSearchResultsSongCheckbox(0, "")
 	page.clickSearchResultsSongCheckbox(1, "")
-	page.checkSearchResults(songs, searchResultsChecked(true, true, false))
+	page.checkSearchResults(songs, songListChecked(true, true, false))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked|checkboxTransparent)
 
 	// Click the third song to select it as well.
 	page.clickSearchResultsSongCheckbox(2, "")
-	page.checkSearchResults(songs, searchResultsChecked(true, true, true))
+	page.checkSearchResults(songs, songListChecked(true, true, true))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked)
 
 	// Shift-click from the first to third song to select all songs.
 	page.click(searchResultsCheckbox)
-	page.checkSearchResults(songs, searchResultsChecked(false, false, false))
+	page.checkSearchResults(songs, songListChecked(false, false, false))
 	page.clickSearchResultsSongCheckbox(0, selenium.ShiftKey)
 	page.clickSearchResultsSongCheckbox(2, selenium.ShiftKey)
-	page.checkSearchResults(songs, searchResultsChecked(true, true, true))
+	page.checkSearchResults(songs, songListChecked(true, true, true))
 	page.checkCheckbox(searchResultsCheckbox, checkboxChecked)
 }
 
@@ -391,43 +402,43 @@ func TestAddToPlaylist(t *testing.T) {
 	page.click(searchButton)
 	page.checkSearchResults(joinSongs(song1, song2))
 	page.click(appendButton)
-	page.checkPlaylist(joinSongs(song1, song2), playlistActive(0))
+	page.checkPlaylist(joinSongs(song1, song2), songListActive(0))
 
 	// Pause so we don't advance through the playlist mid-test.
-	page.checkSong(song1, songNotPaused)
+	page.checkSong(song1, songPaused(false))
 	page.click(playPauseButton)
-	page.checkSong(song1, songPaused)
+	page.checkSong(song1, songPaused(true))
 
 	// Inserting should leave the current track paused.
 	page.setText(keywordsInput, "al2")
 	page.click(searchButton)
 	page.checkSearchResults(joinSongs(song3, song4))
 	page.click(insertButton)
-	page.checkPlaylist(joinSongs(song1, song3, song4, song2), playlistActive(0))
-	page.checkSong(song1, songPaused)
+	page.checkPlaylist(joinSongs(song1, song3, song4, song2), songListActive(0))
+	page.checkSong(song1, songPaused(true))
 
 	// Replacing should result in the new first track being played.
 	page.setText(keywordsInput, "al3")
 	page.click(searchButton)
 	page.checkSearchResults(joinSongs(song5, song6))
 	page.click(replaceButton)
-	page.checkPlaylist(joinSongs(song5, song6), playlistActive(0))
-	page.checkSong(song5, songNotPaused)
+	page.checkPlaylist(joinSongs(song5, song6), songListActive(0))
+	page.checkSong(song5, songPaused(false))
 
 	// Appending should leave the first track playing.
 	page.setText(keywordsInput, "al1")
 	page.click(searchButton)
 	page.checkSearchResults(joinSongs(song1, song2))
 	page.click(appendButton)
-	page.checkPlaylist(joinSongs(song5, song6, song1, song2), playlistActive(0))
-	page.checkSong(song5, songNotPaused)
+	page.checkPlaylist(joinSongs(song5, song6, song1, song2), songListActive(0))
+	page.checkSong(song5, songPaused(false))
 
 	// The "I'm feeling lucky" button should replace the current playlist and
 	// start playing the new first song.
 	page.setText(keywordsInput, "al2")
 	page.click(luckyButton)
-	page.checkPlaylist(joinSongs(song3, song4), playlistActive(0))
-	page.checkSong(song3, songNotPaused)
+	page.checkPlaylist(joinSongs(song3, song4), songListActive(0))
+	page.checkSong(song3, songPaused(false))
 }
 
 func TestPlaybackButtons(t *testing.T) {
@@ -439,39 +450,39 @@ func TestPlaybackButtons(t *testing.T) {
 	// We should start playing automatically when the 'lucky' button is clicked.
 	page.setText(keywordsInput, song1.Artist)
 	page.click(luckyButton)
-	page.checkSong(song1, songNotPaused)
-	page.checkPlaylist(joinSongs(song1, song2), playlistActive(0))
+	page.checkSong(song1, songPaused(false), songFilename(song1.Filename))
+	page.checkPlaylist(joinSongs(song1, song2), songListActive(0))
 
 	// Pausing and playing should work.
 	page.click(playPauseButton)
-	page.checkSong(song1, songPaused)
-	page.checkPlaylist(joinSongs(song1, song2), playlistActive(0))
+	page.checkSong(song1, songPaused(true))
+	page.checkPlaylist(joinSongs(song1, song2), songListActive(0))
 	page.click(playPauseButton)
-	page.checkSong(song1, songNotPaused)
+	page.checkSong(song1, songPaused(false))
 
 	// Clicking the 'next' button should go to the second song.
 	page.click(nextButton)
-	page.checkSong(song2, songNotPaused)
-	page.checkPlaylist(joinSongs(song1, song2), playlistActive(1))
+	page.checkSong(song2, songPaused(false), songFilename(song2.Filename))
+	page.checkPlaylist(joinSongs(song1, song2), songListActive(1))
 
 	// Clicking it again shouldn't do anything.
 	page.click(nextButton)
-	page.checkSong(song2, songNotPaused)
-	page.checkPlaylist(joinSongs(song1, song2), playlistActive(1))
+	page.checkSong(song2, songPaused(false))
+	page.checkPlaylist(joinSongs(song1, song2), songListActive(1))
 
 	// Clicking the 'prev' button should go back to the first song.
 	page.click(prevButton)
-	page.checkSong(song1, songNotPaused)
-	page.checkPlaylist(joinSongs(song1, song2), playlistActive(0))
+	page.checkSong(song1, songPaused(false))
+	page.checkPlaylist(joinSongs(song1, song2), songListActive(0))
 
 	// Clicking it again shouldn't do anything.
 	page.click(prevButton)
-	page.checkSong(song1, songNotPaused)
-	page.checkPlaylist(joinSongs(song1, song2), playlistActive(0))
+	page.checkSong(song1, songPaused(false))
+	page.checkPlaylist(joinSongs(song1, song2), songListActive(0))
 
 	// We should eventually play through to the second song.
-	page.checkSong(song2, songNotPaused)
-	page.checkPlaylist(joinSongs(song1, song2), playlistActive(1))
+	page.checkSong(song2, songPaused(false))
+	page.checkPlaylist(joinSongs(song1, song2), songListActive(1))
 }
 
 func TestContextMenu(t *testing.T) {
@@ -486,32 +497,32 @@ func TestContextMenu(t *testing.T) {
 
 	page.setText(keywordsInput, song1.Album)
 	page.click(luckyButton)
-	page.checkSong(song1, songNotPaused)
-	page.checkPlaylist(songs, playlistActive(0))
+	page.checkSong(song1, songPaused(false))
+	page.checkPlaylist(songs, songListActive(0))
 
 	page.rightClickPlaylistSong(3)
-	page.checkPlaylist(songs, playlistMenu(3))
+	page.checkPlaylist(songs, songListMenu(3))
 	page.click(menuPlay)
-	page.checkSong(song4, songNotPaused)
-	page.checkPlaylist(songs, playlistActive(3))
+	page.checkSong(song4, songPaused(false))
+	page.checkPlaylist(songs, songListActive(3))
 
 	page.rightClickPlaylistSong(2)
-	page.checkPlaylist(songs, playlistMenu(2))
+	page.checkPlaylist(songs, songListMenu(2))
 	page.click(menuPlay)
-	page.checkSong(song3, songNotPaused)
-	page.checkPlaylist(songs, playlistActive(2))
+	page.checkSong(song3, songPaused(false))
+	page.checkPlaylist(songs, songListActive(2))
 
 	page.rightClickPlaylistSong(0)
-	page.checkPlaylist(songs, playlistMenu(0))
+	page.checkPlaylist(songs, songListMenu(0))
 	page.click(menuRemove)
-	page.checkSong(song3, songNotPaused)
-	page.checkPlaylist(joinSongs(song2, song3, song4, song5), playlistActive(1))
+	page.checkSong(song3, songPaused(false))
+	page.checkPlaylist(joinSongs(song2, song3, song4, song5), songListActive(1))
 
 	page.rightClickPlaylistSong(1)
-	page.checkPlaylist(joinSongs(song2, song3, song4, song5), playlistMenu(1))
+	page.checkPlaylist(joinSongs(song2, song3, song4, song5), songListMenu(1))
 	page.click(menuTruncate)
-	page.checkSong(song2, songPaused)
-	page.checkPlaylist(joinSongs(song2), playlistActive(0))
+	page.checkSong(song2, songPaused(true))
+	page.checkPlaylist(joinSongs(song2), songListActive(0))
 }
 
 func TestDisplayTimeWhilePlaying(t *testing.T) {
@@ -521,12 +532,12 @@ func TestDisplayTimeWhilePlaying(t *testing.T) {
 
 	page.setText(keywordsInput, song.Artist)
 	page.click(luckyButton)
-	page.checkSong(song, songNotPaused, songTime("[ 0:00 / 0:05 ]"))
-	page.checkSong(song, songNotPaused, songTime("[ 0:01 / 0:05 ]"))
-	page.checkSong(song, songNotPaused, songTime("[ 0:02 / 0:05 ]"))
-	page.checkSong(song, songNotPaused, songTime("[ 0:03 / 0:05 ]"))
-	page.checkSong(song, songNotPaused, songTime("[ 0:04 / 0:05 ]"))
-	page.checkSong(song, songEnded|songPaused, songTime("[ 0:05 / 0:05 ]"))
+	page.checkSong(song, songPaused(false), songTime("[ 0:00 / 0:05 ]"))
+	page.checkSong(song, songPaused(false), songTime("[ 0:01 / 0:05 ]"))
+	page.checkSong(song, songPaused(false), songTime("[ 0:02 / 0:05 ]"))
+	page.checkSong(song, songPaused(false), songTime("[ 0:03 / 0:05 ]"))
+	page.checkSong(song, songPaused(false), songTime("[ 0:04 / 0:05 ]"))
+	page.checkSong(song, songEnded(true), songPaused(true), songTime("[ 0:05 / 0:05 ]"))
 }
 
 func TestReportPlayed(t *testing.T) {
@@ -538,10 +549,10 @@ func TestReportPlayed(t *testing.T) {
 	// Skip the first song early on, but listen to all of the second song.
 	page.setText(keywordsInput, song1.Artist)
 	page.click(luckyButton)
-	page.checkSong(song1, songNotPaused)
+	page.checkSong(song1, songPaused(false))
 	song2Lower := time.Now()
 	page.click(nextButton)
-	page.checkSong(song2, songEnded)
+	page.checkSong(song2, songEnded(true))
 	song2Upper := time.Now()
 
 	// Only the second song should've been reported.
@@ -553,14 +564,14 @@ func TestReportPlayed(t *testing.T) {
 	// Go back to the first song but pause it immediately.
 	song1Lower := time.Now()
 	page.click(prevButton)
-	page.checkSong(song1, songNotPaused)
+	page.checkSong(song1, songPaused(false))
 	song1Upper := time.Now()
 	page.click(playPauseButton)
-	page.checkSong(song1, songPaused)
+	page.checkSong(song1, songPaused(true))
 
 	// After more than half of the first song has played, it should be reported.
 	page.click(playPauseButton)
-	page.checkSong(song1, songNotPaused)
+	page.checkSong(song1, songPaused(false))
 	checkServerUserData(t, map[string]songUserData{
 		song1.SHA1: newSongUserData(-1.0, nil, [2]time.Time{song1Lower, song1Upper}),
 		song2.SHA1: newSongUserData(-1.0, nil, [2]time.Time{song2Lower, song2Upper}),
@@ -576,7 +587,7 @@ func TestReportReplay(t *testing.T) {
 	page.setText(keywordsInput, song.Artist)
 	firstLower := time.Now()
 	page.click(luckyButton)
-	page.checkSong(song, songEnded)
+	page.checkSong(song, songEnded(true))
 
 	// Replay the song.
 	secondLower := time.Now()
