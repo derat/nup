@@ -93,7 +93,10 @@ func makeSongInfo(s db.Song) songInfo {
 	}
 }
 
-func (s songInfo) String() string {
+func (s *songInfo) String() string {
+	if s == nil {
+		return "nil"
+	}
 	str := fmt.Sprintf("%q %q %q", s.artist, s.title, s.album)
 	for _, f := range []struct {
 		pos, neg string

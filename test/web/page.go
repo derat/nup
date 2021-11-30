@@ -37,6 +37,8 @@ func joinLocs(locs ...interface{}) []loc {
 }
 
 var (
+	body = joinLocs(loc{selenium.ByTagName, "body"})
+
 	overlayManager = joinLocs(loc{selenium.ByTagName, "overlay-manager"})
 
 	optionsDialog   = joinLocs(overlayManager, loc{selenium.ByCSSSelector, ".dialog"})
@@ -70,6 +72,14 @@ var (
 
 	playlistTable = joinLocs(musicPlayer, loc{selenium.ByID, "playlist"},
 		loc{selenium.ByCSSSelector, "table"})
+
+	presentationLayer = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "presentation-layer"})
+	currentArtistDiv  = joinLocs(presentationLayer, loc{selenium.ByID, "current-artist"})
+	currentTitleDiv   = joinLocs(presentationLayer, loc{selenium.ByID, "current-title"})
+	currentAlbumDiv   = joinLocs(presentationLayer, loc{selenium.ByID, "current-album"})
+	nextArtistDiv     = joinLocs(presentationLayer, loc{selenium.ByID, "next-artist"})
+	nextTitleDiv      = joinLocs(presentationLayer, loc{selenium.ByID, "next-title"})
+	nextAlbumDiv      = joinLocs(presentationLayer, loc{selenium.ByID, "next-album"})
 
 	musicSearcher      = joinLocs(loc{selenium.ByTagName, "music-searcher"})
 	keywordsInput      = joinLocs(musicSearcher, loc{selenium.ByID, "keywords-input"})
@@ -404,6 +414,67 @@ func (p *page) checkPlaylist(songs []db.Song, checks ...songListCheck) {
 		for _, s := range got {
 			msg += "  " + s.String() + "\n"
 		}
+		p.t.Fatal(msg)
+	}
+}
+
+// checkPresentation waits for the presentation layer to display the specified songs.
+func (p *page) checkPresentation(cur, next *db.Song) {
+	var curWant, nextWant *songInfo
+	if cur != nil {
+		s := makeSongInfo(*cur)
+		curWant = &s
+	}
+	if next != nil {
+		s := makeSongInfo(*next)
+		nextWant = &s
+	}
+
+	getSongs := func() (cur, next *songInfo) {
+		if d, err := p.getOrFail(currentArtistDiv).IsDisplayed(); err != nil {
+			p.t.Fatalf("Failed checking visibility of current artist for %v: %v", p.desc(), err)
+		} else if d {
+			cur = &songInfo{
+				artist: p.getTextOrFail(p.getOrFail(currentArtistDiv), false),
+				title:  p.getTextOrFail(p.getOrFail(currentTitleDiv), false),
+				album:  p.getTextOrFail(p.getOrFail(currentAlbumDiv), false),
+			}
+		}
+		if d, err := p.getOrFail(nextArtistDiv).IsDisplayed(); err != nil {
+			p.t.Fatalf("Failed checking visibility of next artist for %v: %v", p.desc(), err)
+		} else if d {
+			next = &songInfo{
+				artist: p.getTextOrFail(p.getOrFail(nextArtistDiv), false),
+				title:  p.getTextOrFail(p.getOrFail(nextTitleDiv), false),
+				album:  p.getTextOrFail(p.getOrFail(nextAlbumDiv), false),
+			}
+		}
+		return cur, next
+	}
+	equal := func(want, got *songInfo) bool {
+		if (want == nil) != (got == nil) {
+			return false
+		}
+		if want == nil {
+			return true
+		}
+		return songInfosEqual(*want, *got)
+	}
+	if err := wait(func() error {
+		curGot, nextGot := getSongs()
+		if !equal(curWant, curGot) || !equal(nextWant, nextGot) {
+			return errors.New("songs don't match")
+		}
+		return nil
+	}); err != nil {
+		curGot, nextGot := getSongs()
+		msg := fmt.Sprintf("Bad presentation songs for %v\n", p.desc())
+		msg += "Want:\n"
+		msg += "  " + curWant.String() + "\n"
+		msg += "  " + nextWant.String() + "\n"
+		msg += "Got:\n"
+		msg += "  " + curGot.String() + "\n"
+		msg += "  " + nextGot.String() + "\n"
 		p.t.Fatal(msg)
 	}
 }

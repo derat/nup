@@ -216,34 +216,6 @@ class Test(unittest.TestCase):
             self.fail('Timed out waiting for songs.\nReceived ' +
                       str(page.get_presentation_songs()))
 
-    def test_presentation(self):
-        song1 = Song('artist', 'track1', 'album1', track=1, filename=Song.FILE_5S)
-        song2 = Song('artist', 'track2', 'album1', track=2, filename=Song.FILE_5S)
-        song3 = Song('artist', 'track3', 'album2', track=1, filename=Song.FILE_5S)
-        server.import_songs([song1, song2, song3])
-
-        page = Page(driver)
-        page.keywords = 'album:album1'
-        page.click(page.LUCKY_BUTTON)
-        self.wait_for_playlist(page, [song1, song2], 0)
-
-        page.show_presentation()
-        self.wait_for_presentation(page, song1, song2)
-
-        ESCAPE = u'\ue00c'
-        page.get(page.BODY).send_keys(ESCAPE)
-        # TODO: Wait to ensure that it's not visible.
-
-        page.keywords = 'album:album2'
-        page.click(page.SEARCH_BUTTON)
-        self.wait_for_search_results(page, [song3])
-        page.click(page.INSERT_BUTTON)
-        self.wait_for_playlist(page, [song1, song3, song2], 0)
-
-        page.show_presentation()
-        self.wait_for_presentation(page, song1, song3)
-        page.get(page.BODY).send_keys(ESCAPE)
-
 
 if __name__ == '__main__':
     unittest.main()

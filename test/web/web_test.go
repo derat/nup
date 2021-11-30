@@ -782,9 +782,9 @@ func TestEditTagsAutocomplete(t *testing.T) {
 
 func TestOptions(t *testing.T) {
 	page := initWebTest(t)
-	showOptions := func() { page.emitKeyDown("o", 79, true /* alt */) }
+	show := func() { page.emitKeyDown("o", 79, true /* alt */) }
 
-	showOptions()
+	show()
 	page.checkAttr(gainTypeSelect, "value", gainAlbumValue)
 	page.clickOption(gainTypeSelect, gainTrack)
 	page.checkAttr(gainTypeSelect, "value", gainTrackValue)
@@ -798,12 +798,12 @@ func TestOptions(t *testing.T) {
 	page.checkGone(optionsOKButton)
 
 	// Escape should dismiss the dialog.
-	showOptions()
+	show()
 	page.sendKeys(optionsOKButton, selenium.EscapeKey, false)
 	page.checkGone(optionsOKButton)
 
 	page.reload()
-	showOptions()
+	show()
 	page.checkAttr(gainTypeSelect, "value", gainTrackValue)
 	page.checkAttr(preAmpRange, "value", origPreAmp)
 	page.click(optionsOKButton)
@@ -836,4 +836,43 @@ func TestPresets(t *testing.T) {
 	} else if reflect.DeepEqual(active, page.getOrFail(presetSelect)) {
 		t.Error("Preset select still focused after click")
 	}
+}
+
+func TestPresentation(t *testing.T) {
+	page := initWebTest(t)
+	show := func() { page.emitKeyDown("v", 86, true /* alt */) }
+	next := func() { page.emitKeyDown("n", 78, true /* alt */) }
+
+	song1 := newSong("artist", "track1", "album1", withTrack(1))
+	song2 := newSong("artist", "track2", "album1", withTrack(2))
+	song3 := newSong("artist", "track1", "album2", withTrack(1))
+	importSongs(song1, song2, song3)
+
+	// Enqueue song1 and song2 and check that they're displayed.
+	page.setText(keywordsInput, "album:"+song1.Album)
+	page.click(luckyButton)
+	page.checkPlaylist(joinSongs(song1, song2), hasActive(0))
+	show()
+	page.checkPresentation(&song1, &song2)
+	page.sendKeys(body, selenium.EscapeKey, false)
+	page.checkPresentation(nil, nil)
+
+	// Insert song3 after song1 and check that it's displayed as the next song.
+	page.setText(keywordsInput, "album:"+song3.Album)
+	page.click(searchButton)
+	page.checkSearchResults(joinSongs(song3))
+	page.click(insertButton)
+	page.checkPlaylist(joinSongs(song1, song3, song2), hasActive(0))
+	show()
+	page.checkPresentation(&song1, &song3)
+
+	// Skip to the next song.
+	next()
+	page.checkPresentation(&song3, &song2)
+
+	// Skip to the last song.
+	next()
+	page.checkPresentation(&song2, nil)
+	page.sendKeys(body, selenium.EscapeKey, false)
+	page.checkPresentation(nil, nil)
 }
