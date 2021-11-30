@@ -216,44 +216,6 @@ class Test(unittest.TestCase):
             self.fail('Timed out waiting for songs.\nReceived ' +
                       str(page.get_presentation_songs()))
 
-    def test_edit_tags_autocomplete(self):
-        song1 = Song('ar', 't1', 'al', tags=['a0', 'a1', 'b'])
-        song2 = Song('ar', 't2', 'al', tags=['c0', 'c1', 'd'])
-        server.import_songs([song1, song2])
-
-        page = Page(driver)
-        page.refresh_tags()
-        page.keywords = song1.title
-        page.click(page.LUCKY_BUTTON)
-        self.wait_for_song(page, song1)
-
-        page.show_update_div()
-        textarea = page.get(page.EDIT_TAGS_TEXTAREA)
-
-        def check_textarea(expected):
-            utils.wait_equal(lambda: textarea.get_attribute('value'),
-                             expected,
-                             timeout_sec=3)
-
-        def check_suggestions(expected):
-            utils.wait_equal(
-                lambda: page.get_tag_suggestions(page.EDIT_TAGS_SUGGESTER),
-                expected,
-                timeout_sec=3)
-
-        check_textarea('a0 a1 b ')
-
-        TAB = u'\ue004'
-        textarea.send_keys('d' + TAB)
-        check_textarea('a0 a1 b d ')
-
-        textarea.send_keys('c' + TAB)
-        check_textarea('a0 a1 b d c')
-        check_suggestions(['c0', 'c1'])
-
-        textarea.send_keys('1' + TAB)
-        check_textarea('a0 a1 b d c1 ')
-
     def test_options(self):
         page = Page(driver)
         page.show_options()

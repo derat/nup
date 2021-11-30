@@ -728,3 +728,28 @@ func TestRetryUpdates(t *testing.T) {
 	sendConfig(updatesSucceed)
 	checkServerUserData(t, map[string]songUserData{song.SHA1: newSongUserData(1.0, nil)})
 }
+
+func TestEditTagsAutocomplete(t *testing.T) {
+	page := initWebTest(t)
+	song1 := newSong("ar", "t1", "al", withTags("a0", "a1", "b"))
+	song2 := newSong("ar", "t2", "al", withTags("c0", "c1", "d"))
+	importSongs(song1, song2)
+
+	page.refreshTags()
+	page.setText(keywordsInput, song1.Title)
+	page.click(luckyButton)
+	page.checkSong(song1)
+
+	page.click(coverImage)
+	page.checkAttr(editTagsTextarea, "value", "a0 a1 b ")
+
+	page.sendKeys(editTagsTextarea, "d"+selenium.TabKey, false)
+	page.checkAttr(editTagsTextarea, "value", "a0 a1 b d ")
+
+	page.sendKeys(editTagsTextarea, "c"+selenium.TabKey, false)
+	page.checkAttr(editTagsTextarea, "value", "a0 a1 b d c")
+	page.checkText(editTagsSuggester, `^\s*c0\s*c1\s*$`)
+
+	page.sendKeys(editTagsTextarea, "1"+selenium.TabKey, false)
+	page.checkAttr(editTagsTextarea, "value", "a0 a1 b d c1 ")
+}

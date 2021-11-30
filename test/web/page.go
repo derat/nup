@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -43,24 +44,25 @@ var (
 	menuRemove     = joinLocs(overlayManager, loc{selenium.ByID, "remove"})
 	menuTruncate   = joinLocs(overlayManager, loc{selenium.ByID, "truncate"})
 
-	musicPlayer      = joinLocs(loc{selenium.ByTagName, "music-player"})
-	audio            = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "audio"})
-	coverImage       = joinLocs(musicPlayer, loc{selenium.ByID, "cover-img"})
-	ratingOverlayDiv = joinLocs(musicPlayer, loc{selenium.ByID, "rating-overlay"})
-	ratingOneStar    = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(1)"})
-	ratingTwoStars   = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(2)"})
-	ratingThreeStars = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(3)"})
-	ratingFourStars  = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(4)"})
-	ratingFiveStars  = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(5)"})
-	editTagsTextarea = joinLocs(musicPlayer, loc{selenium.ByID, "edit-tags"})
-	updateCloseImage = joinLocs(musicPlayer, loc{selenium.ByID, "update-close"})
-	artistDiv        = joinLocs(musicPlayer, loc{selenium.ByID, "artist"})
-	titleDiv         = joinLocs(musicPlayer, loc{selenium.ByID, "title"})
-	albumDiv         = joinLocs(musicPlayer, loc{selenium.ByID, "album"})
-	timeDiv          = joinLocs(musicPlayer, loc{selenium.ByID, "time"})
-	prevButton       = joinLocs(musicPlayer, loc{selenium.ByID, "prev"})
-	playPauseButton  = joinLocs(musicPlayer, loc{selenium.ByID, "play-pause"})
-	nextButton       = joinLocs(musicPlayer, loc{selenium.ByID, "next"})
+	musicPlayer       = joinLocs(loc{selenium.ByTagName, "music-player"})
+	audio             = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "audio"})
+	coverImage        = joinLocs(musicPlayer, loc{selenium.ByID, "cover-img"})
+	ratingOverlayDiv  = joinLocs(musicPlayer, loc{selenium.ByID, "rating-overlay"})
+	ratingOneStar     = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(1)"})
+	ratingTwoStars    = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(2)"})
+	ratingThreeStars  = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(3)"})
+	ratingFourStars   = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(4)"})
+	ratingFiveStars   = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(5)"})
+	editTagsTextarea  = joinLocs(musicPlayer, loc{selenium.ByID, "edit-tags"})
+	editTagsSuggester = joinLocs(musicPlayer, loc{selenium.ByID, "edit-tags-suggester"})
+	updateCloseImage  = joinLocs(musicPlayer, loc{selenium.ByID, "update-close"})
+	artistDiv         = joinLocs(musicPlayer, loc{selenium.ByID, "artist"})
+	titleDiv          = joinLocs(musicPlayer, loc{selenium.ByID, "title"})
+	albumDiv          = joinLocs(musicPlayer, loc{selenium.ByID, "album"})
+	timeDiv           = joinLocs(musicPlayer, loc{selenium.ByID, "time"})
+	prevButton        = joinLocs(musicPlayer, loc{selenium.ByID, "prev"})
+	playPauseButton   = joinLocs(musicPlayer, loc{selenium.ByID, "play-pause"})
+	nextButton        = joinLocs(musicPlayer, loc{selenium.ByID, "next"})
 
 	playlistTable = joinLocs(musicPlayer, loc{selenium.ByID, "playlist"},
 		loc{selenium.ByCSSSelector, "table"})
@@ -163,6 +165,13 @@ func (p *page) reload() {
 		p.t.Fatalf("Reloading page for %v failed: %v", p.desc(), err)
 	}
 	p.configPage()
+}
+
+// refreshTags instructs the page to refresh the list of available tags from the server.
+func (p *page) refreshTags() {
+	if _, err := p.wd.ExecuteScript("document.test.updateTags()", nil); err != nil {
+		p.t.Fatalf("Failed refreshing tags for %v: %v", p.desc(), err)
+	}
 }
 
 // get returns the element matched by locs.
@@ -415,6 +424,34 @@ func (p *page) clickOption(sel []loc, option string) {
 		}
 	}
 	p.t.Fatalf("Failed finding %v option %q for %v: %v", sel, option, p.desc(), err)
+}
+
+// checkText checks that text of the element matched by locs is matched by want.
+// Spacing can be weird if the text is spread across multiple child nodes.
+func (p *page) checkText(locs []loc, wantRegexp string) {
+	el := p.getOrFail(locs)
+	want := regexp.MustCompile(wantRegexp)
+	if err := wait(func() error {
+		if got := p.getTextOrFail(el, false); !want.MatchString(got) {
+			return fmt.Errorf("got %q; want %q", got, want)
+		}
+		return nil
+	}); err != nil {
+		p.t.Fatalf("Bad text in element for %v: %v", p.desc(), err)
+	}
+}
+
+// checkAttr checks that attribute attr of the element matched by locs equals want.
+func (p *page) checkAttr(locs []loc, attr, want string) {
+	el := p.getOrFail(locs)
+	if err := wait(func() error {
+		if got := p.getAttrOrFail(el, attr, false); got != want {
+			return fmt.Errorf("got %q; want %q", got, want)
+		}
+		return nil
+	}); err != nil {
+		p.t.Fatalf("Bad %v attribute for %v: %v", attr, p.desc(), err)
+	}
 }
 
 type checkboxState uint32
