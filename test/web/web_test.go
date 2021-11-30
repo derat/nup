@@ -24,6 +24,7 @@ import (
 )
 
 const (
+	// TODO: Choose unused ports dynamically.
 	chromeDriverPort = 8088
 	musicServerAddr  = "localhost:8089"
 	serverURL        = "http://localhost:8080/"
@@ -32,6 +33,14 @@ const (
 // Globals shared across all tests.
 var wd selenium.WebDriver
 var tester *test.Tester
+
+var (
+	// Pull some stuff into our namespace for convenience.
+	file0s  = test.Song0s.Filename
+	file1s  = test.Song1s.Filename
+	file5s  = test.Song5s.Filename
+	file10s = test.Song10s.Filename
+)
 
 func TestMain(m *testing.M) {
 	os.Exit(func() int {
@@ -60,7 +69,7 @@ func TestMain(m *testing.M) {
 		defer tester.Close()
 
 		// Serve music files in the background.
-		test.CopySongs(tester.MusicDir, song1s.Filename, song5s.Filename, song10s.Filename)
+		test.CopySongs(tester.MusicDir, file0s, file1s, file5s, file10s)
 		fs := http.FileServer(http.Dir(tester.MusicDir))
 		ms := &http.Server{
 			Addr: musicServerAddr,
@@ -77,10 +86,7 @@ func TestMain(m *testing.M) {
 		}()
 		defer ms.Shutdown(context.Background())
 
-		tester.SendConfig(&config.Config{
-			SongBaseURL:  fmt.Sprintf("http://%s/", musicServerAddr),
-			CoverBaseURL: "",
-		})
+		sendConfig(updatesSucceed)
 		defer tester.SendConfig(nil)
 
 		// WebDriver only allows setting cookies for the currently-loaded page,
@@ -115,6 +121,28 @@ type songUserData struct {
 	plays  [][2]time.Time // lower/upper bounds for timestamps
 }
 
+// updatePolicy is passed to sendConfig to control the server's handling of updates.
+type updatePolicy bool
+
+const (
+	// Values correspond to server's ForceUpdateFailures field.
+	updatesSucceed updatePolicy = false
+	updatesFail    updatePolicy = true
+)
+
+func sendConfig(p updatePolicy) {
+	tester.SendConfig(&config.Config{
+		SongBaseURL:         fmt.Sprintf("http://%s/", musicServerAddr),
+		CoverBaseURL:        "",
+		ForceUpdateFailures: bool(p),
+	})
+}
+
+// importSongs posts the supplied db.Song or []db.Song args to the server.
+func importSongs(songs ...interface{}) {
+	tester.PostSongs(joinSongs(songs...), true, 0)
+}
+
 func newSongUserData(rating float64, tags []string, plays ...[2]time.Time) songUserData {
 	d := songUserData{rating, tags, plays}
 	sort.Slice(d.plays, func(i, j int) bool { return d.plays[i][0].Before(d.plays[j][0]) })
@@ -144,19 +172,24 @@ func checkServerUserData(t *testing.T, want map[string]songUserData) {
 			if gd.rating != wd.rating {
 				return fmt.Errorf("%v rating is %.2f; want %.2f", sha1, gd.rating, wd.rating)
 			}
-			sort.Strings(gd.tags)
-			sort.Strings(wd.tags)
-			if !reflect.DeepEqual(gd.tags, wd.tags) {
-				return fmt.Errorf("%v tags are %v; want %v", sha1, gd.tags, wd.tags)
+
+			if wd.tags != nil {
+				sort.Strings(gd.tags)
+				sort.Strings(wd.tags)
+				if !reflect.DeepEqual(gd.tags, wd.tags) {
+					return fmt.Errorf("%v tags are %v; want %v", sha1, gd.tags, wd.tags)
+				}
 			}
 
-			if len(gd.plays) != len(wd.plays) {
-				return fmt.Errorf("%v has %v play(s); want %v", sha1, len(gd.plays), len(wd.plays))
-			}
-			for i := range gd.plays {
-				if gp, wp := gd.plays[i], wd.plays[i]; gp[0].Before(wp[0]) || gp[0].After(wp[1]) {
-					return fmt.Errorf("%v play %d has time %v outside of [%v, %v]",
-						sha1, i, gp[0], wp[0], wp[1])
+			if wd.plays != nil {
+				if len(gd.plays) != len(wd.plays) {
+					return fmt.Errorf("%v has %v play(s); want %v", sha1, len(gd.plays), len(wd.plays))
+				}
+				for i := range gd.plays {
+					if gp, wp := gd.plays[i], wd.plays[i]; gp[0].Before(wp[0]) || gp[0].After(wp[1]) {
+						return fmt.Errorf("%v play %d has time %v outside of [%v, %v]",
+							sha1, i, gp[0], wp[0], wp[1])
+					}
 				}
 			}
 		}
@@ -182,7 +215,7 @@ func TestKeywordQuery(t *testing.T) {
 	album3 := joinSongs(
 		newSong("artist with space", "ti1", "al3", withTrack(1)),
 	)
-	tester.PostSongs(joinSongs(album1, album2, album3), true, 0)
+	importSongs(album1, album2, album3)
 
 	for _, tc := range []struct {
 		kw   string
@@ -208,7 +241,7 @@ func TestTagQuery(t *testing.T) {
 	song1 := newSong("ar1", "ti1", "al1", withTags("electronic", "instrumental"))
 	song2 := newSong("ar2", "ti2", "al2", withTags("rock", "guitar"))
 	song3 := newSong("ar3", "ti3", "al3", withTags("instrumental", "rock"))
-	tester.PostSongs(joinSongs(song1, song2, song3), true, 0)
+	importSongs(song1, song2, song3)
 
 	for _, tc := range []struct {
 		tags string
@@ -235,7 +268,7 @@ func TestRatingQuery(t *testing.T) {
 	song5 := newSong("a", "t", "al5", withRating(1.0))
 	song6 := newSong("a", "t", "al6", withRating(-1.0))
 	allSongs := joinSongs(song1, song2, song3, song4, song5, song6)
-	tester.PostSongs(allSongs, true, 0)
+	importSongs(allSongs)
 
 	page.setStage(oneStar)
 	page.setText(keywordsInput, "t") // need to set at least one search term
@@ -276,7 +309,7 @@ func TestFirstTrackQuery(t *testing.T) {
 		newSong("ar2", "ti1", "al2", withTrack(1), withDisc(1)),
 		newSong("ar2", "ti2", "al2", withTrack(2), withDisc(1)),
 	)
-	tester.PostSongs(joinSongs(album1, album2), true, 0)
+	importSongs(album1, album2)
 
 	page.click(firstTrackCheckbox)
 	page.click(searchButton)
@@ -288,7 +321,7 @@ func TestMaxPlaysQuery(t *testing.T) {
 	song1 := newSong("ar1", "ti1", "al1", withPlays(1, 2))
 	song2 := newSong("ar2", "ti2", "al2", withPlays(1, 2, 3))
 	song3 := newSong("ar3", "ti3", "al3")
-	tester.PostSongs(joinSongs(song1, song2, song3), true, 0)
+	importSongs(song1, song2, song3)
 
 	for _, tc := range []struct {
 		plays string
@@ -312,7 +345,7 @@ func TestPlayTimeQuery(t *testing.T) {
 	now := time.Now().Unix()
 	song1 := newSong("ar1", "ti1", "al1", withPlays(now-5*day))
 	song2 := newSong("ar2", "ti2", "al2", withPlays(now-90*day))
-	tester.PostSongs(joinSongs(song1, song2), true, 0)
+	importSongs(song1, song2)
 
 	for _, tc := range []struct {
 		first, last string
@@ -340,7 +373,7 @@ func TestSearchResultCheckboxes(t *testing.T) {
 		newSong("a", "t2", "al", withTrack(2)),
 		newSong("a", "t3", "al", withTrack(3)),
 	)
-	tester.PostSongs(songs, true, 0)
+	importSongs(songs)
 
 	// All songs should be selected by default after a search.
 	page.setText(keywordsInput, songs[0].Artist)
@@ -396,7 +429,7 @@ func TestAddToPlaylist(t *testing.T) {
 	song4 := newSong("a", "t4", "al2", withTrack(2))
 	song5 := newSong("a", "t5", "al3", withTrack(1))
 	song6 := newSong("a", "t6", "al3", withTrack(2))
-	tester.PostSongs(joinSongs(song1, song2, song3, song4, song5, song6), true, 0)
+	importSongs(song1, song2, song3, song4, song5, song6)
 
 	page.setText(keywordsInput, "al1")
 	page.click(searchButton)
@@ -443,9 +476,9 @@ func TestAddToPlaylist(t *testing.T) {
 
 func TestPlaybackButtons(t *testing.T) {
 	page := initWebTest(t)
-	song1 := newSong("artist", "track1", "album", withTrack(1), withFilename(song5s.Filename))
-	song2 := newSong("artist", "track2", "album", withTrack(2), withFilename(song1s.Filename))
-	tester.PostSongs(joinSongs(song1, song2), true, 0)
+	song1 := newSong("artist", "track1", "album", withTrack(1), withFilename(file5s))
+	song2 := newSong("artist", "track2", "album", withTrack(2), withFilename(file1s))
+	importSongs(song1, song2)
 
 	// We should start playing automatically when the 'lucky' button is clicked.
 	page.setText(keywordsInput, song1.Artist)
@@ -493,7 +526,7 @@ func TestContextMenu(t *testing.T) {
 	song4 := newSong("a", "t4", "al", withTrack(4))
 	song5 := newSong("a", "t5", "al", withTrack(5))
 	songs := joinSongs(song1, song2, song3, song4, song5)
-	tester.PostSongs(songs, true, 0)
+	importSongs(songs)
 
 	page.setText(keywordsInput, song1.Album)
 	page.click(luckyButton)
@@ -527,8 +560,8 @@ func TestContextMenu(t *testing.T) {
 
 func TestDisplayTimeWhilePlaying(t *testing.T) {
 	page := initWebTest(t)
-	song := newSong("ar", "t", "al", withFilename(song5s.Filename))
-	tester.PostSongs(joinSongs(song), true, 0)
+	song := newSong("ar", "t", "al", withFilename(file5s))
+	importSongs(song)
 
 	page.setText(keywordsInput, song.Artist)
 	page.click(luckyButton)
@@ -542,9 +575,9 @@ func TestDisplayTimeWhilePlaying(t *testing.T) {
 
 func TestReportPlayed(t *testing.T) {
 	page := initWebTest(t)
-	song1 := newSong("a", "t1", "al", withTrack(1), withFilename(song5s.Filename))
-	song2 := newSong("a", "t2", "al", withTrack(2), withFilename(song1s.Filename))
-	tester.PostSongs(joinSongs(song1, song2), true, 0)
+	song1 := newSong("a", "t1", "al", withTrack(1), withFilename(file5s))
+	song2 := newSong("a", "t2", "al", withTrack(2), withFilename(file1s))
+	importSongs(song1, song2)
 
 	// Skip the first song early on, but listen to all of the second song.
 	page.setText(keywordsInput, song1.Artist)
@@ -580,8 +613,8 @@ func TestReportPlayed(t *testing.T) {
 
 func TestReportReplay(t *testing.T) {
 	page := initWebTest(t)
-	song := newSong("a", "t1", "al", withFilename(song1s.Filename))
-	tester.PostSongs(joinSongs(song), true, 0)
+	song := newSong("a", "t1", "al", withFilename(file1s))
+	importSongs(song)
 
 	// Play the song to completion.
 	page.setText(keywordsInput, song.Artist)
@@ -605,7 +638,7 @@ func TestReportReplay(t *testing.T) {
 func TestRateAndTag(t *testing.T) {
 	page := initWebTest(t)
 	song := newSong("ar", "t1", "al", withRating(0.5), withTags("rock", "guitar"))
-	tester.PostSongs(joinSongs(song), true, 0)
+	importSongs(song)
 
 	page.setText(keywordsInput, song.Artist)
 	page.click(luckyButton)
@@ -630,4 +663,68 @@ func TestRateAndTag(t *testing.T) {
 	checkServerUserData(t, map[string]songUserData{
 		song.SHA1: newSongUserData(0.75, []string{"guitar", "metal", "rock"}),
 	})
+}
+
+func TestRetryUpdates(t *testing.T) {
+	page := initWebTest(t)
+	song := newSong("ar", "t1", "al", withFilename(file1s),
+		withRating(0.5), withTags("rock", "guitar"))
+	importSongs(song)
+
+	// Configure the server to reject updates and play the song.
+	sendConfig(updatesFail)
+	page.setText(keywordsInput, song.Artist)
+	firstLower := time.Now()
+	page.click(luckyButton)
+	page.checkSong(song, isEnded(true))
+	firstUpper := time.Now()
+
+	// Change the song's rating and tags.
+	page.click(coverImage)
+	page.click(ratingFourStars)
+	page.setText(editTagsTextarea, "+jazz +mellow")
+	page.click(updateCloseImage)
+
+	// Wait a bit to let the updates fail and then let them succeed.
+	time.Sleep(time.Second)
+	sendConfig(updatesSucceed)
+	checkServerUserData(t, map[string]songUserData{
+		song.SHA1: newSongUserData(0.75, []string{"jazz", "mellow"},
+			[2]time.Time{firstLower, firstUpper}),
+	})
+
+	// Queue some more failed updates.
+	sendConfig(updatesFail)
+	secondLower := time.Now()
+	page.click(playPauseButton)
+	page.checkSong(song, isEnded(false))
+	page.checkSong(song, isEnded(true))
+	secondUpper := time.Now()
+	page.click(coverImage)
+	page.click(ratingTwoStars)
+	page.setText(editTagsTextarea, "+lively +soul")
+	page.click(updateCloseImage)
+	time.Sleep(time.Second)
+
+	// The queued updates should be sent if the page is reloaded.
+	page.reload()
+	sendConfig(updatesSucceed)
+	checkServerUserData(t, map[string]songUserData{
+		song.SHA1: newSongUserData(0.25, []string{"lively", "soul"},
+			[2]time.Time{firstLower, firstUpper}, [2]time.Time{secondLower, secondUpper}),
+	})
+
+	// In the case of multiple queued updates, the last one should take precedence.
+	sendConfig(updatesFail)
+	page.setText(keywordsInput, song.Artist)
+	page.click(luckyButton)
+	page.checkSong(song)
+	for _, r := range [][]loc{ratingThreeStars, ratingFourStars, ratingFiveStars} {
+		page.click(coverImage)
+		page.click(r)
+		page.click(updateCloseImage)
+		time.Sleep(100 * time.Millisecond)
+	}
+	sendConfig(updatesSucceed)
+	checkServerUserData(t, map[string]songUserData{song.SHA1: newSongUserData(1.0, nil)})
 }

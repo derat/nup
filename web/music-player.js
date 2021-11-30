@@ -428,6 +428,11 @@ customElements.define(
       this.overlayManager_ = manager;
     }
 
+    // Returns true if the update div is currently shown.
+    get updateDivShown() {
+      return !!this.updateSong_;
+    }
+
     // Requests known tags from the server and updates the internal list.
     // Returns a promise for completion of the task.
     updateTagsFromServer_() {

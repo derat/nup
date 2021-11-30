@@ -587,8 +587,9 @@ customElements.define(
 
     handleBodyKeyDown_(e) {
       if (this.overlayManager_ && this.overlayManager_.numChildren) return;
+      if (this.musicPlayer_ && this.musicPlayer_.updateDivShown) return;
 
-      if (e.key == '/') {
+      if (e.key === '/') {
         this.keywordsInput_.focus();
         e.preventDefault();
         e.stopPropagation();

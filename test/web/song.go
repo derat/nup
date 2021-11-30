@@ -11,14 +11,6 @@ import (
 	"github.com/derat/nup/test"
 )
 
-var (
-	// Pull some stuff into our namespace for convenience.
-	song0s  = test.Song0s
-	song1s  = test.Song1s
-	song5s  = test.Song5s
-	song10s = test.Song10s
-)
-
 func newSong(artist, title, album string, fields ...songField) db.Song {
 	s := db.Song{
 		Artist:   artist,
@@ -26,7 +18,7 @@ func newSong(artist, title, album string, fields ...songField) db.Song {
 		Album:    album,
 		SHA1:     fmt.Sprintf("%s-%s-%s", artist, title, album),
 		AlbumID:  artist + "-" + album,
-		Filename: song10s.Filename,
+		Filename: test.Song10s.Filename,
 		Rating:   -1.0,
 	}
 	for _, f := range fields {
@@ -34,7 +26,7 @@ func newSong(artist, title, album string, fields ...songField) db.Song {
 	}
 	// Gross hack: infer the length from the filename.
 	if s.Length == 0 {
-		for _, ks := range []db.Song{song0s, song1s, song5s, song10s} {
+		for _, ks := range []db.Song{test.Song0s, test.Song1s, test.Song5s, test.Song10s} {
 			if s.Filename == ks.Filename {
 				s.Length = ks.Length
 			}

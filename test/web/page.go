@@ -128,13 +128,19 @@ type page struct {
 }
 
 func newPage(t *testing.T, wd selenium.WebDriver) *page {
-	if _, err := wd.ExecuteScript("document.test.setPlayDelayMs(10)", nil); err != nil {
-		t.Fatal("Failed setting short play delay: ", err)
+	p := page{t, wd, ""}
+	p.configPage()
+	return &p
+}
+
+// configPage configures the page for testing. This is called automatically.
+func (p *page) configPage() {
+	if _, err := p.wd.ExecuteScript("document.test.setPlayDelayMs(10)", nil); err != nil {
+		p.t.Fatalf("Failed setting short play delay for %v: %v", p.desc(), err)
 	}
-	if _, err := wd.ExecuteScript("document.test.reset()", nil); err != nil {
-		t.Fatal("Failed resetting page: ", err)
+	if _, err := p.wd.ExecuteScript("document.test.reset()", nil); err != nil {
+		p.t.Fatalf("Failed resetting page for %v: %v", p.desc(), err)
 	}
-	return &page{t, wd, ""}
 }
 
 // setStage sets a short human-readable string that will be included in failure messages.
@@ -149,6 +155,14 @@ func (p *page) desc() string {
 		s += " (" + p.stage + ")"
 	}
 	return s
+}
+
+// reload reloads the page.
+func (p *page) reload() {
+	if err := p.wd.Refresh(); err != nil {
+		p.t.Fatalf("Reloading page for %v failed: %v", p.desc(), err)
+	}
+	p.configPage()
 }
 
 // get returns the element matched by locs.
@@ -353,6 +367,15 @@ func (p *page) checkPlaylist(songs []db.Song, checks ...songListCheck) {
 }
 
 // sendKeys sends text to the element matched by locs.
+//
+// Note that this doesn't work right on systems without a US Qwerty layout
+// due to a ChromeDriver bug that will never be fixed:
+//  https://bugs.chromium.org/p/chromedriver/issues/detail?id=553
+//  https://chromedriver.chromium.org/help/keyboard-support
+//  https://github.com/SeleniumHQ/selenium/issues/4523
+// Specifically, the requested text is sent to the element,
+// but JavaScript key events contain incorrect values
+// (e.g. when sending 'z' with Dvorak, the JS event will contain '/').
 func (p *page) sendKeys(locs []loc, text string, clearFirst bool) {
 	el := p.getOrFail(locs)
 	if clearFirst {

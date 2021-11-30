@@ -216,54 +216,6 @@ class Test(unittest.TestCase):
             self.fail('Timed out waiting for songs.\nReceived ' +
                       str(page.get_presentation_songs()))
 
-    def test_retry_updates(self):
-        song = Song('ar', 't1', 'al', rating=0.5, tags=['rock', 'guitar'])
-        server.import_songs([song])
-        song_id = server.get_song_id(song.sha1)
-
-        # Make the server always report failure.
-        page = Page(driver)
-        server.send_config(force_update_failures=True)
-        rating = 0.75
-        tags = ['jazz', 'mellow']
-        page.rate_and_tag_song(song_id, rating, tags)
-        first_start_time = 1437526417
-        page.report_play(song_id, first_start_time)
-        time.sleep(0.1)
-
-        # Let the updates succeed.
-        server.send_config(force_update_failures=False)
-        self.wait_for_server_user_data({
-            song.sha1: (rating, tags, [first_start_time]),
-        })
-
-        # Queue some more failed updates.
-        server.send_config(force_update_failures=True)
-        rating = 0.25
-        tags = ['lively', 'soul']
-        page.rate_and_tag_song(song_id, rating, tags)
-        second_start_time = 1437526778
-        page.report_play(song_id, second_start_time)
-        time.sleep(0.1)
-
-        # The queued updates should be sent if the page is reloaded.
-        page.reload()
-        server.send_config(force_update_failures=False)
-        self.wait_for_server_user_data({
-            song.sha1: (rating, tags, [first_start_time, second_start_time]),
-        })
-
-        # In the case of multiple queued updates, the last one should take
-        # precedence.
-        server.send_config(force_update_failures=True)
-        page.rate_and_tag_song(song_id, 0.5)
-        time.sleep(0.1)
-        page.rate_and_tag_song(song_id, 0.75)
-        time.sleep(0.1)
-        page.rate_and_tag_song(song_id, 1.0)
-        server.send_config(force_update_failures=False)
-        self.wait_for_server_user_data({ song.sha1: (1.0, None, None) })
-
     def test_edit_tags_autocomplete(self):
         song1 = Song('ar', 't1', 'al', tags=['a0', 'a1', 'b'])
         song2 = Song('ar', 't2', 'al', tags=['c0', 'c1', 'd'])
