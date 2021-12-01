@@ -1,5 +1,13 @@
 #!/bin/sh -e
 
+if [ "$#" -ne 0 ]; then
+  cat <<EOF >&2
+Usage: deploy.sh
+Deploy the App Engine app to CGP and delete old versions.
+EOF
+  exit 2
+fi
+
 project=$(./project_id.sh)
 
 # As of November 2021, 'beta' is required here to use App Engine bundled

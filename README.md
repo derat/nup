@@ -160,23 +160,21 @@ development App Engine instance listening at `http://localhost:8080/`.
     server can be run from the `test/web/` directory via `go test`. By default,
     Chrome runs headlessly using [Xvfb]. Run `go test -args -help` to see
     available flags.
-*   For development, you can import example data and start a file server by
-    running `./import_to_devserver.sh` in the `test/example/` directory. Use
-    `test@example.com` to log in.
-
-All Go tests (including unit tests) can be executed by running the following
-from the root of this repository:
-
-```sh
-go test -p 1 ./...
-```
-
-The tests in `test/e2e/` and `test/web/` both make use of the dev App Engine
-instance, so `-p 1` is needed to prevent them from running simultaneously. See
-`go help build` for more about the `-p` flag.
 
 [Selenium]: https://www.selenium.dev/
 [Xvfb]: https://en.wikipedia.org/wiki/Xvfb
+
+All Go tests (including unit tests) can be executed by running `./dev.sh
+--test`.
+
+The tests in `test/e2e/` and `test/web/` both make use of the dev App Engine
+instance, so when running all tests manually, `go test -p 1 ./...` (rather than
+`go test ./...`) should be used to prevent them from running simultaneously. See
+`go help build` for more about the `-p` flag.
+
+For development, you can additionally import example data from the `example/`
+directory and start a file server by running `./dev.sh --example`. Load
+`http://localhost:8080/` in a web browser and use `test@example.com` to log in.
 
 ## Merging songs
 
