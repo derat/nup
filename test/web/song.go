@@ -4,6 +4,7 @@
 package web
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -15,6 +16,7 @@ import (
 	"github.com/derat/nup/test"
 )
 
+// newSong creates a new db.Song containing the supplied data.
 func newSong(artist, title, album string, fields ...songField) db.Song {
 	s := db.Song{
 		Artist:   artist,
@@ -71,7 +73,7 @@ func joinSongs(songs ...interface{}) []db.Song {
 	return all
 }
 
-// songInfo contains information about a song in the web interface.
+// songInfo contains information about a song in the web interface or server.
 //
 // I've made a few attempts to get rid of the use of db.Song in this code
 // (other than when posting songs to the server), but it's harder than it
@@ -79,13 +81,22 @@ func joinSongs(songs ...interface{}) []db.Song {
 // server, but we don't want to check filenames when we're inspecting the
 // playlist or search results.
 type songInfo struct {
-	artist, title, album  string  // metadata from either <song-table> row or <music-player>
-	active, checked, menu *bool   // song row is active, checked, or has context menu
-	paused, ended         *bool   // audio element is paused or ended
-	filename              *string // filename from audio element src attribute
-	ratingStr             *string // rating string from cover image, e.g. "★★★"
-	imgTitle              *string // cover image title attr, e.g. "Rating: ★★★☆☆\nTags: guitar rock"
-	timeStr               *string // displayed time, e.g. "[ 0:00 / 0:05 ]"
+	artist, title, album string // metadata from either <song-table> row or <music-player>
+
+	active  *bool // song row is active/highlighted
+	checked *bool // song row is checked
+	menu    *bool // song row has context menu
+	paused  *bool // audio element is paused
+	ended   *bool // audio element is ended
+
+	filename  *string // filename from audio element src attribute
+	ratingStr *string // rating string from cover image, e.g. "★★★"
+	imgTitle  *string // cover image title attr, e.g. "Rating: ★★★☆☆\nTags: guitar rock"
+	timeStr   *string // displayed time, e.g. "[ 0:00 / 0:05 ]"
+
+	srvRating *float64       // server rating in [0.0, 1.0] or -1.0 for unrated
+	srvTags   []string       // server tags in ascending order
+	srvPlays  [][2]time.Time // server play time lower/upper bounds in ascending order
 }
 
 // makeSongInfo constructs a basic songInfo using data from s.
@@ -130,11 +141,42 @@ func (s *songInfo) String() string {
 		val  *string
 	}{
 		{"filename", s.filename},
+		{"rating", s.ratingStr},
 		{"time", s.timeStr},
+		{"title", s.imgTitle},
 	} {
 		if f.val != nil {
 			str += fmt.Sprintf(" %s=%s", f.name, *f.val)
 		}
+	}
+
+	// Describe optional floats.
+	for _, f := range []struct {
+		name string
+		val  *float64
+	}{
+		{"rating", s.srvRating},
+	} {
+		if f.val != nil {
+			str += fmt.Sprintf(" %s=%.2f", f.name, *f.val)
+		}
+	}
+
+	// Add other miscellaneous junk.
+	if s.srvTags != nil {
+		str += fmt.Sprintf(" tags=%v", s.srvTags)
+	}
+	if s.srvPlays != nil {
+		const tf = "2006-01-02-15:04:05"
+		var ps []string
+		for _, p := range s.srvPlays {
+			if p[0].Equal(p[1]) {
+				ps = append(ps, p[0].Local().Format(tf))
+			} else {
+				ps = append(ps, p[0].Local().Format(tf)+"/"+p[1].Local().Format(tf))
+			}
+		}
+		str += fmt.Sprintf(" plays=[%s]", strings.Join(ps, " "))
 	}
 
 	return "[" + str + "]"
@@ -144,12 +186,24 @@ func (s *songInfo) String() string {
 type songCheck func(*songInfo)
 
 // See equivalently-named fields in songInfo for more info.
-func isPaused(p bool) songCheck       { return func(i *songInfo) { i.paused = &p } }
-func isEnded(e bool) songCheck        { return func(i *songInfo) { i.ended = &e } }
-func hasFilename(f string) songCheck  { return func(i *songInfo) { i.filename = &f } }
-func hasRatingStr(r string) songCheck { return func(i *songInfo) { i.ratingStr = &r } }
-func hasImgTitle(t string) songCheck  { return func(i *songInfo) { i.imgTitle = &t } }
-func hasTimeStr(s string) songCheck   { return func(i *songInfo) { i.timeStr = &s } }
+func isPaused(p bool) songCheck        { return func(i *songInfo) { i.paused = &p } }
+func isEnded(e bool) songCheck         { return func(i *songInfo) { i.ended = &e } }
+func hasFilename(f string) songCheck   { return func(i *songInfo) { i.filename = &f } }
+func hasRatingStr(r string) songCheck  { return func(i *songInfo) { i.ratingStr = &r } }
+func hasImgTitle(t string) songCheck   { return func(i *songInfo) { i.imgTitle = &t } }
+func hasTimeStr(s string) songCheck    { return func(i *songInfo) { i.timeStr = &s } }
+func hasSrvRating(r float64) songCheck { return func(i *songInfo) { i.srvRating = &r } }
+func hasSrvTags(t ...string) songCheck { return func(i *songInfo) { i.srvTags = t } }
+
+// hasSrvPlay should be called once for each play (in ascending order).
+func hasSrvPlay(lower, upper time.Time) songCheck {
+	return func(si *songInfo) {
+		si.srvPlays = append(si.srvPlays, [2]time.Time{lower, upper})
+	}
+}
+
+// hasNoSrvPlays asserts that there are no recorded plays.
+func hasNoSrvPlays() songCheck { return func(i *songInfo) { i.srvPlays = [][2]time.Time{} } }
 
 // songInfosEqual returns true if want and got have the same artist, title, and album
 // and any additional optional fields specified in want also match.
@@ -168,6 +222,7 @@ func songInfosEqual(want, got songInfo) bool {
 			return false
 		}
 	}
+
 	// Compare strings.
 	for _, t := range []struct {
 		want, got *string
@@ -184,6 +239,33 @@ func songInfosEqual(want, got songInfo) bool {
 			return false
 		}
 	}
+
+	// Compare floats.
+	for _, t := range []struct {
+		want, got *float64
+	}{
+		{want.srvRating, got.srvRating},
+	} {
+		if t.want != nil && (t.got == nil || *t.got != *t.want) {
+			return false
+		}
+	}
+
+	if want.srvTags != nil && !reflect.DeepEqual(want.srvTags, got.srvTags) {
+		return false
+	}
+	if want.srvPlays != nil {
+		if len(want.srvPlays) != len(got.srvPlays) {
+			return false
+		}
+		for i, bounds := range want.srvPlays {
+			t := got.srvPlays[i][0]
+			if t.Before(bounds[0]) || t.After(bounds[1]) {
+				return false
+			}
+		}
+	}
+
 	return true
 }
 
@@ -233,97 +315,42 @@ func songInfoSlicesEqual(want, got []songInfo) bool {
 	return true
 }
 
-// songUserData holds expected user data from the server for a single song.
-type songUserData struct {
-	rating float64
-	tags   []string       // nil means don't check
-	plays  [][2]time.Time // lower/upper bounds for timestamps, nil means don't check
-}
-
-func newSongUserData(rating float64, tags []string, plays ...[2]time.Time) songUserData {
-	d := songUserData{rating, tags, plays}
-	sort.Slice(d.plays, func(i, j int) bool { return d.plays[i][0].Before(d.plays[j][0]) })
-	return d
-}
-
-const timeFmt = "2006-01-02-15:04:05"
-
-func (d *songUserData) String() string {
-	s := fmt.Sprintf("rating=%.2f", d.rating)
-	if d.tags != nil {
-		s += fmt.Sprintf(" tags=%q", d.tags)
+// checkServerSong verifies that the server's data for song (identified by
+// SHA1) matches the expected. This is used to verify user data: see
+// hasSrvRating, hasSrvTags, and hasSrvPlay.
+func checkServerSong(t *testing.T, song db.Song, checks ...songCheck) {
+	want := makeSongInfo(song)
+	for _, c := range checks {
+		c(&want)
 	}
-	if d.plays != nil {
-		var ps []string
-		for _, p := range d.plays {
-			if p[0].Equal(p[1]) {
-				ps = append(ps, p[0].Local().Format(timeFmt))
-			} else {
-				ps = append(ps, p[0].Local().Format(timeFmt)+"/"+p[1].Local().Format(timeFmt))
-			}
-		}
-		s += fmt.Sprintf(" plays=[%s]", strings.Join(ps, " "))
-	}
-	return s
-}
 
-// checkServerUserData verifies that for every song in want (keyed by SHA1),
-// the server contains the expected user data. The tested is failed if any
-// mismatches are found.
-func checkServerUserData(t *testing.T, want map[string]songUserData) {
-	var got map[string]songUserData
+	var got *songInfo
 	if err := wait(func() error {
-		got = make(map[string]songUserData)
-		for _, s := range tester.DumpSongs(test.KeepIDs) {
-			var plays [][2]time.Time
+		got = nil
+		songs := tester.DumpSongs(test.KeepIDs)
+		for i := range songs {
+			s := songs[i]
+			if s.SHA1 != song.SHA1 {
+				continue
+			}
+
+			si := makeSongInfo(s)
+			si.srvRating = &s.Rating
+			si.srvTags = s.Tags
+			sort.Sort(db.PlayArray(s.Plays))
 			for _, p := range s.Plays {
-				plays = append(plays, [2]time.Time{p.StartTime, p.StartTime})
+				si.srvPlays = append(si.srvPlays, [2]time.Time{p.StartTime, p.StartTime})
 			}
-			data := newSongUserData(s.Rating, s.Tags, plays...)
-			got[s.SHA1] = data
+			got = &si
 		}
-
-		for sha1, wd := range want {
-			gd, ok := got[sha1]
-			if !ok {
-				return fmt.Errorf("%v missing from server", sha1)
-			}
-			if gd.rating != wd.rating {
-				return fmt.Errorf("%v rating is %.2f; want %.2f", sha1, gd.rating, wd.rating)
-			}
-
-			if wd.tags != nil {
-				sort.Strings(gd.tags)
-				sort.Strings(wd.tags)
-				if !reflect.DeepEqual(gd.tags, wd.tags) {
-					return fmt.Errorf("%v tags are %v; want %v", sha1, gd.tags, wd.tags)
-				}
-			}
-
-			if wd.plays != nil {
-				if len(gd.plays) != len(wd.plays) {
-					return fmt.Errorf("%v has %v play(s); want %v", sha1, len(gd.plays), len(wd.plays))
-				}
-				for i := range gd.plays {
-					if gp, wp := gd.plays[i], wd.plays[i]; gp[0].Before(wp[0]) || gp[0].After(wp[1]) {
-						return fmt.Errorf("%v play %d has time %v outside of [%v, %v]",
-							sha1, i, gp[0], wp[0], wp[1])
-					}
-				}
-			}
+		if got == nil || !songInfosEqual(want, *got) {
+			return errors.New("songs don't match")
 		}
 		return nil
 	}); err != nil {
-		msg := fmt.Sprintf("Bad server user data for %v: %v\n", test.Caller(), err)
-		for sha1, wd := range want {
-			msg += fmt.Sprintf("Song %q:\n", sha1)
-			msg += "  Want: " + wd.String() + "\n"
-			if gd, ok := got[sha1]; ok {
-				msg += "  Got:  " + gd.String() + "\n"
-			} else {
-				msg += "  Got:  [missing]\n"
-			}
-		}
+		msg := fmt.Sprintf("Bad server %q data for %v:\n", song.SHA1, test.Caller())
+		msg += "  Want: " + want.String() + "\n"
+		msg += "  Got:  " + got.String() + "\n"
 		t.Fatal(msg)
 	}
 }

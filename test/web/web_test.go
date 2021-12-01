@@ -607,10 +607,8 @@ func TestReportPlayed(t *testing.T) {
 	song2Upper := time.Now()
 
 	// Only the second song should've been reported.
-	checkServerUserData(t, map[string]songUserData{
-		song1.SHA1: newSongUserData(-1.0, nil),
-		song2.SHA1: newSongUserData(-1.0, nil, [2]time.Time{song2Lower, song2Upper}),
-	})
+	checkServerSong(t, song2, hasSrvPlay(song2Lower, song2Upper))
+	checkServerSong(t, song1, hasNoSrvPlays())
 
 	// Go back to the first song but pause it immediately.
 	song1Lower := time.Now()
@@ -623,10 +621,8 @@ func TestReportPlayed(t *testing.T) {
 	// After more than half of the first song has played, it should be reported.
 	page.click(playPauseButton)
 	page.checkSong(song1, isPaused(false))
-	checkServerUserData(t, map[string]songUserData{
-		song1.SHA1: newSongUserData(-1.0, nil, [2]time.Time{song1Lower, song1Upper}),
-		song2.SHA1: newSongUserData(-1.0, nil, [2]time.Time{song2Lower, song2Upper}),
-	})
+	checkServerSong(t, song1, hasSrvPlay(song1Lower, song1Upper))
+	checkServerSong(t, song2, hasSrvPlay(song2Lower, song2Upper))
 }
 
 func TestReportReplay(t *testing.T) {
@@ -645,12 +641,8 @@ func TestReportReplay(t *testing.T) {
 	page.click(playPauseButton)
 
 	// Both playbacks should be reported.
-	checkServerUserData(t, map[string]songUserData{
-		song.SHA1: newSongUserData(-1.0, nil,
-			[2]time.Time{firstLower, secondLower},
-			[2]time.Time{secondLower, secondLower.Add(2 * time.Second)},
-		),
-	})
+	checkServerSong(t, song, hasSrvPlay(firstLower, secondLower),
+		hasSrvPlay(secondLower, secondLower.Add(2*time.Second)))
 }
 
 func TestRateAndTag(t *testing.T) {
@@ -670,18 +662,14 @@ func TestRateAndTag(t *testing.T) {
 	page.click(updateCloseImage)
 	page.checkSong(song, hasRatingStr(fourStars),
 		hasImgTitle("Rating: ★★★★☆\nTags: guitar rock"))
-	checkServerUserData(t, map[string]songUserData{
-		song.SHA1: newSongUserData(0.75, []string{"guitar", "rock"}),
-	})
+	checkServerSong(t, song, hasSrvRating(0.75), hasSrvTags("guitar", "rock"))
 
 	page.click(coverImage)
 	page.sendKeys(editTagsTextarea, " +metal", false)
 	page.click(updateCloseImage)
 	page.checkSong(song, hasRatingStr(fourStars),
 		hasImgTitle("Rating: ★★★★☆\nTags: guitar metal rock"))
-	checkServerUserData(t, map[string]songUserData{
-		song.SHA1: newSongUserData(0.75, []string{"guitar", "metal", "rock"}),
-	})
+	checkServerSong(t, song, hasSrvRating(0.75), hasSrvTags("guitar", "metal", "rock"))
 }
 
 func TestRetryUpdates(t *testing.T) {
@@ -707,10 +695,8 @@ func TestRetryUpdates(t *testing.T) {
 	// Wait a bit to let the updates fail and then let them succeed.
 	time.Sleep(time.Second)
 	sendConfig(updatesSucceed)
-	checkServerUserData(t, map[string]songUserData{
-		song.SHA1: newSongUserData(0.75, []string{"jazz", "mellow"},
-			[2]time.Time{firstLower, firstUpper}),
-	})
+	checkServerSong(t, song, hasSrvRating(0.75), hasSrvTags("jazz", "mellow"),
+		hasSrvPlay(firstLower, firstUpper))
 
 	// Queue some more failed updates.
 	sendConfig(updatesFail)
@@ -728,10 +714,8 @@ func TestRetryUpdates(t *testing.T) {
 	// The queued updates should be sent if the page is reloaded.
 	page.reload()
 	sendConfig(updatesSucceed)
-	checkServerUserData(t, map[string]songUserData{
-		song.SHA1: newSongUserData(0.25, []string{"lively", "soul"},
-			[2]time.Time{firstLower, firstUpper}, [2]time.Time{secondLower, secondUpper}),
-	})
+	checkServerSong(t, song, hasSrvRating(0.25), hasSrvTags("lively", "soul"),
+		hasSrvPlay(firstLower, firstUpper), hasSrvPlay(secondLower, secondUpper))
 
 	// In the case of multiple queued updates, the last one should take precedence.
 	sendConfig(updatesFail)
@@ -745,7 +729,7 @@ func TestRetryUpdates(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	sendConfig(updatesSucceed)
-	checkServerUserData(t, map[string]songUserData{song.SHA1: newSongUserData(1.0, nil)})
+	checkServerSong(t, song, hasSrvRating(1.0))
 }
 
 func TestEditTagsAutocomplete(t *testing.T) {
