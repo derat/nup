@@ -83,9 +83,9 @@ type songInfo struct {
 	active, checked, menu *bool   // song row is active, checked, or has context menu
 	paused, ended         *bool   // audio element is paused or ended
 	filename              *string // filename from audio element src attribute
-	rating                *string // rating string from cover image, e.g. "★★★"
+	ratingStr             *string // rating string from cover image, e.g. "★★★"
 	imgTitle              *string // cover image title attr, e.g. "Rating: ★★★☆☆\nTags: guitar rock"
-	time                  *string // displayed time, e.g. "[ 0:00 / 0:05 ]"
+	timeStr               *string // displayed time, e.g. "[ 0:00 / 0:05 ]"
 }
 
 // makeSongInfo constructs a basic songInfo using data from s.
@@ -101,7 +101,10 @@ func (s *songInfo) String() string {
 	if s == nil {
 		return "nil"
 	}
+
 	str := fmt.Sprintf("%q %q %q", s.artist, s.title, s.album)
+
+	// Describe optional bools.
 	for _, f := range []struct {
 		pos, neg string
 		val      *bool
@@ -120,12 +123,20 @@ func (s *songInfo) String() string {
 			}
 		}
 	}
-	if s.filename != nil {
-		str += " filename=" + *s.filename
+
+	// Describe optional strings.
+	for _, f := range []struct {
+		name string
+		val  *string
+	}{
+		{"filename", s.filename},
+		{"time", s.timeStr},
+	} {
+		if f.val != nil {
+			str += fmt.Sprintf(" %s=%s", f.name, *f.val)
+		}
 	}
-	if s.time != nil {
-		str += " time=" + *s.time
-	}
+
 	return "[" + str + "]"
 }
 
@@ -133,22 +144,19 @@ func (s *songInfo) String() string {
 type songCheck func(*songInfo)
 
 // See equivalently-named fields in songInfo for more info.
-func isPaused(p bool) songCheck      { return func(i *songInfo) { i.paused = &p } }
-func isEnded(e bool) songCheck       { return func(i *songInfo) { i.ended = &e } }
-func hasFilename(f string) songCheck { return func(i *songInfo) { i.filename = &f } }
-func hasRating(r string) songCheck   { return func(i *songInfo) { i.rating = &r } }
-func hasImgTitle(t string) songCheck { return func(i *songInfo) { i.imgTitle = &t } }
-func hasTime(s string) songCheck     { return func(i *songInfo) { i.time = &s } }
+func isPaused(p bool) songCheck       { return func(i *songInfo) { i.paused = &p } }
+func isEnded(e bool) songCheck        { return func(i *songInfo) { i.ended = &e } }
+func hasFilename(f string) songCheck  { return func(i *songInfo) { i.filename = &f } }
+func hasRatingStr(r string) songCheck { return func(i *songInfo) { i.ratingStr = &r } }
+func hasImgTitle(t string) songCheck  { return func(i *songInfo) { i.imgTitle = &t } }
+func hasTimeStr(s string) songCheck   { return func(i *songInfo) { i.timeStr = &s } }
 
 // songInfosEqual returns true if want and got have the same artist, title, and album
 // and any additional optional fields specified in want also match.
 func songInfosEqual(want, got songInfo) bool {
-	if want.artist != got.artist || want.title != got.title || want.album != got.album {
-		return false
-	}
+	// Compare bools.
 	for _, t := range []struct {
-		want *bool
-		got  *bool
+		want, got *bool
 	}{
 		{want.active, got.active},
 		{want.checked, got.checked},
@@ -160,17 +168,21 @@ func songInfosEqual(want, got songInfo) bool {
 			return false
 		}
 	}
-	if want.filename != nil && (got.filename == nil || *want.filename != *got.filename) {
-		return false
-	}
-	if want.rating != nil && (got.rating == nil || *want.rating != *got.rating) {
-		return false
-	}
-	if want.imgTitle != nil && (got.imgTitle == nil || *want.imgTitle != *got.imgTitle) {
-		return false
-	}
-	if want.time != nil && (got.time == nil || *want.time != *got.time) {
-		return false
+	// Compare strings.
+	for _, t := range []struct {
+		want, got *string
+	}{
+		{&want.artist, &got.artist},
+		{&want.title, &got.title},
+		{&want.album, &got.album},
+		{want.filename, got.filename},
+		{want.imgTitle, got.imgTitle},
+		{want.ratingStr, got.ratingStr},
+		{want.timeStr, got.timeStr},
+	} {
+		if t.want != nil && (t.got == nil || *t.got != *t.want) {
+			return false
+		}
 	}
 	return true
 }

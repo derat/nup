@@ -583,12 +583,12 @@ func TestDisplayTimeWhilePlaying(t *testing.T) {
 
 	page.setText(keywordsInput, song.Artist)
 	page.click(luckyButton)
-	page.checkSong(song, isPaused(false), hasTime("[ 0:00 / 0:05 ]"))
-	page.checkSong(song, isPaused(false), hasTime("[ 0:01 / 0:05 ]"))
-	page.checkSong(song, isPaused(false), hasTime("[ 0:02 / 0:05 ]"))
-	page.checkSong(song, isPaused(false), hasTime("[ 0:03 / 0:05 ]"))
-	page.checkSong(song, isPaused(false), hasTime("[ 0:04 / 0:05 ]"))
-	page.checkSong(song, isEnded(true), isPaused(true), hasTime("[ 0:05 / 0:05 ]"))
+	page.checkSong(song, isPaused(false), hasTimeStr("[ 0:00 / 0:05 ]"))
+	page.checkSong(song, isPaused(false), hasTimeStr("[ 0:01 / 0:05 ]"))
+	page.checkSong(song, isPaused(false), hasTimeStr("[ 0:02 / 0:05 ]"))
+	page.checkSong(song, isPaused(false), hasTimeStr("[ 0:03 / 0:05 ]"))
+	page.checkSong(song, isPaused(false), hasTimeStr("[ 0:04 / 0:05 ]"))
+	page.checkSong(song, isEnded(true), isPaused(true), hasTimeStr("[ 0:05 / 0:05 ]"))
 }
 
 func TestReportPlayed(t *testing.T) {
@@ -662,13 +662,13 @@ func TestRateAndTag(t *testing.T) {
 	page.click(luckyButton)
 	page.checkSong(song, isPaused(false))
 	page.click(playPauseButton)
-	page.checkSong(song, isPaused(true), hasRating(threeStars),
+	page.checkSong(song, isPaused(true), hasRatingStr(threeStars),
 		hasImgTitle("Rating: ★★★☆☆\nTags: guitar rock"))
 
 	page.click(coverImage)
 	page.click(ratingFourStars)
 	page.click(updateCloseImage)
-	page.checkSong(song, hasRating(fourStars),
+	page.checkSong(song, hasRatingStr(fourStars),
 		hasImgTitle("Rating: ★★★★☆\nTags: guitar rock"))
 	checkServerUserData(t, map[string]songUserData{
 		song.SHA1: newSongUserData(0.75, []string{"guitar", "rock"}),
@@ -677,7 +677,7 @@ func TestRateAndTag(t *testing.T) {
 	page.click(coverImage)
 	page.sendKeys(editTagsTextarea, " +metal", false)
 	page.click(updateCloseImage)
-	page.checkSong(song, hasRating(fourStars),
+	page.checkSong(song, hasRatingStr(fourStars),
 		hasImgTitle("Rating: ★★★★☆\nTags: guitar metal rock"))
 	checkServerUserData(t, map[string]songUserData{
 		song.SHA1: newSongUserData(0.75, []string{"guitar", "metal", "rock"}),

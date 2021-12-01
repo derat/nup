@@ -679,15 +679,15 @@ func (p *page) checkSong(s db.Song, checks ...songCheck) {
 		}
 
 		got = songInfo{
-			artist:   p.getTextOrFail(p.getOrFail(artistDiv), false),
-			title:    p.getTextOrFail(p.getOrFail(titleDiv), false),
-			album:    p.getTextOrFail(p.getOrFail(albumDiv), false),
-			paused:   &paused,
-			ended:    &ended,
-			filename: &filename,
-			rating:   &rating,
-			imgTitle: &imgTitle,
-			time:     &time,
+			artist:    p.getTextOrFail(p.getOrFail(artistDiv), false),
+			title:     p.getTextOrFail(p.getOrFail(titleDiv), false),
+			album:     p.getTextOrFail(p.getOrFail(albumDiv), false),
+			paused:    &paused,
+			ended:     &ended,
+			filename:  &filename,
+			ratingStr: &rating,
+			imgTitle:  &imgTitle,
+			timeStr:   &time,
 		}
 		if !songInfosEqual(want, got) {
 			return errors.New("songs don't match")
