@@ -80,7 +80,8 @@ func TestMain(m *testing.M) {
 		defer webDrv.Quit()
 
 		// Create a file containing messages logged by the web interface.
-		if browserLog, err = ioutil.TempFile("", "nup_web_test-*.txt"); err != nil {
+		if browserLog, err = ioutil.TempFile("",
+			"nup_web_test-"+time.Now().Format("20060102_150405-")+"*.txt"); err != nil {
 			log.Fatal("Failed creating browser log: ", err)
 		}
 		fmt.Fprintf(os.Stderr, "Writing browser logs to %v\n", browserLog.Name())
