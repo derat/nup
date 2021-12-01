@@ -819,6 +819,7 @@ func TestPresentation(t *testing.T) {
 	page := initWebTest(t)
 	show := func() { page.emitKeyDown("v", 86, true /* alt */) }
 	next := func() { page.emitKeyDown("n", 78, true /* alt */) }
+	rate := func() { page.emitKeyDown("r", 82, true /* alt */) }
 
 	song1 := newSong("artist", "track1", "album1", withTrack(1))
 	song2 := newSong("artist", "track2", "album1", withTrack(2))
@@ -847,9 +848,9 @@ func TestPresentation(t *testing.T) {
 	next()
 	page.checkPresentation(&song3, &song2)
 
-	// Skip to the last song.
+	// Skip to the last song. Displaying the update window should hide the presentation layer.
 	next()
 	page.checkPresentation(&song2, nil)
-	page.sendKeys(body, selenium.EscapeKey, false)
+	rate()
 	page.checkPresentation(nil, nil)
 }

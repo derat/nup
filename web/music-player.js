@@ -1032,6 +1032,13 @@ customElements.define(
       );
     }
 
+    // Shows or hides the presentation layer.
+    setPresentationLayerVisible_(visible) {
+      if (this.presentationLayer_.visible == visible) return;
+      this.presentationLayer_.visible = visible;
+      this.emitPresentEvent_(visible);
+    }
+
     // Adjusts |gainNode_|'s gain appropriately for the current song and
     // settings. This implements the approach described at
     // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification.
@@ -1075,25 +1082,29 @@ customElements.define(
       if (e.altKey && e.key == 'd') {
         const song = this.currentSong_;
         if (song) window.open(getDumpSongUrl(song.songId), '_blank');
+        this.setPresentationLayerVisible_(false);
         return true;
       } else if (e.altKey && e.key == 'n') {
         this.cycleTrack_(1, true /* delay */);
         return true;
       } else if (e.altKey && e.key == 'o') {
         this.showOptions_();
+        this.setPresentationLayerVisible_(false);
         return true;
       } else if (e.altKey && e.key == 'p') {
         this.cycleTrack_(-1, true /* delay */);
         return true;
       } else if (e.altKey && e.key == 'r') {
         if (this.showUpdateDiv_()) this.ratingSpan_.focus();
+        this.setPresentationLayerVisible_(false);
         return true;
       } else if (e.altKey && e.key == 't') {
         if (this.showUpdateDiv_()) this.tagsTextarea_.focus();
+        this.setPresentationLayerVisible_(false);
         return true;
       } else if (e.altKey && e.key == 'v') {
-        this.presentationLayer_.visible = !this.presentationLayer_.visible;
-        this.emitPresentEvent_(this.presentationLayer_.visible);
+        this.setPresentationLayerVisible_(!this.presentationLayer_.visible);
+        if (this.updateSong_) this.hideUpdateDiv_(false);
         return true;
       } else if (e.key == ' ' && !this.updateSong_) {
         this.togglePause_();
@@ -1102,8 +1113,7 @@ customElements.define(
         this.hideUpdateDiv_(true);
         return true;
       } else if (e.key == 'Escape' && this.presentationLayer_.visible) {
-        this.presentationLayer_.visible = false;
-        this.emitPresentEvent_(false);
+        this.setPresentationLayerVisible_(false);
         return true;
       } else if (e.key == 'Escape' && this.updateSong_) {
         this.hideUpdateDiv_(false);
