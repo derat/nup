@@ -279,6 +279,12 @@ customElements.define(
       return this.visible_;
     }
     set visible(visible) {
+      if (this.visible_ == visible) return;
+
+      // Prevent the old cover from crossfading out again.
+      // Its animation seems to be repeated whenever it becomes visible.
+      if (visible) this.oldCover_.classList.add('hidden');
+
       visible
         ? this.classList.add('visible')
         : this.classList.remove('visible');
