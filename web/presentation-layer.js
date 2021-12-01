@@ -27,14 +27,23 @@ const template = createTemplate(`
     display: flex;
   }
 
-  #current-cover {
+  .bg-img {
     height: 100%;
     width: 100%;
     object-fit: cover;
-    position: absolute:
+    position: absolute;
   }
-  #current-cover.hidden {
+  .bg-img.hidden {
     visibility: hidden;
+  }
+
+  @keyframes fade-out {
+    0% { opacity: 1 }
+    100% { opacity: 0 }
+  }
+  #old-cover {
+    animation: fade-out 0.5s ease-in-out;
+    opacity: 0;
   }
 
   #bottom {
@@ -131,7 +140,8 @@ const template = createTemplate(`
   }
 </style>
 
-<img id="current-cover" />
+<img id="current-cover" class="bg-img" />
+<img id="old-cover" class="bg-img" />
 
 <div id="bottom">
   <div id="current-details">
@@ -176,8 +186,9 @@ customElements.define(
       this.playNextTrackFunction_ = null;
 
       this.shadow_ = createShadow(this, template);
-      this.currentDetails_ = $('current-details', this.shadow_);
       this.currentCover_ = $('current-cover', this.shadow_);
+      this.oldCover_ = $('old-cover', this.shadow_);
+      this.currentDetails_ = $('current-details', this.shadow_);
       this.currentArtist_ = $('current-artist', this.shadow_);
       this.currentTitle_ = $('current-title', this.shadow_);
       this.currentAlbum_ = $('current-album', this.shadow_);
@@ -222,6 +233,15 @@ customElements.define(
         this.durationDiv_.innerText = formatTime(currentSong.length);
         this.duration_ = currentSong.length;
       }
+
+      // Make the "old" cover image display the image that we were just
+      // displaying, if any, and then fade out. We swap in a new image to
+      // retrigger the fade-out animation.
+      const el = this.currentCover_.cloneNode(true);
+      el.id = 'old-cover';
+      this.oldCover_.parentNode.replaceChild(el, this.oldCover_);
+      this.oldCover_ = el;
+
       // Use the full-resolution cover image.
       updateImg(
         this.currentCover_,
