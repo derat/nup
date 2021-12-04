@@ -205,30 +205,30 @@ func testConfigKey(ctx context.Context) *datastore.Key {
 }
 
 // GetConfig returns the currently-in-use Config.
-func GetConfig(ctx context.Context) *Config {
+func GetConfig(ctx context.Context) (*Config, error) {
 	if appengine.IsDevAppServer() {
 		var testCfg Config
 		if err := datastore.Get(ctx, testConfigKey(ctx), &testCfg); err == nil {
-			return &testCfg
+			return &testCfg, nil
 		} else if err != datastore.ErrNoSuchEntity {
-			panic(err)
+			return nil, err
 		}
 	}
 
 	if baseCfg == nil {
-		panic("LoadConfig() not called")
+		return nil, errors.New("LoadConfig not called")
 	}
-	return baseCfg
+	return baseCfg, nil
 }
 
-func SaveTestConfig(ctx context.Context, cfg *Config) {
-	if _, err := datastore.Put(ctx, testConfigKey(ctx), cfg); err != nil {
-		panic(err)
-	}
+func SaveTestConfig(ctx context.Context, cfg *Config) error {
+	_, err := datastore.Put(ctx, testConfigKey(ctx), cfg)
+	return err
 }
 
-func ClearTestConfig(ctx context.Context) {
+func ClearTestConfig(ctx context.Context) error {
 	if err := datastore.Delete(ctx, testConfigKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
-		panic(err)
+		return err
 	}
+	return nil
 }

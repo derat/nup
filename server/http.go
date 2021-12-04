@@ -84,7 +84,12 @@ type handlerFunc func(ctx context.Context, cfg *config.Config, w http.ResponseWr
 func addHandler(path, method string, redirectToLogin bool, fn handlerFunc) {
 	http.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		ctx := appengine.NewContext(r)
-		cfg := config.GetConfig(ctx)
+		cfg, err := config.GetConfig(ctx)
+		if err != nil {
+			log.Criticalf(ctx, "Failed getting config: %v", err)
+			http.Error(w, "Failed getting config", http.StatusInternalServerError)
+			return
+		}
 		if !checkRequest(ctx, cfg, w, r, method, redirectToLogin) {
 			return
 		}

@@ -124,15 +124,23 @@ func handleConfig(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 	}
 
 	var newCfg config.Config
-	if err := json.NewDecoder(r.Body).Decode(&newCfg); err == nil {
-		newCfg.AddTestUser()
-		config.SaveTestConfig(ctx, &newCfg)
-	} else if err == io.EOF {
-		config.ClearTestConfig(ctx)
-	} else {
-		log.Errorf(ctx, "Failed to decode config: %v", err)
+	if err := json.NewDecoder(r.Body).Decode(&newCfg); err == io.EOF {
+		if err := config.ClearTestConfig(ctx); err != nil {
+			log.Errorf(ctx, "Failed clearing config: %v", err)
+			http.Error(w, "Failed clearing config", http.StatusInternalServerError)
+			return
+		}
+	} else if err != nil {
+		log.Errorf(ctx, "Failed decoding config: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	} else {
+		newCfg.AddTestUser()
+		if err := config.SaveTestConfig(ctx, &newCfg); err != nil {
+			log.Errorf(ctx, "Failed saving config: %v", err)
+			http.Error(w, "Failed saving config", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	writeTextResponse(w, "ok")
