@@ -5,6 +5,7 @@
 package web
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -34,7 +36,7 @@ var (
 	musicSrv   *httptest.Server   // HTTP server for music files
 	webDrv     selenium.WebDriver // talks to browser using ChromeDriver
 	tester     *test.Tester       // interacts with App Engine server
-	browserLog *os.File           // contains log messages from browser
+	browserLog io.Writer          // receives log messages from browser
 
 	// Pull some stuff into our namespace for convenience.
 	file0s  = test.Song0s.Filename
@@ -45,6 +47,7 @@ var (
 
 func TestMain(m *testing.M) {
 	binDir := flag.String("bin-dir", "", "Directory containing dump_music (empty to search $PATH)")
+	brLogPath := flag.String("browser-log", "", `File for writing browser log (empty for temp file, "stderr" for stderr)`)
 	debug := flag.Bool("debug", false, "Print Selenium debug logs to stderr")
 	headless := flag.Bool("headless", true, "Run Chrome headlessly using Xvfb")
 	flag.StringVar(&serverURL, "server", "http://localhost:8080/", "Slash-terminated URL of dev_appserver.py instance")
@@ -80,14 +83,26 @@ func TestMain(m *testing.M) {
 		defer webDrv.Quit()
 
 		// Create a file containing messages logged by the web interface.
-		if browserLog, err = ioutil.TempFile("",
-			"nup_web_test-"+time.Now().Format("20060102_150405-")+"*.txt"); err != nil {
-			log.Fatal("Failed creating browser log: ", err)
+		var browserLogFile *os.File
+		if *brLogPath == "stderr" {
+			browserLog = os.Stderr
+		} else if *brLogPath != "" {
+			if browserLogFile, err = os.Create(*brLogPath); err != nil {
+				log.Fatal("Failed creating browser log: ", err)
+			}
+		} else {
+			if browserLogFile, err = ioutil.TempFile("",
+				"nup_web_test-"+time.Now().Format("20060102_150405-")+"*.txt"); err != nil {
+				log.Fatal("Failed creating browser log: ", err)
+			}
+			fmt.Fprintf(os.Stderr, "Writing browser logs to %v\n", browserLogFile.Name())
+			browserLog = browserLogFile
 		}
-		fmt.Fprintf(os.Stderr, "Writing browser logs to %v\n", browserLog.Name())
-		defer browserLog.Close()
+		if browserLogFile != nil {
+			defer browserLogFile.Close()
+		}
 		writeLogHeader("Running web tests against " + serverURL)
-		defer writeBrowserLogs()
+		defer copyBrowserLogs()
 
 		tester = test.NewTester(serverURL, *binDir)
 		defer tester.Close()
@@ -134,27 +149,26 @@ func writeLogHeader(s string) {
 	fmt.Fprintf(browserLog, "%s\n%s\n", s, strings.Repeat("-", 80))
 }
 
-// writeBrowserLogs gets new log messages from the browser and writes them to browserLog.
-func writeBrowserLogs() {
+// Log messages usually look like this:
+//  http://localhost:8080/music-searcher.js 478:18 "Got response with 1 song(s)"
+// This regexp matches the filename, line number, and unquoted message.
+var logRegexp = regexp.MustCompile(`^https?://[^ ]+/([^ /]+\.js) (\d+):\d+ (.*)$`)
+
+// copyBrowserLogs gets new log messages from the browser and writes them to browserLog.
+func copyBrowserLogs() {
 	msgs, err := webDrv.Log(slog.Browser)
 	if err != nil {
 		fmt.Fprintf(browserLog, "Failed getting browser logs: %v\n", err)
 		return
 	}
-
 	for _, msg := range msgs {
-		ts := msg.Timestamp.Format("15:04:05.000")
-
-		// Log messages usually look like this:
-		//  music-searcher.js 478:18 "Got response with 1 song(s)"
-		// Try to make them more readable by dropping the server URL from the
+		// Try to make logs more readable by dropping the server URL from the
 		// beginning of the filename and lining up the actual messages.
-		text := strings.TrimPrefix(msg.Message, serverURL)
-		if parts := strings.SplitN(text, " ", 3); len(parts) == 3 &&
-			strings.HasSuffix(parts[0], ".js") && strings.Contains(parts[1], ":") {
-			text = fmt.Sprintf("%-30s %s", parts[0]+" "+parts[1], strings.Trim(parts[2], `"`))
+		text := msg.Message
+		if ms := logRegexp.FindStringSubmatch(text); ms != nil {
+			text = fmt.Sprintf("%-30s %s", ms[1]+":"+ms[2], strings.Trim(ms[3], `"`))
 		}
-
+		ts := msg.Timestamp.Format("15:04:05.000")
 		fmt.Fprintf(browserLog, "%s %-7s %s\n", ts, msg.Level, text)
 	}
 }
@@ -163,7 +177,7 @@ func writeBrowserLogs() {
 // The returned object is used to interact with the web interface via Selenium.
 func initWebTest(t *testing.T) *page {
 	// Copy any browser logs from the previous test and write a header.
-	writeBrowserLogs()
+	copyBrowserLogs()
 	io.WriteString(browserLog, "\n")
 	writeLogHeader(t.Name())
 
@@ -854,4 +868,71 @@ func TestPresentation(t *testing.T) {
 	page.checkPresentation(&song2, nil)
 	rate()
 	page.checkPresentation(nil, nil)
+}
+
+func TestUnit(t *testing.T) {
+	// We don't care about initializing the page object, but we want to write a header
+	// to the browser log.
+	initWebTest(t)
+
+	// Start an HTTP server that serves both the web interface and the unit test files.
+	fs := unionFS{[]http.Dir{http.Dir("unit"), http.Dir("../../web")}}
+	srv := httptest.NewServer(http.FileServer(fs))
+	defer srv.Close()
+
+	defer func() {
+		if err := webDrv.Get(serverURL); err != nil {
+			// Crash since this will probably mess up other tests.
+			log.Fatalf("Failed navigating back to %v: %v", serverURL, err)
+		}
+	}()
+	if err := webDrv.Get(srv.URL); err != nil {
+		t.Fatalf("Failed navigating to %v: %v", srv.URL, err)
+	}
+
+	// WebDriver apparently blocks internally while executing scripts, so it seems like we
+	// unfortunately can't just start a goroutine to stream logs via copyBrowserLogs.
+	out, err := webDrv.ExecuteScriptAsyncRaw(
+		// ExecuteScriptAsync injects a 'done' callback as the final argument to the called code.
+		`const done = arguments[0];
+		const results = await window.runTests();
+		done(results);`, nil)
+	if err != nil {
+		t.Fatalf("Failed running tests: %v", err)
+	}
+
+	// The outer object with a 'value' property gets added by Selenium.
+	var results struct {
+		Value []struct {
+			Name   string `json:"name"` // "suite.test"
+			Errors []struct {
+				Src string `json:"src"`
+				Msg string `json:"msg"`
+			} `json:"errors"`
+		} `json:"value"`
+	}
+	if err := json.Unmarshal(out, &results); err != nil {
+		t.Fatalf("Failed unmarshaling test results %q: %v", string(out), err)
+	}
+	for _, res := range results.Value {
+		for _, err := range res.Errors {
+			t.Errorf("%v: %v: %v", res.Name, err.Src, err.Msg)
+		}
+	}
+}
+
+// unionFS implements http.FileSystem using layered http.Dirs.
+type unionFS struct {
+	dirs []http.Dir
+}
+
+func (fs unionFS) Open(name string) (http.File, error) {
+	var err error
+	for _, dir := range fs.dirs {
+		var f http.File
+		if f, err = dir.Open(name); err == nil {
+			return f, nil
+		}
+	}
+	return nil, err
 }
