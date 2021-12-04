@@ -40,26 +40,32 @@ var (
 	LegacySong2   = test.LegacySong2
 )
 
-func setUpTest() *test.Tester {
-	t := test.NewTester(server, binDir)
-	if err := t.PingServer(); err != nil {
-		log.Printf("Unable to connect to server: %v\n", err)
-		log.Printf("Run dev_appserver.py, maybe?")
-		os.Exit(1)
+func initTest(t *testing.T) (tester *test.Tester, done func()) {
+	tester = test.NewTester(t, server, binDir)
+	done = func() {
+		tester.SendConfig(nil)
+		tester.Close()
 	}
+
+	// Clean up if we fail.
+	success := false
+	defer func() {
+		if !success {
+			done()
+		}
+	}()
+
+	tester.PingServer()
 	log.Printf("clearing all data on %v", server)
-	t.DoPost("clear", nil)
-	t.DoPost("flush_cache", nil)
-	t.SendConfig(&config.Config{
+	tester.DoPost("clear", nil)
+	tester.DoPost("flush_cache", nil)
+	tester.SendConfig(&config.Config{
 		SongBucket:  songBucket,
 		CoverBucket: coverBucket,
 	})
-	return t
-}
 
-func cleanUpTest(t *test.Tester) {
-	t.SendConfig(nil)
-	t.Close()
+	success = true
+	return tester, done
 }
 
 func compareQueryResults(expected, actual []db.Song, order test.OrderPolicy) error {
@@ -101,8 +107,8 @@ func timeToSeconds(t time.Time) float64 {
 }
 
 func TestUpdate(tt *testing.T) {
-	t := setUpTest()
-	defer cleanUpTest(t)
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("importing songs from music dir")
 	test.CopySongs(t.MusicDir, Song0s.Filename, Song1s.Filename)
@@ -148,8 +154,8 @@ func TestUpdate(tt *testing.T) {
 }
 
 func TestUserData(tt *testing.T) {
-	t := setUpTest()
-	defer cleanUpTest(t)
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("importing a song")
 	test.CopySongs(t.MusicDir, Song0s.Filename)
@@ -254,8 +260,8 @@ func TestUserData(tt *testing.T) {
 }
 
 func TestQueries(tt *testing.T) {
-	t := setUpTest()
-	defer cleanUpTest(t)
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("posting some songs")
 	t.PostSongs([]db.Song{LegacySong1, LegacySong2}, true, 0)
@@ -291,8 +297,8 @@ func TestQueries(tt *testing.T) {
 }
 
 func TestCaching(tt *testing.T) {
-	t := setUpTest()
-	defer cleanUpTest(t)
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("posting and querying a song")
 	const cacheParam = "cacheOnly=1"
@@ -368,8 +374,8 @@ func TestCaching(tt *testing.T) {
 }
 
 func TestAndroid(tt *testing.T) {
-	t := setUpTest()
-	defer cleanUpTest(t)
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("posting songs")
 	now := t.GetNowFromServer()
@@ -411,8 +417,8 @@ func TestAndroid(tt *testing.T) {
 }
 
 func TestTags(tt *testing.T) {
-	t := setUpTest()
-	defer cleanUpTest(t)
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("getting hopefully-empty tag list")
 	if tags := t.GetTags(false); len(tags) > 0 {
@@ -451,8 +457,8 @@ func TestTags(tt *testing.T) {
 }
 
 func TestCovers(tt *testing.T) {
-	t := setUpTest()
-	defer cleanUpTest(t)
+	t, done := initTest(tt)
+	defer done()
 
 	createCover := func(fn string) {
 		f, err := os.Create(filepath.Join(t.CoverDir, fn))
@@ -511,8 +517,8 @@ func TestCovers(tt *testing.T) {
 }
 
 func TestJSONImport(tt *testing.T) {
-	t := setUpTest()
-	defer cleanUpTest(t)
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("importing songs from json file")
 	t.ImportSongsFromJSONFile(test.WriteSongsToJSONFile(t.TempDir,
@@ -565,8 +571,8 @@ func TestJSONImport(tt *testing.T) {
 }
 
 func TestUpdateList(tt *testing.T) {
-	t := setUpTest()
-	defer cleanUpTest(t)
+	t, done := initTest(tt)
+	defer done()
 
 	test.CopySongs(t.MusicDir, Song0s.Filename, Song1s.Filename, Song5s.Filename)
 	listPath := test.WriteSongPathsFile(t.TempDir, Song0s.Filename, Song5s.Filename)
@@ -600,8 +606,8 @@ func TestUpdateList(tt *testing.T) {
 }
 
 func TestSorting(tt *testing.T) {
-	t := setUpTest()
-	defer cleanUpTest(t)
+	t, done := initTest(tt)
+	defer done()
 
 	songs := make([]db.Song, 0)
 	for _, s := range []struct {
@@ -643,8 +649,8 @@ func TestSorting(tt *testing.T) {
 }
 
 func TestDeleteSong(tt *testing.T) {
-	t := setUpTest()
-	defer cleanUpTest(t)
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("posting songs and deleting first song")
 	postTime := t.GetNowFromServer()

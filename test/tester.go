@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/derat/nup/client"
@@ -60,9 +61,10 @@ func runCommand(p string, args ...string) (stdout, stderr string, err error) {
 // Tester helps tests send HTTP requests to a development server and
 // run the update_music and dump_music commands.
 type Tester struct {
-	TempDir  string // base temp dir created for holding test-related data
-	MusicDir string // created within TempDir for songs
-	CoverDir string // created within MusicDir for album art images
+	T        *testing.T // used to report errors (panic on errors if nil)
+	TempDir  string     // base temp dir created for holding test-related data
+	MusicDir string     // directory within TempDir for songs
+	CoverDir string     // directory within TempDir for album art images
 
 	updateConfigFile string // path to update_music config file
 	dumpConfigFile   string // path to dump_music config file
@@ -72,10 +74,16 @@ type Tester struct {
 }
 
 // NewTester creates a new tester for the development server at serverURL.
+//
+// The supplied testing.T object will be used to report errors.
+// If nil (e.g. if sharing a Tester between multiple tests), log.Panic will be called instead.
+// The T field can be modified as tests start and stop.
+//
 // binDir is the directory containing the update_music and dump_music commands
 // (e.g. $HOME/go/bin).
-func NewTester(serverURL, binDir string) *Tester {
+func NewTester(tt *testing.T, serverURL, binDir string) *Tester {
 	t := &Tester{
+		T:         tt,
 		serverURL: serverURL,
 		binDir:    binDir,
 	}
@@ -83,25 +91,27 @@ func NewTester(serverURL, binDir string) *Tester {
 	var err error
 	t.TempDir, err = ioutil.TempDir("", "nup_test.")
 	if err != nil {
-		// TODO: Switch this and other panics to log.Fatal.
-		panic(err)
+		t.fatal("Failed creating temp dir: ", err)
 	}
 	t.MusicDir = filepath.Join(t.TempDir, "music")
-	t.CoverDir = filepath.Join(t.MusicDir, ".covers")
-	if err := os.MkdirAll(t.CoverDir, 0700); err != nil {
-		panic(err)
+	if err := os.Mkdir(t.MusicDir, 0755); err != nil {
+		t.fatal("Failed creating music dir: ", err)
+	}
+	t.CoverDir = filepath.Join(t.TempDir, "covers")
+	if err := os.Mkdir(t.CoverDir, 0755); err != nil {
+		t.fatal("Failed creating cover dir: ", err)
 	}
 
 	writeConfig := func(fn string, d interface{}) (path string) {
 		path = filepath.Join(t.TempDir, fn)
 		f, err := os.Create(path)
 		if err != nil {
-			panic(err)
+			t.fatal("Failed writing config: ", err)
 		}
 		defer f.Close()
 
 		if err = json.NewEncoder(f).Encode(d); err != nil {
-			panic(err)
+			t.fatal("Failed encoding config: ", err)
 		}
 		return path
 	}
@@ -139,6 +149,17 @@ func (t *Tester) Close() {
 	os.RemoveAll(t.TempDir)
 }
 
+func (t *Tester) fatal(args ...interface{}) {
+	if t.T != nil {
+		t.T.Fatal(args...)
+	}
+	log.Panic(args...)
+}
+
+func (t *Tester) fatalf(format string, args ...interface{}) {
+	t.fatal(fmt.Sprintf(format, args...))
+}
+
 // SendConfig sends cfg to the server.
 // If cfg is nil, the server's config is cleared.
 func (t *Tester) SendConfig(cfg *config.Config) {
@@ -146,7 +167,7 @@ func (t *Tester) SendConfig(cfg *config.Config) {
 	if cfg != nil {
 		var err error
 		if b, err = json.Marshal(cfg); err != nil {
-			log.Fatal("Failed marshaling config: ", err)
+			t.fatal("Failed marshaling config: ", err)
 		}
 	}
 	t.DoPost("config", bytes.NewBuffer(b))
@@ -169,7 +190,7 @@ func (t *Tester) DumpSongs(strip StripPolicy, flags ...string) []db.Song {
 	}, flags...)
 	stdout, stderr, err := runCommand(filepath.Join(t.binDir, "dump_music"), args...)
 	if err != nil {
-		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
+		t.fatalf("Failed dumping songs: %v\nstderr: %v", err, stderr)
 	}
 	songs := make([]db.Song, 0)
 
@@ -183,7 +204,7 @@ func (t *Tester) DumpSongs(strip StripPolicy, flags ...string) []db.Song {
 			if err == io.EOF {
 				break
 			}
-			panic(fmt.Sprintf("unable to unmarshal song %q: %v", l, err))
+			t.fatalf("Failed unmarshaling song %q: %v", l, err)
 		}
 		if strip == StripIDs {
 			s.SongID = ""
@@ -199,7 +220,8 @@ func (t *Tester) SongID(sha1 string) string {
 			return s.SongID
 		}
 	}
-	panic(fmt.Sprintf("failed to find ID for %v", sha1))
+	t.fatalf("Failed finding ID for %v", sha1)
+	return ""
 }
 
 const KeepUserDataFlag = "-import-user-data=false"
@@ -214,7 +236,7 @@ func (t *Tester) UpdateSongs(flags ...string) {
 	}, flags...)
 	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
 		args...); err != nil {
-		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
+		t.fatalf("Failed updating songs: %v\nstderr: %v", err, stderr)
 	}
 }
 
@@ -230,14 +252,14 @@ func (t *Tester) DeleteSong(songID string) {
 	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
 		"-config="+t.updateConfigFile,
 		"-delete-song-id="+songID); err != nil {
-		panic(fmt.Sprintf("%v\nstderr: %v", err, stderr))
+		t.fatalf("Failed deleting song %v: %v\nstderr: %v", songID, err, stderr)
 	}
 }
 
 func (t *Tester) newRequest(method, path string, body io.Reader) *http.Request {
 	req, err := http.NewRequest(method, t.serverURL+path, body)
 	if err != nil {
-		panic(err)
+		t.fatalf("Failed creating %v request to %v: %v", method, path, err)
 	}
 	req.SetBasicAuth(config.TestUsername, config.TestPassword)
 	return req
@@ -246,20 +268,19 @@ func (t *Tester) newRequest(method, path string, body io.Reader) *http.Request {
 func (t *Tester) sendRequest(req *http.Request) *http.Response {
 	resp, err := t.client.Do(req)
 	if err != nil {
-		panic(err)
+		t.fatal("Failed sending request: ", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		panic(resp.Status)
+		t.fatal("Server reported error: ", resp.Status)
 	}
 	return resp
 }
 
-func (t *Tester) PingServer() error {
+func (t *Tester) PingServer() {
 	if resp, err := t.client.Do(t.newRequest("HEAD", "", nil)); err != nil {
-		return err
+		t.fatal("Failed pinging server (is dev_appserver.py running?): ", err)
 	} else {
 		resp.Body.Close()
-		return nil
 	}
 }
 
@@ -269,7 +290,7 @@ func (t *Tester) DoPost(pathAndQueryParams string, body io.Reader) {
 	resp := t.sendRequest(req)
 	defer resp.Body.Close()
 	if _, err := ioutil.ReadAll(resp.Body); err != nil {
-		panic(err)
+		t.fatalf("POST %v failed: %v", pathAndQueryParams, err)
 	}
 }
 
@@ -278,7 +299,7 @@ func (t *Tester) PostSongs(songs []db.Song, replaceUserData bool, updateDelay ti
 	e := json.NewEncoder(&buf)
 	for _, s := range songs {
 		if err := e.Encode(s); err != nil {
-			panic(err)
+			t.fatal("Encoding songs failed: ", err)
 		}
 	}
 	path := fmt.Sprintf("import?updateDelayNsec=%v", int64(updateDelay*time.Nanosecond))
@@ -295,7 +316,7 @@ func (t *Tester) QuerySongs(params ...string) []db.Song {
 	songs := make([]db.Song, 0)
 	d := json.NewDecoder(resp.Body)
 	if err := d.Decode(&songs); err != nil {
-		panic(err)
+		t.fatal("Decoding songs failed: ", err)
 	}
 	return songs
 }
@@ -315,7 +336,7 @@ func (t *Tester) GetTags(requireCache bool) string {
 	tags := make([]string, 0)
 	d := json.NewDecoder(resp.Body)
 	if err := d.Decode(&tags); err != nil {
-		panic(err)
+		t.fatal("Decoding tags failed: ", err)
 	}
 	return strings.Join(tags, ",")
 }
@@ -326,11 +347,11 @@ func (t *Tester) GetNowFromServer() time.Time {
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		panic(err)
+		t.fatal("Reading time from server failed: ", err)
 	}
 	nsec, err := strconv.ParseInt(string(b), 10, 64)
 	if err != nil {
-		panic(err)
+		t.fatal("Parsing time failed: ", err)
 	} else if nsec <= 0 {
 		return time.Time{}
 	}
@@ -377,7 +398,7 @@ func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted DeletionP
 			if err := dec.Decode(&msg); err == io.EOF {
 				break
 			} else if err != nil {
-				panic(err)
+				t.fatal("Decoding message failed: ", err)
 			}
 
 			var s db.Song
@@ -386,7 +407,7 @@ func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted DeletionP
 			} else if err := json.Unmarshal(msg, &cursor); err == nil {
 				break
 			} else {
-				panic(err)
+				t.fatal("Unmarshaling song failed: ", err)
 			}
 		}
 

@@ -53,6 +53,8 @@ func TestMain(m *testing.M) {
 	flag.StringVar(&serverURL, "server", "http://localhost:8080/", "Slash-terminated URL of dev_appserver.py instance")
 	flag.Parse()
 
+	// Do everything in a function so that deferred calls will run on failure
+	// (os.Exit() exits immediately).
 	os.Exit(func() int {
 		opts := []selenium.ServiceOption{}
 		if *debug {
@@ -67,7 +69,7 @@ func TestMain(m *testing.M) {
 		svc, err := selenium.NewChromeDriverService("/usr/local/bin/chromedriver",
 			chromeDrvPort, opts...)
 		if err != nil {
-			log.Fatal("Failed starting ChromeDriver service: ", err)
+			log.Panic("Failed starting ChromeDriver service: ", err)
 		}
 		defer svc.Stop()
 
@@ -78,7 +80,7 @@ func TestMain(m *testing.M) {
 		caps.SetLogLevel(slog.Browser, slog.All)
 		webDrv, err = selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", chromeDrvPort))
 		if err != nil {
-			log.Fatal("Failed connecting to Selenium: ", err)
+			log.Panic("Failed connecting to Selenium: ", err)
 		}
 		defer webDrv.Quit()
 
@@ -88,12 +90,12 @@ func TestMain(m *testing.M) {
 			browserLog = os.Stderr
 		} else if *brLogPath != "" {
 			if browserLogFile, err = os.Create(*brLogPath); err != nil {
-				log.Fatal("Failed creating browser log: ", err)
+				log.Panic("Failed creating browser log: ", err)
 			}
 		} else {
 			if browserLogFile, err = ioutil.TempFile("",
 				"nup_web_test-"+time.Now().Format("20060102_150405-")+"*.txt"); err != nil {
-				log.Fatal("Failed creating browser log: ", err)
+				log.Panic("Failed creating browser log: ", err)
 			}
 			fmt.Fprintf(os.Stderr, "Writing browser logs to %v\n", browserLogFile.Name())
 			browserLog = browserLogFile
@@ -104,11 +106,9 @@ func TestMain(m *testing.M) {
 		writeLogHeader("Running web tests against " + serverURL)
 		defer copyBrowserLogs()
 
-		tester = test.NewTester(serverURL, *binDir)
+		tester = test.NewTester(nil, serverURL, *binDir)
 		defer tester.Close()
-		if err := tester.PingServer(); err != nil {
-			log.Fatal("Failed pinging server (is dev_appserver.py running?): ", err)
-		}
+		tester.PingServer()
 
 		// Serve music files in the background.
 		test.CopySongs(tester.MusicDir, file0s, file1s, file5s, file10s)
@@ -127,17 +127,17 @@ func TestMain(m *testing.M) {
 		// so we need to load the site before setting the cookie that lets us
 		// skip authentication.
 		if err := webDrv.Get(serverURL); err != nil {
-			log.Fatalf("Failed loading %v: %v", serverURL, err)
+			log.Panicf("Failed loading %v: %v", serverURL, err)
 		}
 		if err := webDrv.AddCookie(&selenium.Cookie{
 			Name:   config.WebDriverCookie,
 			Value:  "1", // arbitrary
 			Expiry: math.MaxUint32,
 		}); err != nil {
-			log.Fatalf("Failed setting %q cookie: %v", config.WebDriverCookie, err)
+			log.Panicf("Failed setting %q cookie: %v", config.WebDriverCookie, err)
 		}
 		if err := webDrv.Get(serverURL); err != nil {
-			log.Fatalf("Failed reloading %v: %v", serverURL, err)
+			log.Panicf("Failed reloading %v: %v", serverURL, err)
 		}
 
 		return m.Run()
@@ -174,15 +174,16 @@ func copyBrowserLogs() {
 }
 
 // initWebTest should be called at the beginning of each test.
-// The returned object is used to interact with the web interface via Selenium.
-func initWebTest(t *testing.T) *page {
+// The returned page object is used to interact with the web interface via Selenium.
+func initWebTest(t *testing.T) (p *page, done func()) {
 	// Copy any browser logs from the previous test and write a header.
 	copyBrowserLogs()
 	io.WriteString(browserLog, "\n")
 	writeLogHeader(t.Name())
 
+	tester.T = t
 	tester.ClearData()
-	return newPage(t, webDrv)
+	return newPage(t, webDrv), func() { tester.T = nil }
 }
 
 // updatePolicy is passed to sendConfig to control the server's handling of updates.
@@ -236,7 +237,8 @@ func importSongs(songs ...interface{}) {
 }
 
 func TestKeywordQuery(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	album1 := joinSongs(
 		newSong("ar1", "ti1", "al1", withTrack(1)),
 		newSong("ar1", "ti2", "al1", withTrack(2)),
@@ -271,7 +273,8 @@ func TestKeywordQuery(t *testing.T) {
 }
 
 func TestTagQuery(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	song1 := newSong("ar1", "ti1", "al1", withTags("electronic", "instrumental"))
 	song2 := newSong("ar2", "ti2", "al2", withTags("rock", "guitar"))
 	song3 := newSong("ar3", "ti3", "al3", withTags("instrumental", "rock"))
@@ -294,7 +297,8 @@ func TestTagQuery(t *testing.T) {
 }
 
 func TestRatingQuery(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	song1 := newSong("a", "t", "al1", withRating(0.0))
 	song2 := newSong("a", "t", "al2", withRating(0.25))
 	song3 := newSong("a", "t", "al3", withRating(0.5))
@@ -333,7 +337,8 @@ func TestRatingQuery(t *testing.T) {
 }
 
 func TestFirstTrackQuery(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	album1 := joinSongs(
 		newSong("ar1", "ti1", "al1", withTrack(1), withDisc(1)),
 		newSong("ar1", "ti2", "al1", withTrack(2), withDisc(1)),
@@ -351,7 +356,8 @@ func TestFirstTrackQuery(t *testing.T) {
 }
 
 func TestMaxPlaysQuery(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	t1, t2, t3 := time.Unix(1, 0), time.Unix(2, 0), time.Unix(3, 0)
 	song1 := newSong("ar1", "ti1", "al1", withPlays(t1, t2))
 	song2 := newSong("ar2", "ti2", "al2", withPlays(t1, t2, t3))
@@ -374,7 +380,8 @@ func TestMaxPlaysQuery(t *testing.T) {
 }
 
 func TestPlayTimeQuery(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	now := time.Now()
 	song1 := newSong("ar1", "ti1", "al1", withPlays(now.Add(-5*24*time.Hour)))
 	song2 := newSong("ar2", "ti2", "al2", withPlays(now.Add(-90*24*time.Hour)))
@@ -400,7 +407,8 @@ func TestPlayTimeQuery(t *testing.T) {
 }
 
 func TestSearchResultCheckboxes(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	songs := joinSongs(
 		newSong("a", "t1", "al", withTrack(1)),
 		newSong("a", "t2", "al", withTrack(2)),
@@ -455,7 +463,8 @@ func TestSearchResultCheckboxes(t *testing.T) {
 }
 
 func TestAddToPlaylist(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	song1 := newSong("a", "t1", "al1", withTrack(1))
 	song2 := newSong("a", "t2", "al1", withTrack(2))
 	song3 := newSong("a", "t3", "al2", withTrack(1))
@@ -508,7 +517,8 @@ func TestAddToPlaylist(t *testing.T) {
 }
 
 func TestPlaybackButtons(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	song1 := newSong("artist", "track1", "album", withTrack(1), withFilename(file5s))
 	song2 := newSong("artist", "track2", "album", withTrack(2), withFilename(file1s))
 	importSongs(song1, song2)
@@ -552,7 +562,8 @@ func TestPlaybackButtons(t *testing.T) {
 }
 
 func TestContextMenu(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	song1 := newSong("a", "t1", "al", withTrack(1))
 	song2 := newSong("a", "t2", "al", withTrack(2))
 	song3 := newSong("a", "t3", "al", withTrack(3))
@@ -592,7 +603,8 @@ func TestContextMenu(t *testing.T) {
 }
 
 func TestDisplayTimeWhilePlaying(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	song := newSong("ar", "t", "al", withFilename(file5s))
 	importSongs(song)
 
@@ -607,7 +619,8 @@ func TestDisplayTimeWhilePlaying(t *testing.T) {
 }
 
 func TestReportPlayed(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	song1 := newSong("a", "t1", "al", withTrack(1), withFilename(file5s))
 	song2 := newSong("a", "t2", "al", withTrack(2), withFilename(file1s))
 	importSongs(song1, song2)
@@ -641,7 +654,8 @@ func TestReportPlayed(t *testing.T) {
 }
 
 func TestReportReplay(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	song := newSong("a", "t1", "al", withFilename(file1s))
 	importSongs(song)
 
@@ -661,7 +675,8 @@ func TestReportReplay(t *testing.T) {
 }
 
 func TestRateAndTag(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	song := newSong("ar", "t1", "al", withRating(0.5), withTags("rock", "guitar"))
 	importSongs(song)
 
@@ -688,7 +703,8 @@ func TestRateAndTag(t *testing.T) {
 }
 
 func TestRetryUpdates(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	song := newSong("ar", "t1", "al", withFilename(file1s),
 		withRating(0.5), withTags("rock", "guitar"))
 	importSongs(song)
@@ -748,7 +764,8 @@ func TestRetryUpdates(t *testing.T) {
 }
 
 func TestEditTagsAutocomplete(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	song1 := newSong("ar", "t1", "al", withTags("a0", "a1", "b"))
 	song2 := newSong("ar", "t2", "al", withTags("c0", "c1", "d"))
 	importSongs(song1, song2)
@@ -773,7 +790,8 @@ func TestEditTagsAutocomplete(t *testing.T) {
 }
 
 func TestOptions(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	show := func() { page.emitKeyDown("o", 79, true /* alt */) }
 
 	show()
@@ -803,7 +821,8 @@ func TestOptions(t *testing.T) {
 }
 
 func TestPresets(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	now := time.Now()
 	old := now.Add(-2 * 365 * 24 * time.Hour)
 	song1 := newSong("a", "t1", "unrated")
@@ -831,7 +850,8 @@ func TestPresets(t *testing.T) {
 }
 
 func TestPresentation(t *testing.T) {
-	page := initWebTest(t)
+	page, done := initWebTest(t)
+	defer done()
 	show := func() { page.emitKeyDown("v", 86, true /* alt */) }
 	next := func() { page.emitKeyDown("n", 78, true /* alt */) }
 	rate := func() { page.emitKeyDown("r", 82, true /* alt */) }
@@ -873,7 +893,8 @@ func TestPresentation(t *testing.T) {
 func TestUnit(t *testing.T) {
 	// We don't care about initializing the page object, but we want to write a header
 	// to the browser log.
-	initWebTest(t)
+	_, done := initWebTest(t)
+	defer done()
 
 	// Start an HTTP server that serves both the web interface and the unit test files.
 	fs := unionFS{[]http.Dir{http.Dir("unit"), http.Dir("../../web")}}
@@ -882,8 +903,8 @@ func TestUnit(t *testing.T) {
 
 	defer func() {
 		if err := webDrv.Get(serverURL); err != nil {
-			// Crash since this will probably mess up other tests.
-			log.Fatalf("Failed navigating back to %v: %v", serverURL, err)
+			// Note that this will probably mess up other tests.
+			t.Fatalf("Failed navigating back to %v: %v", serverURL, err)
 		}
 	}()
 	if err := webDrv.Get(srv.URL); err != nil {
