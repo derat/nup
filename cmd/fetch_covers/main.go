@@ -187,7 +187,7 @@ func main() {
 		log.Printf("Reading songs from %v", *dumpFile)
 		var err error
 		if albumIDs, err = readDumpFile(*dumpFile, *coverDir, *maxSongs); err != nil {
-			log.Fatal(err)
+			log.Fatalf("Failed reading dumped songs from %v: %v", *dumpFile, err)
 		}
 	} else if len(flag.Args()) > 0 {
 		ids := make(map[string]bool)

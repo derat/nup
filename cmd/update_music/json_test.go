@@ -4,8 +4,6 @@
 package main
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/derat/nup/server/db"
@@ -13,23 +11,18 @@ import (
 )
 
 func TestJSON(t *testing.T) {
-	dir, err := ioutil.TempDir("", "update_music.")
-	if err != nil {
-		panic(err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	songs := []db.Song{test.LegacySong1, test.LegacySong2}
 	ch := make(chan songOrErr)
 	num, err := readSongsFromJSONFile(test.WriteSongsToJSONFile(dir, songs), ch)
 	if err != nil {
-		t.Error(err)
+		t.Error("Failed reading songs from JSON: ", err)
 	}
 	actual, err := getSongsFromChannel(ch, num)
 	if err != nil {
-		t.Error(err)
+		t.Error("Failed getting songs from channel: ", err)
 	}
 	if err = test.CompareSongs(songs, actual, test.IgnoreOrder); err != nil {
-		t.Error(err)
+		t.Error("Bad songs: ", err)
 	}
 }

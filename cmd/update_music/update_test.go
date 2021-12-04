@@ -82,7 +82,7 @@ func TestUpdate(t *testing.T) {
 		t.Fatalf("Failed to send songs: %v", err)
 	}
 	if err := test.CompareSongs([]db.Song{s0, s1}, recv, test.CompareOrder); err != nil {
-		t.Error(err)
+		t.Error("Bad songs after initial update: ", err)
 	}
 	if replace != "1" {
 		t.Errorf("replaceUserData param was %q instead of 1", replace)
@@ -102,7 +102,7 @@ func TestUpdate(t *testing.T) {
 		t.Fatalf("Failed to send songs: %v", err)
 	}
 	if err := test.CompareSongs(sent, recv, test.CompareOrder); err != nil {
-		t.Error(err)
+		t.Error("Bad songs after second update: ", err)
 	}
 	if len(replace) > 0 {
 		t.Errorf("replaceUserData param was %q instead of empty", replace)

@@ -5,7 +5,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -76,12 +75,7 @@ func scanAndCompareSongs(t *testing.T, desc, dir string, lastUpdateTime time.Tim
 }
 
 func TestScanAndCompareSongs(t *testing.T) {
-	dir, err := ioutil.TempDir("", "update_music.")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	test.CopySongs(dir, test.Song0s.Filename, test.Song1s.Filename)
 	startTime := time.Now()
 	scanAndCompareSongs(t, "initial", dir, time.Time{}, nil, nil, []db.Song{test.Song0s, test.Song1s})
@@ -91,24 +85,24 @@ func TestScanAndCompareSongs(t *testing.T) {
 	addTime := time.Now()
 	scanAndCompareSongs(t, "add", dir, startTime, nil, nil, []db.Song{test.Song5s})
 
-	if err = os.Remove(filepath.Join(dir, test.Song0s.Filename)); err != nil {
-		panic(err)
+	if err := os.Remove(filepath.Join(dir, test.Song0s.Filename)); err != nil {
+		t.Fatal("Failed removing song: ", err)
 	}
 	test.CopySongs(dir, test.Song0sUpdated.Filename)
 	updateTime := time.Now()
 	scanAndCompareSongs(t, "update", dir, addTime, nil, nil, []db.Song{test.Song0sUpdated})
 
 	subdir := filepath.Join(dir, "foo")
-	if err = os.Mkdir(subdir, 0700); err != nil {
-		panic(err)
+	if err := os.Mkdir(subdir, 0700); err != nil {
+		t.Fatal("Failed making subdir: ", err)
 	}
 	renamedPath := filepath.Join(subdir, test.Song1s.Filename)
 	if err := os.Rename(filepath.Join(dir, test.Song1s.Filename), renamedPath); err != nil {
-		panic(err)
+		t.Fatal("Failed renaming song: ", err)
 	}
 	now := time.Now()
 	if err := os.Chtimes(renamedPath, now, now); err != nil {
-		panic(err)
+		t.Fatal("Failed setting times: ", err)
 	}
 	renamedSong1s := test.Song1s
 	renamedSong1s.Filename = filepath.Join(filepath.Base(subdir), test.Song1s.Filename)
@@ -125,12 +119,7 @@ func TestScanAndCompareSongs(t *testing.T) {
 }
 
 func TestScanAndCompareSongs_Rewrite(t *testing.T) {
-	dir, err := ioutil.TempDir("", "update_music.")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	const newArtist = "Rewritten Artist"
 	newSong1s := test.Song1s
 	newSong1s.Artist = newArtist
@@ -142,12 +131,7 @@ func TestScanAndCompareSongs_Rewrite(t *testing.T) {
 }
 
 func TestScanAndCompareSongs_NewFiles(t *testing.T) {
-	dir, err := ioutil.TempDir("", "update_music.")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-
+	dir := t.TempDir()
 	const (
 		oldArtist = "old_artist"
 		oldAlbum  = "old_album"
@@ -181,7 +165,7 @@ func TestScanAndCompareSongs_NewFiles(t *testing.T) {
 	// Move the new files into various locations under the music dir.
 	mv := func(src, dst string) {
 		if err := os.Rename(src, dst); err != nil {
-			t.Fatal(err)
+			t.Fatal("Failed renaming file: ", err)
 		}
 	}
 
