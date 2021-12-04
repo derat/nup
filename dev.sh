@@ -38,9 +38,21 @@ EOF
   shift 1
 done
 
-# Send TERM to our process group on exit:
-# https://stackoverflow.com/a/2173421/6882947
-trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM EXIT
+# On SIGINT or SIGTERM, send SIGTERM to our process group (including ourselves).
+# I think that killing via session ID may be more reliable, but sessions are
+# created by terminals and unavailable when running as a script.
+trap "trap - SIGTERM && pkill -g $$" SIGINT SIGTERM
+
+# When we exit normally, also send SIGTERM to the group, but ignore it so we can
+# preserve the original exit code.
+function cleanup() {
+  local code=$?
+  trap '' SIGTERM
+  pkill -g $$
+  trap - EXIT
+  exit $code
+}
+trap cleanup EXIT
 
 echo "Starting dev_appserver.py..." >&2
 dev_appserver.py --application=nup \
