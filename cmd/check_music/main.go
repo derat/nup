@@ -178,7 +178,6 @@ func main() {
 			os.Args[0])
 		flag.PrintDefaults()
 	}
-
 	musicDir := flag.String("music-dir", filepath.Join(os.Getenv("HOME"), "music"), "Directory containing song files")
 	coverDir := flag.String("cover-dir", "",
 		fmt.Sprintf("Directory containing cover art (%q within -music-dir if unset)", defaultCoverSubdir))

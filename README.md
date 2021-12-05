@@ -16,11 +16,13 @@ personal music collection, along with a web client and various command-line
 tools for managing the data.
 
 The basic idea is that you mirror your music collection (and the corresponding
-album artwork) to [Google Cloud Storage] and then run the `update_music` command
-against the local copy to save metadata to a [Datastore] database.
+album artwork) to [Google Cloud Storage] and then run the [update\_music]
+command against the local copy to save metadata to a [Datastore] database.
 User-generated information like ratings, tags, and playback history is also
 saved in Datastore. The App Engine app performs queries against Datastore and
 serves songs and album art from Cloud Storage.
+
+[update_music]: ./cmd/update_music
 
 An [Android client](https://github.com/derat/nup-android/) is also available.
 
@@ -95,7 +97,7 @@ At the very least, you'll need to do the following:
 *   Create Cloud Storage buckets for your songs and album art.
 *   Use the [gsutil] tool to sync songs and album art to Cloud Storage.
 *   Configure and deploy the App Engine app.
-*   Compile the `update_music` tool, create a small config file for it, and use
+*   Compile the [update\_music] tool, create a small config file for it, and use
     it to send song metadata to the App Engine app so it can be saved to
     Datastore.
 
@@ -153,19 +155,20 @@ discussion.
 First, from the base directory, run the `./dev.sh` script. This starts a local
 development App Engine instance listening at `http://localhost:8080/`.
 
-*   End-to-end Go tests that exercise the App Engine server and the `dump_music`
-    and `update_music` commands can be run from the `test/e2e/` directory via
-    `go test`.
+*   End-to-end Go tests that exercise the App Engine server and the
+    [dump\_music] and [update\_music] commands can be run from the `test/e2e/`
+    directory via `go test`.
 *   [Selenium] Go tests that exercise both the web interface (in Chrome) and the
     server can be run from the `test/web/` directory via `go test`. By default,
     Chrome runs headlessly using [Xvfb]. Run `go test -args -help` to see
     available flags.
 
+[dump_music]: ./cmd/dump_music
 [Selenium]: https://www.selenium.dev/
 [Xvfb]: https://en.wikipedia.org/wiki/Xvfb
 
-All Go tests (including unit tests) can be executed by running `./dev.sh
---test`.
+All Go tests (including unit tests) can be executed by running
+`./dev.sh --test`.
 
 The tests in `test/e2e/` and `test/web/` both make use of the dev App Engine
 instance, so when running all tests manually, `go test -p 1 ./...` (rather than
@@ -175,47 +178,3 @@ instance, so when running all tests manually, `go test -p 1 ./...` (rather than
 For development, you can additionally import example data from the `example/`
 directory and start a file server by running `./dev.sh --example`. Load
 `http://localhost:8080/` in a web browser and use `test@example.com` to log in.
-
-## Merging songs
-
-Suppose you have an existing file `old/song.mp3` that's already been rated,
-tagged, and played. You just added a new file `new/song.mp3` that contains a
-better (e.g. higher-bitrate) version of the same song from a different album.
-You want to delete the old file and merge its rating, tags, and play history
-into the new file.
-
-1.  Run the `update_music` command to create a new database object for the new
-    file.
-2.  Use the `dump_music` command to produce a local text file containing JSON
-    representations of all songs. Let's call it `music.txt`. This will contain
-    objects for both the old and new files.
-3.  Optionally, find the old file's line in `music.txt` and copy it into a new
-    `delete.txt` file. You can keep this as a backup in case something goes
-    wrong.
-4.  Find the new file's line in `music.txt` and copy it into a new `update.txt`
-    file.
-5.  Replace the `rating`, `plays`, and `tags` properties in `update.txt` with
-    the old file's values.
-6.  Run a command like the following to update the new file's database object:
-    ```sh
-    update_music -config $HOME/.nup/update_music.json \
-      -import-user-data -import-json-file update.txt
-    ```
-    You might want to run this with `-dry-run` first to check `update.txt`'s
-    syntax and double-check what will be done.
-7.  Run a command like the following to delete the old file's database object:
-    ```sh
-    update_music -config $HOME/.nup/update_music.json -delete-song-id <ID>
-    ```
-    `ID` corresponds to the numeric value of the old file's `songId` property.
-8.  Delete `old/song.mp3` or remove it from your local music directory.
-
-
-You can put multiple updated objects in `update.txt`, with each on its own line.
-If you want to delete multiple objects from a `delete.txt` file, use a command
-like the following:
-```sh
-sed -nre 's/.*"songId":"([0-9]+)".*/\1/p' <delete.txt | while read id; do
-  update_music -config $HOME/.nup/update_music.json -delete-song-id $id
-done
-```

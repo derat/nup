@@ -38,6 +38,11 @@ type config struct {
 }
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage %v: [flag]...\n"+
+			"Sends song updates to the server.\n\n", os.Args[0])
+		flag.PrintDefaults()
+	}
 	configFile := flag.String("config", "", "Path to config file")
 	deleteSongID := flag.Int64("delete-song-id", 0, "Delete song with given ID")
 	dryRun := flag.Bool("dry-run", false, "Only print what would be updated")

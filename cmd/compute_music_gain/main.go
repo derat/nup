@@ -21,8 +21,8 @@ func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage %v: [flag]...\n"+
 			"Computes gain adjustments for songs.\n"+
-			"Unmarshals \"dump_music\" song objects from stdin and\n"+
-			"marshals updated objects to stdout.\n\n",
+			"Reads \"dump_music\" song objects from stdin and"+
+			"writes updated objects to stdout.\n\n",
 			os.Args[0])
 		flag.PrintDefaults()
 	}

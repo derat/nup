@@ -169,6 +169,12 @@ func downloadCovers(albumIDs []string, dir string, maxRequests int) {
 }
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage %v: [flag]...\n"+
+			"Reads dumped song metadata and downloads album art from coverartarchive.org.\n\n",
+			os.Args[0])
+		flag.PrintDefaults()
+	}
 	dumpFile := flag.String("dump-file", "", "Path to file containing dumped JSON songs")
 	coverDir := flag.String("cover-dir", "", "Path to directory where cover images should be written")
 	maxSongs := flag.Int("max-songs", -1, "Maximum number of songs to inspect")

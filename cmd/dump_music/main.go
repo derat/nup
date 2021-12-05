@@ -100,6 +100,13 @@ func getPlays(cfg *client.Config, batchSize int, ch chan *db.PlayDump) {
 }
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage %v: [flag]...\n"+
+			"Downloads song metadata and user data from the server and writes JSON-marshaled\n"+
+			"songs to stdout.\n\n",
+			os.Args[0])
+		flag.PrintDefaults()
+	}
 	songBatchSize := flag.Int("song-batch-size", defaultSongBatchSize, "Size for each batch of entities")
 	playBatchSize := flag.Int("play-batch-size", defaultPlayBatchSize, "Size for each batch of entities")
 	configFile := flag.String("config", "", "Path to config file")
