@@ -2,7 +2,7 @@
 
 The `set_music_storage_classes` executable reads JSON-marshaled
 [Song objects](../../server/db/song.go) written by
-[dump\_music](../dump_music) and updates each song file's
+[dump_music](../dump_music) and updates each song file's
 [storage class](https://cloud.google.com/storage/docs/storage-classes) in
 [Google Cloud Storage](https://cloud.google.com/storage) based on its rating.
 

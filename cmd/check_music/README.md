@@ -1,7 +1,7 @@
 # check\_music
 
 The `check_music` executable checks for issues in songs dumped by
-[dump\_music](../dump_music) or in cover images.
+[dump_music](../dump_music) or in cover images.
 
 ```
 Usage check_music: [flag]...

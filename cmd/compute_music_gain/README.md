@@ -4,7 +4,7 @@ The `compute_music_gain` executable uses the
 [mp3gain](http://mp3gain.sourceforge.net/) program to compute gain adjustments
 and peak amplitudes for dumped songs.
 
-The [update\_music](../update_music) executable computes the same data when
+The [update_music](../update_music) executable computes the same data when
 importing songs. This program is only useful for backfilling missing data.
 
 ```

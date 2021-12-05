@@ -53,7 +53,7 @@ You want to delete the old file and merge its rating, tags, and play history
 into the new file.
 
 1.  Run `update_music` to create a new database object for the new file.
-2.  Use [dump\_music](../dump_music) to produce a local text file containing JSON
+2.  Use [dump_music](../dump_music) to produce a local text file containing JSON
     representations of all songs. Let's call it `music.txt`. This will contain
     objects for both the old and new files.
 3.  Optionally, find the old file's line in `music.txt` and copy it into a new

@@ -1,7 +1,7 @@
 # fetch\_covers
 
 The `fetch_covers` executable reads JSON-marshaled
-[Song objects](../../server/db/song.go) written by [dump\_music](../dump_music)
+[Song objects](../../server/db/song.go) written by [dump_music](../dump_music)
 and downloads the corresponding album artwork from the
 [Cover Art Archive](https://coverartarchive.org/).
 

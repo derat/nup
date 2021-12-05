@@ -16,7 +16,7 @@ personal music collection, along with a web client and various command-line
 tools for managing the data.
 
 The basic idea is that you mirror your music collection (and the corresponding
-album artwork) to [Google Cloud Storage] and then run the [update\_music]
+album artwork) to [Google Cloud Storage] and then run the [update_music]
 command against the local copy to save metadata to a [Datastore] database.
 User-generated information like ratings, tags, and playback history is also
 saved in Datastore. The App Engine app performs queries against Datastore and
@@ -97,7 +97,7 @@ At the very least, you'll need to do the following:
 *   Create Cloud Storage buckets for your songs and album art.
 *   Use the [gsutil] tool to sync songs and album art to Cloud Storage.
 *   Configure and deploy the App Engine app.
-*   Compile the [update\_music] tool, create a small config file for it, and use
+*   Compile the [update_music] tool, create a small config file for it, and use
     it to send song metadata to the App Engine app so it can be saved to
     Datastore.
 
@@ -156,7 +156,7 @@ First, from the base directory, run the `./dev.sh` script. This starts a local
 development App Engine instance listening at `http://localhost:8080/`.
 
 *   End-to-end Go tests that exercise the App Engine server and the
-    [dump\_music] and [update\_music] commands can be run from the `test/e2e/`
+    [dump_music] and [update_music] commands can be run from the `test/e2e/`
     directory via `go test`.
 *   [Selenium] Go tests that exercise both the web interface (in Chrome) and the
     server can be run from the `test/web/` directory via `go test`. By default,
