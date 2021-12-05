@@ -12,7 +12,7 @@ Deletes all song and play objects from Datastore. Used by tests.
 
 ### /config (POST, dev-only)
 
-Unmarshals a JSON-encoded [ServerConfig] struct from the request body and
+Unmarshals a JSON-encoded [Config] struct from the request body and
 applies it. Used by tests.
 
 ### /cover (GET)
@@ -86,8 +86,8 @@ address.
 
 ### /presets (GET)
 
-Returns a JSON-marshaled array of [Preset] objects describing search presets
-for the web interface.
+Returns a JSON-marshaled array of [SearchPreset] objects describing search
+presets for the web interface.
 
 ### /query (GET)
 
@@ -141,7 +141,7 @@ Returns a JSON-marshaled array of strings containing known tags.
 
 *   `requireCache` (optional) - If `1`, only return cached data. Used by tests.
 
-[ServerConfig]: ./types/config.go
-[Play]: ./types/song.go
-[Song]: ./types/song.go
-[Preset]: ./types/config.go
+[Config]: ./config/config.go
+[Play]: ./db/song.go
+[Song]: ./db/song.go
+[SearchPreset]: ./config/config.go

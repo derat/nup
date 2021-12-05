@@ -38,39 +38,6 @@ func writeTextResponse(w http.ResponseWriter, s string) {
 	w.Write([]byte(s))
 }
 
-// checkRequest verifies that r is authorized (if needed) and uses method.
-// If verification fails, an appropriate error or redirect is written to w.
-func checkRequest(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request,
-	method string, auth handlerAuth) bool {
-	if auth != allowUnauth {
-		username, allowed := cfg.HasAllowedGoogleAuth(ctx)
-		if !allowed && len(username) == 0 {
-			username, allowed = cfg.HasAllowedBasicAuth(r)
-		}
-		if !allowed {
-			if len(username) == 0 && auth == redirectUnauth {
-				loginURL, _ := user.LoginURL(ctx, "/")
-				log.Debugf(ctx, "Unauthenticated request for %v from %v; redirecting to login",
-					r.URL.String(), r.RemoteAddr)
-				http.Redirect(w, r, loginURL, http.StatusFound)
-			} else {
-				log.Debugf(ctx, "Unauthorized request for %v from %q at %v", r.URL.String(), username, r.RemoteAddr)
-				http.Error(w, "Request requires authorization", http.StatusUnauthorized)
-			}
-			return false
-		}
-	}
-
-	if r.Method != method {
-		log.Debugf(ctx, "Invalid %v request for %v (expected %v)", r.Method, r.URL.String(), method)
-		w.Header().Set("Allow", method)
-		http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
-		return false
-	}
-
-	return true
-}
-
 // handlerAuth is passed to addHandler to describe authorization requirements.
 type handlerAuth int
 
@@ -100,9 +67,34 @@ func addHandler(path, method string, auth handlerAuth, fn handlerFunc) {
 			http.Error(w, "Failed getting config", http.StatusInternalServerError)
 			return
 		}
-		if !checkRequest(ctx, cfg, w, r, method, auth) {
+
+		switch auth {
+		case allowUnauth:
+			// Allow all requests.
+		case rejectUnauth, redirectUnauth:
+			if ok, username := cfg.Auth(r); !ok {
+				switch auth {
+				case rejectUnauth:
+					log.Debugf(ctx, "Unauthorized request for %v from %v (user %q)",
+						r.URL.String(), r.RemoteAddr, username)
+					http.Error(w, "Request requires authorization", http.StatusUnauthorized)
+				case redirectUnauth:
+					loginURL, _ := user.LoginURL(ctx, "/")
+					log.Debugf(ctx, "Unauthorized request for %v from %v (user %q); redirecting to login",
+						r.URL.String(), r.RemoteAddr, username)
+					http.Redirect(w, r, loginURL, http.StatusFound)
+				}
+				return
+			}
+		}
+
+		if r.Method != method {
+			log.Debugf(ctx, "Invalid %v request for %v (expected %v)", r.Method, r.URL.String(), method)
+			w.Header().Set("Allow", method)
+			http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
 			return
 		}
+
 		fn(ctx, cfg, w, r)
 	})
 }

@@ -98,36 +98,29 @@ type Config struct {
 	ForceUpdateFailures bool `json:"forceUpdateFailures"`
 }
 
-// HasAllowedGoogleAuth checks whether ctx contains credentials for an authorized Google user.
-// If the user is logged in, the email address associated with their account is returned
-// even if they are not allowed to use the app.
-func (cfg *Config) HasAllowedGoogleAuth(ctx context.Context) (email string, allowed bool) {
-	u := user.Current(ctx)
-	if u == nil {
-		return "", false
-	}
-	for _, e := range cfg.GoogleUsers {
-		if u.Email == e {
-			return u.Email, true
+// Auth checks that r is authorized in cfg via either HTTP basic authentication or Google
+// authentication. A username or email address that can be used in logging is returned if found,
+// even if the the request is unauthorized.
+func (cfg *Config) Auth(r *http.Request) (ok bool, username string) {
+	if username, password, ok := r.BasicAuth(); ok {
+		for _, u := range cfg.BasicAuthUsers {
+			if username == u.Username && password == u.Password {
+				return true, username
+			}
 		}
+		return false, username
 	}
-	return u.Email, false
-}
 
-// HasAllowedBasicAuth checks whether r is authorized via HTTP basic
-// authentication with a username and password. If basic auth was used in r,
-// the username return value is set regardless of the user is actually allowed or not.
-func (cfg *Config) HasAllowedBasicAuth(r *http.Request) (username string, allowed bool) {
-	username, password, ok := r.BasicAuth()
-	if !ok {
-		return "", false
-	}
-	for _, u := range cfg.BasicAuthUsers {
-		if username == u.Username && password == u.Password {
-			return username, true
+	if u := user.Current(appengine.NewContext(r)); u != nil {
+		for _, e := range cfg.GoogleUsers {
+			if u.Email == e {
+				return true, u.Email
+			}
 		}
+		return false, u.Email
 	}
-	return username, false
+
+	return false, ""
 }
 
 // cleanBaseURL appends a trailing slash to u if not already present.
