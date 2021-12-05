@@ -100,11 +100,15 @@ func updateCachedQueries(ctx context.Context, f func(cachedQueries) error, t cac
 // getCachedResults returns cached results for q from t.
 // If the query isn't cached, then a nil slice is returned.
 func getCachedResults(ctx context.Context, q *SongQuery, t cache.Type) ([]int64, error) {
+	hash, err := q.hash()
+	if err != nil {
+		return nil, err
+	}
 	if m, err := loadCachedQueries(ctx, t); err != nil {
 		return nil, err
 	} else if m == nil { // cache miss
 		return nil, nil
-	} else if q, ok := m[q.hash()]; ok { // query among cached queries
+	} else if q, ok := m[hash]; ok { // query among cached queries
 		return q.IDs, nil
 	}
 	return nil, nil // query not among cached queries
@@ -112,8 +116,12 @@ func getCachedResults(ctx context.Context, q *SongQuery, t cache.Type) ([]int64,
 
 // setCachedResults caches ids as results for query in t.
 func setCachedResults(ctx context.Context, q *SongQuery, ids []int64, t cache.Type) error {
+	hash, err := q.hash()
+	if err != nil {
+		return err
+	}
 	return updateCachedQueries(ctx, func(m cachedQueries) error {
-		m[q.hash()] = cachedQuery{Query: *q, IDs: ids}
+		m[hash] = cachedQuery{Query: *q, IDs: ids}
 		return nil
 	}, t)
 }

@@ -10,7 +10,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"math/rand"
 	"sort"
 	"strconv"
@@ -57,14 +56,14 @@ type SongQuery struct {
 	Shuffle bool // randomize results set/order
 }
 
-// hash returns a unique string identifying q.
-func (q *SongQuery) hash() string {
+// hash returns a string uniquely identifying q.
+func (q *SongQuery) hash() (string, error) {
 	b, err := json.Marshal(q)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to marshal query: %v", err))
+		return "", err
 	}
 	s := sha1.Sum(b)
-	return hex.EncodeToString(s[:])
+	return hex.EncodeToString(s[:]), nil
 }
 
 // canCache returns true if the query's results can be safely cached.
