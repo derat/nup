@@ -31,7 +31,7 @@ func joinLocs(locs ...interface{}) []loc {
 		} else if tl, ok := l.([]loc); ok {
 			all = append(all, tl...)
 		} else {
-			panic("Invalid type (must be loc or []loc)")
+			panic(fmt.Sprintf("Invalid type %T (must be loc or []loc)", l))
 		}
 	}
 	return all
@@ -259,7 +259,7 @@ func (p *page) getNoWait(locs []loc) (selenium.WebElement, error) {
 		case selenium.ByCSSSelector:
 			query += ".querySelector('" + value + "')"
 		default:
-			panic(fmt.Sprintf("Invalid 'by' %q", by))
+			return nil, fmt.Errorf("invalid 'by' %q", by)
 		}
 		locs = locs[1:]
 	}

@@ -67,7 +67,7 @@ func joinSongs(songs ...interface{}) []db.Song {
 		} else if ts, ok := s.([]db.Song); ok {
 			all = append(all, ts...)
 		} else {
-			panic("Invalid type (must be db.Song or []db.Song)")
+			panic(fmt.Sprintf("Invalid type %T (must be db.Song or []db.Song)", s))
 		}
 	}
 	return all
