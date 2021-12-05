@@ -1,4 +1,5 @@
 {
+  "basicAuthUsers": [{ "username": "testuser", "password": "testpass" }],
   "googleUsers": ["test@example.com"],
   "songBaseURL": "http://localhost:8123/music/",
   "coverBaseURL": "http://localhost:8123/covers/",

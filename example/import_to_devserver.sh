@@ -12,8 +12,8 @@ UPDATE_MUSIC="update_music"
 
 cd "$(dirname "$0")"
 
-curl -u "${APP_AUTH}" -X POST "${APP_URL}/clear"
 curl -u "${APP_AUTH}" --data @server_config.json "${APP_URL}/config"
+curl -u "${APP_AUTH}" -X POST "${APP_URL}/clear"
 
 # To test with actual songs, remove --require-covers and --import-json-file and
 # update musicDir in update_config.json.
