@@ -25,6 +25,11 @@ import (
 )
 
 const (
+	// Username and Password are used for basic HTTP authentication by Tester.
+	// The server must be configured to accept these credentials.
+	Username = "testuser"
+	Password = "testpass"
+
 	dumpBatchSize    = 2 // song/play batch size for dump_music
 	androidBatchSize = 1 // song batch size when exporting for Android
 )
@@ -126,8 +131,8 @@ func NewTester(tt *testing.T, serverURL, binDir string) *Tester {
 	}{
 		Config: client.Config{
 			ServerURL: t.serverURL,
-			Username:  config.TestUsername,
-			Password:  config.TestPassword,
+			Username:  Username,
+			Password:  Password,
 		},
 		CoverDir:           t.CoverDir,
 		MusicDir:           t.MusicDir,
@@ -137,8 +142,8 @@ func NewTester(tt *testing.T, serverURL, binDir string) *Tester {
 
 	t.dumpConfigFile = writeConfig("dump_config.json", client.Config{
 		ServerURL: t.serverURL,
-		Username:  config.TestUsername,
-		Password:  config.TestPassword,
+		Username:  Username,
+		Password:  Password,
 	})
 
 	return t
@@ -160,8 +165,8 @@ func (t *Tester) fatalf(format string, args ...interface{}) {
 	t.fatal(fmt.Sprintf(format, args...))
 }
 
-// SendConfig sends cfg to the server.
-// If cfg is nil, the server's config is cleared.
+// SendConfig sends cfg to the server to override its real configuration.
+// If cfg is nil, the server's test configuration is cleared.
 func (t *Tester) SendConfig(cfg *config.Config) {
 	var b []byte
 	if cfg != nil {
@@ -265,7 +270,7 @@ func (t *Tester) newRequest(method, path string, body io.Reader) *http.Request {
 	if err != nil {
 		t.fatalf("Failed creating %v request to %v: %v", method, path, err)
 	}
-	req.SetBasicAuth(config.TestUsername, config.TestPassword)
+	req.SetBasicAuth(Username, Password)
 	return req
 }
 

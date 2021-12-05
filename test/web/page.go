@@ -16,6 +16,10 @@ import (
 	"github.com/tebeka/selenium"
 )
 
+// testEmail is used to log in to the dev_appserver.py's fake login page:
+// https://cloud.google.com/appengine/docs/standard/go111/users
+const testEmail = "testuser@example.org"
+
 // loc matches an element in the page.
 // See selenium.WebDriver.FindElement().
 type loc struct {
@@ -38,6 +42,10 @@ func joinLocs(locs ...interface{}) []loc {
 }
 
 var (
+	// Fake login page served by dev_appserver.py.
+	loginEmail  = joinLocs(loc{selenium.ByID, "email"})
+	loginButton = joinLocs(loc{selenium.ByID, "submit-login"})
+
 	body = joinLocs(loc{selenium.ByTagName, "body"})
 
 	overlayManager = joinLocs(loc{selenium.ByTagName, "overlay-manager"})
@@ -160,14 +168,25 @@ type page struct {
 	stage string
 }
 
-func newPage(t *testing.T, wd selenium.WebDriver) *page {
+func newPage(t *testing.T, wd selenium.WebDriver, baseURL string) *page {
 	p := page{t, wd, ""}
+	if err := wd.Get(baseURL); err != nil {
+		t.Fatalf("Failed loading %v: %v", baseURL, err)
+	}
 	p.configPage()
 	return &p
 }
 
 // configPage configures the page for testing. This is called automatically.
 func (p *page) configPage() {
+	// If we're at dev_appserver.py's fake login page, log in to get to the app.
+	if btn, err := p.getNoWait(loginButton); err == nil {
+		p.setText(loginEmail, testEmail)
+		if err := btn.Click(); err != nil {
+			p.t.Fatalf("Failed clicking login button for %v: %v", p.desc(), err)
+		}
+		p.getOrFail(musicPlayer)
+	}
 	if _, err := p.wd.ExecuteScript("document.test.setPlayDelayMs(10)", nil); err != nil {
 		p.t.Fatalf("Failed setting short play delay for %v: %v", p.desc(), err)
 	}

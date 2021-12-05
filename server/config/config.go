@@ -17,16 +17,6 @@ import (
 )
 
 const (
-	// TestUsername and TestPassword are accepted for basic HTTP authentication by development servers.
-	TestUsername = "testuser"
-	TestPassword = "testpass"
-
-	// WebDriverCookie is set by web tests to skip authentication.
-	WebDriverCookie = "webdriver"
-
-	// Config file path relative to base directory.
-	configPath = "config.json"
-
 	// Datastore kind and ID for storing the server config for testing.
 	configKind  = "ServerConfig"
 	configKeyID = "config"
@@ -109,12 +99,13 @@ type Config struct {
 }
 
 // HasAllowedGoogleAuth checks whether ctx contains credentials for an authorized Google user.
+// If the user is logged in, the email address associated with their account is returned
+// even if they are not allowed to use the app.
 func (cfg *Config) HasAllowedGoogleAuth(ctx context.Context) (email string, allowed bool) {
 	u := user.Current(ctx)
 	if u == nil {
 		return "", false
 	}
-
 	for _, e := range cfg.GoogleUsers {
 		if u.Email == e {
 			return u.Email, true
@@ -139,22 +130,6 @@ func (cfg *Config) HasAllowedBasicAuth(r *http.Request) (username string, allowe
 	return username, false
 }
 
-func (cfg *Config) AddTestUser() {
-	cfg.BasicAuthUsers = append(cfg.BasicAuthUsers, BasicAuthInfo{
-		Username: TestUsername,
-		Password: TestPassword,
-	})
-}
-
-// RequestHasWebDriverCookie returns true if r contains a special cookie set by browser
-// tests that use WebDriver.
-func RequestHasWebDriverCookie(r *http.Request) bool {
-	if _, err := r.Cookie(WebDriverCookie); err != nil {
-		return false
-	}
-	return true
-}
-
 // cleanBaseURL appends a trailing slash to u if not already present.
 // Does nothing if u is empty.
 func cleanBaseURL(u *string) {
@@ -163,10 +138,10 @@ func cleanBaseURL(u *string) {
 	}
 }
 
-// LoadConfig loads the server configuration from disk.
+// LoadConfig loads the server configuration from path p.
 // It should be called once at the start of main().
-func LoadConfig() error {
-	f, err := os.Open(configPath)
+func LoadConfig(p string) error {
+	f, err := os.Open(p)
 	if err != nil {
 		return err
 	}
@@ -194,9 +169,6 @@ func LoadConfig() error {
 		return errors.New("exactly one of CoverBucket and CoverBaseURL must be set")
 	}
 
-	if appengine.IsDevAppServer() {
-		baseCfg.AddTestUser()
-	}
 	return nil
 }
 

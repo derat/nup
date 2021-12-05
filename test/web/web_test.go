@@ -11,7 +11,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -108,7 +107,6 @@ func TestMain(m *testing.M) {
 
 		tester = test.NewTester(nil, serverURL, *binDir)
 		defer tester.Close()
-		tester.PingServer()
 
 		// Serve music files in the background.
 		if err := test.CopySongs(tester.MusicDir, file0s, file1s, file5s, file10s); err != nil {
@@ -124,23 +122,6 @@ func TestMain(m *testing.M) {
 
 		sendConfig(updatesSucceed)
 		defer tester.SendConfig(nil)
-
-		// WebDriver only allows setting cookies for the currently-loaded page,
-		// so we need to load the site before setting the cookie that lets us
-		// skip authentication.
-		if err := webDrv.Get(serverURL); err != nil {
-			log.Panicf("Failed loading %v: %v", serverURL, err)
-		}
-		if err := webDrv.AddCookie(&selenium.Cookie{
-			Name:   config.WebDriverCookie,
-			Value:  "1", // arbitrary
-			Expiry: math.MaxUint32,
-		}); err != nil {
-			log.Panicf("Failed setting %q cookie: %v", config.WebDriverCookie, err)
-		}
-		if err := webDrv.Get(serverURL); err != nil {
-			log.Panicf("Failed reloading %v: %v", serverURL, err)
-		}
 
 		return m.Run()
 	}())
@@ -185,7 +166,7 @@ func initWebTest(t *testing.T) (p *page, done func()) {
 
 	tester.T = t
 	tester.ClearData()
-	return newPage(t, webDrv), func() { tester.T = nil }
+	return newPage(t, webDrv, serverURL), func() { tester.T = nil }
 }
 
 // updatePolicy is passed to sendConfig to control the server's handling of updates.
@@ -200,6 +181,8 @@ const (
 // sendConfig updates the server's configuration.
 func sendConfig(p updatePolicy) {
 	tester.SendConfig(&config.Config{
+		GoogleUsers:         []string{testEmail},
+		BasicAuthUsers:      []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
 		SongBaseURL:         musicSrv.URL + "/",
 		CoverBaseURL:        "",
 		ForceUpdateFailures: bool(p),
@@ -902,13 +885,6 @@ func TestUnit(t *testing.T) {
 	fs := unionFS{[]http.Dir{http.Dir("unit"), http.Dir("../../web")}}
 	srv := httptest.NewServer(http.FileServer(fs))
 	defer srv.Close()
-
-	defer func() {
-		if err := webDrv.Get(serverURL); err != nil {
-			// Note that this will probably mess up other tests.
-			t.Fatalf("Failed navigating back to %v: %v", serverURL, err)
-		}
-	}()
 	if err := webDrv.Get(srv.URL); err != nil {
 		t.Fatalf("Failed navigating to %v: %v", srv.URL, err)
 	}

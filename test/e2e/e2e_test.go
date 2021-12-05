@@ -55,14 +55,14 @@ func initTest(t *testing.T) (tester *test.Tester, done func()) {
 		}
 	}()
 
-	tester.PingServer()
-	log.Printf("Clearing all data on %v", server)
+	log.Printf("Configuring and clearing %v", server)
+	tester.SendConfig(&config.Config{
+		BasicAuthUsers: []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
+		SongBucket:     songBucket,
+		CoverBucket:    coverBucket,
+	})
 	tester.DoPost("clear", nil)
 	tester.DoPost("flush_cache", nil)
-	tester.SendConfig(&config.Config{
-		SongBucket:  songBucket,
-		CoverBucket: coverBucket,
-	})
 
 	success = true
 	return tester, done

@@ -33,7 +33,8 @@ import (
 )
 
 const (
-	indexPath = "web/index.html" // path to index relative to base dir
+	configPath = "config.json"    // server config relative to base dir
+	indexPath  = "web/index.html" // path to index relative to base dir
 
 	defaultDumpBatchSize = 100  // default size of batch of dumped entities
 	maxDumpBatchSize     = 5000 // max size of batch of dumped entities
@@ -43,31 +44,32 @@ const (
 )
 
 func main() {
-	if err := config.LoadConfig(); err != nil {
+	if err := config.LoadConfig(configPath); err != nil {
 		panic(fmt.Sprintf("Loading config failed: %v", err))
 	}
 	rand.Seed(time.Now().UnixNano())
 
 	// Use a wrapper instead of calling http.HandleFunc directly to reduce the risk
 	// that a handler neglects checking that requests are authorized.
-	addHandler("/", http.MethodGet, true /* redirectToLogin */, handleIndex)
-	addHandler("/cover", http.MethodGet, false, handleCover)
-	addHandler("/delete_song", http.MethodPost, false, handleDeleteSong)
-	addHandler("/dump_song", http.MethodGet, false, handleDumpSong)
-	addHandler("/export", http.MethodGet, false, handleExport)
-	addHandler("/import", http.MethodPost, false, handleImport)
-	addHandler("/now", http.MethodGet, false, handleNow)
-	addHandler("/played", http.MethodPost, false, handlePlayed)
-	addHandler("/presets", http.MethodGet, false, handlePresets)
-	addHandler("/query", http.MethodGet, false, handleQuery)
-	addHandler("/rate_and_tag", http.MethodPost, false, handleRateAndTag)
-	addHandler("/song", http.MethodGet, false, handleSong)
-	addHandler("/tags", http.MethodGet, false, handleTags)
+	addHandler("/", http.MethodGet, redirectUnauth, handleIndex)
+	addHandler("/cover", http.MethodGet, rejectUnauth, handleCover)
+	addHandler("/delete_song", http.MethodPost, rejectUnauth, handleDeleteSong)
+	addHandler("/dump_song", http.MethodGet, rejectUnauth, handleDumpSong)
+	addHandler("/export", http.MethodGet, rejectUnauth, handleExport)
+	addHandler("/import", http.MethodPost, rejectUnauth, handleImport)
+	addHandler("/now", http.MethodGet, rejectUnauth, handleNow)
+	addHandler("/played", http.MethodPost, rejectUnauth, handlePlayed)
+	addHandler("/presets", http.MethodGet, rejectUnauth, handlePresets)
+	addHandler("/query", http.MethodGet, rejectUnauth, handleQuery)
+	addHandler("/rate_and_tag", http.MethodPost, rejectUnauth, handleRateAndTag)
+	addHandler("/song", http.MethodGet, rejectUnauth, handleSong)
+	addHandler("/tags", http.MethodGet, rejectUnauth, handleTags)
 
 	if appengine.IsDevAppServer() {
-		addHandler("/clear", http.MethodPost, false, handleClear)
-		addHandler("/config", http.MethodPost, false, handleConfig)
-		addHandler("/flush_cache", http.MethodPost, false, handleFlushCache)
+		addHandler("/clear", http.MethodPost, rejectUnauth, handleClear)
+		// Don't require authorization for /config since tests use it to inject auth info.
+		addHandler("/config", http.MethodPost, allowUnauth, handleConfig)
+		addHandler("/flush_cache", http.MethodPost, rejectUnauth, handleFlushCache)
 	}
 
 	// The google.golang.org/appengine packages are (were?) deprecated, and the official way forward
@@ -119,10 +121,6 @@ func handleClear(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 }
 
 func handleConfig(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
-	if !checkRequest(ctx, cfg, w, r, "POST", false) {
-		return
-	}
-
 	var newCfg config.Config
 	if err := json.NewDecoder(r.Body).Decode(&newCfg); err == io.EOF {
 		if err := config.ClearTestConfig(ctx); err != nil {
@@ -134,13 +132,10 @@ func handleConfig(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 		log.Errorf(ctx, "Failed decoding config: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	} else {
-		newCfg.AddTestUser()
-		if err := config.SaveTestConfig(ctx, &newCfg); err != nil {
-			log.Errorf(ctx, "Failed saving config: %v", err)
-			http.Error(w, "Failed saving config", http.StatusInternalServerError)
-			return
-		}
+	} else if err := config.SaveTestConfig(ctx, &newCfg); err != nil {
+		log.Errorf(ctx, "Failed saving config: %v", err)
+		http.Error(w, "Failed saving config", http.StatusInternalServerError)
+		return
 	}
 
 	writeTextResponse(w, "ok")

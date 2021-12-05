@@ -38,30 +38,27 @@ func writeTextResponse(w http.ResponseWriter, s string) {
 	w.Write([]byte(s))
 }
 
-// checkRequest verifies that r is an authorized request using method.
-// If the request is unauthorized and redirectToLogin is true, the client
-// is redirected to the login screen. Otherwise, an appropriate error is
-// written to w.
+// checkRequest verifies that r is authorized (if needed) and uses method.
+// If verification fails, an appropriate error or redirect is written to w.
 func checkRequest(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request,
-	method string, redirectToLogin bool) bool {
-	username, allowed := cfg.HasAllowedGoogleAuth(ctx)
-	if !allowed && len(username) == 0 {
-		username, allowed = cfg.HasAllowedBasicAuth(r)
-	}
-	// Ugly hack since WebDriver doesn't support basic auth.
-	if !allowed && appengine.IsDevAppServer() && config.RequestHasWebDriverCookie(r) {
-		allowed = true
-	}
-	if !allowed {
-		if len(username) == 0 && redirectToLogin {
-			loginURL, _ := user.LoginURL(ctx, "/")
-			log.Debugf(ctx, "Unauthenticated request for %v from %v; redirecting to login", r.URL.String(), r.RemoteAddr)
-			http.Redirect(w, r, loginURL, http.StatusFound)
-		} else {
-			log.Debugf(ctx, "Unauthorized request for %v from %q at %v", r.URL.String(), username, r.RemoteAddr)
-			http.Error(w, "Request requires authorization", http.StatusUnauthorized)
+	method string, auth handlerAuth) bool {
+	if auth != allowUnauth {
+		username, allowed := cfg.HasAllowedGoogleAuth(ctx)
+		if !allowed && len(username) == 0 {
+			username, allowed = cfg.HasAllowedBasicAuth(r)
 		}
-		return false
+		if !allowed {
+			if len(username) == 0 && auth == redirectUnauth {
+				loginURL, _ := user.LoginURL(ctx, "/")
+				log.Debugf(ctx, "Unauthenticated request for %v from %v; redirecting to login",
+					r.URL.String(), r.RemoteAddr)
+				http.Redirect(w, r, loginURL, http.StatusFound)
+			} else {
+				log.Debugf(ctx, "Unauthorized request for %v from %q at %v", r.URL.String(), username, r.RemoteAddr)
+				http.Error(w, "Request requires authorization", http.StatusUnauthorized)
+			}
+			return false
+		}
 	}
 
 	if r.Method != method {
@@ -74,14 +71,27 @@ func checkRequest(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 	return true
 }
 
+// handlerAuth is passed to addHandler to describe authorization requirements.
+type handlerAuth int
+
+const (
+	rejectUnauth   handlerAuth = iota // 401 if unauthorized
+	redirectUnauth                    // 302 to login page if unauthorized
+	allowUnauth                       // no auth required
+)
+
 // handlerFunc handles HTTP requests to a single endpoint.
 type handlerFunc func(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request)
 
 // addHandler registers fn to handle HTTP requests to the specified path.
-// Requests are verified to come from an authorized user and use the specified HTTP method before
-// they are passed to fn. If redirectToLogin is true, unauthorized requests are redirected to the
-// login page.
-func addHandler(path, method string, redirectToLogin bool, fn handlerFunc) {
+// Requests are verified to meet authorization requirements and use
+// the specified HTTP method before they are passed to fn.
+func addHandler(path, method string, auth handlerAuth, fn handlerFunc) {
+	// Guard against mistakes.
+	if auth == allowUnauth && !appengine.IsDevAppServer() {
+		panic("Unauthorized requests can only be allowed in dev_appserver")
+	}
+
 	http.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		ctx := appengine.NewContext(r)
 		cfg, err := config.GetConfig(ctx)
@@ -90,7 +100,7 @@ func addHandler(path, method string, redirectToLogin bool, fn handlerFunc) {
 			http.Error(w, "Failed getting config", http.StatusInternalServerError)
 			return
 		}
-		if !checkRequest(ctx, cfg, w, r, method, redirectToLogin) {
+		if !checkRequest(ctx, cfg, w, r, method, auth) {
 			return
 		}
 		fn(ctx, cfg, w, r)
