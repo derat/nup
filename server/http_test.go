@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/derat/nup/server/config"
@@ -140,6 +141,16 @@ func TestAddHandler(t *testing.T) {
 			if lastMethod != "" || lastPath != "" {
 				t.Errorf("%v resulted in %v %v; should've been rejected",
 					desc, lastMethod, lastPath)
+			}
+			if rec.Code == 302 {
+				// These checks depend on the format of App Engine URLs:
+				//  /_ah/login?continue=http%3A//localhost%3A34773/
+				//  /_ah/logout?continue=http%3A//localhost%3A34773/_ah/login%3Fcontinue%3Dhttp%253A//localhost%253A34773/
+				if loc := rec.Result().Header.Get("Location"); !strings.Contains(loc, "/login") {
+					t.Errorf("%v redirected to non-login URL %v", desc, loc)
+				} else if tc.email != "" && !strings.Contains(loc, "/logout") {
+					t.Errorf("%v redirected to non-logout URL %v", desc, loc)
+				}
 			}
 		}
 	}

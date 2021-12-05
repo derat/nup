@@ -79,10 +79,14 @@ func addHandler(path, method string, auth handlerAuth, fn handlerFunc) {
 						r.URL.String(), r.RemoteAddr, username)
 					http.Error(w, "Request requires authorization", http.StatusUnauthorized)
 				case redirectUnauth:
-					loginURL, _ := user.LoginURL(ctx, "/")
-					log.Debugf(ctx, "Unauthorized request for %v from %v (user %q); redirecting to login",
-						r.URL.String(), r.RemoteAddr, username)
-					http.Redirect(w, r, loginURL, http.StatusFound)
+					if u, err := getLoginURL(ctx); err != nil {
+						log.Errorf(ctx, "Failed generating login URL: %v", err)
+						http.Error(w, "Failed redirecting to login", http.StatusInternalServerError)
+					} else {
+						log.Debugf(ctx, "Unauthorized request for %v from %v (user %q); redirecting to %v",
+							r.URL.String(), r.RemoteAddr, username, u)
+						http.Redirect(w, r, u, http.StatusFound)
+					}
 				}
 				return
 			}
@@ -97,6 +101,20 @@ func addHandler(path, method string, auth handlerAuth, fn handlerFunc) {
 
 		fn(ctx, cfg, w, r)
 	})
+}
+
+// getLoginURL returns a login URL for the app.
+func getLoginURL(ctx context.Context) (string, error) {
+	u, err := user.LoginURL(ctx, "/")
+	if err != nil {
+		return "", err
+	}
+	// If the user is already logged in, send them to a URL that logs
+	// them out first to avoid a redirect loop.
+	if user.Current(ctx) != nil {
+		return user.LogoutURL(ctx, u)
+	}
+	return u, err
 }
 
 // parseIntParam parses and returns the named int64 form parameter from r.
