@@ -111,7 +111,9 @@ func TestMain(m *testing.M) {
 		tester.PingServer()
 
 		// Serve music files in the background.
-		test.CopySongs(tester.MusicDir, file0s, file1s, file5s, file10s)
+		if err := test.CopySongs(tester.MusicDir, file0s, file1s, file5s, file10s); err != nil {
+			log.Panic("Failed copying songs: ", err)
+		}
 		fs := http.FileServer(http.Dir(tester.MusicDir))
 		musicSrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Credentials", "true")

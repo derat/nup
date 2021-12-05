@@ -244,8 +244,12 @@ func (t *Tester) UpdateSongsFromList(path string, flags ...string) {
 	t.UpdateSongs(append(flags, "-song-paths-file="+path)...)
 }
 
-func (t *Tester) ImportSongsFromJSONFile(path string, flags ...string) {
-	t.UpdateSongs(append(flags, "-import-json-file="+path)...)
+func (t *Tester) ImportSongsFromJSONFile(songs []db.Song, flags ...string) {
+	p, err := WriteSongsToJSONFile(t.TempDir, songs)
+	if err != nil {
+		t.fatal("Failed writing songs to JSON file: ", err)
+	}
+	t.UpdateSongs(append(flags, "-import-json-file="+p)...)
 }
 
 func (t *Tester) DeleteSong(songID string) {

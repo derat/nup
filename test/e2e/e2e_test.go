@@ -111,7 +111,7 @@ func TestUpdate(tt *testing.T) {
 	defer done()
 
 	log.Print("Importing songs from music dir")
-	test.CopySongs(t.MusicDir, Song0s.Filename, Song1s.Filename)
+	test.Must(tt, test.CopySongs(t.MusicDir, Song0s.Filename, Song1s.Filename))
 	t.UpdateSongs()
 	if err := test.CompareSongs([]db.Song{Song0s, Song1s},
 		t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
@@ -119,7 +119,7 @@ func TestUpdate(tt *testing.T) {
 	}
 
 	log.Print("Importing another song")
-	test.CopySongs(t.MusicDir, Song5s.Filename)
+	test.Must(tt, test.CopySongs(t.MusicDir, Song5s.Filename))
 	t.UpdateSongs()
 	if err := test.CompareSongs([]db.Song{Song0s, Song1s, Song5s},
 		t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
@@ -127,8 +127,8 @@ func TestUpdate(tt *testing.T) {
 	}
 
 	log.Print("Updating a song")
-	test.DeleteSongs(t.MusicDir, Song0s.Filename)
-	test.CopySongs(t.MusicDir, Song0sUpdated.Filename)
+	test.Must(tt, test.DeleteSongs(t.MusicDir, Song0s.Filename))
+	test.Must(tt, test.CopySongs(t.MusicDir, Song0sUpdated.Filename))
 	t.UpdateSongs()
 	if err := test.CompareSongs([]db.Song{Song0sUpdated, Song1s, Song5s},
 		t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
@@ -145,7 +145,10 @@ func TestUpdate(tt *testing.T) {
 	// verify that it worked as expected.
 	log.Print("Importing dumped gain with glob")
 	glob := strings.TrimSuffix(gs5.Filename, ".mp3") + ".*"
-	dumpPath := test.WriteSongsToJSONFile(t.TempDir, []db.Song{gs5})
+	dumpPath, err := test.WriteSongsToJSONFile(t.TempDir, []db.Song{gs5})
+	if err != nil {
+		tt.Fatal("Failed writing JSON file: ", err)
+	}
 	t.UpdateSongs(test.ForceGlobFlag(glob), test.DumpedGainsFlag(dumpPath))
 	if err := test.CompareSongs([]db.Song{Song0sUpdated, Song1s, gs5},
 		t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
@@ -158,7 +161,7 @@ func TestUserData(tt *testing.T) {
 	defer done()
 
 	log.Print("Importing a song")
-	test.CopySongs(t.MusicDir, Song0s.Filename)
+	test.Must(tt, test.CopySongs(t.MusicDir, Song0s.Filename))
 	t.UpdateSongs()
 	id := t.SongID(Song0s.SHA1)
 
@@ -185,12 +188,12 @@ func TestUserData(tt *testing.T) {
 	}
 
 	log.Print("Updating song and checking that user data is preserved")
-	test.DeleteSongs(t.MusicDir, s.Filename)
+	test.Must(tt, test.DeleteSongs(t.MusicDir, s.Filename))
 	us := Song0sUpdated
 	us.Rating = s.Rating
 	us.Tags = s.Tags
 	us.Plays = s.Plays
-	test.CopySongs(t.MusicDir, us.Filename)
+	test.Must(tt, test.CopySongs(t.MusicDir, us.Filename))
 	t.UpdateSongs()
 	if err := test.CompareSongs([]db.Song{us}, t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
 		tt.Error("Bad songs after updating song: ", err)
@@ -468,7 +471,7 @@ func TestCovers(tt *testing.T) {
 	}
 
 	log.Print("Writing cover and importing songs")
-	test.CopySongs(t.MusicDir, Song0s.Filename, Song5s.Filename)
+	test.Must(tt, test.CopySongs(t.MusicDir, Song0s.Filename, Song5s.Filename))
 	s5 := Song5s
 	s5.CoverFilename = fmt.Sprintf("%s.jpg", s5.AlbumID)
 	createCover(s5.CoverFilename)
@@ -478,8 +481,8 @@ func TestCovers(tt *testing.T) {
 	}
 
 	log.Print("Writing another cover and updating")
-	test.DeleteSongs(t.MusicDir, Song0s.Filename)
-	test.CopySongs(t.MusicDir, Song0sUpdated.Filename)
+	test.Must(tt, test.DeleteSongs(t.MusicDir, Song0s.Filename))
+	test.Must(tt, test.CopySongs(t.MusicDir, Song0sUpdated.Filename))
 	s0 := Song0sUpdated
 	s0.CoverFilename = fmt.Sprintf("%s.jpg", s0.AlbumID)
 	createCover(s0.CoverFilename)
@@ -489,11 +492,11 @@ func TestCovers(tt *testing.T) {
 	}
 
 	log.Print("Writing cover named after recording ID")
-	test.CopySongs(t.MusicDir, Song1s.Filename)
+	test.Must(tt, test.CopySongs(t.MusicDir, Song1s.Filename))
 	s1 := Song1s
 	s1.CoverFilename = fmt.Sprintf("%s.jpg", s1.RecordingID)
 	createCover(s1.CoverFilename)
-	test.DeleteSongs(t.CoverDir, s0.CoverFilename)
+	test.Must(tt, test.DeleteSongs(t.CoverDir, s0.CoverFilename))
 	t.UpdateSongs()
 	if err := compareQueryResults([]db.Song{s0, s1, s5}, t.QuerySongs(), test.IgnoreOrder); err != nil {
 		tt.Error("Bad results after using recording ID: ", err)
@@ -518,8 +521,7 @@ func TestJSONImport(tt *testing.T) {
 	defer done()
 
 	log.Print("Importing songs from JSON")
-	t.ImportSongsFromJSONFile(test.WriteSongsToJSONFile(t.TempDir,
-		[]db.Song{LegacySong1, LegacySong2}))
+	t.ImportSongsFromJSONFile([]db.Song{LegacySong1, LegacySong2})
 	if err := test.CompareSongs([]db.Song{LegacySong1, LegacySong2},
 		t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
 		tt.Error("Bad songs after importing from JSON: ", err)
@@ -536,8 +538,7 @@ func TestJSONImport(tt *testing.T) {
 	us.Rating /= 2.0
 	us.Plays = us.Plays[0:1]
 	us.Tags = []string{"bogus"}
-	t.ImportSongsFromJSONFile(test.WriteSongsToJSONFile(t.TempDir,
-		[]db.Song{us, LegacySong2}))
+	t.ImportSongsFromJSONFile([]db.Song{us, LegacySong2})
 	if err := test.CompareSongs([]db.Song{us, LegacySong2},
 		t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
 		tt.Error("Bad songs after updating from JSON: ", err)
@@ -554,9 +555,7 @@ func TestJSONImport(tt *testing.T) {
 	}
 
 	log.Print("Updating song from JSON but preserving user data")
-	t.ImportSongsFromJSONFile(test.WriteSongsToJSONFile(t.TempDir,
-		[]db.Song{LegacySong1, LegacySong2}),
-		test.KeepUserDataFlag)
+	t.ImportSongsFromJSONFile([]db.Song{LegacySong1, LegacySong2}, test.KeepUserDataFlag)
 	us2 := LegacySong1
 	us2.Rating = us.Rating
 	us2.Tags = us.Tags
@@ -571,8 +570,11 @@ func TestUpdateList(tt *testing.T) {
 	t, done := initTest(tt)
 	defer done()
 
-	test.CopySongs(t.MusicDir, Song0s.Filename, Song1s.Filename, Song5s.Filename)
-	listPath := test.WriteSongPathsFile(t.TempDir, Song0s.Filename, Song5s.Filename)
+	test.Must(tt, test.CopySongs(t.MusicDir, Song0s.Filename, Song1s.Filename, Song5s.Filename))
+	listPath, err := test.WriteSongPathsFile(t.TempDir, Song0s.Filename, Song5s.Filename)
+	if err != nil {
+		tt.Fatal("Failed writing song paths: ", err)
+	}
 
 	gs0 := Song0s
 	gs0.TrackGain = -8.4
@@ -593,8 +595,10 @@ func TestUpdateList(tt *testing.T) {
 
 	// When a dump file is passed, its gain info should be sent to the server.
 	log.Print("Updating songs from list with dumped gains")
-	dumpPath := test.WriteSongsToJSONFile(t.TempDir,
-		[]db.Song{gs0, gs5})
+	dumpPath, err := test.WriteSongsToJSONFile(t.TempDir, []db.Song{gs0, gs5})
+	if err != nil {
+		tt.Fatal("Failed writing JSON file: ", err)
+	}
 	t.UpdateSongsFromList(listPath, test.DumpedGainsFlag(dumpPath))
 	if err := test.CompareSongs([]db.Song{gs0, gs5},
 		t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
@@ -639,7 +643,7 @@ func TestSorting(tt *testing.T) {
 	}
 
 	log.Print("Importing songs and checking sort order")
-	t.ImportSongsFromJSONFile(test.WriteSongsToJSONFile(t.TempDir, songs))
+	t.ImportSongsFromJSONFile(songs)
 	if err := compareQueryResults(songs, t.QuerySongs(), test.CompareOrder); err != nil {
 		tt.Error("Bad results: ", err)
 	}

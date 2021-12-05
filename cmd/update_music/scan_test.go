@@ -76,19 +76,19 @@ func scanAndCompareSongs(t *testing.T, desc, dir string, lastUpdateTime time.Tim
 
 func TestScanAndCompareSongs(t *testing.T) {
 	dir := t.TempDir()
-	test.CopySongs(dir, test.Song0s.Filename, test.Song1s.Filename)
+	test.Must(t, test.CopySongs(dir, test.Song0s.Filename, test.Song1s.Filename))
 	startTime := time.Now()
 	scanAndCompareSongs(t, "initial", dir, time.Time{}, nil, nil, []db.Song{test.Song0s, test.Song1s})
 	scanAndCompareSongs(t, "unchanged", dir, startTime, nil, nil, []db.Song{})
 
-	test.CopySongs(dir, test.Song5s.Filename)
+	test.Must(t, test.CopySongs(dir, test.Song5s.Filename))
 	addTime := time.Now()
 	scanAndCompareSongs(t, "add", dir, startTime, nil, nil, []db.Song{test.Song5s})
 
 	if err := os.Remove(filepath.Join(dir, test.Song0s.Filename)); err != nil {
 		t.Fatal("Failed removing song: ", err)
 	}
-	test.CopySongs(dir, test.Song0sUpdated.Filename)
+	test.Must(t, test.CopySongs(dir, test.Song0sUpdated.Filename))
 	updateTime := time.Now()
 	scanAndCompareSongs(t, "update", dir, addTime, nil, nil, []db.Song{test.Song0sUpdated})
 
@@ -114,7 +114,7 @@ func TestScanAndCompareSongs(t *testing.T) {
 		[]db.Song{renamedSong1s})
 
 	updateTime = time.Now()
-	test.CopySongs(dir, test.ID3V1Song.Filename)
+	test.Must(t, test.CopySongs(dir, test.ID3V1Song.Filename))
 	scanAndCompareSongs(t, "id3v1", dir, updateTime, nil, nil, []db.Song{test.ID3V1Song})
 }
 
@@ -124,7 +124,7 @@ func TestScanAndCompareSongs_Rewrite(t *testing.T) {
 	newSong1s := test.Song1s
 	newSong1s.Artist = newArtist
 
-	test.CopySongs(dir, test.Song1s.Filename, test.Song5s.Filename)
+	test.Must(t, test.CopySongs(dir, test.Song1s.Filename, test.Song5s.Filename))
 	scanAndCompareSongs(t, "initial", dir, time.Time{}, nil,
 		&scanOptions{artistRewrites: map[string]string{test.Song1s.Artist: newSong1s.Artist}},
 		[]db.Song{newSong1s, test.Song5s})
@@ -141,13 +141,13 @@ func TestScanAndCompareSongs_NewFiles(t *testing.T) {
 
 	// Start out with an artist/album directory containing a single song.
 	musicDir := filepath.Join(dir, "music")
-	test.CopySongs(filepath.Join(musicDir, oldArtist, oldAlbum), test.Song0s.Filename)
+	test.Must(t, test.CopySongs(filepath.Join(musicDir, oldArtist, oldAlbum), test.Song0s.Filename))
 
 	// Copy some more songs into the temp dir to give them old timestamps,
 	// but don't move them under the music dir yet.
-	test.CopySongs(dir, test.Song1s.Filename)
-	test.CopySongs(filepath.Join(dir, newAlbum), test.Song5s.Filename)
-	test.CopySongs(filepath.Join(dir, newArtist, newAlbum), test.ID3V1Song.Filename)
+	test.Must(t, test.CopySongs(dir, test.Song1s.Filename))
+	test.Must(t, test.CopySongs(filepath.Join(dir, newAlbum), test.Song5s.Filename))
+	test.Must(t, test.CopySongs(filepath.Join(dir, newArtist, newAlbum), test.ID3V1Song.Filename))
 
 	// Updates the supplied song's filename to be under dir.
 	gs := func(s db.Song, dir string) db.Song {

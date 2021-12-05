@@ -6,6 +6,7 @@ package test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,6 +15,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/derat/nup/server/db"
@@ -34,99 +36,105 @@ func Caller() string {
 	return "unknown"
 }
 
-// GetDataDir returns the test data dir relative to the caller.
-func GetDataDir() string {
+// Must aborts t if err is non-nil.
+func Must(t *testing.T, err error) {
+	if err != nil {
+		t.Fatalf("Failed at %v: %v", Caller(), err)
+	}
+}
+
+// dataDir returns the test data dir relative to the caller.
+func dataDir() (string, error) {
 	_, p, _, ok := runtime.Caller(0)
 	if !ok {
-		panic("Unable to get runtime caller info")
+		return "", errors.New("unable to get runtime caller info")
 	}
-	return filepath.Join(filepath.Dir(p), "data")
+	return filepath.Join(filepath.Dir(p), "data"), nil
 }
 
 // CopySongs copies the provided songs (e.g. Song0s.Filename) into dir.
 // The supplied directory is created if it doesn't already exist.
-func CopySongs(dir string, filenames ...string) {
+func CopySongs(dir string, filenames ...string) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		panic(err)
+		return err
 	}
 
+	dd, err := dataDir()
+	if err != nil {
+		return err
+	}
+	musicDir := filepath.Join(dd, "music")
+
 	for _, fn := range filenames {
-		sp := filepath.Join(GetDataDir(), "music", fn)
+		sp := filepath.Join(musicDir, fn)
 		s, err := os.Open(sp)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		defer s.Close()
 
 		dp := filepath.Join(dir, fn)
 		d, err := os.Create(dp)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		if _, err := io.Copy(d, s); err != nil {
 			d.Close()
-			panic(err)
+			return err
 		}
 		if err := d.Close(); err != nil {
-			panic(err)
+			return err
 		}
 
 		now := time.Now()
 		if err := os.Chtimes(dp, now, now); err != nil {
-			panic(err)
+			return err
 		}
 	}
+	return nil
 }
 
 // DeleteSongs removes the provided songs (e.g. Song0s.Filename) from dir.
-func DeleteSongs(dir string, filenames ...string) {
+func DeleteSongs(dir string, filenames ...string) error {
 	for _, fn := range filenames {
 		if err := os.Remove(filepath.Join(dir, fn)); err != nil {
-			panic(err)
+			return err
 		}
 	}
+	return nil
 }
 
 // WriteSongsToJSONFile creates a file in dir containing JSON-marshaled songs.
-func WriteSongsToJSONFile(dir string, songs []db.Song) (path string) {
+// The file's path is returned.
+func WriteSongsToJSONFile(dir string, songs []db.Song) (string, error) {
 	f, err := ioutil.TempFile(dir, "songs-json.")
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-
 	e := json.NewEncoder(f)
 	for _, s := range songs {
 		if err = e.Encode(s); err != nil {
 			f.Close()
-			panic(err)
+			return "", err
 		}
 	}
-
-	if err := f.Close(); err != nil {
-		panic(err)
-	}
-	return f.Name()
+	return f.Name(), f.Close()
 }
 
 // WriteSongPathsFile creates a file in dir listing filenames,
 // suitable for passing to update_music's -song-paths-file flag.
-func WriteSongPathsFile(dir string, filenames ...string) (path string) {
+func WriteSongPathsFile(dir string, filenames ...string) (string, error) {
 	f, err := ioutil.TempFile(dir, "song-list.")
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-
 	for _, fn := range filenames {
 		if _, err := f.WriteString(fn + "\n"); err != nil {
 			f.Close()
-			panic(err)
+			return "", err
 		}
 	}
-
-	if err := f.Close(); err != nil {
-		panic(err)
-	}
-	return f.Name()
+	return f.Name(), f.Close()
 }
 
 // OrderPolicy specifies whether CompareSongs requires that songs appear in the specified order.
@@ -161,7 +169,7 @@ func CompareSongs(expected, actual []db.Song, order OrderPolicy) error {
 		}
 		b, err := json.Marshal(s)
 		if err != nil {
-			panic(err)
+			return "failed: " + err.Error()
 		}
 		return string(b)
 	}

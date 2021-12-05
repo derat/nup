@@ -14,7 +14,11 @@ func TestJSON(t *testing.T) {
 	dir := t.TempDir()
 	songs := []db.Song{test.LegacySong1, test.LegacySong2}
 	ch := make(chan songOrErr)
-	num, err := readSongsFromJSONFile(test.WriteSongsToJSONFile(dir, songs), ch)
+	p, err := test.WriteSongsToJSONFile(dir, songs)
+	if err != nil {
+		t.Error("Failed writing JSON file: ", err)
+	}
+	num, err := readSongsFromJSONFile(p, ch)
 	if err != nil {
 		t.Error("Failed reading songs from JSON: ", err)
 	}
@@ -22,7 +26,7 @@ func TestJSON(t *testing.T) {
 	if err != nil {
 		t.Error("Failed getting songs from channel: ", err)
 	}
-	if err = test.CompareSongs(songs, actual, test.IgnoreOrder); err != nil {
+	if err := test.CompareSongs(songs, actual, test.IgnoreOrder); err != nil {
 		t.Error("Bad songs: ", err)
 	}
 }
