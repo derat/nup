@@ -152,29 +152,19 @@ discussion.
 
 ## Development and testing
 
-First, from the base directory, run the `./dev.sh` script. This starts a local
-development App Engine instance listening at `http://localhost:8080/`.
+The [example/](./example) directory contains code for starting a local App
+Engine server with example data for development.
 
-*   End-to-end Go tests that exercise the App Engine server and the
-    [dump_music] and [update_music] commands can be run from the `test/e2e/`
-    directory via `go test`.
-*   [Selenium] Go tests that exercise both the web interface (in Chrome) and the
-    server can be run from the `test/web/` directory via `go test`. By default,
-    Chrome runs headlessly using [Xvfb]. Run `go test -args -help` to see
-    available flags.
+All tests can be executed by running `go test ./...` from the root of the
+repository.
+
+*   Unit tests live alongside the code that they exercise.
+*   End-to-end tests that exercise the App Engine server and the [dump_music]
+    and [update_music] commands are in the [test/e2e/](./test/e2e) directory.
+*   [Selenium] tests that exercise both the web interface (in Chrome) and the
+    server are in the [test/web/](./test/web) directory. By default, Chrome runs
+    headlessly using [Xvfb].
 
 [dump_music]: ./cmd/dump_music
 [Selenium]: https://www.selenium.dev/
 [Xvfb]: https://en.wikipedia.org/wiki/Xvfb
-
-All Go tests (including unit tests) can be executed by running
-`./dev.sh --test`.
-
-The tests in `test/e2e/` and `test/web/` both make use of the dev App Engine
-instance, so when running all tests manually, `go test -p 1 ./...` (rather than
-`go test ./...`) should be used to prevent them from running simultaneously. See
-`go help build` for more about the `-p` flag.
-
-For development, you can additionally import example data from the `example/`
-directory and start a file server by running `./dev.sh --example`. Load
-`http://localhost:8080/` in a web browser and use `test@example.com` to log in.

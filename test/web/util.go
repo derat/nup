@@ -5,8 +5,6 @@ package web
 
 import (
 	"fmt"
-	"log"
-	"net"
 	"time"
 )
 
@@ -28,14 +26,4 @@ func waitFull(f func() error, timeout time.Duration, sleep time.Duration) error 
 		}
 		time.Sleep(sleep)
 	}
-}
-
-// findUnusedPort returns an unused TCP port.
-func findUnusedPort() int {
-	ls, err := net.Listen("tcp", ":0")
-	if err != nil {
-		log.Fatal("Failed finding unused port: ", err)
-	}
-	defer ls.Close()
-	return ls.Addr().(*net.TCPAddr).Port
 }

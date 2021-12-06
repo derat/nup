@@ -23,6 +23,7 @@ import (
 	"github.com/derat/nup/server/config"
 	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/test"
+	"golang.org/x/sys/unix"
 
 	"github.com/tebeka/selenium"
 	"github.com/tebeka/selenium/chrome"
@@ -31,10 +32,11 @@ import (
 
 var (
 	// Globals shared across all tests.
-	serverURL  string             // slash-terminated URL of App Engine server
+	appURL     string             // slash-terminated URL of App Engine server
 	musicSrv   *httptest.Server   // HTTP server for music files
 	webDrv     selenium.WebDriver // talks to browser using ChromeDriver
 	tester     *test.Tester       // interacts with App Engine server
+	appLog     io.Writer          // receives log messages from dev_appserver
 	browserLog io.Writer          // receives log messages from browser
 
 	// Pull some stuff into our namespace for convenience.
@@ -45,86 +47,103 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	binDir := flag.String("bin-dir", "", "Directory containing dump_music (empty to search $PATH)")
-	brLogPath := flag.String("browser-log", "", `File for writing browser log (empty for temp file, "stderr" for stderr)`)
-	debug := flag.Bool("debug", false, "Print Selenium debug logs to stderr")
+	// Do everything in a function so that deferred calls run on failure.
+	code, err := runTests(m)
+	if err != nil {
+		log.Print("Failed running tests: ", err)
+	}
+	os.Exit(code)
+}
+
+func runTests(m *testing.M) (int, error) {
+	binDir := flag.String("bin-dir", "",
+		"Directory containing nup executables (empty to search $PATH)")
+	browserLogPath := flag.String("browser-log", "",
+		`File for writing browser log (empty for temp file, "stderr" for stderr)`)
+	debugApp := flag.Bool("debug-app", false, "Show dev_appserver output")
+	debugSelenium := flag.Bool("debug-selenium", false, "Write Selenium debug logs to stderr")
 	headless := flag.Bool("headless", true, "Run Chrome headlessly using Xvfb")
-	flag.StringVar(&serverURL, "server", "http://localhost:8080/", "Slash-terminated URL of dev_appserver.py instance")
 	flag.Parse()
 
-	// Do everything in a function so that deferred calls will run on failure
-	// (os.Exit() exits immediately).
-	os.Exit(func() int {
-		opts := []selenium.ServiceOption{}
-		if *debug {
-			selenium.SetDebug(true)
-			opts = append(opts, selenium.Output(os.Stderr))
-		}
-		if *headless {
-			opts = append(opts, selenium.StartFrameBuffer())
-		}
+	test.HandleSignals(unix.SIGINT, unix.SIGTERM)
 
-		chromeDrvPort := findUnusedPort()
-		svc, err := selenium.NewChromeDriverService("/usr/local/bin/chromedriver",
-			chromeDrvPort, opts...)
-		if err != nil {
-			log.Panic("Failed starting ChromeDriver service: ", err)
+	log.Print("Starting dev_appserver")
+	appSrv, err := test.NewDevAppserver(0 /* appPort */, *debugApp)
+	if err != nil {
+		return -1, fmt.Errorf("dev_appserver: %v", err)
+	}
+	defer appSrv.Close()
+	appURL = appSrv.URL()
+	log.Print("dev_appserver is listening at ", appURL)
+
+	opts := []selenium.ServiceOption{}
+	if *debugSelenium {
+		selenium.SetDebug(true)
+		opts = append(opts, selenium.Output(os.Stderr))
+	}
+	if *headless {
+		opts = append(opts, selenium.StartFrameBuffer())
+	}
+
+	ports, err := test.FindUnusedPorts(1)
+	if err != nil {
+		return -1, fmt.Errorf("finding ports: %v", err)
+	}
+	chromeDrvPort := ports[0]
+	svc, err := selenium.NewChromeDriverService(
+		"/usr/local/bin/chromedriver", chromeDrvPort, opts...)
+	if err != nil {
+		return -1, fmt.Errorf("ChromeDriver: %v", err)
+	}
+	defer svc.Stop()
+
+	caps := selenium.Capabilities{}
+	caps.AddChrome(chrome.Capabilities{
+		Args: []string{"--autoplay-policy=no-user-gesture-required"},
+	})
+	caps.SetLogLevel(slog.Browser, slog.All)
+	webDrv, err = selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", chromeDrvPort))
+	if err != nil {
+		return -1, fmt.Errorf("Selenium: %v", err)
+	}
+	defer webDrv.Quit()
+
+	// Create a file containing messages logged by the web interface.
+	var browserLogFile *os.File
+	if *browserLogPath == "stderr" {
+		browserLog = os.Stderr
+	} else if *browserLogPath != "" {
+		if browserLogFile, err = os.Create(*browserLogPath); err != nil {
+			return -1, fmt.Errorf("creating browser log: %v", err)
 		}
-		defer svc.Stop()
-
-		caps := selenium.Capabilities{}
-		caps.AddChrome(chrome.Capabilities{
-			Args: []string{"--autoplay-policy=no-user-gesture-required"},
-		})
-		caps.SetLogLevel(slog.Browser, slog.All)
-		webDrv, err = selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", chromeDrvPort))
-		if err != nil {
-			log.Panic("Failed connecting to Selenium: ", err)
+	} else {
+		if browserLogFile, err = ioutil.TempFile("",
+			"nup_web_test-"+time.Now().Format("20060102_150405-")+"*.txt"); err != nil {
+			return -1, fmt.Errorf("creating browser log: %v", err)
 		}
-		defer webDrv.Quit()
+		log.Print("Writing browser logs to ", browserLogFile.Name())
+		browserLog = browserLogFile
+	}
+	if browserLogFile != nil {
+		defer browserLogFile.Close()
+	}
+	writeLogHeader("Running web tests against " + appURL)
+	defer copyBrowserLogs()
 
-		// Create a file containing messages logged by the web interface.
-		var browserLogFile *os.File
-		if *brLogPath == "stderr" {
-			browserLog = os.Stderr
-		} else if *brLogPath != "" {
-			if browserLogFile, err = os.Create(*brLogPath); err != nil {
-				log.Panic("Failed creating browser log: ", err)
-			}
-		} else {
-			if browserLogFile, err = ioutil.TempFile("",
-				"nup_web_test-"+time.Now().Format("20060102_150405-")+"*.txt"); err != nil {
-				log.Panic("Failed creating browser log: ", err)
-			}
-			fmt.Fprintf(os.Stderr, "Writing browser logs to %v\n", browserLogFile.Name())
-			browserLog = browserLogFile
-		}
-		if browserLogFile != nil {
-			defer browserLogFile.Close()
-		}
-		writeLogHeader("Running web tests against " + serverURL)
-		defer copyBrowserLogs()
+	tester = test.NewTester(nil, appURL, test.TesterConfig{BinDir: *binDir})
+	defer tester.Close()
 
-		tester = test.NewTester(nil, serverURL, *binDir)
-		defer tester.Close()
+	// Serve music files in the background.
+	if err := test.CopySongs(tester.MusicDir, file0s, file1s, file5s, file10s); err != nil {
+		return -1, fmt.Errorf("copying songs: %v", err)
+	}
+	musicSrv = test.ServeFiles(tester.MusicDir)
+	defer musicSrv.Close()
 
-		// Serve music files in the background.
-		if err := test.CopySongs(tester.MusicDir, file0s, file1s, file5s, file10s); err != nil {
-			log.Panic("Failed copying songs: ", err)
-		}
-		fs := http.FileServer(http.Dir(tester.MusicDir))
-		musicSrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Allow-Origin", serverURL)
-			fs.ServeHTTP(w, r)
-		}))
-		defer musicSrv.Close()
+	sendConfig(updatesSucceed)
+	defer tester.SendConfig(nil)
 
-		sendConfig(updatesSucceed)
-		defer tester.SendConfig(nil)
-
-		return m.Run()
-	}())
+	return m.Run(), nil
 }
 
 // writeLogHeader writes s and a line of dashes to browserLog.
@@ -166,7 +185,7 @@ func initWebTest(t *testing.T) (p *page, done func()) {
 
 	tester.T = t
 	tester.ClearData()
-	return newPage(t, webDrv, serverURL), func() { tester.T = nil }
+	return newPage(t, webDrv, appURL), func() { tester.T = nil }
 }
 
 // updatePolicy is passed to sendConfig to control the server's handling of updates.

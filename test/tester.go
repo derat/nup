@@ -34,42 +34,13 @@ const (
 	androidBatchSize = 1 // song batch size when exporting for Android
 )
 
-// runCommand synchronously runs the executable at p with args and returns its output.
-func runCommand(p string, args ...string) (stdout, stderr string, err error) {
-	cmd := exec.Command(p, args...)
-	outPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return
-	}
-	errPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return
-	}
-	if err = cmd.Start(); err != nil {
-		return
-	}
-
-	outBytes, err := ioutil.ReadAll(outPipe)
-	if err != nil {
-		return
-	}
-	errBytes, err := ioutil.ReadAll(errPipe)
-	if err != nil {
-		return
-	}
-	stdout = string(outBytes)
-	stderr = string(errBytes)
-	err = cmd.Wait()
-	return
-}
-
 // Tester helps tests send HTTP requests to a development server and
 // run the update_music and dump_music commands.
 type Tester struct {
 	T        *testing.T // used to report errors (panic on errors if nil)
 	TempDir  string     // base temp dir created for holding test-related data
-	MusicDir string     // directory within TempDir for songs
-	CoverDir string     // directory within TempDir for album art images
+	MusicDir string     // directory for songs
+	CoverDir string     // directory for album art images
 
 	updateConfigFile string // path to update_music config file
 	dumpConfigFile   string // path to dump_music config file
@@ -78,33 +49,48 @@ type Tester struct {
 	client           http.Client
 }
 
+// TesterConfig contains optional configuration for Tester.
+type TesterConfig struct {
+	// MusicDir is the directory containing song files.
+	// If empty, a directory will be created within Tester.TempDir.
+	MusicDir string
+	// MusicDir is the directory containing album art image files.
+	// If empty, a directory will be created within Tester.TempDir.
+	CoverDir string
+	// BinDir is the directory containing the update_music and dump_music commands
+	// (e.g. $HOME/go/bin). If empty, $PATH will be searched.
+	BinDir string
+}
+
 // NewTester creates a new tester for the development server at serverURL.
 //
 // The supplied testing.T object will be used to report errors.
 // If nil (e.g. if sharing a Tester between multiple tests), log.Panic will be called instead.
 // The T field can be modified as tests start and stop.
-//
-// binDir is the directory containing the update_music and dump_music commands
-// (e.g. $HOME/go/bin).
-func NewTester(tt *testing.T, serverURL, binDir string) *Tester {
+func NewTester(tt *testing.T, serverURL string, cfg TesterConfig) *Tester {
 	t := &Tester{
 		T:         tt,
+		MusicDir:  cfg.MusicDir,
+		CoverDir:  cfg.CoverDir,
 		serverURL: serverURL,
-		binDir:    binDir,
+		binDir:    cfg.BinDir,
 	}
 
 	var err error
-	t.TempDir, err = ioutil.TempDir("", "nup_test.")
-	if err != nil {
+	if t.TempDir, err = ioutil.TempDir("", "nup_test."); err != nil {
 		t.fatal("Failed creating temp dir: ", err)
 	}
-	t.MusicDir = filepath.Join(t.TempDir, "music")
-	if err := os.Mkdir(t.MusicDir, 0755); err != nil {
-		t.fatal("Failed creating music dir: ", err)
+	if t.MusicDir == "" {
+		t.MusicDir = filepath.Join(t.TempDir, "music")
+		if err := os.Mkdir(t.MusicDir, 0755); err != nil {
+			t.fatal("Failed creating music dir: ", err)
+		}
 	}
-	t.CoverDir = filepath.Join(t.TempDir, "covers")
-	if err := os.Mkdir(t.CoverDir, 0755); err != nil {
-		t.fatal("Failed creating cover dir: ", err)
+	if t.CoverDir == "" {
+		t.CoverDir = filepath.Join(t.TempDir, "covers")
+		if err := os.Mkdir(t.CoverDir, 0755); err != nil {
+			t.fatal("Failed creating cover dir: ", err)
+		}
 	}
 
 	writeConfig := func(fn string, d interface{}) (path string) {
@@ -176,6 +162,35 @@ func (t *Tester) SendConfig(cfg *config.Config) {
 		}
 	}
 	t.DoPost("config", bytes.NewBuffer(b))
+}
+
+// runCommand synchronously runs the executable at p with args and returns its output.
+func runCommand(p string, args ...string) (stdout, stderr string, err error) {
+	cmd := exec.Command(p, args...)
+	outPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return
+	}
+	errPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return
+	}
+	if err = cmd.Start(); err != nil {
+		return
+	}
+
+	outBytes, err := ioutil.ReadAll(outPipe)
+	if err != nil {
+		return
+	}
+	errBytes, err := ioutil.ReadAll(errPipe)
+	if err != nil {
+		return
+	}
+	stdout = string(outBytes)
+	stderr = string(errBytes)
+	err = cmd.Wait()
+	return
 }
 
 type StripPolicy int // controls whether DumpSongs removes data from songs

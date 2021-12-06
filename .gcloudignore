@@ -30,6 +30,7 @@
 
 client/
 cmd/
+example/
 mp3gain/
 test/
 web/fontello/LICENSE.txt

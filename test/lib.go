@@ -6,13 +6,11 @@ package test
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -21,21 +19,6 @@ import (
 	"github.com/derat/nup/server/db"
 )
 
-// Caller walks down the call stack and returns the first test file
-// that it sees as e.g. "foo_test.go:53".
-func Caller() string {
-	for skip := 1; true; skip++ {
-		_, file, line, ok := runtime.Caller(skip)
-		if !ok {
-			break
-		}
-		if strings.HasSuffix(file, "_test.go") {
-			return fmt.Sprintf("%s:%d", filepath.Base(file), line)
-		}
-	}
-	return "unknown"
-}
-
 // Must aborts t if err is non-nil.
 func Must(t *testing.T, err error) {
 	if err != nil {
@@ -43,27 +26,18 @@ func Must(t *testing.T, err error) {
 	}
 }
 
-// dataDir returns the test data dir relative to the caller.
-func dataDir() (string, error) {
-	_, p, _, ok := runtime.Caller(0)
-	if !ok {
-		return "", errors.New("unable to get runtime caller info")
-	}
-	return filepath.Join(filepath.Dir(p), "data"), nil
-}
-
 // CopySongs copies the provided songs (e.g. Song0s.Filename) into dir.
 // The supplied directory is created if it doesn't already exist.
 func CopySongs(dir string, filenames ...string) error {
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-
-	dd, err := dataDir()
+	libDir, err := CallerDir()
 	if err != nil {
 		return err
 	}
-	musicDir := filepath.Join(dd, "music")
+	musicDir := filepath.Join(libDir, "data/music")
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
 
 	for _, fn := range filenames {
 		sp := filepath.Join(musicDir, fn)

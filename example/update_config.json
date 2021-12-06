@@ -1,8 +1,0 @@
-{
-  "serverURL": "http://localhost:8080/",
-  "username": "testuser",
-  "password": "testpass",
-  "musicDir": "music",
-  "coverDir": "covers",
-  "lastUpdateInfoFile": "last_update_info.json"
-}

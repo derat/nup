@@ -5,6 +5,7 @@
 package e2e
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net/url"
@@ -20,15 +21,14 @@ import (
 	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/server/query"
 	"github.com/derat/nup/test"
+
+	"golang.org/x/sys/unix"
 )
 
 const (
-	server      = "http://localhost:8080/"
 	songBucket  = "song-bucket"
 	coverBucket = "cover-bucket"
 )
-
-var binDir string = filepath.Join(os.Getenv("GOPATH"), "bin")
 
 var (
 	// Pull some stuff into our namespace for convenience.
@@ -38,24 +38,54 @@ var (
 	Song5s        = test.Song5s
 	LegacySong1   = test.LegacySong1
 	LegacySong2   = test.LegacySong2
+
+	appURL string // URL of App Engine app
+	binDir string // directory containing executables from cmd/...
 )
 
+func TestMain(m *testing.M) {
+	// Do everything in a function so that deferred calls run on failure.
+	code, err := runTests(m)
+	if err != nil {
+		log.Print("Failed running tests: ", err)
+	}
+	os.Exit(code)
+}
+
+func runTests(m *testing.M) (int, error) {
+	flag.StringVar(&binDir, "bin-dir", "",
+		"Directory containing nup executables (empty to search $PATH)")
+	debugApp := flag.Bool("debug-app", false, "Show dev_appserver output")
+	flag.Parse()
+
+	test.HandleSignals(unix.SIGINT, unix.SIGTERM)
+
+	log.Print("Starting dev_appserver")
+	srv, err := test.NewDevAppserver(0 /* appPort */, *debugApp)
+	if err != nil {
+		return -1, fmt.Errorf("dev_appserver: %v", err)
+	}
+	defer srv.Close()
+	appURL = srv.URL()
+	log.Print("dev_appserver is listening at ", appURL)
+
+	return m.Run(), nil
+}
+
 func initTest(t *testing.T) (tester *test.Tester, done func()) {
-	tester = test.NewTester(t, server, binDir)
+	tester = test.NewTester(t, appURL, test.TesterConfig{BinDir: binDir})
 	done = func() {
 		tester.SendConfig(nil)
 		tester.Close()
 	}
-
-	// Clean up if we fail.
-	success := false
+	success := false // clean up on failure
 	defer func() {
 		if !success {
 			done()
 		}
 	}()
 
-	log.Printf("Configuring and clearing %v", server)
+	log.Print("Configuring and clearing ", appURL)
 	tester.SendConfig(&config.Config{
 		BasicAuthUsers: []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
 		SongBucket:     songBucket,
