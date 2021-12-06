@@ -20,3 +20,31 @@ handlers:
 - url: /.*
   script: auto
   secure: always
+
+# The skip\_files documentation is a self-contradictory mess:
+#
+# https://cloud.google.com/appengine/docs/standard/python/config/appref:
+#   "Note that skip\_files compares absolute paths."
+#   "Filenames are relative to the project directory."
+# https://cloud.google.com/appengine/docs/standard/python3/testing-and-deploying-your-app:
+#   "Note: You cannot specify the skip\_files field in your app.yaml file if you
+#    have a .gcloudignore file."
+#
+# As far as I can tell (using google-cloud-sdk-app-engine-python 365.0.0-0), a
+# skip\_files directive convinces dev_appserver.py not to rebuild unnecessarily
+# even when there's a .gcloudignore file, and the regular expressions need to
+# fully match absolute paths (".*/nup/(client|cmd|example|mp3gain|test)/.*").
+#
+# None of this matters, though, since "gcloud beta app deploy" fails if
+# skip\_files is set:
+#
+#   ERROR: (gcloud.beta.app.deploy) skip|_files cannot be used with the [go115]
+#   runtime. Ignore patterns are instead expressed in a .gcloudignore file. For
+#   information on the format and syntax of .gcloudignore files, see
+#   https://cloud.google.com/sdk/gcloud/reference/topic/gcloudignore.
+#
+# skip\_files (without a backslash in the middle of it) is so forbidden that I'm
+# not even allowed to mention it in comments!
+#
+# This is unfortunate, since dev_appserver.py doesn't seem to honor
+# .gcloudignore for the purpose of skipping rebuilds.
