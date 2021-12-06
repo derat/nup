@@ -46,8 +46,8 @@ const (
 
 // forceUpdateFailures can be set by tests via /config to indicate that failures should be reported
 // for all user data updates (ratings, tags, plays).
-// TODO: This is hacky since it'll only affect the instance that receives the /config request.
-// Maybe that's good enough for testing, though.
+// TODO: This will only affect the instance that receives the /config request. For now,
+// test/dev_server.go passes --max_module_instances=1 to ensure that there's a single instance.
 var forceUpdateFailures = false
 
 func main() {

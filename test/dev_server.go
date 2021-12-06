@@ -68,6 +68,8 @@ func NewDevAppserver(appPort int, showLogging bool, cfg *config.Config) (*DevApp
 		"--storage_path", storageDir,
 		"--env_var", "NUP_CONFIG="+string(cfgData),
 		"--datastore_consistency_policy", "consistent",
+		// TODO: This is a hack to work around forceUpdateFailures in server/main.go.
+		"--max_module_instances", "1",
 		".")
 	cmd.Dir = filepath.Join(libDir, "..") // directory containing app.yaml
 	if showLogging {
