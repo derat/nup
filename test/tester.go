@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,7 +21,6 @@ import (
 	"time"
 
 	"github.com/derat/nup/client"
-	"github.com/derat/nup/server/config"
 	"github.com/derat/nup/server/db"
 )
 
@@ -30,8 +30,9 @@ const (
 	Username = "testuser"
 	Password = "testpass"
 
-	dumpBatchSize    = 2 // song/play batch size for dump_music
-	androidBatchSize = 1 // song batch size when exporting for Android
+	dumpBatchSize    = 2                // song/play batch size for dump_music
+	androidBatchSize = 1                // song batch size when exporting for Android
+	serverTimeout    = 10 * time.Second // timeout for HTTP requests to server
 )
 
 // Tester helps tests send HTTP requests to a development server and
@@ -51,10 +52,10 @@ type Tester struct {
 
 // TesterConfig contains optional configuration for Tester.
 type TesterConfig struct {
-	// MusicDir is the directory containing song files.
+	// MusicDir is the directory update_music will examine for song files.
 	// If empty, a directory will be created within Tester.TempDir.
 	MusicDir string
-	// MusicDir is the directory containing album art image files.
+	// CoverDir is the directory update_music will examine for album art image files.
 	// If empty, a directory will be created within Tester.TempDir.
 	CoverDir string
 	// BinDir is the directory containing the update_music and dump_music commands
@@ -74,6 +75,7 @@ func NewTester(tt *testing.T, serverURL string, cfg TesterConfig) *Tester {
 		CoverDir:  cfg.CoverDir,
 		serverURL: serverURL,
 		binDir:    cfg.BinDir,
+		client:    http.Client{Timeout: serverTimeout},
 	}
 
 	var err error
@@ -140,28 +142,25 @@ func (t *Tester) Close() {
 	os.RemoveAll(t.TempDir)
 }
 
+// fatal fails the test or panics (if not in a test).
+// args are formatted using fmt.Sprint, i.e. spaces are only inserted between non-string pairs.
 func (t *Tester) fatal(args ...interface{}) {
+	// testing.T.Fatal formats like testing.T.Log, which formats like fmt.Println,
+	// which always adds spaces between args.
+	//
+	// log.Panic formats like log.Print, which formats like fmt.Print,
+	// which only adds spaces between non-strings.
+	//
+	// I hate this.
+	msg := fmt.Sprint(args...)
 	if t.T != nil {
-		t.T.Fatal(args...)
+		t.T.Fatal(msg)
 	}
-	log.Panic(args...)
+	log.Panic(msg)
 }
 
 func (t *Tester) fatalf(format string, args ...interface{}) {
 	t.fatal(fmt.Sprintf(format, args...))
-}
-
-// SendConfig sends cfg to the server to override its real configuration.
-// If cfg is nil, the server's test configuration is cleared.
-func (t *Tester) SendConfig(cfg *config.Config) {
-	var b []byte
-	if cfg != nil {
-		var err error
-		if b, err = json.Marshal(cfg); err != nil {
-			t.fatal("Failed marshaling config: ", err)
-		}
-	}
-	t.DoPost("config", bytes.NewBuffer(b))
 }
 
 // runCommand synchronously runs the executable at p with args and returns its output.
@@ -202,6 +201,7 @@ const (
 
 const DumpCoversFlag = "-covers=true"
 
+// DumpSongs runs dump_music with the supplied flags and returns unmarshaled songs.
 func (t *Tester) DumpSongs(strip StripPolicy, flags ...string) []db.Song {
 	args := append([]string{
 		"-config=" + t.dumpConfigFile,
@@ -234,6 +234,8 @@ func (t *Tester) DumpSongs(strip StripPolicy, flags ...string) []db.Song {
 	return songs
 }
 
+// SongID dumps all songs from the server and returns the ID of the song with the
+// supplied SHA1. The test is failed if the song is not found.
 func (t *Tester) SongID(sha1 string) string {
 	for _, s := range t.DumpSongs(KeepIDs) {
 		if s.SHA1 == sha1 {
@@ -249,6 +251,7 @@ const KeepUserDataFlag = "-import-user-data=false"
 func DumpedGainsFlag(p string) string  { return "-dumped-gains-file=" + p }
 func ForceGlobFlag(glob string) string { return "-force-glob=" + glob }
 
+// UpdateSongs runs update_music with the supplied flags.
 func (t *Tester) UpdateSongs(flags ...string) {
 	args := append([]string{
 		"-config=" + t.updateConfigFile,
@@ -260,10 +263,13 @@ func (t *Tester) UpdateSongs(flags ...string) {
 	}
 }
 
+// UpdateSongsFromList runs update_music to import the songs listed in path.
 func (t *Tester) UpdateSongsFromList(path string, flags ...string) {
 	t.UpdateSongs(append(flags, "-song-paths-file="+path)...)
 }
 
+// ImportSongsFromJSON serializes the supplied songs to JSON and sends them
+// to the server using update_music.
 func (t *Tester) ImportSongsFromJSONFile(songs []db.Song, flags ...string) {
 	p, err := WriteSongsToJSONFile(t.TempDir, songs)
 	if err != nil {
@@ -272,6 +278,7 @@ func (t *Tester) ImportSongsFromJSONFile(songs []db.Song, flags ...string) {
 	t.UpdateSongs(append(flags, "-import-json-file="+p)...)
 }
 
+// DeleteSong deletes the specified song using update_music.
 func (t *Tester) DeleteSong(songID string) {
 	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
 		"-config="+t.updateConfigFile,
@@ -300,15 +307,7 @@ func (t *Tester) sendRequest(req *http.Request) *http.Response {
 	return resp
 }
 
-func (t *Tester) PingServer() {
-	if resp, err := t.client.Do(t.newRequest("HEAD", "", nil)); err != nil {
-		t.fatal("Failed pinging server (is dev_appserver.py running?): ", err)
-	} else {
-		resp.Body.Close()
-	}
-}
-
-func (t *Tester) DoPost(pathAndQueryParams string, body io.Reader) {
+func (t *Tester) doPost(pathAndQueryParams string, body io.Reader) {
 	req := t.newRequest("POST", pathAndQueryParams, body)
 	req.Header.Set("Content-Type", "text/plain")
 	resp := t.sendRequest(req)
@@ -318,6 +317,21 @@ func (t *Tester) DoPost(pathAndQueryParams string, body io.Reader) {
 	}
 }
 
+// PingServer fails the test if the server isn't serving the main page.
+func (t *Tester) PingServer() {
+	resp, err := t.client.Do(t.newRequest("GET", "/", nil))
+	if err != nil && err.(*url.Error).Timeout() {
+		t.fatal("Server timed out (is the app crashing?)")
+	} else if err != nil {
+		t.fatal("Failed pinging server (is dev_appserver running?): ", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.fatal("Server replied with failure: ", resp.Status)
+	}
+}
+
+// PostSongs posts the supplied songs directly to the server.
 func (t *Tester) PostSongs(songs []db.Song, replaceUserData bool, updateDelay time.Duration) {
 	var buf bytes.Buffer
 	e := json.NewEncoder(&buf)
@@ -330,9 +344,10 @@ func (t *Tester) PostSongs(songs []db.Song, replaceUserData bool, updateDelay ti
 	if replaceUserData {
 		path += "&replaceUserData=1"
 	}
-	t.DoPost(path, &buf)
+	t.doPost(path, &buf)
 }
 
+// QuerySongs issues a query with the supplied parameters to the server.
 func (t *Tester) QuerySongs(params ...string) []db.Song {
 	resp := t.sendRequest(t.newRequest("GET", "query?"+strings.Join(params, "&"), nil))
 	defer resp.Body.Close()
@@ -345,10 +360,25 @@ func (t *Tester) QuerySongs(params ...string) []db.Song {
 	return songs
 }
 
+// ClearData clears all songs from the server.
 func (t *Tester) ClearData() {
-	t.sendRequest(t.newRequest("POST", "clear", nil))
+	t.doPost("clear", nil)
 }
 
+// FlushType describes which caches should be flushed by FlushCache.
+type FlushType string
+
+const (
+	FlushAll      FlushType = "" // also flush Datastore
+	FlushMemcache FlushType = "?onlyMemcache=1"
+)
+
+// FlushCache flushes the specified caches in the app server.
+func (t *Tester) FlushCache(ft FlushType) {
+	t.doPost("flush_cache"+string(ft), nil)
+}
+
+// GetTags gets the list of known tags from the server.
 func (t *Tester) GetTags(requireCache bool) string {
 	path := "tags"
 	if requireCache {
@@ -365,6 +395,27 @@ func (t *Tester) GetTags(requireCache bool) string {
 	return strings.Join(tags, ",")
 }
 
+// RateAndTag sends a rating and/or tags update to the server.
+// The rating is not sent if negative, and tags are not sent if nil.
+func (t *Tester) RateAndTag(songID string, rating float64, tags []string) {
+	var args string
+	if rating >= 0 {
+		args += fmt.Sprintf("&rating=%0.2f", rating)
+	}
+	if tags != nil {
+		args += "&tags=" + url.QueryEscape(strings.Join(tags, " "))
+	}
+	if args != "" {
+		t.doPost("rate_and_tag?songId="+songID+args, nil)
+	}
+}
+
+// ReportPlayed sends a playback report to the server.
+func (t *Tester) ReportPlayed(songID string, startTime time.Time) {
+	t.doPost(fmt.Sprintf("played?songId=%v&startTime=%v", songID, startTime.Unix()), nil)
+}
+
+// GetNowFromServer queries the server for the current time.
 func (t *Tester) GetNowFromServer() time.Time {
 	resp := t.sendRequest(t.newRequest("GET", "now", nil))
 	defer resp.Body.Close()
@@ -389,6 +440,8 @@ const (
 	GetDeletedSongs                       // get only deleted songs
 )
 
+// GetSongsForAndroid exports songs from the server in a manner similar to
+// that of the Android client.
 func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted DeletionPolicy) []db.Song {
 	params := []string{
 		"type=song",
@@ -441,4 +494,13 @@ func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted DeletionP
 	}
 
 	return songs
+}
+
+// ForceUpdateFailures configures the server to reject or allow updates.
+func (t *Tester) ForceUpdateFailures(fail bool) {
+	val := "0"
+	if fail {
+		val = "1"
+	}
+	t.doPost("config?forceUpdateFailures="+val, nil)
 }

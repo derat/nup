@@ -44,7 +44,6 @@ type handlerAuth int
 const (
 	rejectUnauth   handlerAuth = iota // 401 if unauthorized
 	redirectUnauth                    // 302 to login page if unauthorized
-	allowUnauth                       // no auth required
 )
 
 // handlerFunc handles HTTP requests to a single endpoint.
@@ -54,11 +53,6 @@ type handlerFunc func(ctx context.Context, cfg *config.Config, w http.ResponseWr
 // Requests are verified to meet authorization requirements and use
 // the specified HTTP method before they are passed to fn.
 func addHandler(path, method string, auth handlerAuth, fn handlerFunc) {
-	// Guard against mistakes.
-	if auth == allowUnauth && !appengine.IsDevAppServer() {
-		panic("Unauthorized requests can only be allowed in dev_appserver")
-	}
-
 	http.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		ctx := appengine.NewContext(r)
 		cfg, err := config.GetConfig(ctx)
@@ -68,28 +62,23 @@ func addHandler(path, method string, auth handlerAuth, fn handlerFunc) {
 			return
 		}
 
-		switch auth {
-		case allowUnauth:
-			// Allow all requests.
-		case rejectUnauth, redirectUnauth:
-			if ok, username := cfg.Auth(r); !ok {
-				switch auth {
-				case rejectUnauth:
-					log.Debugf(ctx, "Unauthorized request for %v from %v (user %q)",
-						r.URL.String(), r.RemoteAddr, username)
-					http.Error(w, "Request requires authorization", http.StatusUnauthorized)
-				case redirectUnauth:
-					if u, err := getLoginURL(ctx); err != nil {
-						log.Errorf(ctx, "Failed generating login URL: %v", err)
-						http.Error(w, "Failed redirecting to login", http.StatusInternalServerError)
-					} else {
-						log.Debugf(ctx, "Unauthorized request for %v from %v (user %q); redirecting to %v",
-							r.URL.String(), r.RemoteAddr, username, u)
-						http.Redirect(w, r, u, http.StatusFound)
-					}
+		if ok, username := cfg.Auth(r); !ok {
+			switch auth {
+			case rejectUnauth:
+				log.Debugf(ctx, "Unauthorized request for %v from %v (user %q)",
+					r.URL.String(), r.RemoteAddr, username)
+				http.Error(w, "Request requires authorization", http.StatusUnauthorized)
+			case redirectUnauth:
+				if u, err := getLoginURL(ctx); err != nil {
+					log.Errorf(ctx, "Failed generating login URL: %v", err)
+					http.Error(w, "Failed redirecting to login", http.StatusInternalServerError)
+				} else {
+					log.Debugf(ctx, "Unauthorized request for %v from %v (user %q); redirecting to %v",
+						r.URL.String(), r.RemoteAddr, username, u)
+					http.Redirect(w, r, u, http.StatusFound)
 				}
-				return
 			}
+			return
 		}
 
 		if r.Method != method {

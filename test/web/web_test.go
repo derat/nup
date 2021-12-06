@@ -67,8 +67,26 @@ func runTests(m *testing.M) (int, error) {
 
 	test.HandleSignals(unix.SIGINT, unix.SIGTERM)
 
+	// Serve music files in the background.
+	musicDir, err := ioutil.TempDir("", "nup_web_test_music.*")
+	if err != nil {
+		return -1, err
+	}
+	defer os.RemoveAll(musicDir)
+	if err := test.CopySongs(musicDir, file0s, file1s, file5s, file10s); err != nil {
+		return -1, fmt.Errorf("copying songs: %v", err)
+	}
+	musicSrv = test.ServeFiles(musicDir)
+	defer musicSrv.Close()
+
 	log.Print("Starting dev_appserver")
-	appSrv, err := test.NewDevAppserver(0 /* appPort */, *debugApp)
+	appSrv, err := test.NewDevAppserver(0 /* appPort */, *debugApp, &config.Config{
+		GoogleUsers:    []string{testEmail},
+		BasicAuthUsers: []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
+		SongBaseURL:    musicSrv.URL + "/",
+		CoverBaseURL:   musicSrv.URL + "/.covers/", // bogus but required
+		Presets:        presets,
+	})
 	if err != nil {
 		return -1, fmt.Errorf("dev_appserver: %v", err)
 	}
@@ -130,18 +148,11 @@ func runTests(m *testing.M) (int, error) {
 	writeLogHeader("Running web tests against " + appURL)
 	defer copyBrowserLogs()
 
-	tester = test.NewTester(nil, appURL, test.TesterConfig{BinDir: *binDir})
+	tester = test.NewTester(nil, appURL, test.TesterConfig{
+		MusicDir: musicDir,
+		BinDir:   *binDir,
+	})
 	defer tester.Close()
-
-	// Serve music files in the background.
-	if err := test.CopySongs(tester.MusicDir, file0s, file1s, file5s, file10s); err != nil {
-		return -1, fmt.Errorf("copying songs: %v", err)
-	}
-	musicSrv = test.ServeFiles(tester.MusicDir)
-	defer musicSrv.Close()
-
-	sendConfig(updatesSucceed)
-	defer tester.SendConfig(nil)
 
 	return m.Run(), nil
 }
@@ -184,55 +195,38 @@ func initWebTest(t *testing.T) (p *page, done func()) {
 	writeLogHeader(t.Name())
 
 	tester.T = t
+	tester.PingServer()
 	tester.ClearData()
+	tester.ForceUpdateFailures(false)
 	return newPage(t, webDrv, appURL), func() { tester.T = nil }
 }
 
-// updatePolicy is passed to sendConfig to control the server's handling of updates.
-type updatePolicy bool
-
-const (
-	// Values correspond to server's ForceUpdateFailures field.
-	updatesSucceed updatePolicy = false
-	updatesFail    updatePolicy = true
-)
-
-// sendConfig updates the server's configuration.
-func sendConfig(p updatePolicy) {
-	tester.SendConfig(&config.Config{
-		GoogleUsers:         []string{testEmail},
-		BasicAuthUsers:      []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
-		SongBaseURL:         musicSrv.URL + "/",
-		CoverBaseURL:        "",
-		ForceUpdateFailures: bool(p),
-		Presets: []config.SearchPreset{
-			{
-				Name:       "instrumental old",
-				Tags:       "instrumental",
-				MinRating:  4,
-				LastPlayed: 6,
-				Shuffle:    true,
-				Play:       true,
-			},
-			{
-				Name:      "mellow",
-				Tags:      "mellow",
-				MinRating: 4,
-				Shuffle:   true,
-				Play:      true,
-			},
-			{
-				Name:        "new albums",
-				FirstPlayed: 3,
-				FirstTrack:  true,
-			},
-			{
-				Name:    "unrated",
-				Unrated: true,
-				Play:    true,
-			},
-		},
-	})
+var presets = []config.SearchPreset{
+	{
+		Name:       "instrumental old",
+		Tags:       "instrumental",
+		MinRating:  4,
+		LastPlayed: 6,
+		Shuffle:    true,
+		Play:       true,
+	},
+	{
+		Name:      "mellow",
+		Tags:      "mellow",
+		MinRating: 4,
+		Shuffle:   true,
+		Play:      true,
+	},
+	{
+		Name:        "new albums",
+		FirstPlayed: 3,
+		FirstTrack:  true,
+	},
+	{
+		Name:    "unrated",
+		Unrated: true,
+		Play:    true,
+	},
 }
 
 // importSongs posts the supplied db.Song or []db.Song args to the server.
@@ -714,7 +708,7 @@ func TestRetryUpdates(t *testing.T) {
 	importSongs(song)
 
 	// Configure the server to reject updates and play the song.
-	sendConfig(updatesFail)
+	tester.ForceUpdateFailures(true)
 	page.setText(keywordsInput, song.Artist)
 	firstLower := time.Now()
 	page.click(luckyButton)
@@ -729,12 +723,12 @@ func TestRetryUpdates(t *testing.T) {
 
 	// Wait a bit to let the updates fail and then let them succeed.
 	time.Sleep(time.Second)
-	sendConfig(updatesSucceed)
+	tester.ForceUpdateFailures(false)
 	checkServerSong(t, song, hasSrvRating(0.75), hasSrvTags("jazz", "mellow"),
 		hasSrvPlay(firstLower, firstUpper))
 
 	// Queue some more failed updates.
-	sendConfig(updatesFail)
+	tester.ForceUpdateFailures(true)
 	secondLower := time.Now()
 	page.click(playPauseButton)
 	page.checkSong(song, isEnded(false))
@@ -748,12 +742,12 @@ func TestRetryUpdates(t *testing.T) {
 
 	// The queued updates should be sent if the page is reloaded.
 	page.reload()
-	sendConfig(updatesSucceed)
+	tester.ForceUpdateFailures(false)
 	checkServerSong(t, song, hasSrvRating(0.25), hasSrvTags("lively", "soul"),
 		hasSrvPlay(firstLower, firstUpper), hasSrvPlay(secondLower, secondUpper))
 
 	// In the case of multiple queued updates, the last one should take precedence.
-	sendConfig(updatesFail)
+	tester.ForceUpdateFailures(true)
 	page.setText(keywordsInput, song.Artist)
 	page.click(luckyButton)
 	page.checkSong(song)
@@ -763,7 +757,7 @@ func TestRetryUpdates(t *testing.T) {
 		page.click(updateCloseImage)
 		time.Sleep(100 * time.Millisecond)
 	}
-	sendConfig(updatesSucceed)
+	tester.ForceUpdateFailures(false)
 	checkServerSong(t, song, hasSrvRating(1.0))
 }
 

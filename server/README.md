@@ -12,6 +12,11 @@ Deletes all song and play objects from Datastore. Used by tests.
 
 ### /config (POST, dev-only)
 
+Modifies server behavior. Used by tests.
+
+*   `forceUpdateFailures` (optional) - If `1`, report failures for all user data
+    updates (ratings, tags, plays).
+
 Unmarshals a JSON-encoded [Config] struct from the request body and
 applies it. Used by tests.
 

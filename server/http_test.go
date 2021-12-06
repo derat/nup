@@ -7,10 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -45,7 +43,7 @@ func TestAddHandler(t *testing.T) {
 	}
 	defer inst.Close()
 
-	// Write a config and load it.
+	// Load a config.
 	origCfg := &config.Config{
 		BasicAuthUsers: []config.BasicAuthInfo{{user1, pass1}, {user2, pass2}},
 		GoogleUsers:    []string{email1, email2},
@@ -56,11 +54,7 @@ func TestAddHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed marshaling config: ", err)
 	}
-	p := filepath.Join(t.TempDir(), "config.json")
-	if err := ioutil.WriteFile(p, b, 0644); err != nil {
-		t.Fatal("Failed writing config: ", err)
-	}
-	if err := config.LoadConfig(p); err != nil {
+	if err := config.LoadConfig(b); err != nil {
 		t.Fatal("Failed loading config: ", err)
 	}
 

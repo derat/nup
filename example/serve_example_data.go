@@ -46,7 +46,13 @@ func run() (int, error) {
 	log.Print("File server is listening at ", fileSrv.URL)
 
 	log.Print("Starting dev_appserver")
-	appSrv, err := test.NewDevAppserver(*port, *debugApp)
+	appSrv, err := test.NewDevAppserver(*port, *debugApp, &config.Config{
+		GoogleUsers:    []string{*email},
+		BasicAuthUsers: []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
+		SongBaseURL:    fileSrv.URL + "/music/",
+		CoverBaseURL:   fileSrv.URL + "/covers/",
+		Presets:        presets,
+	})
 	if err != nil {
 		return -1, fmt.Errorf("dev_appserver: %v", err)
 	}
@@ -60,13 +66,6 @@ func run() (int, error) {
 		BinDir:   *binDir,
 	})
 	defer tester.Close()
-	tester.SendConfig(&config.Config{
-		GoogleUsers:    []string{*email},
-		BasicAuthUsers: []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
-		SongBaseURL:    fileSrv.URL + "/music/",
-		CoverBaseURL:   fileSrv.URL + "/covers/",
-		Presets:        presets,
-	})
 	tester.ImportSongsFromJSONFile(songs)
 
 	time.Sleep(time.Minute)

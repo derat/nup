@@ -5,24 +5,17 @@
 package config
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
 
 	"google.golang.org/appengine/v2"
-	"google.golang.org/appengine/v2/datastore"
 	"google.golang.org/appengine/v2/user"
 )
 
-const (
-	// Datastore kind and ID for storing the server config for testing.
-	configKind  = "ServerConfig"
-	configKeyID = "config"
-)
-
-// Singleton loaded from disk by LoadConfig().
+// Singleton parsed by LoadConfig().
 var baseCfg *Config
 
 // BasicAuthInfo contains information used for validating HTTP basic authentication.
@@ -92,10 +85,6 @@ type Config struct {
 
 	// Presets describes search presets for the web interface.
 	Presets []SearchPreset `json:"presets"`
-
-	// ForceUpdateFailures is set by tests to indicate that failure be reported
-	// for all user data updates (ratings, tags, plays). Ignored for non-development servers.
-	ForceUpdateFailures bool `json:"forceUpdateFailures"`
 }
 
 // Auth checks that r is authorized in cfg via either HTTP basic authentication or Google
@@ -131,69 +120,38 @@ func cleanBaseURL(u *string) {
 	}
 }
 
-// LoadConfig loads the server configuration from path p.
+// LoadConfig unmarshals jsonData, validates it, and sets baseCfg.
 // It should be called once at the start of main().
-func LoadConfig(p string) error {
-	f, err := os.Open(p)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
+func LoadConfig(jsonData []byte) error {
 	var cfg Config
-	dec := json.NewDecoder(f)
+	dec := json.NewDecoder(bytes.NewReader(jsonData))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&cfg); err != nil {
 		return err
 	}
-	baseCfg = &cfg
 
-	cleanBaseURL(&baseCfg.SongBaseURL)
-	haveSongBucket := len(baseCfg.SongBucket) > 0
-	haveSongURL := len(baseCfg.SongBaseURL) > 0
+	cleanBaseURL(&cfg.SongBaseURL)
+	haveSongBucket := len(cfg.SongBucket) > 0
+	haveSongURL := len(cfg.SongBaseURL) > 0
 	if (haveSongBucket && haveSongURL) || !(haveSongBucket || haveSongURL) {
 		return errors.New("exactly one of SongBucket and SongBaseURL must be set")
 	}
 
-	cleanBaseURL(&baseCfg.CoverBaseURL)
-	haveCoverBucket := len(baseCfg.CoverBucket) > 0
-	haveCoverURL := len(baseCfg.CoverBaseURL) > 0
+	cleanBaseURL(&cfg.CoverBaseURL)
+	haveCoverBucket := len(cfg.CoverBucket) > 0
+	haveCoverURL := len(cfg.CoverBaseURL) > 0
 	if (haveCoverBucket && haveCoverURL) || !(haveCoverBucket || haveCoverURL) {
 		return errors.New("exactly one of CoverBucket and CoverBaseURL must be set")
 	}
 
+	baseCfg = &cfg
 	return nil
-}
-
-func testConfigKey(ctx context.Context) *datastore.Key {
-	return datastore.NewKey(ctx, configKind, configKeyID, 0, nil)
 }
 
 // GetConfig returns the currently-in-use Config.
 func GetConfig(ctx context.Context) (*Config, error) {
-	if appengine.IsDevAppServer() {
-		var testCfg Config
-		if err := datastore.Get(ctx, testConfigKey(ctx), &testCfg); err == nil {
-			return &testCfg, nil
-		} else if err != datastore.ErrNoSuchEntity {
-			return nil, err
-		}
-	}
-
 	if baseCfg == nil {
 		return nil, errors.New("LoadConfig not called")
 	}
 	return baseCfg, nil
-}
-
-func SaveTestConfig(ctx context.Context, cfg *Config) error {
-	_, err := datastore.Put(ctx, testConfigKey(ctx), cfg)
-	return err
-}
-
-func ClearTestConfig(ctx context.Context) error {
-	if err := datastore.Delete(ctx, testConfigKey(ctx)); err != nil && err != datastore.ErrNoSuchEntity {
-		return err
-	}
-	return nil
 }

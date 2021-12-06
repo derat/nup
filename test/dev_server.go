@@ -4,6 +4,7 @@
 package test
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -13,6 +14,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/derat/nup/server/config"
 
 	"golang.org/x/sys/unix"
 )
@@ -26,11 +29,17 @@ type DevAppserver struct {
 	storageDir string    // temp dir used for datastore
 }
 
-// NewDevAppserver starts a dev_appserver.py process.
+// NewDevAppserver starts a dev_appserver.py process using the supplied configuration.
+//
 // If appPort is 0 or negative, an unused port will be chosen.
-// Close should be called later to kill the process.
-func NewDevAppserver(appPort int, showLogging bool) (*DevAppserver, error) {
+// If showLogging is true, dev_appserver.py's noisy output will be written to stdout and stderr.
+// Close must be called later to kill the process.
+func NewDevAppserver(appPort int, showLogging bool, cfg *config.Config) (*DevAppserver, error) {
 	libDir, err := CallerDir()
+	if err != nil {
+		return nil, err
+	}
+	cfgData, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -53,11 +62,12 @@ func NewDevAppserver(appPort int, showLogging bool) (*DevAppserver, error) {
 
 	cmd := exec.Command(
 		"dev_appserver.py",
-		"--application=nup-test",
-		"--port="+strconv.Itoa(appPort),
-		"--admin_port="+strconv.Itoa(adminPort),
-		"--storage_path="+storageDir,
-		"--datastore_consistency_policy=consistent",
+		"--application", "nup-test",
+		"--port", strconv.Itoa(appPort),
+		"--admin_port", strconv.Itoa(adminPort),
+		"--storage_path", storageDir,
+		"--env_var", "NUP_CONFIG="+string(cfgData),
+		"--datastore_consistency_policy", "consistent",
 		".")
 	cmd.Dir = filepath.Join(libDir, "..") // directory containing app.yaml
 	if showLogging {

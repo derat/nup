@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -43,10 +44,25 @@ const (
 	coverJPEGQuality = 90  // quality to use when encoding /cover replies
 )
 
+// forceUpdateFailures can be set by tests via /config to indicate that failures should be reported
+// for all user data updates (ratings, tags, plays).
+// TODO: This is hacky since it'll only affect the instance that receives the /config request.
+// Maybe that's good enough for testing, though.
+var forceUpdateFailures = false
+
 func main() {
-	if err := config.LoadConfig(configPath); err != nil {
+	// Tests can override the config file via a NUP_CONFIG environment variable.
+	cfgData := []byte(os.Getenv("NUP_CONFIG"))
+	if len(cfgData) == 0 {
+		var err error
+		if cfgData, err = ioutil.ReadFile(configPath); err != nil {
+			panic(fmt.Sprintf("Reading config failed: %v", err))
+		}
+	}
+	if err := config.LoadConfig(cfgData); err != nil {
 		panic(fmt.Sprintf("Loading config failed: %v", err))
 	}
+
 	rand.Seed(time.Now().UnixNano())
 
 	// Use a wrapper instead of calling http.HandleFunc directly to reduce the risk
@@ -67,8 +83,7 @@ func main() {
 
 	if appengine.IsDevAppServer() {
 		addHandler("/clear", http.MethodPost, rejectUnauth, handleClear)
-		// Don't require authorization for /config since tests use it to inject auth info.
-		addHandler("/config", http.MethodPost, allowUnauth, handleConfig)
+		addHandler("/config", http.MethodPost, rejectUnauth, handleConfig)
 		addHandler("/flush_cache", http.MethodPost, rejectUnauth, handleFlushCache)
 	}
 
@@ -121,23 +136,7 @@ func handleClear(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 }
 
 func handleConfig(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
-	var newCfg config.Config
-	if err := json.NewDecoder(r.Body).Decode(&newCfg); err == io.EOF {
-		if err := config.ClearTestConfig(ctx); err != nil {
-			log.Errorf(ctx, "Failed clearing config: %v", err)
-			http.Error(w, "Failed clearing config", http.StatusInternalServerError)
-			return
-		}
-	} else if err != nil {
-		log.Errorf(ctx, "Failed decoding config: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	} else if err := config.SaveTestConfig(ctx, &newCfg); err != nil {
-		log.Errorf(ctx, "Failed saving config: %v", err)
-		http.Error(w, "Failed saving config", http.StatusInternalServerError)
-		return
-	}
-
+	forceUpdateFailures = r.FormValue("forceUpdateFailures") == "1"
 	writeTextResponse(w, "ok")
 }
 
@@ -387,7 +386,7 @@ func handlePlayed(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 	}
 	startTime := secondsToTime(startTimeFloat)
 
-	if cfg.ForceUpdateFailures && appengine.IsDevAppServer() {
+	if forceUpdateFailures && appengine.IsDevAppServer() {
 		http.Error(w, "Returning an error, as requested", http.StatusInternalServerError)
 		return
 	}
@@ -517,7 +516,7 @@ func handleRateAndTag(ctx context.Context, cfg *config.Config, w http.ResponseWr
 		return
 	}
 
-	if cfg.ForceUpdateFailures && appengine.IsDevAppServer() {
+	if forceUpdateFailures && appengine.IsDevAppServer() {
 		http.Error(w, "Returning an error, as requested", http.StatusInternalServerError)
 		return
 	}
