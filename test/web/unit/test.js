@@ -62,27 +62,36 @@ class Test {
     this.func = f;
   }
 
-  // Runs the test to completion.
+  // Runs the test to completion. This could probably be simplified, but I'm
+  // terrible at promises and async functions. :-/
   async run() {
-    if (this.func.length === 1) {
-      // This can't catch exceptions thrown from functions passed to
-      // window.setTimeout():
-      //  https://stackoverflow.com/q/41431605/6882947
-      //  https://stackoverflow.com/q/60644708/6882947
-      // Those get handled by window.onerror.
-      await new Promise((resolve, reject) => {
-        lastDone = resolve;
-        this.func(resolve);
-      }).catch((e) => {
-        handleException(e);
-      });
-    } else {
+    // First, create a promise to get a 'done' callback to pass to tests that
+    // want one.
+    await new Promise((done) => {
       try {
-        this.func();
+        // Save the 'done' callback to a global variable so it can be called by
+        // the 'error' and 'unhandledrejection' handlers if an error happens in
+        // e.g. a timeout, which runs in the window execution context.
+        lastDone = done;
+
+        Promise.resolve(this.func(done))
+          .catch((e) => {
+            // This handles exceptions thrown directly from async tests.
+            handleException(e);
+            done();
+          })
+          .then(() => {
+            // If the test doesn't take any args, run the 'done' callback for it.
+            if (!this.func.length) done();
+          });
       } catch (e) {
+        // This handles exceptions thrown directly from synchronous tests.
         handleException(e);
+        done();
       }
-    }
+    });
+
+    lastDone = null;
   }
 }
 
@@ -135,6 +144,8 @@ export function afterEach(f) {
 
 // Adds a test named |name| with function |f|.
 // This must be called from within a function passed to suite().
+// If |f| accepts an argument, it will be passed a 'done' callback that it
+// must run upon completion. Additionally, |f| may be async.
 export function test(name, f) {
   if (!curSuite) throw new Error('test() called outside suite()');
   curSuite.tests.push(new Test(name, f));
@@ -209,12 +220,19 @@ export function expectEq(got, want, desc) {
   }
 }
 
-// Catch uncaught errors (e.g. exceptions thrown from setTimeout()).
-window.onerror = (msg, source, line, col, err) => {
-  const src = getSource(err);
-  handleException(err);
+// Errors in the window execution context, e.g. exceptions thrown from timeouts
+// in either synchronous or async tests, trigger error events.
+window.addEventListener('error', (ev) => {
+  handleException(ev.error);
   if (lastDone) lastDone();
-};
+});
+
+// Unhandled promise rejections trigger unhandledrejection events.
+window.addEventListener('unhandledrejection', (ev) => {
+  console.error(`Unhandled rejection: ${ev.reason}`);
+  addError(`${ev.reason} (rejection)`);
+  if (lastDone) lastDone();
+});
 
 // Runs all tests and returns results as an array of objects:
 //

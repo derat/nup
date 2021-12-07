@@ -11,17 +11,33 @@ suite('example', () => {
     //throw new Error('exception');
   });
 
-  test('async', (done) => {
+  test('done', (done) => {
     //error('error');
     //fatal('fatal');
     //throw new Error('exception');
-
+    //Promise.reject('reject');
     window.setTimeout(() => {
-      console.log('Running timeout');
+      console.log('Timeout fired');
       //error('error');
       //fatal('fatal');
       //throw new Error('exception');
+      //Promise.reject('reject');
       done();
     }, 100);
+  });
+
+  test('async', async () => {
+    //error('error');
+    //fatal('fatal');
+    //throw new Error('exception');
+    //Promise.reject('reject');
+    await new Promise((resolve, reject) => {
+      window.setTimeout(() => {
+        console.log('Timeout fired');
+        //throw new Error('exception');
+        //reject();
+        resolve();
+      }, 100);
+    });
   });
 });

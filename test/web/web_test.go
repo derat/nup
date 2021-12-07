@@ -944,7 +944,11 @@ func TestUnit(t *testing.T) {
 	}
 	for _, res := range results.Value {
 		for _, err := range res.Errors {
-			t.Errorf("%v: %v: %v", res.Name, err.Src, err.Msg)
+			pre := res.Name
+			if err.Src != "" {
+				pre += ": " + err.Src
+			}
+			t.Errorf("%v: %v", pre, err.Msg)
 		}
 	}
 }
