@@ -28,7 +28,7 @@ export default class MockWindow {
       const method = (init && init.method) || 'GET';
       const info = this.getFetch_(resource, method);
       if (!info) {
-        error(`${method} ${resource} fetch() unexpected`);
+        error(`Unexpected ${method} ${resource} fetch()`);
         return Promise.reject();
       }
       return Promise.resolve({
@@ -44,35 +44,31 @@ export default class MockWindow {
   // expectations were satisfied.
   finish() {
     Object.entries(this.old_).forEach(([n, f]) => (window[n] = f));
-    Object.entries(this.fetches_).forEach(([resource, infos]) => {
-      for (const info of infos) {
-        error(`${method} ${resource} fetch() unsatisfied`);
-      }
+    Object.entries(this.fetches_).forEach(([key, infos]) => {
+      error(`${infos.length} unsatisfied ${key} fetch()`);
     });
   }
 
   // Expects |resource| (a URL) to be fetched once via |method| (e.g. "POST").
   // |text| will be returned as the response body.
   expectFetch(resource, method, text, status = 200) {
-    const infos = this.fetches_[resource] || [];
-    infos.push({ method, text, status });
-    this.fetches_[resource] = infos;
+    const key = fetchKey(resource, method);
+    const infos = this.fetches_[key] || [];
+    infos.push({ text, status });
+    this.fetches_[key] = infos;
   }
 
   // Removes and returns the first info from |fetches_| with the supplied
   // resource and method, or null if no matching info is found.
   getFetch_(resource, method) {
-    const infos = this.fetches_[resource];
-    if (!infos) return null;
+    const key = fetchKey(resource, method);
+    const infos = this.fetches_[key];
+    if (!infos || !infos.length) return null;
 
-    // TODO: Just check the first request to verify order.
-    for (const [i, info] of infos.entries()) {
-      if (info.method === method) {
-        infos.splice(i, 1);
-        return info;
-      }
-    }
-    return null;
+    const info = infos[0];
+    infos.splice(0, 1);
+    if (!infos.length) delete this.fetches_[key];
+    return info;
   }
 
   // Number of pending timeouts added via setTimeout().
@@ -116,4 +112,8 @@ export default class MockWindow {
     this.old_[name] = window[name];
     window[name] = val;
   }
+}
+
+function fetchKey(resource, method) {
+  return `${method} ${resource}`;
 }
