@@ -605,8 +605,8 @@ customElements.define(
 
       // Cache the scaled cover images for the next song and the one after it.
       // This prevents ugly laggy updates here and in <presentation-layer>.
-      // TODO: Except this probably won't work due to App Engine caching:
-      // https://github.com/derat/nup/issues/1
+      // Note that this will probably only work for non-admin users due to an
+      // App Engine "feature": https://github.com/derat/nup/issues/1
       const precacheCover = (s) => {
         if (!s || !s.coverFilename) return;
         new Image().src = getScaledCoverUrl(s.coverFilename);

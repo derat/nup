@@ -139,7 +139,7 @@ func parseFloatParam(ctx context.Context, w http.ResponseWriter, r *http.Request
 // addLongCacheHeaders adds headers to w such that it will be cached for a long time.
 // See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control.
 func addLongCacheHeaders(w http.ResponseWriter) {
-	// TODO: App Engine "helpfully" rewrites Cache-Control to "no-cache, must-revalidate" in
+	// App Engine "helpfully" rewrites Cache-Control to "no-cache, must-revalidate" in
 	// response to requests from admin users: https://github.com/derat/nup/issues/1
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	w.Header().Set("Expires", time.Now().UTC().Add(24*time.Hour).Format(time.RFC1123))
