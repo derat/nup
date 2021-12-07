@@ -75,7 +75,7 @@ export default class Updater {
       `&startTime=${encodeURIComponent(startTime)}`;
     console.log(`Reporting track: ${url}`);
 
-    fetch(url, { method: 'POST' })
+    return fetch(url, { method: 'POST' })
       .then((res) => handleFetchError(res))
       .then(() => {
         removePlayReport(this.inProgressPlayReports_, songId, startTime);
@@ -95,13 +95,13 @@ export default class Updater {
   // (float) and |tags| (string array). Either |rating| or |tags| can be null to
   // leave them unchanged.
   rateAndTag(songId, rating, tags) {
-    if (rating == null && tags == null) return;
+    if (rating == null && tags == null) return Promise.resolve();
 
     delete this.queuedRatingsAndTags_[songId];
 
     if (this.inProgressRatingsAndTags_[songId] != null) {
       addRatingAndTags(this.queuedRatingsAndTags_, songId, rating, tags);
-      return;
+      return Promise.resolve();
     }
 
     addRatingAndTags(this.inProgressRatingsAndTags_, songId, rating, tags);
@@ -112,7 +112,7 @@ export default class Updater {
     if (tags != null) url += `&tags=${encodeURIComponent(tags.join(' '))}`;
     console.log(`Rating/tagging track: ${url}`);
 
-    fetch(url, { method: 'POST' })
+    return fetch(url, { method: 'POST' })
       .then((res) => handleFetchError(res))
       .then(() => {
         delete this.inProgressRatingsAndTags_[songId];
@@ -175,7 +175,7 @@ export default class Updater {
     console.log('Scheduling retry in ' + delayMs + ' ms');
     this.retryTimeoutId_ = window.setTimeout(() => {
       this.retryTimeoutId_ = null;
-      this.doRetry_();
+      return this.doRetry_();
     }, delayMs);
     this.lastRetryDelayMs_ = delayMs;
   }
@@ -189,21 +189,21 @@ export default class Updater {
     ) {
       this.lastRetryDelayMs_ = 0; // use min retry delay
       this.scheduleRetry_(false);
-      return;
+      return Promise.resolve();
     }
 
     if (Object.keys(this.queuedRatingsAndTags_).length) {
       const songId = Object.keys(this.queuedRatingsAndTags_)[0];
       const entry = this.queuedRatingsAndTags_[songId];
-      this.rateAndTag(songId, entry.rating, entry.tags);
-      return;
+      return this.rateAndTag(songId, entry.rating, entry.tags);
     }
 
     if (this.queuedPlayReports_.length) {
       const entry = this.queuedPlayReports_[0];
-      this.reportPlay(entry.songId, entry.startTime);
-      return;
+      return this.reportPlay(entry.songId, entry.startTime);
     }
+
+    return Promise.resolve();
   }
 }
 

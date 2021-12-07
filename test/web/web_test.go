@@ -174,7 +174,7 @@ func writeLogHeader(s string) {
 // Log messages usually look like this:
 //  http://localhost:8080/music-searcher.js 478:18 "Got response with 1 song(s)"
 // This regexp matches the filename, line number, and unquoted message.
-var logRegexp = regexp.MustCompile(`^https?://[^ ]+/([^ /]+\.js) (\d+):\d+ (.*)$`)
+var logRegexp = regexp.MustCompile(`(?s)^https?://[^ ]+/([^ /]+\.js) (\d+):\d+ (.*)$`)
 
 // copyBrowserLogs gets new log messages from the browser and writes them to browserLog.
 func copyBrowserLogs() {

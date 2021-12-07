@@ -1,10 +1,10 @@
 // Copyright 2021 Daniel Erat.
 // All rights reserved.
 
-import { addSuite, error, fatal, test } from './test.js';
+import { error, fatal, suite, test } from './test.js';
 
 // This suite contains example tests for exercising test.js.
-addSuite('example', () => {
+suite('example', () => {
   test('sync', () => {
     //error('error');
     //fatal('fatal');

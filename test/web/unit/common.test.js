@@ -1,7 +1,7 @@
 // Copyright 2021 Daniel Erat.
 // All rights reserved.
 
-import { addSuite, expectEq, error, fatal, test } from './test.js';
+import { expectEq, error, fatal, suite, test } from './test.js';
 import {
   createElement,
   formatTime,
@@ -10,7 +10,7 @@ import {
   ratingToNumStars,
 } from './common.js';
 
-addSuite('common', () => {
+suite('common', () => {
   test('formatTime', () => {
     for (const [sec, want] of [
       [0, '0:00'],

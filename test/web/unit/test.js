@@ -5,8 +5,8 @@
 // shoved into globals so it can be accessed by exported functions in an
 // approximation of the style of other JS test frameworks.
 const initResult = newResult('init'); // errors outside of tests
-const allSuites = []; // Suite objects registered via addSuite()
-let curSuite = null; // Suite currently being added via addSuite()
+const allSuites = []; // Suite objects registered via suite()
+let curSuite = null; // Suite currently being added via suite()
 let results = []; // test results from current run
 let curResult = null; // in-progress test's result
 let lastDone = null; // promise resolve func from last async test
@@ -16,11 +16,10 @@ class Suite {
   constructor(name) {
     this.name = name;
     this.tests = []; // Test objects
-  }
-
-  // Adds a test with name |name| and function |func| to the suite.
-  addTest(name, func) {
-    this.tests.push(new Test(name, func));
+    this.beforeAlls = [];
+    this.afterAlls = [];
+    this.beforeEaches = [];
+    this.afterEaches = [];
   }
 
   // Sequentially run all tests in the suite.
@@ -31,23 +30,36 @@ class Suite {
     );
     if (!tests.length) throw new Error(`No test ${this.name}.${testName}`);
 
-    for (const t of tests) {
-      const fullName = `${this.name}.${t.name}`;
-      console.log(`Starting ${fullName}`);
-      curResult = newResult(fullName);
-      await t.run();
-      console.log(`Finished ${fullName}`);
-      results.push(curResult);
-      curResult = null;
+    try {
+      this.beforeAlls.forEach((f) => f());
+      for (const t of tests) {
+        const fullName = `${this.name}.${t.name}`;
+        console.log('-'.repeat(80));
+        console.log(`Starting ${fullName}`);
+        curResult = newResult(fullName);
+        try {
+          this.beforeEaches.forEach((f) => f());
+          await t.run();
+          this.afterEaches.forEach((f) => f());
+        } finally {
+          console.log(
+            `Finished ${fullName} with ${curResult.errors.length} error(s)`
+          );
+          results.push(curResult);
+          curResult = null;
+        }
+      }
+    } finally {
+      this.afterAlls.forEach((f) => f());
     }
   }
 }
 
 // Test contains an individual test.
 class Test {
-  constructor(name, func) {
+  constructor(name, f) {
     this.name = name;
-    this.func = func;
+    this.func = f;
   }
 
   // Runs the test to completion.
@@ -75,9 +87,9 @@ class Test {
 }
 
 // Adds a test suite named |name|.
-// |func| is is executed immediately; it should call test() to define the
+// |f| is is executed immediately; it should call test() to define the
 // suite's tests.
-export function addSuite(name, f) {
+export function suite(name, f) {
   if (curSuite) throw new Error(`Already adding suite ${curSuite.name}`);
 
   const s = new Suite(name);
@@ -93,11 +105,39 @@ export function addSuite(name, f) {
   }
 }
 
-// Adds a test named |name| with function |func|.
-// This must be called from within a function passed to addSuite().
+// Adds |f| to run before all tests in the suite.
+// This must be called from within a function passed to suite().
+export function beforeAll(f) {
+  if (!curSuite) throw new Error('beforeAll() called outside suite()');
+  curSuite.beforeAlls.push(f);
+}
+
+// Adds |f| to run after all tests in the suite.
+// This must be called from within a function passed to suite().
+export function afterAll(f) {
+  if (!curSuite) throw new Error('afterAll() called outside suite()');
+  curSuite.afterAlls.push(f);
+}
+
+// Adds |f| to run before each tests in the suite.
+// This must be called from within a function passed to suite().
+export function beforeEach(f) {
+  if (!curSuite) throw new Error('beforeEach() called outside suite()');
+  curSuite.beforeEaches.push(f);
+}
+
+// Adds |f| to run after all tests in the suite.
+// This must be called from within a function passed to suite().
+export function afterEach(f) {
+  if (!curSuite) throw new Error('afterEach() called outside suite()');
+  curSuite.afterEaches.push(f);
+}
+
+// Adds a test named |name| with function |f|.
+// This must be called from within a function passed to suite().
 export function test(name, f) {
-  if (!curSuite) throw new Error('test() called outside addSuite()');
-  curSuite.addTest(name, f);
+  if (!curSuite) throw new Error('test() called outside suite()');
+  curSuite.tests.push(new Test(name, f));
 }
 
 // Extracts filename, line, and column from a stack trace line:
@@ -115,6 +155,7 @@ function getSource(err) {
       return `${matches[1]}:${matches[2]}`;
     }
   }
+  // TODO: Maybe it was triggered by test.js.
   return '';
 }
 
