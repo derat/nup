@@ -128,12 +128,12 @@ export function handleFetchError(response) {
 }
 
 // Converts a star count in the range [1, 5] to a rating in the range
-// [0.0, 4.0]. A zero or negative star count (i.e. unrated) is mapped to -1.0.
+// [0.0, 1.0]. A zero or negative star count (i.e. unrated) is mapped to -1.0.
 export function numStarsToRating(numStars) {
   return numStars <= 0 ? -1.0 : (Math.min(numStars, 5) - 1) / 4.0;
 }
 
-// Converts a rating in the range [0.0, 4.0] to a star count in the range
+// Converts a rating in the range [0.0, 1.0] to a star count in the range
 // [1, 5]. A negative rating (i.e. unrated) is mapped to 0 stars.
 export function ratingToNumStars(rating) {
   return rating < 0.0 ? 0 : 1 + Math.round(Math.min(rating, 1.0) * 4.0);
@@ -141,7 +141,6 @@ export function ratingToNumStars(rating) {
 
 // Converts a rating in the range [0.0, 4.0] (or negative for unrated) to a
 // string.
-//export function getRatingString(rating, withLabel, includeEmpty) {
 export function getRatingString(
   rating,
   filledStar = '★',

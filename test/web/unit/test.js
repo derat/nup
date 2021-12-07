@@ -138,6 +138,22 @@ export function fatal(msg) {
   throw new Error('Test aborted');
 }
 
+function fmt(val) {
+  return JSON.stringify(val);
+}
+
+// Adds an error if |got| doesn't strictly equal |want|.
+// |desc| can contain a description of what's being compared.
+export function expectEq(got, want, desc) {
+  if (got !== want) {
+    error(
+      desc
+        ? `${desc} is ${fmt(got)}; want ${fmt(want)}`
+        : `Got ${fmt(got)}; want ${fmt(want)}`
+    );
+  }
+}
+
 // Catch uncaught errors (e.g. exceptions thrown from setTimeout()).
 window.onerror = (msg, source, line, col, err) => {
   const src = getSource(err);
