@@ -6,7 +6,7 @@ package test
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -24,23 +24,27 @@ const appserverTimeout = 15 * time.Second
 
 // DevAppserver wraps a dev_appserver.py process.
 type DevAppserver struct {
-	addr       string    // address of app's HTTP server, e.g. "localhost:8080".
-	cmd        *exec.Cmd // dev_appserver.py process
-	storageDir string    // temp dir used for datastore
+	addr string    // address of app's HTTP server, e.g. "localhost:8080".
+	cmd  *exec.Cmd // dev_appserver.py process
 }
 
 // NewDevAppserver starts a dev_appserver.py process using the supplied configuration.
 //
 // If appPort is 0 or negative, an unused port will be chosen.
-// If showLogging is true, dev_appserver.py's noisy output will be written to stdout and stderr.
+// storageDir is used to hold Datastore data and will be created if it doesn't exist.
+// dev_appserver.py's noisy output will be sent to out (which may be nil).
 // Close must be called later to kill the process.
-func NewDevAppserver(appPort int, showLogging bool, cfg *config.Config) (*DevAppserver, error) {
+func NewDevAppserver(appPort int, storageDir string, out io.Writer,
+	cfg *config.Config) (*DevAppserver, error) {
 	libDir, err := CallerDir()
 	if err != nil {
 		return nil, err
 	}
 	cfgData, err := json.Marshal(cfg)
 	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(storageDir, 0755); err != nil {
 		return nil, err
 	}
 
@@ -54,12 +58,6 @@ func NewDevAppserver(appPort int, showLogging bool, cfg *config.Config) (*DevApp
 	}
 	adminPort := ports[1]
 
-	// Prevent multiple instances from using the same Datastore directory.
-	storageDir, err := ioutil.TempDir("", "nup_dev_appserver.*")
-	if err != nil {
-		return nil, err
-	}
-
 	cmd := exec.Command(
 		"dev_appserver.py",
 		"--application", "nup-test",
@@ -72,19 +70,15 @@ func NewDevAppserver(appPort int, showLogging bool, cfg *config.Config) (*DevApp
 		"--max_module_instances", "1",
 		".")
 	cmd.Dir = filepath.Join(libDir, "..") // directory containing app.yaml
-	if showLogging {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	}
+	cmd.Stdout = out
+	cmd.Stderr = out
 	if err := cmd.Start(); err != nil {
-		os.RemoveAll(storageDir)
 		return nil, err
 	}
 
 	srv := &DevAppserver{
-		addr:       net.JoinHostPort("localhost", strconv.Itoa(appPort)),
-		cmd:        cmd,
-		storageDir: storageDir,
+		addr: net.JoinHostPort("localhost", strconv.Itoa(appPort)),
+		cmd:  cmd,
 	}
 
 	// Wait for the server to accept connections.
@@ -120,8 +114,6 @@ func NewDevAppserver(appPort int, showLogging bool, cfg *config.Config) (*DevApp
 
 // Close stops dev_appserver.py and cleans up its resources.
 func (srv *DevAppserver) Close() error {
-	defer os.RemoveAll(srv.storageDir)
-
 	// I struggled with reliably cleaning up processes on exit. In the normal-exit case, this seems
 	// pretty straightforward (at least for processes that we exec ourselves): start each process in
 	// its own process group, and at exit, send SIGTERM to the process group, which will kill all of

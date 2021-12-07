@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strings"
@@ -33,10 +34,8 @@ import (
 var (
 	// Globals shared across all tests.
 	appURL     string             // slash-terminated URL of App Engine server
-	musicSrv   *httptest.Server   // HTTP server for music files
 	webDrv     selenium.WebDriver // talks to browser using ChromeDriver
 	tester     *test.Tester       // interacts with App Engine server
-	appLog     io.Writer          // receives log messages from dev_appserver
 	browserLog io.Writer          // receives log messages from browser
 
 	// Pull some stuff into our namespace for convenience.
@@ -55,38 +54,56 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func runTests(m *testing.M) (int, error) {
+func runTests(m *testing.M) (res int, err error) {
 	binDir := flag.String("bin-dir", "",
 		"Directory containing nup executables (empty to search $PATH)")
-	browserLogPath := flag.String("browser-log", "",
-		`File for writing browser log (empty for temp file, "stderr" for stderr)`)
-	debugApp := flag.Bool("debug-app", false, "Show dev_appserver output")
+	browserStderr := flag.Bool("browser-stderr", false, "Write browser log to stderr (default is -out-dir)")
 	debugSelenium := flag.Bool("debug-selenium", false, "Write Selenium debug logs to stderr")
 	headless := flag.Bool("headless", true, "Run Chrome headlessly using Xvfb")
+	outDir := flag.String("out-dir", "", "Directory for logs and temp files (empty for temp dir)")
 	flag.Parse()
 
-	test.HandleSignals(unix.SIGINT, unix.SIGTERM)
+	test.HandleSignals([]os.Signal{unix.SIGINT, unix.SIGTERM}, nil)
+
+	if *outDir == "" {
+		if *outDir, err = ioutil.TempDir("", test.TempDirPattern("nup_web_test")); err != nil {
+			return -1, err
+		}
+		defer func() {
+			if res == 0 {
+				log.Print("Removing ", *outDir)
+				os.RemoveAll(*outDir)
+			}
+		}()
+	}
+	log.Print("Writing files to ", *outDir)
 
 	// Serve music files in the background.
-	musicDir, err := ioutil.TempDir("", "nup_web_test_music.*")
-	if err != nil {
+	musicDir := filepath.Join(*outDir, "music")
+	if err := os.MkdirAll(musicDir, 0755); err != nil {
 		return -1, err
 	}
 	defer os.RemoveAll(musicDir)
 	if err := test.CopySongs(musicDir, file0s, file1s, file5s, file10s); err != nil {
 		return -1, fmt.Errorf("copying songs: %v", err)
 	}
-	musicSrv = test.ServeFiles(musicDir)
+	musicSrv := test.ServeFiles(musicDir)
 	defer musicSrv.Close()
 
-	log.Print("Starting dev_appserver")
-	appSrv, err := test.NewDevAppserver(0 /* appPort */, *debugApp, &config.Config{
+	appLog, err := os.Create(filepath.Join(*outDir, "app.log"))
+	if err != nil {
+		return -1, err
+	}
+	defer appLog.Close()
+
+	cfg := &config.Config{
 		GoogleUsers:    []string{testEmail},
 		BasicAuthUsers: []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
 		SongBaseURL:    musicSrv.URL + "/",
 		CoverBaseURL:   musicSrv.URL + "/.covers/", // bogus but required
 		Presets:        presets,
-	})
+	}
+	appSrv, err := test.NewDevAppserver(0, filepath.Join(*outDir, "app_storage"), appLog, cfg)
 	if err != nil {
 		return -1, fmt.Errorf("dev_appserver: %v", err)
 	}
@@ -126,35 +143,27 @@ func runTests(m *testing.M) (int, error) {
 	}
 	defer webDrv.Quit()
 
-	// Create a file containing messages logged by the web interface.
-	var browserLogFile *os.File
-	if *browserLogPath == "stderr" {
+	if *browserStderr {
 		browserLog = os.Stderr
-	} else if *browserLogPath != "" {
-		if browserLogFile, err = os.Create(*browserLogPath); err != nil {
-			return -1, fmt.Errorf("creating browser log: %v", err)
-		}
 	} else {
-		if browserLogFile, err = ioutil.TempFile("",
-			"nup_web_test-"+time.Now().Format("20060102_150405-")+"*.txt"); err != nil {
-			return -1, fmt.Errorf("creating browser log: %v", err)
+		// Create a file containing messages logged by the web interface.
+		f, err := os.Create(filepath.Join(*outDir, "browser.log"))
+		if err != nil {
+			return -1, err
 		}
-		log.Print("Writing browser logs to ", browserLogFile.Name())
-		browserLog = browserLogFile
-	}
-	if browserLogFile != nil {
-		defer browserLogFile.Close()
+		defer f.Close()
+		browserLog = f
 	}
 	writeLogHeader("Running web tests against " + appURL)
 	defer copyBrowserLogs()
 
-	tester = test.NewTester(nil, appURL, test.TesterConfig{
+	tester = test.NewTester(nil, appURL, filepath.Join(*outDir, "tester"), test.TesterConfig{
 		MusicDir: musicDir,
 		BinDir:   *binDir,
 	})
-	defer tester.Close()
 
-	return m.Run(), nil
+	res = m.Run()
+	return res, nil
 }
 
 // writeLogHeader writes s and a line of dashes to browserLog.
@@ -754,6 +763,13 @@ func TestRetryUpdates(t *testing.T) {
 	for _, r := range [][]loc{ratingThreeStars, ratingFourStars, ratingFiveStars} {
 		page.click(coverImage)
 		page.click(r)
+		// I saw the below assertion fail once due to the song still having a rating of 0.75.
+		// An attempt to send the final 1.0 rating didn't even show up in the browser log, so
+		// I'm a bit suspicious that there might be a race in this loop. It already had a 100
+		// ms pause after clicking the close button, but I'm adding a delay before clicking it
+		// too to see if that helps. I ran this test in a loop for a while without any delays
+		// and couldn't reproduce the failure, though.
+		time.Sleep(100 * time.Millisecond)
 		page.click(updateCloseImage)
 		time.Sleep(100 * time.Millisecond)
 	}

@@ -5,6 +5,7 @@ go 1.12
 require (
 	cloud.google.com/go/storage v1.6.0
 	github.com/derat/taglib-go v0.0.0-20200408183415-49d1875d1328
+	github.com/mitchellh/go-ps v1.0.0
 	github.com/tebeka/selenium v0.9.9
 	golang.org/x/image v0.0.0-20190802002840-cff245a6509b
 	golang.org/x/sys v0.0.0-20200223170610-d5e6a3e2c0ae

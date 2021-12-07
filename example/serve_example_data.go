@@ -7,14 +7,19 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
-	"time"
+	"regexp"
+	"syscall"
 
 	"github.com/derat/nup/server/config"
 	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/test"
+
+	gops "github.com/mitchellh/go-ps"
 
 	"golang.org/x/sys/unix"
 )
@@ -28,14 +33,30 @@ func main() {
 }
 
 func run() (int, error) {
-	binDir := flag.String("bin-dir", "",
-		"Directory containing nup executables (empty to search $PATH)")
-	debugApp := flag.Bool("debug-app", true, "Show dev_appserver output")
+	binDir := flag.String("bin-dir", "", "Directory containing nup executables (empty to search $PATH)")
 	email := flag.String("email", "test@example.com", "Email address for login")
+	logToStderr := flag.Bool("log-to-stderr", true, "Write noisy dev_appserver output to stderr")
 	port := flag.Int("port", 8080, "HTTP port for app")
 	flag.Parse()
 
-	test.HandleSignals(unix.SIGINT, unix.SIGTERM)
+	tmpDir, err := ioutil.TempDir("", test.TempDirPattern("nup_example"))
+	if err != nil {
+		return -1, err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Unlike actual tests, we expect to receive SIGINT in normal usage,
+	// so none of these defer statements are actually going to run.
+	// Delete the temp dir in the signal handler to avoid leaving a mess.
+	test.HandleSignals([]os.Signal{unix.SIGINT, unix.SIGTERM}, func() {
+		// dev_appserver.py seems to frequently hang if its storage directory
+		// gets deleted while it's still shutting down. Send SIGKILL to make
+		// sure it really goes away.
+		if err := killProcs(regexp.MustCompile("^python2?$")); err != nil {
+			log.Print("Failed killing processes: ", err)
+		}
+		os.RemoveAll(tmpDir)
+	})
 
 	exampleDir, err := test.CallerDir()
 	if err != nil {
@@ -46,13 +67,18 @@ func run() (int, error) {
 	log.Print("File server is listening at ", fileSrv.URL)
 
 	log.Print("Starting dev_appserver")
-	appSrv, err := test.NewDevAppserver(*port, *debugApp, &config.Config{
+	var appOut io.Writer // discard by default
+	if *logToStderr {
+		appOut = os.Stderr
+	}
+	cfg := &config.Config{
 		GoogleUsers:    []string{*email},
 		BasicAuthUsers: []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
 		SongBaseURL:    fileSrv.URL + "/music/",
 		CoverBaseURL:   fileSrv.URL + "/covers/",
 		Presets:        presets,
-	})
+	}
+	appSrv, err := test.NewDevAppserver(*port, filepath.Join(tmpDir, "app_storage"), appOut, cfg)
 	if err != nil {
 		return -1, fmt.Errorf("dev_appserver: %v", err)
 	}
@@ -60,16 +86,43 @@ func run() (int, error) {
 	appURL := appSrv.URL()
 	log.Print("dev_appserver is listening at ", appURL)
 
-	tester := test.NewTester(nil, appURL, test.TesterConfig{
+	tester := test.NewTester(nil, appURL, filepath.Join(tmpDir, "tester"), test.TesterConfig{
 		MusicDir: filepath.Join(exampleDir, "music"),
 		CoverDir: filepath.Join(exampleDir, "covers"),
 		BinDir:   *binDir,
 	})
-	defer tester.Close()
 	tester.ImportSongsFromJSONFile(songs)
 
-	time.Sleep(time.Minute)
+	// Block until we get killed.
+	<-make(chan struct{})
 	return 0, nil
+}
+
+// killProcs sends SIGKILL to all processes in the same process group as us
+// with an executable name matched by re.
+func killProcs(re *regexp.Regexp) error {
+	self := os.Getpid()
+	pgid, err := unix.Getpgid(self)
+	if err != nil {
+		return err
+	}
+	procs, err := gops.Processes()
+	if err != nil {
+		return err
+	}
+	for _, p := range procs {
+		if p.Pid() == self || !re.MatchString(p.Executable()) {
+			continue
+		}
+		if pg, err := unix.Getpgid(p.Pid()); err != nil || pg != pgid {
+			continue
+		}
+		log.Printf("Sending SIGKILL to process %d (%v)", p.Pid(), p.Executable())
+		if err := unix.Kill(p.Pid(), syscall.SIGKILL); err != nil {
+			log.Printf("Killing %d failed: %v", p.Pid(), err)
+		}
+	}
+	return nil
 }
 
 var presets = []config.SearchPreset{

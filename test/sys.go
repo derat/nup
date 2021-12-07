@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -49,23 +50,27 @@ func FindUnusedPorts(n int) ([]int, error) {
 	return ports, nil
 }
 
-// HandleSignals installs a signal handler that sends SIGTERM to the current process group
-// and exits with status 1.
-func HandleSignals(sigs ...os.Signal) {
+// HandleSignals installs a signal handler for sigs that sends SIGTERM to the current process group,
+// runs f (in a goroutine) if non-nil, and then exits with 1.
+func HandleSignals(sigs []os.Signal, f func()) {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, sigs...)
 
 	go func() {
 		var sig = <-ch
 		log.Printf("Received %s; cleaning up", sig)
+
 		if pgid, err := unix.Getpgid(os.Getpid()); err != nil {
 			log.Print("Failed getting process group: ", err)
 		} else {
-			const signum = syscall.SIGTERM
-			log.Printf("Sending %d to process group %v", signum, pgid)
-			if err := unix.Kill(-pgid, signum); err != nil {
+			log.Print("Sending SIGTERM to process group ", pgid)
+			if err := unix.Kill(-pgid, syscall.SIGTERM); err != nil {
 				log.Printf("Killing %v failed: %v", pgid, err)
 			}
+		}
+
+		if f != nil {
+			f()
 		}
 		os.Exit(1)
 	}()
@@ -78,6 +83,12 @@ func CallerDir() (string, error) {
 		return "", errors.New("unable to get runtime caller info")
 	}
 	return filepath.Dir(p), nil
+}
+
+// TempDirPattern takes a base name like "nup_e2e_test" and returns a pattern
+// like "nup_e2e_test-20211214_160354.*" to pass to ioutil.TempDir.
+func TempDirPattern(base string) string {
+	return fmt.Sprintf("%s-%s.*", base, time.Now().Format("20060102_150405"))
 }
 
 // ServeFiles starts an httptest.Server for dir.

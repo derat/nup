@@ -39,10 +39,10 @@ const (
 // run the update_music and dump_music commands.
 type Tester struct {
 	T        *testing.T // used to report errors (panic on errors if nil)
-	TempDir  string     // base temp dir created for holding test-related data
-	MusicDir string     // directory for songs
-	CoverDir string     // directory for album art images
+	MusicDir string     // dir containing songs for update_music
+	CoverDir string     // dir containing album art for update_music
 
+	tempDir          string // base dir for temp files
 	updateConfigFile string // path to update_music config file
 	dumpConfigFile   string // path to dump_music config file
 	serverURL        string // base URL for dev server
@@ -53,10 +53,10 @@ type Tester struct {
 // TesterConfig contains optional configuration for Tester.
 type TesterConfig struct {
 	// MusicDir is the directory update_music will examine for song files.
-	// If empty, a directory will be created within Tester.TempDir.
+	// If empty, a directory will be created within tempDir.
 	MusicDir string
 	// CoverDir is the directory update_music will examine for album art image files.
-	// If empty, a directory will be created within Tester.TempDir.
+	// If empty, a directory will be created within tempDir.
 	CoverDir string
 	// BinDir is the directory containing the update_music and dump_music commands
 	// (e.g. $HOME/go/bin). If empty, $PATH will be searched.
@@ -68,35 +68,35 @@ type TesterConfig struct {
 // The supplied testing.T object will be used to report errors.
 // If nil (e.g. if sharing a Tester between multiple tests), log.Panic will be called instead.
 // The T field can be modified as tests start and stop.
-func NewTester(tt *testing.T, serverURL string, cfg TesterConfig) *Tester {
+func NewTester(tt *testing.T, serverURL, tempDir string, cfg TesterConfig) *Tester {
 	t := &Tester{
 		T:         tt,
 		MusicDir:  cfg.MusicDir,
 		CoverDir:  cfg.CoverDir,
+		tempDir:   tempDir,
 		serverURL: serverURL,
 		binDir:    cfg.BinDir,
 		client:    http.Client{Timeout: serverTimeout},
 	}
 
-	var err error
-	if t.TempDir, err = ioutil.TempDir("", "nup_test."); err != nil {
-		t.fatal("Failed creating temp dir: ", err)
+	if err := os.MkdirAll(t.tempDir, 0755); err != nil {
+		t.fatal("Failed ensuring temp dir exists: ", err)
 	}
 	if t.MusicDir == "" {
-		t.MusicDir = filepath.Join(t.TempDir, "music")
-		if err := os.Mkdir(t.MusicDir, 0755); err != nil {
+		t.MusicDir = filepath.Join(t.tempDir, "music")
+		if err := os.MkdirAll(t.MusicDir, 0755); err != nil {
 			t.fatal("Failed creating music dir: ", err)
 		}
 	}
 	if t.CoverDir == "" {
-		t.CoverDir = filepath.Join(t.TempDir, "covers")
-		if err := os.Mkdir(t.CoverDir, 0755); err != nil {
+		t.CoverDir = filepath.Join(t.tempDir, "covers")
+		if err := os.MkdirAll(t.CoverDir, 0755); err != nil {
 			t.fatal("Failed creating cover dir: ", err)
 		}
 	}
 
 	writeConfig := func(fn string, d interface{}) (path string) {
-		path = filepath.Join(t.TempDir, fn)
+		path = filepath.Join(t.tempDir, fn)
 		f, err := os.Create(path)
 		if err != nil {
 			t.fatal("Failed writing config: ", err)
@@ -110,7 +110,7 @@ func NewTester(tt *testing.T, serverURL string, cfg TesterConfig) *Tester {
 	}
 
 	// Corresponds to Config in cmd/update_music/main.go.
-	t.updateConfigFile = writeConfig("update_config.json", struct {
+	t.updateConfigFile = writeConfig("update_music_config.json", struct {
 		client.Config
 		CoverDir           string `json:"coverDir"`
 		MusicDir           string `json:"musicDir"`
@@ -124,22 +124,17 @@ func NewTester(tt *testing.T, serverURL string, cfg TesterConfig) *Tester {
 		},
 		CoverDir:           t.CoverDir,
 		MusicDir:           t.MusicDir,
-		LastUpdateInfoFile: filepath.Join(t.TempDir, "last_update_info.json"),
+		LastUpdateInfoFile: filepath.Join(t.tempDir, "last_update_info.json"),
 		ComputeGain:        true,
 	})
 
-	t.dumpConfigFile = writeConfig("dump_config.json", client.Config{
+	t.dumpConfigFile = writeConfig("dump_music_config.json", client.Config{
 		ServerURL: t.serverURL,
 		Username:  Username,
 		Password:  Password,
 	})
 
 	return t
-}
-
-// Close deletes temporary files created by the test.
-func (t *Tester) Close() {
-	os.RemoveAll(t.TempDir)
 }
 
 // fatal fails the test or panics (if not in a test).
@@ -271,7 +266,7 @@ func (t *Tester) UpdateSongsFromList(path string, flags ...string) {
 // ImportSongsFromJSON serializes the supplied songs to JSON and sends them
 // to the server using update_music.
 func (t *Tester) ImportSongsFromJSONFile(songs []db.Song, flags ...string) {
-	p, err := WriteSongsToJSONFile(t.TempDir, songs)
+	p, err := WriteSongsToJSONFile(t.tempDir, songs)
 	if err != nil {
 		t.fatal("Failed writing songs to JSON file: ", err)
 	}

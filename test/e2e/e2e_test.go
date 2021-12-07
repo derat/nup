@@ -7,6 +7,7 @@ package e2e
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -41,6 +42,7 @@ var (
 
 	appURL string // URL of App Engine app
 	binDir string // directory containing executables from cmd/...
+	outDir string // base directory for temp files and logs
 )
 
 func TestMain(m *testing.M) {
@@ -52,20 +54,38 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func runTests(m *testing.M) (int, error) {
-	flag.StringVar(&binDir, "bin-dir", "",
-		"Directory containing nup executables (empty to search $PATH)")
-	debugApp := flag.Bool("debug-app", false, "Show dev_appserver output")
+func runTests(m *testing.M) (res int, err error) {
+	flag.StringVar(&binDir, "bin-dir", "", "Directory containing nup executables (empty to search $PATH)")
+	flag.StringVar(&outDir, "out-dir", "", "Directory for logs and temp files (empty for temp dir)")
 	flag.Parse()
 
-	test.HandleSignals(unix.SIGINT, unix.SIGTERM)
+	test.HandleSignals([]os.Signal{unix.SIGINT, unix.SIGTERM}, nil)
 
-	log.Print("Starting dev_appserver")
-	srv, err := test.NewDevAppserver(0 /* appPort */, *debugApp, &config.Config{
+	if outDir == "" {
+		if outDir, err = ioutil.TempDir("", test.TempDirPattern("nup_e2e_test")); err != nil {
+			return -1, err
+		}
+		defer func() {
+			if res == 0 {
+				log.Print("Removing ", outDir)
+				os.RemoveAll(outDir)
+			}
+		}()
+	}
+	log.Print("Writing files to ", outDir)
+
+	appLog, err := os.Create(filepath.Join(outDir, "app.log"))
+	if err != nil {
+		return -1, err
+	}
+	defer appLog.Close()
+
+	cfg := &config.Config{
 		BasicAuthUsers: []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
 		SongBucket:     songBucket,
 		CoverBucket:    coverBucket,
-	})
+	}
+	srv, err := test.NewDevAppserver(0, filepath.Join(outDir, "app_storage"), appLog, cfg)
 	if err != nil {
 		return -1, fmt.Errorf("dev_appserver: %v", err)
 	}
@@ -73,25 +93,20 @@ func runTests(m *testing.M) (int, error) {
 	appURL = srv.URL()
 	log.Print("dev_appserver is listening at ", appURL)
 
-	return m.Run(), nil
+	res = m.Run()
+	return res, nil
 }
 
-func initTest(t *testing.T) (tester *test.Tester) {
-	tester = test.NewTester(t, appURL, test.TesterConfig{BinDir: binDir})
-	success := false // clean up on failure
-	defer func() {
-		if !success {
-			tester.Close()
-		}
-	}()
-
+func initTest(t *testing.T) (*test.Tester, func()) {
+	tmpDir := filepath.Join(outDir, "tester."+t.Name())
+	tester := test.NewTester(t, appURL, tmpDir, test.TesterConfig{BinDir: binDir})
 	tester.PingServer()
 	log.Print("Clearing ", appURL)
 	tester.ClearData()
 	tester.FlushCache(test.FlushAll)
 
-	success = true
-	return tester
+	// Remove the test-specific temp dir since it often ends up holding music files.
+	return tester, func() { os.RemoveAll(tmpDir) }
 }
 
 func compareQueryResults(expected, actual []db.Song, order test.OrderPolicy) error {
@@ -133,8 +148,8 @@ func timeToSeconds(t time.Time) float64 {
 }
 
 func TestUpdate(tt *testing.T) {
-	t := initTest(tt)
-	defer t.Close()
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("Importing songs from music dir")
 	test.Must(tt, test.CopySongs(t.MusicDir, Song0s.Filename, Song1s.Filename))
@@ -171,7 +186,7 @@ func TestUpdate(tt *testing.T) {
 	// verify that it worked as expected.
 	log.Print("Importing dumped gain with glob")
 	glob := strings.TrimSuffix(gs5.Filename, ".mp3") + ".*"
-	dumpPath, err := test.WriteSongsToJSONFile(t.TempDir, []db.Song{gs5})
+	dumpPath, err := test.WriteSongsToJSONFile(tt.TempDir(), []db.Song{gs5})
 	if err != nil {
 		tt.Fatal("Failed writing JSON file: ", err)
 	}
@@ -183,8 +198,8 @@ func TestUpdate(tt *testing.T) {
 }
 
 func TestUserData(tt *testing.T) {
-	t := initTest(tt)
-	defer t.Close()
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("Importing a song")
 	test.Must(tt, test.CopySongs(t.MusicDir, Song0s.Filename))
@@ -285,8 +300,8 @@ func TestUserData(tt *testing.T) {
 }
 
 func TestQueries(tt *testing.T) {
-	t := initTest(tt)
-	defer t.Close()
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("Posting some songs")
 	t.PostSongs([]db.Song{LegacySong1, LegacySong2}, true, 0)
@@ -322,8 +337,8 @@ func TestQueries(tt *testing.T) {
 }
 
 func TestCaching(tt *testing.T) {
-	t := initTest(tt)
-	defer t.Close()
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("Posting and querying a song")
 	const cacheParam = "cacheOnly=1"
@@ -399,8 +414,8 @@ func TestCaching(tt *testing.T) {
 }
 
 func TestAndroid(tt *testing.T) {
-	t := initTest(tt)
-	defer t.Close()
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("Posting songs")
 	now := t.GetNowFromServer()
@@ -442,8 +457,8 @@ func TestAndroid(tt *testing.T) {
 }
 
 func TestTags(tt *testing.T) {
-	t := initTest(tt)
-	defer t.Close()
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("Getting hopefully-empty tag list")
 	if tags := t.GetTags(false); len(tags) > 0 {
@@ -482,8 +497,8 @@ func TestTags(tt *testing.T) {
 }
 
 func TestCovers(tt *testing.T) {
-	t := initTest(tt)
-	defer t.Close()
+	t, done := initTest(tt)
+	defer done()
 
 	createCover := func(fn string) {
 		f, err := os.Create(filepath.Join(t.CoverDir, fn))
@@ -542,8 +557,8 @@ func TestCovers(tt *testing.T) {
 }
 
 func TestJSONImport(tt *testing.T) {
-	t := initTest(tt)
-	defer t.Close()
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("Importing songs from JSON")
 	t.ImportSongsFromJSONFile([]db.Song{LegacySong1, LegacySong2})
@@ -592,11 +607,12 @@ func TestJSONImport(tt *testing.T) {
 }
 
 func TestUpdateList(tt *testing.T) {
-	t := initTest(tt)
-	defer t.Close()
+	t, done := initTest(tt)
+	defer done()
 
 	test.Must(tt, test.CopySongs(t.MusicDir, Song0s.Filename, Song1s.Filename, Song5s.Filename))
-	listPath, err := test.WriteSongPathsFile(t.TempDir, Song0s.Filename, Song5s.Filename)
+	tempDir := tt.TempDir()
+	listPath, err := test.WriteSongPathsFile(tempDir, Song0s.Filename, Song5s.Filename)
 	if err != nil {
 		tt.Fatal("Failed writing song paths: ", err)
 	}
@@ -620,7 +636,7 @@ func TestUpdateList(tt *testing.T) {
 
 	// When a dump file is passed, its gain info should be sent to the server.
 	log.Print("Updating songs from list with dumped gains")
-	dumpPath, err := test.WriteSongsToJSONFile(t.TempDir, []db.Song{gs0, gs5})
+	dumpPath, err := test.WriteSongsToJSONFile(tempDir, []db.Song{gs0, gs5})
 	if err != nil {
 		tt.Fatal("Failed writing JSON file: ", err)
 	}
@@ -632,8 +648,8 @@ func TestUpdateList(tt *testing.T) {
 }
 
 func TestSorting(tt *testing.T) {
-	t := initTest(tt)
-	defer t.Close()
+	t, done := initTest(tt)
+	defer done()
 
 	songs := make([]db.Song, 0)
 	for _, s := range []struct {
@@ -675,8 +691,8 @@ func TestSorting(tt *testing.T) {
 }
 
 func TestDeleteSong(tt *testing.T) {
-	t := initTest(tt)
-	defer t.Close()
+	t, done := initTest(tt)
+	defer done()
 
 	log.Print("Posting songs and deleting first song")
 	postTime := t.GetNowFromServer()
