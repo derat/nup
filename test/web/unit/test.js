@@ -4,9 +4,10 @@
 // TODO: Decide if there's a cleaner way to do this. Right now, this stuff gets
 // shoved into globals so it can be accessed by exported functions in an
 // approximation of the style of other JS test frameworks.
+const initResult = newResult('init'); // errors outside of tests
 const allSuites = []; // Suite objects registered via addSuite()
 let curSuite = null; // Suite currently being added via addSuite()
-let results = []; // test results from current run (see runTests())
+let results = []; // test results from current run
 let curResult = null; // in-progress test's result
 let lastDone = null; // promise resolve func from last async test
 
@@ -33,7 +34,7 @@ class Suite {
     for (const t of tests) {
       const fullName = `${this.name}.${t.name}`;
       console.log(`Starting ${fullName}`);
-      curResult = { name: fullName, errors: [] };
+      curResult = newResult(fullName);
       await t.run();
       console.log(`Finished ${fullName}`);
       results.push(curResult);
@@ -51,12 +52,6 @@ class Test {
 
   // Runs the test to completion.
   async run() {
-    const handleException = (e) => {
-      const src = getSource(e);
-      console.error(`Exception from ${src}: ${e.toString()}`);
-      addError(e.toString() + ' (exception)', src);
-    };
-
     if (this.func.length === 1) {
       // This can't catch exceptions thrown from functions passed to
       // window.setTimeout():
@@ -84,11 +79,18 @@ class Test {
 // suite's tests.
 export function addSuite(name, f) {
   if (curSuite) throw new Error(`Already adding suite ${curSuite.name}`);
-  curSuite = new Suite(name);
-  f();
-  if (!curSuite.tests.length) throw new Error('No tests defined');
-  allSuites.push(curSuite);
-  curSuite = null;
+
+  const s = new Suite(name);
+  try {
+    curSuite = s;
+    f();
+    if (!s.tests.length) throw new Error('No tests defined');
+    allSuites.push(s);
+  } catch (e) {
+    handleException(e);
+  } finally {
+    curSuite = null;
+  }
 }
 
 // Adds a test named |name| with function |func|.
@@ -116,13 +118,25 @@ function getSource(err) {
   return '';
 }
 
-// Adds a test error to |curResult|.
+// Adds an error to |curResult| if we're in a test or |initResult| otherwise.
 // |src| takes the form 'foo.test.js:23'.
 function addError(msg, src) {
-  if (!curResult) throw new Error(`Can't add error outside of test`);
-  const data = { msg };
-  if (src) data.src = src;
-  curResult.errors.push(data);
+  const err = { msg };
+  if (src) err.src = src;
+  (curResult || initResult).errors.push(err);
+}
+
+// Adds an error describing |e|.
+function handleException(e) {
+  const src = getSource(e);
+  console.error(`Exception from ${src}: ${e.toString()}`);
+  const msg = e.toString() + ' (exception)';
+  addError(msg, src);
+}
+
+// Returns a result named |name| to return from runTests().
+function newResult(name) {
+  return { name, errors: [] };
 }
 
 // Fails the current test but continues running it.
@@ -157,11 +171,8 @@ export function expectEq(got, want, desc) {
 // Catch uncaught errors (e.g. exceptions thrown from setTimeout()).
 window.onerror = (msg, source, line, col, err) => {
   const src = getSource(err);
-  console.error(`Uncaught error from ${src}: ${err}`);
-  if (curResult) {
-    addError(`Uncaught exception: ${err}`, src);
-    if (lastDone) lastDone();
-  }
+  handleException(err);
+  if (lastDone) lastDone();
 };
 
 // Runs all tests and returns results as an array of objects:
@@ -179,7 +190,7 @@ window.onerror = (msg, source, line, col, err) => {
 //
 // TODO: Take a test pattern?
 export async function runTests() {
-  results = [];
+  results = [initResult];
   for (const s of allSuites) await s.runTests();
   return Promise.resolve(results);
 }
