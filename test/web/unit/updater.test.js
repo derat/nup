@@ -57,6 +57,38 @@ suite('updater', () => {
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
 
+  test('reportPlay (backoff)', async () => {
+    // Make the initial attempt fail.
+    const updater = new Updater();
+    w.expectFetch(playedUrl('1', 2), 'POST', 'whoops', 500);
+    await updater.reportPlay('1', 2);
+
+    // The retry time should double up to 5 minutes.
+    for (const ms of [
+      500, 1_000, 2_000, 4_000, 8_000, 16_000, 32_000, 64_000, 128_000, 256_000,
+      300_000, 300_000, 300_000,
+    ]) {
+      w.expectFetch(playedUrl('1', 2), 'POST', 'fail', 500);
+      await w.runTimeouts(ms);
+    }
+
+    // Try to report a second play and check that it doesn't reset the delay.
+    w.expectFetch(playedUrl('1', 4), 'POST', 'fail', 500);
+    await updater.reportPlay('1', 4);
+    expectEq(w.numUnsatisfiedFetches, 0, 'Unsatisfied fetches');
+    await w.runTimeouts(299_000);
+
+    // Wait the final second and let the next attempt succeed.
+    w.expectFetch(playedUrl('1', 2), 'POST', 'ok');
+    w.expectFetch(playedUrl('1', 4), 'POST', 'ok');
+    await w.runTimeouts(1_000);
+
+    // Report another play and check that it's sent immediately.
+    w.expectFetch(playedUrl('1', 6), 'POST', 'ok');
+    await updater.reportPlay('1', 6);
+    expectEq(w.numTimeouts, 0, 'numTimeouts');
+  });
+
   test('reportPlay (retry queued at startup)', async () => {
     // Make the initial playback report fail.
     let updater = new Updater();
@@ -141,4 +173,6 @@ suite('updater', () => {
     await updater.initialRetryDoneForTest;
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
+
+  // TODO: Test navigator.onLine property and 'online' events.
 });

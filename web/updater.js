@@ -56,19 +56,21 @@ export default class Updater {
     this.writeState_();
 
     // Start sending queued updates.
-    // Save the promise so it can be used by unit tests.
     this.initialRetryDone_ = this.doRetry_();
 
     // Automatically try to send queued updates when we come back online.
     window.addEventListener('online', (e) => this.scheduleRetry_(true));
   }
 
+  // Returns a promise that is resolved once the initial retry attempt in the
+  // constructor is completed.
   get initialRetryDoneForTest() {
     return this.initialRetryDone_;
   }
 
   // Asynchronously notifies the server that song |songId| was played starting
-  // at |startTime| seconds since the Unix expoch.
+  // at |startTime| seconds since the Unix expoch. Returns a promise that is
+  // resolved once the reporting attempt is completed (possibly unsuccessfully).
   reportPlay(songId, startTime) {
     // Move from queued (if present) to in-progress.
     removePlayReport(this.queuedPlayReports_, songId, startTime);
@@ -78,7 +80,7 @@ export default class Updater {
     const url =
       `played?songId=${encodeURIComponent(songId)}` +
       `&startTime=${encodeURIComponent(startTime)}`;
-    console.log(`Reporting track: ${url}`);
+    console.log(`Reporting play: ${url}`);
 
     return fetch(url, { method: 'POST' })
       .then((res) => handleFetchError(res))
@@ -98,7 +100,8 @@ export default class Updater {
 
   // Asynchronously notifies the server that song |songId| was given |rating|
   // (float) and |tags| (string array). Either |rating| or |tags| can be null to
-  // leave them unchanged.
+  // leave them unchanged. Returns a promise that is resolved once the update
+  // attempt is completed (possibly unsuccessfully).
   rateAndTag(songId, rating, tags) {
     if (rating == null && tags == null) return Promise.resolve();
 
@@ -115,7 +118,7 @@ export default class Updater {
     let url = `rate_and_tag?songId=${encodeURIComponent(songId)}`;
     if (rating != null) url += `&rating=${encodeURIComponent(rating)}`;
     if (tags != null) url += `&tags=${encodeURIComponent(tags.join(' '))}`;
-    console.log(`Rating/tagging track: ${url}`);
+    console.log(`Rating/tagging song: ${url}`);
 
     return fetch(url, { method: 'POST' })
       .then((res) => handleFetchError(res))

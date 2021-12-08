@@ -82,6 +82,11 @@ export default class MockWindow {
     return info;
   }
 
+  // Number of fetch calls registered via expectFetch() that haven't been seen.
+  get numUnsatisfiedFetches() {
+    return Object.values(this.fetches_).reduce((s, f) => s + f.length, 0);
+  }
+
   // Number of pending timeouts added via setTimeout().
   get numTimeouts() {
     return Object.keys(this.timeouts_).length;
