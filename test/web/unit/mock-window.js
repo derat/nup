@@ -6,7 +6,7 @@ import { error } from './test.js';
 export default class MockWindow {
   constructor() {
     this.old_ = {}; // orginal window properties as name -> value
-    this.fetches_ = {}; // resource -> { method, text, status }
+    this.fetches_ = {}; // resource -> array of Promises to hand out
     this.timeouts_ = {}; // id -> { func, delay }
     this.nextTimeoutId_ = 1;
     this.localStorage_ = {};
@@ -27,17 +27,12 @@ export default class MockWindow {
 
     this.replace_('fetch', (resource, init) => {
       const method = (init && init.method) || 'GET';
-      const info = this.getFetch_(resource, method);
-      if (!info) {
+      const promise = this.getFetchPromise_(resource, method);
+      if (!promise) {
         error(`Unexpected ${method} ${resource} fetch()`);
         return Promise.reject();
       }
-      return Promise.resolve({
-        ok: info.status === 200,
-        status: info.status,
-        text: () => Promise.resolve(info.text),
-        json: () => Promise.resolve(JSON.parse(info.text)),
-      });
+      return promise;
     });
 
     this.replace_('localStorage', {
@@ -55,31 +50,50 @@ export default class MockWindow {
     Object.entries(this.old_).forEach(([name, value]) =>
       Object.defineProperty(window, name, { value })
     );
-    Object.entries(this.fetches_).forEach(([key, infos]) => {
-      error(`${infos.length} unsatisfied ${key} fetch()`);
+    Object.entries(this.fetches_).forEach(([key, promises]) => {
+      error(`${promises.length} unsatisfied ${key} fetch()`);
     });
   }
 
   // Expects |resource| (a URL) to be fetched once via |method| (e.g. "POST").
-  // |text| will be returned as the response body.
+  // |text| will be returned as the response body with an HTTP status code of
+  // |status|.
   expectFetch(resource, method, text, status = 200) {
-    const key = fetchKey(resource, method);
-    const infos = this.fetches_[key] || [];
-    infos.push({ text, status });
-    this.fetches_[key] = infos;
+    const done = this.expectFetchDeferred(resource, method, text, status);
+    done();
   }
 
-  // Removes and returns the first info from |fetches_| with the supplied
-  // resource and method, or null if no matching info is found.
-  getFetch_(resource, method) {
-    const key = fetchKey(resource, method);
-    const infos = this.fetches_[key];
-    if (!infos || !infos.length) return null;
+  // Like expectFetch() but returns a function that must be run to resolve the
+  // promise returned to the fetch() call.
+  expectFetchDeferred(resource, method, text, status = 200) {
+    let resolve = null;
+    const promise = new Promise((r) => (resolve = r));
 
-    const info = infos[0];
-    infos.splice(0, 1);
-    if (!infos.length) delete this.fetches_[key];
-    return info;
+    const key = fetchKey(resource, method);
+    const promises = this.fetches_[key] || [];
+    promises.push(promise);
+    this.fetches_[key] = promises;
+
+    return () =>
+      resolve({
+        ok: status === 200,
+        status,
+        text: () => Promise.resolve(text),
+        json: () => Promise.resolve(JSON.parse(text)),
+      });
+  }
+
+  // Removes and returns the first promise from |fetches_| with the supplied
+  // resource and method, or null if no matching promise is found.
+  getFetchPromise_(resource, method) {
+    const key = fetchKey(resource, method);
+    const promises = this.fetches_[key];
+    if (!promises || !promises.length) return null;
+
+    const promise = promises[0];
+    promises.splice(0, 1);
+    if (!promises.length) delete this.fetches_[key];
+    return promise;
   }
 
   // Number of fetch calls registered via expectFetch() that haven't been seen.

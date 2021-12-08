@@ -89,28 +89,61 @@ suite('updater', () => {
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
 
-  test('reportPlay (retry queued at startup)', async () => {
-    // Make the initial playback report fail.
+  test('reportPlay (retry at startup)', async () => {
+    // Make a playback report fail.
+    const id = '1';
     let updater = new Updater();
-    w.expectFetch(playedUrl('123', 456), 'POST', 'fail', 500);
-    await updater.reportPlay('123', 456);
+    w.expectFetch(playedUrl(id, 1), 'POST', 'fail', 500);
+    await updater.reportPlay(id, 1);
 
-    // Clear timeouts to make sure the old updater isn't doing anything
-    // and create a new updater. It should pick up the old report from
-    // localStorage and send it again, but make it fail again.
+    // Report a second playback, but leave the fetch() hanging. This should
+    // leave the playback in the "in-progress" list in localStorage.
+    w.expectFetchDeferred(playedUrl(id, 2), 'POST', 'fail', 500);
+    updater.reportPlay(id, 2);
+
+    // Clear timeouts to make sure the old updater isn't doing anything and
+    // create a new updater. It should pick up both old reports from
+    // localStorage and try to send the first one again, which again fails (and
+    // gets moved to the end of the queue this time).
     w.clearTimeouts();
-    w.expectFetch(playedUrl('123', 456), 'POST', 'fail', 500);
+    w.expectFetch(playedUrl(id, 1), 'POST', 'fail', 500);
     updater = new Updater();
     await updater.initialRetryDoneForTest;
 
-    // Let the next attempt succeed.
+    // After creating another updater, it should send the second report first
+    // and then the first one.
     w.clearTimeouts();
-    w.expectFetch(playedUrl('123', 456), 'POST', 'ok');
+    w.expectFetch(playedUrl(id, 2), 'POST', 'ok');
     updater = new Updater();
     await updater.initialRetryDoneForTest;
+
+    w.expectFetch(playedUrl(id, 1), 'POST', 'ok');
+    await w.runTimeouts(0);
     expectEq(w.numTimeouts, 0, 'numTimeouts');
 
     // If we create a new updater again, nothing should be sent.
+    updater = new Updater();
+    await updater.initialRetryDoneForTest;
+    expectEq(w.numTimeouts, 0, 'numTimeouts');
+  });
+
+  test('reportPlay (overlapping)', async () => {
+    // Report a play, but leave the fetch() call hanging.
+    const id = '1';
+    let updater = new Updater();
+    const finishFetch = w.expectFetchDeferred(playedUrl(id, 1), 'POST', 'ok');
+    const reportDone = updater.reportPlay(id, 1);
+
+    // Successfully report a second play in the meantime.
+    w.expectFetch(playedUrl(id, 2), 'POST', 'ok');
+    await updater.reportPlay(id, 2);
+
+    // Let the first fetch() finish.
+    finishFetch();
+    await reportDone;
+    expectEq(w.numTimeouts, 0, 'numTimeouts');
+
+    // If we create a new updater, nothing should be sent.
     updater = new Updater();
     await updater.initialRetryDoneForTest;
     expectEq(w.numTimeouts, 0, 'numTimeouts');
@@ -149,11 +182,16 @@ suite('updater', () => {
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
 
-  test('rateAndTag (retry queued at startup)', async () => {
-    // Make the initial playback report fail.
+  test('rateAndTag (retry at startup)', async () => {
+    // Make the initial attempt fail.
     let updater = new Updater();
     w.expectFetch(rateAndTagUrl('123', 1.0, ['tag']), 'POST', 'bad', 500);
     await updater.rateAndTag('123', 1.0, ['tag']);
+
+    // Send a second request, but leave the fetch() hanging. This should leave
+    // the update in the "in-progress" list in localStorage.
+    w.expectFetchDeferred(rateAndTagUrl('456', 0, ['a']), 'POST', 'fail', 500);
+    updater.rateAndTag('456', 0, ['a']);
 
     // Fail again with a new updater.
     w.clearTimeouts();
@@ -161,11 +199,13 @@ suite('updater', () => {
     updater = new Updater();
     await updater.initialRetryDoneForTest;
 
-    // Let the update work this time.
+    // Create another updater and let both updates get sent successfully.
     w.clearTimeouts();
     w.expectFetch(rateAndTagUrl('123', 1.0, ['tag']), 'POST', 'ok');
+    w.expectFetch(rateAndTagUrl('456', 0, ['a']), 'POST', 'ok');
     updater = new Updater();
     await updater.initialRetryDoneForTest;
+    await w.runTimeouts(0);
     expectEq(w.numTimeouts, 0, 'numTimeouts');
 
     // If we create a new updater again, nothing should be sent.
