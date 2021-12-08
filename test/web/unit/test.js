@@ -75,18 +75,20 @@ class Test {
         lastDone = done;
 
         Promise.resolve(this.func(done))
-          .catch((e) => {
+          .catch((reason) => {
             // This handles exceptions thrown directly from async tests.
-            handleException(e);
+            // It also handles rejected promises from async tests.
+            if (reason instanceof Error) handleException(reason);
+            else handleRejection(reason);
             done();
           })
           .then(() => {
             // If the test doesn't take any args, run the 'done' callback for it.
             if (!this.func.length) done();
           });
-      } catch (e) {
+      } catch (err) {
         // This handles exceptions thrown directly from synchronous tests.
-        handleException(e);
+        handleException(err);
         done();
       }
     });
@@ -107,8 +109,8 @@ export function suite(name, f) {
     f();
     if (!s.tests.length) throw new Error('No tests defined');
     allSuites.push(s);
-  } catch (e) {
-    handleException(e);
+  } catch (err) {
+    handleException(err);
   } finally {
     curSuite = null;
   }
@@ -178,12 +180,19 @@ function addError(msg, src) {
   (curResult || initResult).errors.push(err);
 }
 
-// Adds an error describing |e|.
-function handleException(e) {
-  const src = getSource(e);
-  console.error(`Exception from ${src}: ${e.toString()}`);
-  const msg = e.toString() + ' (exception)';
+// Adds an error describing |err|.
+function handleException(err) {
+  const src = getSource(err);
+  console.error(`Exception from ${src || '[unknown]'}: ${err.toString()}`);
+  const msg = err.toString() + ' (exception)';
   addError(msg, src);
+}
+
+// Adds an error describing |reason|.
+function handleRejection(reason) {
+  const src = getSource(new Error());
+  console.error(`Unhandled rejection from ${src || '[unknown]'}: ${reason}`);
+  addError(`Unhandled rejection: ${reason}`, src);
 }
 
 // Returns a result named |name| to return from runTests().
@@ -200,8 +209,15 @@ export function error(msg) {
 
 // Fails the current test and aborts it.
 export function fatal(msg) {
-  error(msg);
-  throw new Error('Test aborted');
+  throw new FatalError(msg);
+}
+
+// https://stackoverflow.com/a/32750746/6882947
+class FatalError extends Error {
+  constructor(msg) {
+    super(msg);
+    this.name = 'Fatal';
+  }
 }
 
 function fmt(val) {
@@ -229,8 +245,7 @@ window.addEventListener('error', (ev) => {
 
 // Unhandled promise rejections trigger unhandledrejection events.
 window.addEventListener('unhandledrejection', (ev) => {
-  console.error(`Unhandled rejection: ${ev.reason}`);
-  addError(`${ev.reason} (rejection)`);
+  handleRejection(ev.reason);
   if (lastDone) lastDone();
 });
 

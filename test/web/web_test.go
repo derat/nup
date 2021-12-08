@@ -942,13 +942,49 @@ func TestUnit(t *testing.T) {
 	if err := json.Unmarshal(out, &results); err != nil {
 		t.Fatalf("Failed unmarshaling test results %q: %v", string(out), err)
 	}
+
+	// Some tests intentionally fail in order to exercise test.js.
+	wantErrors := map[string][]string{
+		"example.syncFatal":             {"Fatal: Intentional (exception)"},
+		"example.syncException":         {"Error: Intentional (exception)"},
+		"example.asyncEarlyFatal":       {"Fatal: Intentional (exception)"},
+		"example.asyncEarlyException":   {"Error: Intentional (exception)"},
+		"example.asyncEarlyReject":      {"Unhandled rejection: Intentional"},
+		"example.asyncTimeoutFatal":     {"Fatal: Intentional (exception)"},
+		"example.asyncTimeoutException": {"Error: Intentional (exception)"},
+		"example.asyncTimeoutReject":    {"Unhandled rejection: Intentional"},
+		"example.doneEarlyFatal":        {"Fatal: Intentional (exception)"},
+		"example.doneEarlyException":    {"Error: Intentional (exception)"},
+		"example.doneTimeoutFatal":      {"Fatal: Intentional (exception)"},
+		"example.doneTimeoutException":  {"Error: Intentional (exception)"},
+		"example.doneTimeoutReject":     {"Unhandled rejection: Intentional"},
+	}
+	gotErrors := make(map[string][]string)
+
 	for _, res := range results.Value {
+		if _, ok := wantErrors[res.Name]; ok {
+			msgs := make([]string, 0, len(res.Errors))
+			for _, err := range res.Errors {
+				// TODO: Check err.Src.
+				msgs = append(msgs, err.Msg)
+			}
+			gotErrors[res.Name] = msgs
+			continue
+		}
+
 		for _, err := range res.Errors {
 			pre := res.Name
 			if err.Src != "" {
 				pre += ": " + err.Src
 			}
 			t.Errorf("%v: %v", pre, err.Msg)
+		}
+	}
+
+	// Check that we got expected errors.
+	for test, want := range wantErrors {
+		if got := gotErrors[test]; !reflect.DeepEqual(got, want) {
+			t.Errorf("Got %q errors %q; want %q", test, got, want)
 		}
 	}
 }
