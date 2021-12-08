@@ -56,10 +56,15 @@ export default class Updater {
     this.writeState_();
 
     // Start sending queued updates.
-    this.doRetry_();
+    // Save the promise so it can be used by unit tests.
+    this.initialRetryDone_ = this.doRetry_();
 
     // Automatically try to send queued updates when we come back online.
     window.addEventListener('online', (e) => this.scheduleRetry_(true));
+  }
+
+  get initialRetryDoneForTest() {
+    return this.initialRetryDone_;
   }
 
   // Asynchronously notifies the server that song |songId| was played starting
@@ -130,17 +135,21 @@ export default class Updater {
 
   // Persists the current state to local storage.
   writeState_() {
-    localStorage[Updater.QUEUED_PLAY_REPORTS_KEY_] = JSON.stringify(
-      this.queuedPlayReports_
+    localStorage.setItem(
+      Updater.QUEUED_PLAY_REPORTS_KEY_,
+      JSON.stringify(this.queuedPlayReports_)
     );
-    localStorage[Updater.QUEUED_RATINGS_AND_TAGS_KEY_] = JSON.stringify(
-      this.queuedRatingsAndTags_
+    localStorage.setItem(
+      Updater.QUEUED_RATINGS_AND_TAGS_KEY_,
+      JSON.stringify(this.queuedRatingsAndTags_)
     );
-    localStorage[Updater.IN_PROGRESS_PLAY_REPORTS_KEY_] = JSON.stringify(
-      this.inProgressPlayReports_
+    localStorage.setItem(
+      Updater.IN_PROGRESS_PLAY_REPORTS_KEY_,
+      JSON.stringify(this.inProgressPlayReports_)
     );
-    localStorage[Updater.IN_PROGRESS_RATINGS_AND_TAGS_KEY_] = JSON.stringify(
-      this.inProgressRatingsAndTags_
+    localStorage.setItem(
+      Updater.IN_PROGRESS_RATINGS_AND_TAGS_KEY_,
+      JSON.stringify(this.inProgressRatingsAndTags_)
     );
   }
 
@@ -210,8 +219,8 @@ export default class Updater {
 // Reads |key| from local storage and parses it as JSON.
 // |defaultObject| is returned if the key is unset.
 function readObject(key, defaultObject) {
-  const value = localStorage[key];
-  return value != null ? JSON.parse(value) : defaultObject;
+  const value = localStorage.getItem(key);
+  return value !== null ? JSON.parse(value) : defaultObject;
 }
 
 // Appends a play report to |list|.

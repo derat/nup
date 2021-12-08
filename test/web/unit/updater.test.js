@@ -17,6 +17,12 @@ suite('updater', () => {
   function playedUrl(songId, startTime) {
     return `played?songId=${songId}&startTime=${startTime}`;
   }
+  function rateAndTagUrl(songId, rating, tags) {
+    let url = `rate_and_tag?songId=${songId}`;
+    if (rating != null) url += `&rating=${rating}`;
+    if (tags != null) url += `&tags=${encodeURIComponent(tags.join(' '))}`;
+    return url;
+  }
 
   test('reportPlay (success)', async () => {
     const updater = new Updater();
@@ -48,6 +54,91 @@ suite('updater', () => {
     w.expectFetch(playedUrl(id1, t1), 'POST', 'ok');
     w.expectFetch(playedUrl(id2, t2), 'POST', 'ok');
     await w.runTimeouts(300);
+    expectEq(w.numTimeouts, 0, 'numTimeouts');
+  });
+
+  test('reportPlay (retry queued at startup)', async () => {
+    // Make the initial playback report fail.
+    let updater = new Updater();
+    w.expectFetch(playedUrl('123', 456), 'POST', 'fail', 500);
+    await updater.reportPlay('123', 456);
+
+    // Clear timeouts to make sure the old updater isn't doing anything
+    // and create a new updater. It should pick up the old report from
+    // localStorage and send it again, but make it fail again.
+    w.clearTimeouts();
+    w.expectFetch(playedUrl('123', 456), 'POST', 'fail', 500);
+    updater = new Updater();
+    await updater.initialRetryDoneForTest;
+
+    // Let the next attempt succeed.
+    w.clearTimeouts();
+    w.expectFetch(playedUrl('123', 456), 'POST', 'ok');
+    updater = new Updater();
+    await updater.initialRetryDoneForTest;
+    expectEq(w.numTimeouts, 0, 'numTimeouts');
+
+    // If we create a new updater again, nothing should be sent.
+    updater = new Updater();
+    await updater.initialRetryDoneForTest;
+    expectEq(w.numTimeouts, 0, 'numTimeouts');
+  });
+
+  test('rateAndTag (success)', async () => {
+    const updater = new Updater();
+    w.expectFetch(rateAndTagUrl('123', 0.75, null), 'POST', 'ok');
+    await updater.rateAndTag('123', 0.75, null);
+    w.expectFetch(rateAndTagUrl('123', null, ['abc', 'def']), 'POST', 'ok');
+    await updater.rateAndTag('123', null, ['abc', 'def']);
+    w.expectFetch(rateAndTagUrl('123', 1.0, ['ijk']), 'POST', 'ok');
+    await updater.rateAndTag('123', 1.0, ['ijk']);
+    expectEq(w.numTimeouts, 0, 'numTimeouts');
+  });
+
+  test('rateAndTag (retry)', async () => {
+    const updater = new Updater();
+
+    // Rate and tag a song and have the server report failure.
+    w.expectFetch(rateAndTagUrl('123', 0.25, ['old']), 'POST', 'bad', 500);
+    await updater.rateAndTag('123', 0.25, ['old']);
+
+    // Try to send an updated rating and tag for the same song.
+    w.expectFetch(rateAndTagUrl('123', 0.75, ['new']), 'POST', 'bad', 500);
+    await updater.rateAndTag('123', 0.75, ['new']);
+
+    // Send a rating and tag for another song.
+    w.expectFetch(rateAndTagUrl('456', 1.0, ['other']), 'POST', 'bad', 500);
+    await updater.rateAndTag('456', 1.0, ['other']);
+
+    // After a 500 ms delay, the latest data for each song should be sent.
+    w.expectFetch(rateAndTagUrl('123', 0.75, ['new']), 'POST', 'ok');
+    w.expectFetch(rateAndTagUrl('456', 1.0, ['other']), 'POST', 'ok');
+    await w.runTimeouts(500);
+    expectEq(w.numTimeouts, 0, 'numTimeouts');
+  });
+
+  test('rateAndTag (retry queued at startup)', async () => {
+    // Make the initial playback report fail.
+    let updater = new Updater();
+    w.expectFetch(rateAndTagUrl('123', 1.0, ['tag']), 'POST', 'bad', 500);
+    await updater.rateAndTag('123', 1.0, ['tag']);
+
+    // Fail again with a new updater.
+    w.clearTimeouts();
+    w.expectFetch(rateAndTagUrl('123', 1.0, ['tag']), 'POST', 'bad', 500);
+    updater = new Updater();
+    await updater.initialRetryDoneForTest;
+
+    // Let the update work this time.
+    w.clearTimeouts();
+    w.expectFetch(rateAndTagUrl('123', 1.0, ['tag']), 'POST', 'ok');
+    updater = new Updater();
+    await updater.initialRetryDoneForTest;
+    expectEq(w.numTimeouts, 0, 'numTimeouts');
+
+    // If we create a new updater again, nothing should be sent.
+    updater = new Updater();
+    await updater.initialRetryDoneForTest;
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
 });

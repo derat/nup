@@ -9,6 +9,7 @@ export default class MockWindow {
     this.fetches_ = {}; // resource -> { method, text, status }
     this.timeouts_ = {}; // id -> { func, delay }
     this.nextTimeoutId_ = 1;
+    this.localStorage_ = {};
 
     this.replace_('addEventListener', (type, func, capture) => {
       // TODO: Implement this.
@@ -38,12 +39,22 @@ export default class MockWindow {
         json: () => Promise.resolve(JSON.parse(info.text)),
       });
     });
+
+    this.replace_('localStorage', {
+      getItem: (key) =>
+        this.localStorage_.hasOwnProperty(key) ? this.localStorage_[key] : null,
+      setItem: (key, value) => (this.localStorage_[key] = value),
+      removeItem: (key) => delete this.localStorage_[key],
+      clear: () => (this.localStorage_ = {}),
+    });
   }
 
   // Restores the window object's original properties and verifies that
   // expectations were satisfied.
   finish() {
-    Object.entries(this.old_).forEach(([n, f]) => (window[n] = f));
+    Object.entries(this.old_).forEach(([name, value]) =>
+      Object.defineProperty(window, name, { value })
+    );
     Object.entries(this.fetches_).forEach(([key, infos]) => {
       error(`${infos.length} unsatisfied ${key} fetch()`);
     });
@@ -106,11 +117,20 @@ export default class MockWindow {
     return Promise.all(results).then(() => this.runTimeouts(millis - advance));
   }
 
+  // Clears all scheduled timeouts.
+  // This can be useful when simulating an object being recreated.
+  clearTimeouts() {
+    this.timeouts_ = {};
+  }
+
   // Replaces the window property |name| with |val|.
   // The original value is restored in finish().
-  replace_(name, val) {
+  replace_(name, value) {
     this.old_[name] = window[name];
-    window[name] = val;
+
+    // This approach is needed for window.localStorage:
+    // https://github.com/KaiSforza/mock-local-storage/issues/17
+    Object.defineProperty(window, name, { value, configurable: true });
   }
 }
 
