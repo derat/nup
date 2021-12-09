@@ -149,6 +149,26 @@ suite('updater', () => {
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
 
+  test('reportPlay (online/offline)', async () => {
+    // Make the initial attempt file.
+    const id = '1';
+    let updater = new Updater();
+    w.expectFetch(playedUrl(id, 1), 'POST', 'fail', 500);
+    await updater.reportPlay(id, 1);
+
+    // If we're offline when the retry happens, another retry shouldn't be
+    // scheduled.
+    w.online = false;
+    w.expectFetch(playedUrl(id, 1), 'POST', 'fail', 500);
+    await w.runTimeouts(500);
+    expectEq(w.numTimeouts, 0, 'numTimeouts');
+
+    // As soon as we come back online, an immediate retry should be scheduled.
+    w.expectFetch(playedUrl(id, 1), 'POST');
+    w.online = true;
+    await w.runTimeouts(0);
+  });
+
   test('rateAndTag (success)', async () => {
     const updater = new Updater();
     w.expectFetch(rateAndTagUrl('123', 0.75, null), 'POST', 'ok');
@@ -213,6 +233,4 @@ suite('updater', () => {
     await updater.initialRetryDoneForTest;
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
-
-  // TODO: Test navigator.onLine property and 'online' events.
 });

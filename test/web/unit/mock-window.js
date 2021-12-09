@@ -10,9 +10,12 @@ export default class MockWindow {
     this.timeouts_ = {}; // id -> { func, delay }
     this.nextTimeoutId_ = 1;
     this.localStorage_ = {};
+    this.listeners_ = {}; // event name -> array of funcs
 
     this.replace_('addEventListener', (type, func, capture) => {
-      // TODO: Implement this.
+      const ls = this.listeners_[type] || [];
+      ls.push(func);
+      this.listeners_[type] = ls;
     });
 
     this.replace_('setTimeout', (func, delay) => {
@@ -42,6 +45,10 @@ export default class MockWindow {
       removeItem: (key) => delete this.localStorage_[key],
       clear: () => (this.localStorage_ = {}),
     });
+
+    this.replace_('navigator', {
+      onLine: true,
+    });
   }
 
   // Restores the window object's original properties and verifies that
@@ -53,6 +60,19 @@ export default class MockWindow {
     Object.entries(this.fetches_).forEach(([key, promises]) => {
       error(`${promises.length} unsatisfied ${key} fetch()`);
     });
+  }
+
+  // Sets window.navigator.onLine to |v| and emits an 'online' or 'offline'
+  // event if the state changed.
+  set online(v) {
+    if (v === window.navigator.onLine) return;
+    window.navigator.onLine = v;
+    this.emit(new Event(v ? 'online' : 'offline'));
+  }
+
+  // Emits event |ev| to all listeners registered for |ev.type|.
+  emit(ev) {
+    for (const f of this.listeners_[ev.type] || []) f(ev);
   }
 
   // Expects |resource| (a URL) to be fetched once via |method| (e.g. "POST").
