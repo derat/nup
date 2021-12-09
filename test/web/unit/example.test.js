@@ -1,13 +1,31 @@
 // Copyright 2021 Daniel Erat.
 // All rights reserved.
 
-import { error, fatal, suite, test } from './test.js';
+import { error, expectEq, fatal, suite, test } from './test.js';
 
 // This suite contains example tests, some of which intentionally fail to
 // exercise the error-handling code in test.js. web_test.go inspects the errors
 // from these tests.
 suite('example', () => {
-  test('sync', () => {});
+  test('sync', () => {
+    expectEq(true, true);
+    expectEq(2, 2);
+    expectEq('foo', 'foo');
+    expectEq([], []);
+    expectEq([4, 'foo'], [4, 'foo']);
+    expectEq({}, {});
+    expectEq({ a: 2 }, { a: 2 });
+  });
+  test('syncErrors', () => {
+    expectEq(true, false);
+    expectEq(true, 1);
+    expectEq(1, 2);
+    expectEq(null, false);
+    expectEq(null, undefined);
+    expectEq('foo', 'bar', 'Value');
+    expectEq([4, 'foo'], [4, 'bar']);
+    expectEq({ a: 2 }, { b: 2 });
+  });
   test('syncFatal', () => {
     fatal('Intentional');
   });

@@ -70,6 +70,8 @@ func runTests(m *testing.M) (res int, err error) {
 			return -1, err
 		}
 		defer func() {
+			// TODO: Also delete the dir if we're only running TestUnit and -browser-stderr was set
+			// (since there's nothing interesting in the dir).
 			if res == 0 {
 				log.Print("Removing ", *outDir)
 				os.RemoveAll(*outDir)
@@ -79,6 +81,7 @@ func runTests(m *testing.M) (res int, err error) {
 	log.Print("Writing files to ", *outDir)
 
 	// Serve music files in the background.
+	// TODO: Skip running the app if we're only running TestUnit.
 	musicDir := filepath.Join(*outDir, "music")
 	if err := os.MkdirAll(musicDir, 0755); err != nil {
 		return -1, err
@@ -945,6 +948,16 @@ func TestUnit(t *testing.T) {
 
 	// Some tests intentionally fail in order to exercise test.js.
 	wantErrors := map[string][]string{
+		"example.syncErrors": {
+			"Got true (boolean); want false (boolean)",
+			"Got true (boolean); want 1 (number)",
+			"Got 1 (number); want 2 (number)",
+			"Got null (object); want false (boolean)",
+			"Got null (object); want undefined (undefined)",
+			`Value is "foo" (string); want "bar" (string)`,
+			`Got [4,"foo"] (object); want [4,"bar"] (object)`,
+			`Got {"a":2} (object); want {"b":2} (object)`,
+		},
 		"example.syncFatal":             {"Fatal: Intentional (exception)"},
 		"example.syncException":         {"Error: Intentional (exception)"},
 		"example.asyncEarlyFatal":       {"Fatal: Intentional (exception)"},

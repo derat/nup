@@ -220,20 +220,21 @@ class FatalError extends Error {
   }
 }
 
-function fmt(val) {
-  return JSON.stringify(val);
-}
-
-// Adds an error if |got| doesn't strictly equal |want|.
+// Adds an error if |got| doesn't equal |want|, for some definition of "equal".
 // |desc| can contain a description of what's being compared.
 export function expectEq(got, want, desc) {
-  if (got !== want) {
-    error(
-      desc
-        ? `${desc} is ${fmt(got)}; want ${fmt(want)}`
-        : `Got ${fmt(got)}; want ${fmt(want)}`
-    );
+  if (
+    typeof got === typeof want &&
+    (typeof got === 'object'
+      ? JSON.stringify(got) === JSON.stringify(want)
+      : got === want)
+  ) {
+    return;
   }
+  // TODO: Improve formatting, e.g. this prints '(object)' for an array.
+  const gs = `${JSON.stringify(got)} (${typeof got})`;
+  const ws = `${JSON.stringify(want)} (${typeof want})`;
+  error(desc ? `${desc} is ${gs}; want ${ws}` : `Got ${gs}; want ${ws}`);
 }
 
 // Errors in the window execution context, e.g. exceptions thrown from timeouts
