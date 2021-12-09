@@ -33,10 +33,11 @@ import (
 
 var (
 	// Globals shared across all tests.
-	appURL     string             // slash-terminated URL of App Engine server
-	webDrv     selenium.WebDriver // talks to browser using ChromeDriver
-	tester     *test.Tester       // interacts with App Engine server
-	browserLog io.Writer          // receives log messages from browser
+	webDrv         selenium.WebDriver // talks to browser using ChromeDriver
+	appURL         string             // slash-terminated URL of App Engine server (if running app)
+	tester         *test.Tester       // interacts with App Engine server (if running app)
+	browserLog     io.Writer          // receives log messages from browser
+	unitTestRegexp string             // regexp matching unit tests to run
 
 	// Pull some stuff into our namespace for convenience.
 	file0s  = test.Song0s.Filename
@@ -61,18 +62,25 @@ func runTests(m *testing.M) (res int, err error) {
 	debugSelenium := flag.Bool("debug-selenium", false, "Write Selenium debug logs to stderr")
 	headless := flag.Bool("headless", true, "Run Chrome headlessly using Xvfb")
 	outDir := flag.String("out-dir", "", "Directory for logs and temp files (empty for temp dir)")
+	flag.StringVar(&unitTestRegexp, "unit-test-regexp", "", "Regexp matching unit tests to run (all other tests skipped)")
 	flag.Parse()
 
 	test.HandleSignals([]os.Signal{unix.SIGINT, unix.SIGTERM}, nil)
+
+	// TODO: Find a better way to do this. There doesn't seem to be any way to use testing.M to
+	// determine which tests are being run (probably by design), so we use this flag to determine
+	// that we don't need to start the app for other tests. This is way faster when just running
+	// unit tests.
+	runApp := unitTestRegexp == ""
 
 	if *outDir == "" {
 		if *outDir, err = ioutil.TempDir("", test.TempDirPattern("nup_web_test")); err != nil {
 			return -1, err
 		}
 		defer func() {
-			// TODO: Also delete the dir if we're only running TestUnit and -browser-stderr was set
-			// (since there's nothing interesting in the dir).
-			if res == 0 {
+			// Also delete the dir if the browser logs are going to stderr and we're not running the
+			// app, as everything interesting should be in the browser log in that case.
+			if res == 0 || (*browserStderr && !runApp) {
 				log.Print("Removing ", *outDir)
 				os.RemoveAll(*outDir)
 			}
@@ -80,39 +88,41 @@ func runTests(m *testing.M) (res int, err error) {
 	}
 	log.Print("Writing files to ", *outDir)
 
-	// Serve music files in the background.
-	// TODO: Skip running the app if we're only running TestUnit.
-	musicDir := filepath.Join(*outDir, "music")
-	if err := os.MkdirAll(musicDir, 0755); err != nil {
-		return -1, err
-	}
-	defer os.RemoveAll(musicDir)
-	if err := test.CopySongs(musicDir, file0s, file1s, file5s, file10s); err != nil {
-		return -1, fmt.Errorf("copying songs: %v", err)
-	}
-	musicSrv := test.ServeFiles(musicDir)
-	defer musicSrv.Close()
+	var musicDir string
+	if runApp {
+		// Serve music files in the background.
+		musicDir = filepath.Join(*outDir, "music")
+		if err := os.MkdirAll(musicDir, 0755); err != nil {
+			return -1, err
+		}
+		defer os.RemoveAll(musicDir)
+		if err := test.CopySongs(musicDir, file0s, file1s, file5s, file10s); err != nil {
+			return -1, fmt.Errorf("copying songs: %v", err)
+		}
+		musicSrv := test.ServeFiles(musicDir)
+		defer musicSrv.Close()
 
-	appLog, err := os.Create(filepath.Join(*outDir, "app.log"))
-	if err != nil {
-		return -1, err
-	}
-	defer appLog.Close()
+		appLog, err := os.Create(filepath.Join(*outDir, "app.log"))
+		if err != nil {
+			return -1, err
+		}
+		defer appLog.Close()
 
-	cfg := &config.Config{
-		GoogleUsers:    []string{testEmail},
-		BasicAuthUsers: []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
-		SongBaseURL:    musicSrv.URL + "/",
-		CoverBaseURL:   musicSrv.URL + "/.covers/", // bogus but required
-		Presets:        presets,
+		cfg := &config.Config{
+			GoogleUsers:    []string{testEmail},
+			BasicAuthUsers: []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
+			SongBaseURL:    musicSrv.URL + "/",
+			CoverBaseURL:   musicSrv.URL + "/.covers/", // bogus but required
+			Presets:        presets,
+		}
+		appSrv, err := test.NewDevAppserver(0, filepath.Join(*outDir, "app_storage"), appLog, cfg)
+		if err != nil {
+			return -1, fmt.Errorf("dev_appserver: %v", err)
+		}
+		defer appSrv.Close()
+		appURL = appSrv.URL()
+		log.Print("dev_appserver is listening at ", appURL)
 	}
-	appSrv, err := test.NewDevAppserver(0, filepath.Join(*outDir, "app_storage"), appLog, cfg)
-	if err != nil {
-		return -1, fmt.Errorf("dev_appserver: %v", err)
-	}
-	defer appSrv.Close()
-	appURL = appSrv.URL()
-	log.Print("dev_appserver is listening at ", appURL)
 
 	opts := []selenium.ServiceOption{}
 	if *debugSelenium {
@@ -157,13 +167,15 @@ func runTests(m *testing.M) (res int, err error) {
 		defer f.Close()
 		browserLog = f
 	}
-	writeLogHeader("Running web tests against " + appURL)
 	defer copyBrowserLogs()
 
-	tester = test.NewTester(nil, appURL, filepath.Join(*outDir, "tester"), test.TesterConfig{
-		MusicDir: musicDir,
-		BinDir:   *binDir,
-	})
+	if runApp {
+		writeLogHeader("Running web tests against " + appURL)
+		tester = test.NewTester(nil, appURL, filepath.Join(*outDir, "tester"), test.TesterConfig{
+			MusicDir: musicDir,
+			BinDir:   *binDir,
+		})
+	}
 
 	res = m.Run()
 	return res, nil
@@ -201,10 +213,19 @@ func copyBrowserLogs() {
 // initWebTest should be called at the beginning of each test.
 // The returned page object is used to interact with the web interface via Selenium.
 func initWebTest(t *testing.T) (p *page, done func()) {
+	// Huge hack: skip the test if we're only running unit tests.
+	if unitTestRegexp != "" && t.Name() != "TestUnit" {
+		t.SkipNow() // calls runtime.Goexit
+	}
+
 	// Copy any browser logs from the previous test and write a header.
 	copyBrowserLogs()
 	io.WriteString(browserLog, "\n")
 	writeLogHeader(t.Name())
+
+	if appURL == "" {
+		return nil, func() {}
+	}
 
 	tester.T = t
 	tester.PingServer()
@@ -925,9 +946,9 @@ func TestUnit(t *testing.T) {
 	// unfortunately can't just start a goroutine to stream logs via copyBrowserLogs.
 	out, err := webDrv.ExecuteScriptAsyncRaw(
 		// ExecuteScriptAsync injects a 'done' callback as the final argument to the called code.
-		`const done = arguments[0];
-		const results = await window.runTests();
-		done(results);`, nil)
+		fmt.Sprintf(`const done = arguments[0];
+		const results = await window.runTests(%q);
+		done(results);`, unitTestRegexp), nil)
 	if err != nil {
 		t.Fatalf("Failed running tests: %v", err)
 	}
@@ -995,7 +1016,11 @@ func TestUnit(t *testing.T) {
 	}
 
 	// Check that we got expected errors.
+	re := regexp.MustCompile(unitTestRegexp)
 	for test, want := range wantErrors {
+		if !re.MatchString(test) {
+			continue // won't see error if test was skipped
+		}
 		if got := gotErrors[test]; !reflect.DeepEqual(got, want) {
 			t.Errorf("Got %q errors %q; want %q", test, got, want)
 		}

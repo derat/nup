@@ -23,12 +23,15 @@ class Suite {
   }
 
   // Sequentially run all tests in the suite.
-  // If |testName| is supplied, only the test with that name is run.
-  async runTests(testName) {
+  // If |testNameRegExp| is supplied, only the test with names matched by it
+  // will be run.
+  async runTests(testNameRegexp) {
     const tests = this.tests.filter(
-      (t) => testName === undefined || t.name === testName
+      (t) =>
+        testNameRegexp === undefined ||
+        testNameRegexp.test(`${this.name}.${t.name}`)
     );
-    if (!tests.length) throw new Error(`No test ${this.name}.${testName}`);
+    if (!tests.length) return;
 
     try {
       this.beforeAlls.forEach((f) => f());
@@ -264,7 +267,7 @@ window.addEventListener('unhandledrejection', (ev) => {
   if (lastDone) lastDone();
 });
 
-// Runs all tests and returns results as an array of objects:
+// Runs tests and returns results as an array of objects:
 //
 // {
 //   name: 'suite.testName',
@@ -277,9 +280,11 @@ window.addEventListener('unhandledrejection', (ev) => {
 //   ],
 // }
 //
-// TODO: Take a test pattern?
-export async function runTests() {
+// |testRegexp| is compiled to a regexp and executed against test names to determine
+// which ones run.
+export async function runTests(testRegexp = '') {
   results = [initResult];
-  for (const s of allSuites) await s.runTests();
+  const re = new RegExp(testRegexp);
+  for (const s of allSuites) await s.runTests(re);
   return Promise.resolve(results);
 }
