@@ -45,7 +45,7 @@ export default class Config {
   // if an invalid name is supplied.
   get(name) {
     if (this.values_.hasOwnProperty(name)) return this.values_[name];
-    throw new Error(`Unknown pref '${name}'`);
+    throw new Error(`Unknown pref "${name}"`);
   }
 
   // Sets |name| to |value|. An error is thrown if an invalid name is supplied
@@ -54,28 +54,28 @@ export default class Config {
     const origValue = value;
     if (Config.FLOAT_NAMES_.has(name)) {
       value = parseFloat(value);
-      if (isNaN(value)) throw new Error(`Non-float '${name}' '${origValue}'`);
+      if (isNaN(value)) throw new Error(`Non-float "${name}" "${origValue}"`);
       this.values_[name] = value;
     } else if (Config.INT_NAMES_.has(name)) {
       value = parseInt(value);
-      if (isNaN(value)) throw new Error(`Non-int '${name}' '${origValue}'`);
+      if (isNaN(value)) throw new Error(`Non-int "${name}" "${origValue}"`);
       this.values_[name] = value;
     } else {
-      throw new Error(`Unknown pref '${name}'`);
+      throw new Error(`Unknown pref "${name}"`);
     }
     this.callbacks_.forEach((cb) => cb(name, value));
   }
 
   // Loads and validates prefs from local storage.
   load_() {
-    const json = localStorage[Config.CONFIG_KEY_];
+    const json = localStorage.getItem(Config.CONFIG_KEY_);
     if (!json) return;
 
     let loaded = {};
     try {
       loaded = JSON.parse(json);
     } catch (e) {
-      console.error(`Ignoring bad config ${json}: ${e}`);
+      console.error(`Ignoring bad config ${JSON.stringify(json)}: ${e}`);
       return;
     }
 
@@ -83,13 +83,13 @@ export default class Config {
       try {
         this.set(name, value);
       } catch (e) {
-        console.error(`Skipping bad pref ${name}: ${e}`);
+        console.error(`Skipping bad pref "${name}": ${e}`);
       }
     });
   }
 
   // Saves all prefs to local storage.
   save() {
-    localStorage[Config.CONFIG_KEY_] = JSON.stringify(this.values_);
+    localStorage.setItem(Config.CONFIG_KEY_, JSON.stringify(this.values_));
   }
 }

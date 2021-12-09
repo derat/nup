@@ -101,7 +101,10 @@ class Test {
 // |f| is is executed immediately; it should call test() to define the
 // suite's tests.
 export function suite(name, f) {
-  if (curSuite) throw new Error(`Already adding suite ${curSuite.name}`);
+  if (curSuite) throw new Error(`Already adding suite "${curSuite.name}"`);
+  if (allSuites.some((e) => e.name === name)) {
+    throw new Error(`Suite "${name}" already exists`);
+  }
 
   const s = new Suite(name);
   try {
@@ -235,6 +238,17 @@ export function expectEq(got, want, desc) {
   const gs = `${JSON.stringify(got)} (${typeof got})`;
   const ws = `${JSON.stringify(want)} (${typeof want})`;
   error(desc ? `${desc} is ${gs}; want ${ws}` : `Got ${gs}; want ${ws}`);
+}
+
+// expectThrows runs f and reports an error if an exception isn't thrown.
+export function expectThrows(f, desc) {
+  let threw = false;
+  try {
+    f();
+  } catch (e) {
+    threw = true;
+  }
+  if (!threw) error(desc ? `${desc} didn't throw` : `Didn't throw`);
 }
 
 // Errors in the window execution context, e.g. exceptions thrown from timeouts
