@@ -88,8 +88,14 @@ const template = createTemplate(`
     width: 360px;
   }
   #progress-bar {
+    /* Make this overlap with the border to work around apparent Chrome high-DPI
+     * bugs that result in hairline gaps between the bar and the border:
+     * https://stackoverflow.com/a/40664037 */
     background-color: white;
-    height: 6px;
+    height: 8px;
+    left: -1px;
+    position: relative;
+    top: -1px;
   }
   #current-times {
     display: flex;
@@ -270,8 +276,9 @@ customElements.define(
     updatePosition(sec) {
       if (isNaN(sec)) return;
 
-      const percent = Math.min((100 * sec) / this.duration_, 100);
-      this.progressBar_.style.width = percent + '%';
+      // Make this overlap with the border to avoid hairline gaps.
+      const fraction = Math.min(sec / this.duration_, 1.0);
+      this.progressBar_.style.width = `calc(${fraction} * (100% + 2px))`;
       this.timeDiv_.innerText = formatTime(sec);
     }
 
