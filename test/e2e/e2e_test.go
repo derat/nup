@@ -5,9 +5,7 @@
 package e2e
 
 import (
-	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -41,7 +39,6 @@ var (
 	LegacySong2   = test.LegacySong2
 
 	appURL string // URL of App Engine app
-	binDir string // directory containing executables from cmd/...
 	outDir string // base directory for temp files and logs
 )
 
@@ -55,23 +52,18 @@ func TestMain(m *testing.M) {
 }
 
 func runTests(m *testing.M) (res int, err error) {
-	flag.StringVar(&binDir, "bin-dir", "", "Directory containing nup executables (empty to search $PATH)")
-	flag.StringVar(&outDir, "out-dir", "", "Directory for logs and temp files (empty for temp dir)")
-	flag.Parse()
-
 	test.HandleSignals([]os.Signal{unix.SIGINT, unix.SIGTERM}, nil)
 
-	if outDir == "" {
-		if outDir, err = ioutil.TempDir("", test.TempDirPattern("nup_e2e_test")); err != nil {
-			return -1, err
-		}
-		defer func() {
-			if res == 0 {
-				log.Print("Removing ", outDir)
-				os.RemoveAll(outDir)
-			}
-		}()
+	var keepOutDir bool
+	if outDir, keepOutDir, err = test.OutputDir("e2e_test"); err != nil {
+		return -1, err
 	}
+	defer func() {
+		if res == 0 && !keepOutDir {
+			log.Print("Removing ", outDir)
+			os.RemoveAll(outDir)
+		}
+	}()
 	log.Print("Writing files to ", outDir)
 
 	appLog, err := os.Create(filepath.Join(outDir, "app.log"))
@@ -85,10 +77,12 @@ func runTests(m *testing.M) (res int, err error) {
 		SongBucket:     songBucket,
 		CoverBucket:    coverBucket,
 	}
-	srv, err := test.NewDevAppserver(0, filepath.Join(outDir, "app_storage"), appLog, cfg)
+	storageDir := filepath.Join(outDir, "app_storage")
+	srv, err := test.NewDevAppserver(0, storageDir, appLog, cfg)
 	if err != nil {
 		return -1, fmt.Errorf("dev_appserver: %v", err)
 	}
+	defer os.RemoveAll(storageDir)
 	defer srv.Close()
 	appURL = srv.URL()
 	log.Print("dev_appserver is listening at ", appURL)
@@ -99,7 +93,7 @@ func runTests(m *testing.M) (res int, err error) {
 
 func initTest(t *testing.T) (*test.Tester, func()) {
 	tmpDir := filepath.Join(outDir, "tester."+t.Name())
-	tester := test.NewTester(t, appURL, tmpDir, test.TesterConfig{BinDir: binDir})
+	tester := test.NewTester(t, appURL, tmpDir, test.TesterConfig{})
 	tester.PingServer()
 	log.Print("Clearing ", appURL)
 	tester.ClearData()

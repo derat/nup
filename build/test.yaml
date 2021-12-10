@@ -1,0 +1,9 @@
+steps:
+  - id: run_tests
+    name: gcr.io/${PROJECT_ID}/nup-test
+    entrypoint: bash
+    args: ['-e', '--', 'build/run_tests.sh']
+    env:
+      # Copy some Cloud Build variables to the script's environment.
+      - PROJECT_ID=$PROJECT_ID
+      - BUILD_ID=$BUILD_ID

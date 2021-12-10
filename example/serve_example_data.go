@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -33,13 +32,12 @@ func main() {
 }
 
 func run() (int, error) {
-	binDir := flag.String("bin-dir", "", "Directory containing nup executables (empty to search $PATH)")
 	email := flag.String("email", "test@example.com", "Email address for login")
 	logToStderr := flag.Bool("log-to-stderr", true, "Write noisy dev_appserver output to stderr")
 	port := flag.Int("port", 8080, "HTTP port for app")
 	flag.Parse()
 
-	tmpDir, err := ioutil.TempDir("", test.TempDirPattern("nup_example"))
+	tmpDir, _, err := test.OutputDir("example")
 	if err != nil {
 		return -1, err
 	}
@@ -89,7 +87,6 @@ func run() (int, error) {
 	tester := test.NewTester(nil, appURL, filepath.Join(tmpDir, "tester"), test.TesterConfig{
 		MusicDir: filepath.Join(exampleDir, "music"),
 		CoverDir: filepath.Join(exampleDir, "covers"),
-		BinDir:   *binDir,
 	})
 	tester.ImportSongsFromJSONFile(songs)
 

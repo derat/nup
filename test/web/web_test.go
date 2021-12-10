@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -57,42 +56,39 @@ func TestMain(m *testing.M) {
 }
 
 func runTests(m *testing.M) (res int, err error) {
-	binDir := flag.String("bin-dir", "",
-		"Directory containing nup executables (empty to search $PATH)")
 	browserStderr := flag.Bool("browser-stderr", false, "Write browser log to stderr (default is -out-dir)")
+	chromedriverPath := flag.String("chromedriver", "chromedriver", "Chromedriver executable ($PATH searched by default)")
 	debugSelenium := flag.Bool("debug-selenium", false, "Write Selenium debug logs to stderr")
 	headless := flag.Bool("headless", true, "Run Chrome headlessly using Xvfb")
-	outDir := flag.String("out-dir", "", "Directory for logs and temp files (empty for temp dir)")
 	flag.StringVar(&unitTestRegexp, "unit-test-regexp", "", "Regexp matching unit tests to run (all other tests skipped)")
 	flag.Parse()
 
 	test.HandleSignals([]os.Signal{unix.SIGINT, unix.SIGTERM}, nil)
 
 	// TODO: Find a better way to do this. There doesn't seem to be any way to use testing.M to
-	// determine which tests are being run (probably by design), so we use this flag to determine
-	// that we don't need to start the app for other tests. This is way faster when just running
-	// unit tests.
+	// determine which tests are being run (probably by design), so we use -unit-test-regexp to
+	// determine that we don't need to start the app for other tests. This is way faster when just
+	// running unit tests.
 	runApp := unitTestRegexp == ""
 
-	if *outDir == "" {
-		if *outDir, err = ioutil.TempDir("", test.TempDirPattern("nup_web_test")); err != nil {
-			return -1, err
-		}
-		defer func() {
-			// Also delete the dir if the browser logs are going to stderr and we're not running the
-			// app, as everything interesting should be in the browser log in that case.
-			if res == 0 || (*browserStderr && !runApp) {
-				log.Print("Removing ", *outDir)
-				os.RemoveAll(*outDir)
-			}
-		}()
+	outDir, keepOutDir, err := test.OutputDir("web_test")
+	if err != nil {
+		return -1, err
 	}
-	log.Print("Writing files to ", *outDir)
+	defer func() {
+		// Also delete the dir if the browser logs are going to stderr and we're not running the
+		// app, as everything interesting should be in the browser log in that case.
+		if (res == 0 || (*browserStderr && !runApp)) && !keepOutDir {
+			log.Print("Removing ", outDir)
+			os.RemoveAll(outDir)
+		}
+	}()
+	log.Print("Writing files to ", outDir)
 
 	var musicDir string
 	if runApp {
 		// Serve music files in the background.
-		musicDir = filepath.Join(*outDir, "music")
+		musicDir = filepath.Join(outDir, "music")
 		if err := os.MkdirAll(musicDir, 0755); err != nil {
 			return -1, err
 		}
@@ -103,7 +99,7 @@ func runTests(m *testing.M) (res int, err error) {
 		musicSrv := test.ServeFiles(musicDir)
 		defer musicSrv.Close()
 
-		appLog, err := os.Create(filepath.Join(*outDir, "app.log"))
+		appLog, err := os.Create(filepath.Join(outDir, "app.log"))
 		if err != nil {
 			return -1, err
 		}
@@ -116,10 +112,12 @@ func runTests(m *testing.M) (res int, err error) {
 			CoverBaseURL:   musicSrv.URL + "/.covers/", // bogus but required
 			Presets:        presets,
 		}
-		appSrv, err := test.NewDevAppserver(0, filepath.Join(*outDir, "app_storage"), appLog, cfg)
+		storageDir := filepath.Join(outDir, "app_storage")
+		appSrv, err := test.NewDevAppserver(0, storageDir, appLog, cfg)
 		if err != nil {
 			return -1, fmt.Errorf("dev_appserver: %v", err)
 		}
+		defer os.RemoveAll(storageDir)
 		defer appSrv.Close()
 		appURL = appSrv.URL()
 		log.Print("dev_appserver is listening at ", appURL)
@@ -139,17 +137,21 @@ func runTests(m *testing.M) (res int, err error) {
 		return -1, fmt.Errorf("finding ports: %v", err)
 	}
 	chromeDrvPort := ports[0]
-	svc, err := selenium.NewChromeDriverService(
-		"/usr/local/bin/chromedriver", chromeDrvPort, opts...)
+	svc, err := selenium.NewChromeDriverService(*chromedriverPath, chromeDrvPort, opts...)
 	if err != nil {
 		return -1, fmt.Errorf("ChromeDriver: %v", err)
 	}
 	defer svc.Stop()
 
+	chromeArgs := []string{"--autoplay-policy=no-user-gesture-required"}
+	if test.CloudBuild() {
+		chromeArgs = append(chromeArgs,
+			"--no-sandbox",            // actually get Chrome to run
+			"--disable-dev-shm-usage", // prevent random crashes: https://stackoverflow.com/a/53970825/6882947
+		)
+	}
 	caps := selenium.Capabilities{}
-	caps.AddChrome(chrome.Capabilities{
-		Args: []string{"--autoplay-policy=no-user-gesture-required"},
-	})
+	caps.AddChrome(chrome.Capabilities{Args: chromeArgs})
 	caps.SetLogLevel(slog.Browser, slog.All)
 	webDrv, err = selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", chromeDrvPort))
 	if err != nil {
@@ -161,7 +163,7 @@ func runTests(m *testing.M) (res int, err error) {
 		browserLog = os.Stderr
 	} else {
 		// Create a file containing messages logged by the web interface.
-		f, err := os.Create(filepath.Join(*outDir, "browser.log"))
+		f, err := os.Create(filepath.Join(outDir, "browser.log"))
 		if err != nil {
 			return -1, err
 		}
@@ -172,10 +174,9 @@ func runTests(m *testing.M) (res int, err error) {
 
 	if runApp {
 		writeLogHeader("Running web tests against " + appURL)
-		tester = test.NewTester(nil, appURL, filepath.Join(*outDir, "tester"), test.TesterConfig{
-			MusicDir: musicDir,
-			BinDir:   *binDir,
-		})
+		testerDir := filepath.Join(outDir, "tester")
+		tester = test.NewTester(nil, appURL, testerDir, test.TesterConfig{MusicDir: musicDir})
+		defer os.RemoveAll(testerDir)
 	}
 
 	res = m.Run()
@@ -189,7 +190,7 @@ func writeLogHeader(s string) {
 
 // Log messages usually look like this:
 //  http://localhost:8080/music-searcher.js 478:18 "Got response with 1 song(s)"
-// This regexp matches the filename, line number, and unquoted message.
+// This regexp matches the filename, line number, and message.
 var logRegexp = regexp.MustCompile(`(?s)^https?://[^ ]+/([^ /]+\.js) (\d+):\d+ (.*)$`)
 
 // copyBrowserLogs gets new log messages from the browser and writes them to browserLog.

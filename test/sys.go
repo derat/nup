@@ -6,6 +6,7 @@ package test
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -85,10 +86,23 @@ func CallerDir() (string, error) {
 	return filepath.Dir(p), nil
 }
 
-// TempDirPattern takes a base name like "nup_e2e_test" and returns a pattern
-// like "nup_e2e_test-20211214_160354.*" to pass to ioutil.TempDir.
-func TempDirPattern(base string) string {
-	return fmt.Sprintf("%s-%s.*", base, time.Now().Format("20060102_150405"))
+// OutputDir returns a directory where the named test suite (e.g. "e2e_test" or "web_test")
+// should create output files.
+//
+// If the OUTPUT_DIR environment variable is set, the returned directory is created within it and
+// keep is true, indicating that the caller should preserve the returned directory. Otherwise, a
+// temporary directory is created and keep is false, indicating that the caller can choose whether
+// to keep the directory (e.g. on failure) or delete it (on success).
+//
+// This function should only be called once per test suite.
+func OutputDir(suite string) (dir string, keep bool, err error) {
+	if base := os.Getenv("OUTPUT_DIR"); base != "" {
+		dir = filepath.Join(base, suite)
+		return dir, true, os.MkdirAll(dir, 0755)
+	}
+	pat := fmt.Sprintf("nup_%s-%s.*", suite, time.Now().Format("20060102_150405"))
+	dir, err = ioutil.TempDir("", pat)
+	return dir, false, err
 }
 
 // ServeFiles starts an httptest.Server for dir.
@@ -104,4 +118,9 @@ func ServeFiles(dir string) *httptest.Server {
 		w.Header().Set("Cache-Control", "no-store")
 		fs.ServeHTTP(w, r)
 	}))
+}
+
+// CloudBuild returns true when running under Google Cloud Build.
+func CloudBuild() bool {
+	return os.Getenv("CLOUD_BUILD") != ""
 }

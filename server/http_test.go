@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/derat/nup/server/config"
+
 	"google.golang.org/appengine/v2/aetest"
 	"google.golang.org/appengine/v2/user"
 )
@@ -37,7 +38,7 @@ func TestAddHandler(t *testing.T) {
 	)
 
 	// Start dev_appserver.py.
-	inst, err := aetest.NewInstance(&aetest.Options{SuppressDevAppServerLog: false})
+	inst, err := aetest.NewInstance(&aetest.Options{SuppressDevAppServerLog: true})
 	if err != nil {
 		t.Fatal("Failed starting dev_appserver: ", err)
 	}

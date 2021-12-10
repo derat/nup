@@ -46,7 +46,6 @@ type Tester struct {
 	updateConfigFile string // path to update_music config file
 	dumpConfigFile   string // path to dump_music config file
 	serverURL        string // base URL for dev server
-	binDir           string // directory where update_music and dump_music are located
 	client           http.Client
 }
 
@@ -58,9 +57,6 @@ type TesterConfig struct {
 	// CoverDir is the directory update_music will examine for album art image files.
 	// If empty, a directory will be created within tempDir.
 	CoverDir string
-	// BinDir is the directory containing the update_music and dump_music commands
-	// (e.g. $HOME/go/bin). If empty, $PATH will be searched.
-	BinDir string
 }
 
 // NewTester creates a new tester for the development server at serverURL.
@@ -68,6 +64,8 @@ type TesterConfig struct {
 // The supplied testing.T object will be used to report errors.
 // If nil (e.g. if sharing a Tester between multiple tests), log.Panic will be called instead.
 // The T field can be modified as tests start and stop.
+//
+// The update_music and dump_music commands must be in $PATH.
 func NewTester(tt *testing.T, serverURL, tempDir string, cfg TesterConfig) *Tester {
 	t := &Tester{
 		T:         tt,
@@ -75,7 +73,6 @@ func NewTester(tt *testing.T, serverURL, tempDir string, cfg TesterConfig) *Test
 		CoverDir:  cfg.CoverDir,
 		tempDir:   tempDir,
 		serverURL: serverURL,
-		binDir:    cfg.BinDir,
 		client:    http.Client{Timeout: serverTimeout},
 	}
 
@@ -203,7 +200,7 @@ func (t *Tester) DumpSongs(strip StripPolicy, flags ...string) []db.Song {
 		"-song-batch-size=" + strconv.Itoa(dumpBatchSize),
 		"-play-batch-size=" + strconv.Itoa(dumpBatchSize),
 	}, flags...)
-	stdout, stderr, err := runCommand(filepath.Join(t.binDir, "dump_music"), args...)
+	stdout, stderr, err := runCommand("dump_music", args...)
 	if err != nil {
 		t.fatalf("Failed dumping songs: %v\nstderr: %v", err, stderr)
 	}
@@ -252,8 +249,7 @@ func (t *Tester) UpdateSongs(flags ...string) {
 		"-config=" + t.updateConfigFile,
 		"-test-gain-info=" + fmt.Sprintf("%f:%f:%f", TrackGain, AlbumGain, PeakAmp),
 	}, flags...)
-	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
-		args...); err != nil {
+	if _, stderr, err := runCommand("update_music", args...); err != nil {
 		t.fatalf("Failed updating songs: %v\nstderr: %v", err, stderr)
 	}
 }
@@ -275,7 +271,8 @@ func (t *Tester) ImportSongsFromJSONFile(songs []db.Song, flags ...string) {
 
 // DeleteSong deletes the specified song using update_music.
 func (t *Tester) DeleteSong(songID string) {
-	if _, stderr, err := runCommand(filepath.Join(t.binDir, "update_music"),
+	if _, stderr, err := runCommand(
+		"update_music",
 		"-config="+t.updateConfigFile,
 		"-delete-song-id="+songID); err != nil {
 		t.fatalf("Failed deleting song %v: %v\nstderr: %v", songID, err, stderr)
