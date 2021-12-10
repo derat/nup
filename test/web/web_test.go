@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -203,7 +204,10 @@ func copyBrowserLogs() {
 		// beginning of the filename and lining up the actual messages.
 		text := msg.Message
 		if ms := logRegexp.FindStringSubmatch(text); ms != nil {
-			text = fmt.Sprintf("%-24s %s", ms[1]+":"+ms[2], strings.Trim(ms[3], `"`))
+			if u, err := strconv.Unquote(ms[3]); err == nil {
+				ms[3] = u
+			}
+			text = fmt.Sprintf("%-24s %s", ms[1]+":"+ms[2], ms[3])
 		}
 		ts := msg.Timestamp.Format("15:04:05.000")
 		fmt.Fprintf(browserLog, "%s %-7s %s\n", ts, msg.Level, text)
