@@ -94,6 +94,20 @@ const template = createTemplate(`
   th.checkbox {
     width: 4px;
   }
+  .checkbox {
+    display: none;
+  }
+  :host([use-checkboxes]) .checkbox {
+    display: table-cell;
+  }
+  input[type='checkbox'] {
+    margin: 2px 0 0 0;
+  }
+  input[type='checkbox'][class~='transparent'] {
+    opacity: 0.3;
+  }
+
+
   td.time {
     padding-left: 6px;
   }
@@ -103,12 +117,6 @@ const template = createTemplate(`
     text-align: right;
     padding-right: 10px;
     text-overflow: clip;
-  }
-  input[type='checkbox'] {
-    margin: 2px 0 0 0;
-  }
-  input[type='checkbox'][class~='transparent'] {
-    opacity: 0.3;
   }
 </style>
 
@@ -124,14 +132,6 @@ const template = createTemplate(`
   </thead>
   <tbody></tbody>
 </table>
-`);
-
-const noCheckboxesTemplate = createTemplate(`
-<style>
-  .checkbox {
-    display: none;
-  }
-</style>
 `);
 
 const rowTemplate = createTemplate(`
@@ -163,7 +163,6 @@ customElements.define(
     constructor() {
       super();
 
-      this.useCheckboxes_ = this.hasAttribute('use-checkboxes');
       this.lastClickedCheckboxIndex_ = -1; // 0 is header
       this.numCheckedSongs_ = 0;
 
@@ -176,9 +175,10 @@ customElements.define(
       this.headingCheckbox_.addEventListener('click', (e) => {
         this.onCheckboxClick_(this.headingCheckbox_, e.shiftKey);
       });
-      if (!this.useCheckboxes_) {
-        this.shadow_.appendChild(noCheckboxesTemplate.content.cloneNode(true));
-      }
+    }
+
+    get useCheckboxes_() {
+      return this.hasAttribute('use-checkboxes');
     }
 
     get songRows_() {
