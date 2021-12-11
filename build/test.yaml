@@ -10,7 +10,8 @@ steps:
 
 tags:
   # Set tags to include in Pub/Sub build messages.
-  - branch:$BRANCH_NAME
-  - commit:$COMMIT_SHA
-  - repo:$REPO_NAME
-  - trigger:$TRIGGER_NAME
+  # It'd be nice to also include $REPO_NAME and $BRANCH_NAME, but tags
+  # apparently need to be matched by "^[\\w][\\w.-]{0,127}$" and I don't
+  # know of any way to escape disallowed characters here.
+  - commit-$COMMIT_SHA
+  - trigger-$TRIGGER_NAME
