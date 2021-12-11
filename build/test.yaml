@@ -7,3 +7,10 @@ steps:
       # Copy some Cloud Build variables to the script's environment.
       - PROJECT_ID=$PROJECT_ID
       - BUILD_ID=$BUILD_ID
+
+tags:
+  # Set tags to include in Pub/Sub build messages.
+  - branch:$BRANCH_NAME
+  - commit:$COMMIT_SHA
+  - repo:$REPO_NAME
+  - trigger:$TRIGGER_NAME
