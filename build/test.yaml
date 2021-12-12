@@ -14,4 +14,5 @@ tags:
   # apparently need to be matched by "^[\\w][\\w.-]{0,127}$" and I don't
   # know of any way to escape disallowed characters here.
   - commit-$COMMIT_SHA
-  - trigger-$TRIGGER_NAME
+  - trigger-$TRIGGER_NAME # TODO: Remove this in favor of "trigger-name-".
+  - trigger-name-$TRIGGER_NAME
