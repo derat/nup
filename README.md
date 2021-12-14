@@ -1,5 +1,7 @@
 # nup
 
+![Build Status](https://storage.googleapis.com/derat-build-badges/3a131bc1-9d79-498e-b911-dbe5ee293039.svg)
+
 App Engine app for streaming a music collection.
 
 ## Overview
