@@ -7,11 +7,3 @@ steps:
       # Copy some Cloud Build variables to the script's environment.
       - PROJECT_ID=$PROJECT_ID
       - BUILD_ID=$BUILD_ID
-
-tags:
-  # Set tags to include in Pub/Sub build messages.
-  # It'd be nice to also include $REPO_NAME and $BRANCH_NAME, but tags
-  # apparently need to be matched by "^[\\w][\\w.-]{0,127}$" and I don't
-  # know of any way to escape disallowed characters here.
-  - commit-$COMMIT_SHA
-  - trigger-name-$TRIGGER_NAME
