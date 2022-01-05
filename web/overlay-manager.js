@@ -25,7 +25,7 @@ const template = createTemplate(`
     display: block;
   }
   .lightbox.dimming {
-    opacity: 0.1;
+    opacity: var(--lightbox-dimming-opacity);
   }
 
   .outer-container {
