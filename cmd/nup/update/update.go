@@ -1,7 +1,7 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-package main
+package update
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/server/db"
 )
 
@@ -21,7 +22,7 @@ const batchSize = 100 // updateSongs HTTP request batch size
 // are replaced with data from ch; otherwise the user data on the server
 // are preserved and only static fields (e.g. artist, title, album, etc.)
 // are replaced.
-func updateSongs(cfg *config, ch chan db.Song, replaceUserData bool) error {
+func updateSongs(cfg *client.Config, ch chan db.Song, replaceUserData bool) error {
 	u := cfg.GetURL("/import")
 	if replaceUserData {
 		u.RawQuery = "replaceUserData=1"
@@ -75,7 +76,7 @@ func updateSongs(cfg *config, ch chan db.Song, replaceUserData bool) error {
 }
 
 // deleteSong sends a request to the server to delete the song with the specified ID.
-func deleteSong(cfg *config, songID int64) error {
+func deleteSong(cfg *client.Config, songID int64) error {
 	u := cfg.GetURL("/delete_song")
 	u.RawQuery = fmt.Sprintf("songId=%v", songID)
 	req, err := http.NewRequest("POST", u.String(), nil)

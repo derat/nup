@@ -1,7 +1,7 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-package main
+package update
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/derat/nup/client"
+	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/test"
 )
@@ -41,7 +41,7 @@ func TestUpdate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := &config{Config: client.Config{ServerURL: server.URL}}
+	cfg := &client.Config{ServerURL: server.URL}
 	ch := make(chan db.Song)
 
 	s0 := db.Song{

@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 )
 
-// Config holds configuration details shared across client binaries.
+// Config holds configuration details for the nup client executable.
 type Config struct {
 	// ServerURL contains the App Engine server URL.
 	ServerURL string `json:"serverUrl"`
@@ -21,6 +21,21 @@ type Config struct {
 	Username string `json:"username"`
 	// Password contains an HTTP basic auth password.
 	Password string `json:"password"`
+
+	// CoverDir is the base directory containing cover art.
+	CoverDir string `json:"coverDir"`
+	// MusicDir is the base directory containing song files.
+	MusicDir string `json:"musicDir"`
+	// LastUpdateInfoFile is the path to a JSON file storing info about the last update.
+	// The file will be created if it does not already exist.
+	LastUpdateInfoFile string `json:"lastUpdateInfoFile"`
+	// ComputeGain indicates whether the mp3gain program should be used to compute per-song
+	// and per-album gain information so that volume can be normalized during playback.
+	ComputeGain bool `json:"computeGain"`
+	// ArtistRewrites is a map from original ID3 tag artist names to replacement names that should
+	// be used for updates. This can be used to fix incorrectly-tagged files without needing to
+	// reupload them.
+	ArtistRewrites map[string]string `json:"artistRewrites"`
 }
 
 // LoadConfig loads a JSON-marshaled Config from the file at p.

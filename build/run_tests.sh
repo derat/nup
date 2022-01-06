@@ -9,8 +9,8 @@ set -e
 go version
 google-chrome --version
 
-# Some tests need to run update_music and dump_music.
-go install ./cmd/...
+# Some tests need to run the nup executable.
+go install ./cmd/nup
 
 # Let test.CloudBuild() detect that it's running on Cloud Build.
 export CLOUD_BUILD=1

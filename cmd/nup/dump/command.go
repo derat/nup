@@ -1,10 +1,11 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-package main
+package dump
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -13,8 +14,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/derat/nup/client"
+	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/server/db"
+	"github.com/google/subcommands"
 )
 
 const (
@@ -25,6 +27,70 @@ const (
 	defaultPlayBatchSize = 800
 	chanSize             = 50
 )
+
+type Command struct {
+	Cfg *client.Config
+
+	songBatchSize int  // batch size for Song entities
+	playBatchSize int  // batch size for Play entities
+	includeCovers bool // include cover filenames in dumped songs
+}
+
+func (*Command) Name() string     { return "dump" }
+func (*Command) Synopsis() string { return "dump songs from the server" }
+func (*Command) Usage() string {
+	return `dump [flags]:
+	Dump JSON-marshaled song data from the server to stdout.
+
+`
+}
+
+func (cmd *Command) SetFlags(f *flag.FlagSet) {
+	f.IntVar(&cmd.songBatchSize, "song-batch-size", defaultSongBatchSize, "Size for each batch of entities")
+	f.IntVar(&cmd.playBatchSize, "play-batch-size", defaultPlayBatchSize, "Size for each batch of entities")
+	f.BoolVar(&cmd.includeCovers, "covers", false, "Include cover filenames")
+}
+
+func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
+	songChan := make(chan *db.Song, chanSize)
+	go getSongs(cmd.Cfg, cmd.songBatchSize, cmd.includeCovers, songChan)
+
+	playChan := make(chan *db.PlayDump, chanSize)
+	go getPlays(cmd.Cfg, cmd.playBatchSize, playChan)
+
+	e := json.NewEncoder(os.Stdout)
+
+	numSongs := 0
+	pd := <-playChan
+	for {
+		s := <-songChan
+		if s == nil {
+			break
+		}
+
+		for pd != nil && pd.SongID == s.SongID {
+			s.Plays = append(s.Plays, pd.Play)
+			pd = <-playChan
+		}
+
+		if err := e.Encode(s); err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to encode song:", err)
+			return subcommands.ExitFailure
+		}
+
+		numSongs++
+		if numSongs%progressInterval == 0 {
+			log.Printf("Wrote %d songs", numSongs)
+		}
+	}
+	log.Printf("Wrote %d songs", numSongs)
+
+	if pd != nil {
+		fmt.Fprintf(os.Stderr, "Got orphaned play for song %v: %v\n", pd.SongID, pd.Play)
+		return subcommands.ExitFailure
+	}
+	return subcommands.ExitSuccess
+}
 
 func getEntities(cfg *client.Config, entityType string, extraArgs []string, batchSize int, f func([]byte)) {
 	u := cfg.GetURL("/export")
@@ -97,60 +163,4 @@ func getPlays(cfg *client.Config, batchSize int, ch chan *db.PlayDump) {
 		}
 	})
 	ch <- nil
-}
-
-func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage %v: [flag]...\n"+
-			"Downloads song metadata and user data from the server and writes JSON-marshaled\n"+
-			"songs to stdout.\n\n",
-			os.Args[0])
-		flag.PrintDefaults()
-	}
-	songBatchSize := flag.Int("song-batch-size", defaultSongBatchSize, "Size for each batch of entities")
-	playBatchSize := flag.Int("play-batch-size", defaultPlayBatchSize, "Size for each batch of entities")
-	configFile := flag.String("config", "", "Path to config file")
-	includeCovers := flag.Bool("covers", false, "Include cover filenames")
-	flag.Parse()
-
-	var cfg client.Config
-	if err := client.LoadConfig(*configFile, &cfg); err != nil {
-		log.Fatal("Unable to read config file: ", err)
-	}
-
-	songChan := make(chan *db.Song, chanSize)
-	go getSongs(&cfg, *songBatchSize, *includeCovers, songChan)
-
-	playChan := make(chan *db.PlayDump, chanSize)
-	go getPlays(&cfg, *playBatchSize, playChan)
-
-	e := json.NewEncoder(os.Stdout)
-
-	numSongs := 0
-	pd := <-playChan
-	for {
-		s := <-songChan
-		if s == nil {
-			break
-		}
-
-		for pd != nil && pd.SongID == s.SongID {
-			s.Plays = append(s.Plays, pd.Play)
-			pd = <-playChan
-		}
-
-		if err := e.Encode(s); err != nil {
-			log.Fatal("Failed to encode song: ", err)
-		}
-
-		numSongs++
-		if numSongs%progressInterval == 0 {
-			log.Printf("Wrote %d songs", numSongs)
-		}
-	}
-	log.Printf("Wrote %d songs", numSongs)
-
-	if pd != nil {
-		log.Fatalf("Got orphaned play for song %v: %v", pd.SongID, pd.Play)
-	}
 }

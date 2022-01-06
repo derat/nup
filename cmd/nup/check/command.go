@@ -1,9 +1,10 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-package main
+package check
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -17,8 +18,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/derat/nup/client"
+	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/server/db"
+	"github.com/google/subcommands"
 )
 
 type checkSettings uint32
@@ -30,7 +32,89 @@ const (
 	checkSongCover
 )
 
-func checkSongs(songs []*db.Song, musicDir, coverDir string, settings checkSettings) {
+var checkInfos = map[string]struct { // keys are values for -check flag
+	setting checkSettings
+	desc    string // description for check flag
+	def     bool   // on by default?
+}{
+	"album-id":       {checkAlbumID, "Songs have MusicBrainz album IDs", true},
+	"cover-size-400": {checkCoverSize400, "Cover images are at least 400x400", false},
+	"imported":       {checkImported, "All songs have been imported", true},
+	"song-cover":     {checkSongCover, "Songs have cover files", true},
+}
+
+type Command struct {
+	Cfg    *client.Config
+	checks string // comma-separated list of checks to perform
+}
+
+func (*Command) Name() string     { return "check" }
+func (*Command) Synopsis() string { return "check for issues in songs and cover images" }
+func (*Command) Usage() string {
+	return `check [flags]:
+	Check for issues in dumped songs from stdin.
+
+`
+}
+
+func (cmd *Command) SetFlags(f *flag.FlagSet) {
+	var defaultChecks []string
+	var checkDescs []string
+	for s, info := range checkInfos {
+		if info.def {
+			defaultChecks = append(defaultChecks, s)
+		}
+		checkDescs = append(checkDescs, fmt.Sprintf("  %-14s  %s\n", s, info.desc))
+	}
+	sort.Strings(defaultChecks)
+	sort.Strings(checkDescs)
+	f.StringVar(&cmd.checks, "check", strings.Join(defaultChecks, ","),
+		"Comma-separated list of checks to perform:\n"+strings.Join(checkDescs, ""))
+}
+
+func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
+	if cmd.Cfg.MusicDir == "" || cmd.Cfg.CoverDir == "" {
+		fmt.Fprintln(os.Stderr, "musicDir and coverDir must be set in config")
+		return subcommands.ExitUsageError
+	}
+
+	var settings checkSettings
+	for _, s := range strings.Split(cmd.checks, ",") {
+		info, ok := checkInfos[s]
+		if !ok {
+			fmt.Fprintf(os.Stderr, "Invalid -check value %q\n", s)
+			return subcommands.ExitUsageError
+		}
+		settings |= info.setting
+	}
+
+	d := json.NewDecoder(os.Stdin)
+	songs := make([]*db.Song, 0)
+	for {
+		var s db.Song
+		if err := d.Decode(&s); err == io.EOF {
+			break
+		} else if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed reading song:", err)
+			return subcommands.ExitFailure
+		}
+		songs = append(songs, &s)
+	}
+	log.Printf("Read %d songs", len(songs))
+	sort.Slice(songs, func(i, j int) bool { return songs[i].Filename < songs[j].Filename })
+
+	if err := checkSongs(songs, cmd.Cfg.MusicDir, cmd.Cfg.CoverDir, settings); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed checking songs:", err)
+		return subcommands.ExitFailure
+	}
+	if err := checkCovers(songs, cmd.Cfg.CoverDir, settings); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed checking covers:", err)
+		return subcommands.ExitFailure
+	}
+	return subcommands.ExitSuccess
+}
+
+func checkSongs(songs []*db.Song, musicDir, coverDir string, settings checkSettings) error {
 	fs := [](func(s *db.Song) error){
 		func(s *db.Song) error {
 			if len(s.Filename) == 0 {
@@ -102,21 +186,22 @@ func checkSongs(songs []*db.Song, musicDir, coverDir string, settings checkSetti
 			}
 			return nil
 		}); err != nil {
-			log.Fatalf("Failed walking %v: %v", musicDir, err)
+			return fmt.Errorf("failed walking %v: %v", musicDir, err)
 		}
 	}
+	return nil
 }
 
-func checkCovers(songs []*db.Song, coverDir string, settings checkSettings) {
+func checkCovers(songs []*db.Song, coverDir string, settings checkSettings) error {
 	dir, err := os.Open(coverDir)
 	if err != nil {
-		log.Fatal("Failed to open cover dir: ", err)
+		return err
 	}
 	defer dir.Close()
 
 	fns, err := dir.Readdirnames(0)
 	if err != nil {
-		log.Fatal("Failed to read cover dir: ", err)
+		return err
 	}
 
 	songFns := make(map[string]struct{})
@@ -166,74 +251,5 @@ func checkCovers(songs []*db.Song, coverDir string, settings checkSettings) {
 			}
 		}
 	}
-}
-
-func main() {
-	const defaultCoverSubdir = ".covers" // used if -cover-dir is unset
-
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage %v: [flag]...\n"+
-			"Check for issues in songs and cover images.\n"+
-			"Reads \"dump_music -covers\" song objects from stdin.\n\n",
-			os.Args[0])
-		flag.PrintDefaults()
-	}
-	musicDir := flag.String("music-dir", filepath.Join(os.Getenv("HOME"), "music"), "Directory containing song files")
-	coverDir := flag.String("cover-dir", "",
-		fmt.Sprintf("Directory containing cover art (%q within -music-dir if unset)", defaultCoverSubdir))
-
-	checkInfos := map[string]struct { // keys are values for -check flag
-		setting checkSettings
-		desc    string // description for check flag
-		def     bool   // on by default?
-	}{
-		"album-id":       {checkAlbumID, "Songs have MusicBrainz album IDs", true},
-		"cover-size-400": {checkCoverSize400, "Cover images are at least 400x400", false},
-		"imported":       {checkImported, "All songs have been imported", true},
-		"song-cover":     {checkSongCover, "Songs have cover files", true},
-	}
-	var defaultChecks []string
-	var checkDescs []string
-	for s, info := range checkInfos {
-		if info.def {
-			defaultChecks = append(defaultChecks, s)
-		}
-		checkDescs = append(checkDescs, fmt.Sprintf("  %-14s  %s\n", s, info.desc))
-	}
-	sort.Strings(defaultChecks)
-	sort.Strings(checkDescs)
-	checkStr := flag.String("check", strings.Join(defaultChecks, ","),
-		"Comma-separated list of checks to perform:\n"+strings.Join(checkDescs, ""))
-
-	flag.Parse()
-
-	if len(*coverDir) == 0 {
-		*coverDir = filepath.Join(*musicDir, defaultCoverSubdir)
-	}
-
-	var settings checkSettings
-	for _, s := range strings.Split(*checkStr, ",") {
-		info, ok := checkInfos[s]
-		if !ok {
-			log.Fatalf("Invalid -check value %q", s)
-		}
-		settings |= info.setting
-	}
-
-	d := json.NewDecoder(os.Stdin)
-	songs := make([]*db.Song, 0)
-	for {
-		var s db.Song
-		if err := d.Decode(&s); err == io.EOF {
-			break
-		} else if err != nil {
-			log.Fatal("Failed to read song: ", err)
-		}
-		songs = append(songs, &s)
-	}
-	log.Printf("Read %d songs", len(songs))
-	sort.Slice(songs, func(i, j int) bool { return songs[i].Filename < songs[j].Filename })
-
-	checkSongs(songs, *musicDir, *coverDir, settings)
-	checkCovers(songs, *coverDir, settings)
+	return nil
 }

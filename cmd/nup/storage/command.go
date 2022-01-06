@@ -1,7 +1,7 @@
 // Copyright 2021 Daniel Erat.
 // All rights reserved.
 
-package main
+package storage
 
 import (
 	"context"
@@ -13,7 +13,9 @@ import (
 	"os"
 
 	"cloud.google.com/go/storage"
+	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/server/db"
+	"github.com/google/subcommands"
 
 	"google.golang.org/api/iterator"
 )
@@ -27,30 +29,47 @@ const (
 	archive               = "ARCHIVE"
 )
 
-func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage %v: [flag]...\n"+
-			"Updates song files' storage classes in Google Cloud Storage.\n"+
-			"Unmarshals \"dump_music\" song objects from stdin.\n\n",
-			os.Args[0])
-		flag.PrintDefaults()
-	}
-	bucketName := flag.String("bucket", "", "Google Cloud Storage bucket containing songs")
-	classString := flag.String("class", string(coldline), "Storage class for infrequently-accessed files")
-	maxUpdates := flag.Int("max-updates", -1, "Maximum number of files to update")
-	numWorkers := flag.Int("workers", 10, "Maximum concurrent Google Cloud Storage updates")
-	ratingCutoff := flag.Float64("rating-cutoff", 0.75, "Minimum song rating for standard storage class")
-	flag.Parse()
+type Command struct {
+	Cfg *client.Config
 
+	bucketName   string  // GCS bucket name
+	class        string  // storage class for low-rated files
+	maxUpdates   int     // files to update
+	numWorkers   int     // concurrent GCS updates
+	ratingCutoff float64 // min rating for standard storage class
+}
+
+func (*Command) Name() string     { return "storage" }
+func (*Command) Synopsis() string { return "update song storage classes" }
+func (*Command) Usage() string {
+	return `storage [flags]:
+	Update song files' storage classes in Google Cloud Storage based on
+	ratings in dumped songs from stdin.
+
+`
+}
+
+func (cmd *Command) SetFlags(f *flag.FlagSet) {
+	f.StringVar(&cmd.bucketName, "bucket", "", "Google Cloud Storage bucket containing songs")
+	f.StringVar(&cmd.class, "class", string(coldline), "Storage class for infrequently-accessed files")
+	f.IntVar(&cmd.maxUpdates, "max-updates", -1, "Maximum number of files to update")
+	f.IntVar(&cmd.numWorkers, "workers", 10, "Maximum concurrent Google Cloud Storage updates")
+	f.Float64Var(&cmd.ratingCutoff, "rating-cutoff", 0.75, "Minimum song rating for standard storage class")
+}
+
+func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
 	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") == "" {
-		log.Fatal("Must set GOOGLE_APPLICATION_CREDENTIALS to service account key file")
+		fmt.Fprintln(os.Stderr, "Must set GOOGLE_APPLICATION_CREDENTIALS to service account key file")
+		return subcommands.ExitUsageError
 	}
-	if *bucketName == "" {
-		log.Fatal("Must supply bucket name with -bucket")
+	if cmd.bucketName == "" {
+		fmt.Fprintln(os.Stderr, "Must supply bucket name with -bucket")
+		return subcommands.ExitUsageError
 	}
-	class := storageClass(*classString)
+	class := storageClass(cmd.class)
 	if class != nearline && class != coldline && class != archive {
-		log.Fatalf("Invalid -class %q (valid: %v %v %v)", class, nearline, coldline, archive)
+		fmt.Fprintf(os.Stderr, "Invalid -class %q (valid: %v %v %v)\n", class, nearline, coldline, archive)
+		return subcommands.ExitUsageError
 	}
 
 	// Read songs from stdin and determine the proper storage class for each.
@@ -61,37 +80,39 @@ func main() {
 		if err := d.Decode(&s); err == io.EOF {
 			break
 		} else if err != nil {
-			log.Fatal("Failed to read song: ", err)
+			fmt.Fprintln(os.Stderr, "Failed to read song:", err)
+			return subcommands.ExitFailure
 		}
 		cls := standard
-		if s.Rating >= 0 && s.Rating < *ratingCutoff {
+		if s.Rating >= 0 && s.Rating < cmd.ratingCutoff {
 			cls = class
 		}
 		songClasses[s.Filename] = cls
 	}
 
-	ctx := context.Background()
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		log.Fatal("Failed creating client: ", err)
+		fmt.Fprintln(os.Stderr, "Failed creating client:", err)
+		return subcommands.ExitFailure
 	}
 	defer client.Close()
 
 	// List the objects synchronously so we know how many jobs we'll have.
 	var jobs []job
-	bucket := client.Bucket(*bucketName)
+	bucket := client.Bucket(cmd.bucketName)
 	it := bucket.Objects(ctx, &storage.Query{Prefix: ""})
 	for {
 		attrs, err := it.Next()
 		if err == iterator.Done {
 			break
 		} else if err != nil {
-			log.Fatalf("Failed listing objects in %v: %v", *bucketName, err)
+			fmt.Fprintf(os.Stderr, "Failed listing objects in %v: %v\n", cmd.bucketName, err)
+			return subcommands.ExitFailure
 		}
 		class, ok := songClasses[attrs.Name]
 		if ok && attrs.StorageClass != string(class) {
 			jobs = append(jobs, job{*attrs, class})
-			if *maxUpdates > 0 && len(jobs) >= *maxUpdates {
+			if cmd.maxUpdates > 0 && len(jobs) >= cmd.maxUpdates {
 				break
 			}
 		}
@@ -102,7 +123,7 @@ func main() {
 	resChan := make(chan result, len(jobs))
 
 	// Start the workers.
-	for i := 0; i < *numWorkers; i++ {
+	for i := 0; i < cmd.numWorkers; i++ {
 		go worker(ctx, bucket, jobChan, resChan)
 	}
 
@@ -126,8 +147,10 @@ func main() {
 		}
 	}
 	if numErrs > 0 {
-		log.Fatalf("Failed updating %v object(s)", numErrs)
+		fmt.Fprintf(os.Stderr, "Failed updating %v object(s)\n", numErrs)
+		return subcommands.ExitFailure
 	}
+	return subcommands.ExitSuccess
 }
 
 type job struct {

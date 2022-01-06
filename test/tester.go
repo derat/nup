@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/derat/nup/client"
+	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/server/db"
 )
 
@@ -30,31 +30,29 @@ const (
 	Username = "testuser"
 	Password = "testpass"
 
-	dumpBatchSize    = 2                // song/play batch size for dump_music
+	dumpBatchSize    = 2                // song/play batch size for 'nup dump'
 	androidBatchSize = 1                // song batch size when exporting for Android
 	serverTimeout    = 10 * time.Second // timeout for HTTP requests to server
 )
 
-// Tester helps tests send HTTP requests to a development server and
-// run the update_music and dump_music commands.
+// Tester helps tests send HTTP requests to a development server and run the nup executable.
 type Tester struct {
 	T        *testing.T // used to report errors (panic on errors if nil)
-	MusicDir string     // dir containing songs for update_music
-	CoverDir string     // dir containing album art for update_music
+	MusicDir string     // dir containing songs for 'nup update'
+	CoverDir string     // dir containing album art for 'nup update'
 
-	tempDir          string // base dir for temp files
-	updateConfigFile string // path to update_music config file
-	dumpConfigFile   string // path to dump_music config file
-	serverURL        string // base URL for dev server
-	client           http.Client
+	tempDir    string // base dir for temp files
+	configFile string // path to nup config file
+	serverURL  string // base URL for dev server
+	client     http.Client
 }
 
 // TesterConfig contains optional configuration for Tester.
 type TesterConfig struct {
-	// MusicDir is the directory update_music will examine for song files.
+	// MusicDir is the directory 'nup update' will examine for song files.
 	// If empty, a directory will be created within tempDir.
 	MusicDir string
-	// CoverDir is the directory update_music will examine for album art image files.
+	// CoverDir is the directory 'nup update' will examine for album art image files.
 	// If empty, a directory will be created within tempDir.
 	CoverDir string
 }
@@ -65,7 +63,7 @@ type TesterConfig struct {
 // If nil (e.g. if sharing a Tester between multiple tests), log.Panic will be called instead.
 // The T field can be modified as tests start and stop.
 //
-// The update_music and dump_music commands must be in $PATH.
+// The nup command must be in $PATH.
 func NewTester(tt *testing.T, serverURL, tempDir string, cfg TesterConfig) *Tester {
 	t := &Tester{
 		T:         tt,
@@ -106,29 +104,14 @@ func NewTester(tt *testing.T, serverURL, tempDir string, cfg TesterConfig) *Test
 		return path
 	}
 
-	// Corresponds to Config in cmd/update_music/main.go.
-	t.updateConfigFile = writeConfig("update_music_config.json", struct {
-		client.Config
-		CoverDir           string `json:"coverDir"`
-		MusicDir           string `json:"musicDir"`
-		LastUpdateInfoFile string `json:"lastUpdateInfoFile"`
-		ComputeGain        bool   `json:"computeGain"`
-	}{
-		Config: client.Config{
-			ServerURL: t.serverURL,
-			Username:  Username,
-			Password:  Password,
-		},
+	t.configFile = writeConfig("nup_config.json", client.Config{
+		ServerURL:          t.serverURL,
+		Username:           Username,
+		Password:           Password,
 		CoverDir:           t.CoverDir,
 		MusicDir:           t.MusicDir,
 		LastUpdateInfoFile: filepath.Join(t.tempDir, "last_update_info.json"),
 		ComputeGain:        true,
-	})
-
-	t.dumpConfigFile = writeConfig("dump_music_config.json", client.Config{
-		ServerURL: t.serverURL,
-		Username:  Username,
-		Password:  Password,
 	})
 
 	return t
@@ -193,14 +176,15 @@ const (
 
 const DumpCoversFlag = "-covers=true"
 
-// DumpSongs runs dump_music with the supplied flags and returns unmarshaled songs.
+// DumpSongs runs 'nup dump' with the supplied flags and returns unmarshaled songs.
 func (t *Tester) DumpSongs(strip StripPolicy, flags ...string) []db.Song {
 	args := append([]string{
-		"-config=" + t.dumpConfigFile,
+		"-config=" + t.configFile,
+		"dump",
 		"-song-batch-size=" + strconv.Itoa(dumpBatchSize),
 		"-play-batch-size=" + strconv.Itoa(dumpBatchSize),
 	}, flags...)
-	stdout, stderr, err := runCommand("dump_music", args...)
+	stdout, stderr, err := runCommand("nup", args...)
 	if err != nil {
 		t.fatalf("Failed dumping songs: %v\nstderr: %v", err, stderr)
 	}
@@ -243,24 +227,25 @@ const KeepUserDataFlag = "-import-user-data=false"
 func DumpedGainsFlag(p string) string  { return "-dumped-gains-file=" + p }
 func ForceGlobFlag(glob string) string { return "-force-glob=" + glob }
 
-// UpdateSongs runs update_music with the supplied flags.
+// UpdateSongs runs 'nup update' with the supplied flags.
 func (t *Tester) UpdateSongs(flags ...string) {
 	args := append([]string{
-		"-config=" + t.updateConfigFile,
+		"-config=" + t.configFile,
+		"update",
 		"-test-gain-info=" + fmt.Sprintf("%f:%f:%f", TrackGain, AlbumGain, PeakAmp),
 	}, flags...)
-	if _, stderr, err := runCommand("update_music", args...); err != nil {
+	if _, stderr, err := runCommand("nup", args...); err != nil {
 		t.fatalf("Failed updating songs: %v\nstderr: %v", err, stderr)
 	}
 }
 
-// UpdateSongsFromList runs update_music to import the songs listed in path.
+// UpdateSongsFromList runs 'nup update' to import the songs listed in path.
 func (t *Tester) UpdateSongsFromList(path string, flags ...string) {
 	t.UpdateSongs(append(flags, "-song-paths-file="+path)...)
 }
 
 // ImportSongsFromJSON serializes the supplied songs to JSON and sends them
-// to the server using update_music.
+// to the server using 'nup update'.
 func (t *Tester) ImportSongsFromJSONFile(songs []db.Song, flags ...string) {
 	p, err := WriteSongsToJSONFile(t.tempDir, songs)
 	if err != nil {
@@ -269,11 +254,12 @@ func (t *Tester) ImportSongsFromJSONFile(songs []db.Song, flags ...string) {
 	t.UpdateSongs(append(flags, "-import-json-file="+p)...)
 }
 
-// DeleteSong deletes the specified song using update_music.
+// DeleteSong deletes the specified song using 'nup update'.
 func (t *Tester) DeleteSong(songID string) {
 	if _, stderr, err := runCommand(
-		"update_music",
-		"-config="+t.updateConfigFile,
+		"nup",
+		"-config="+t.configFile,
+		"update",
 		"-delete-song-id="+songID); err != nil {
 		t.fatalf("Failed deleting song %v: %v\nstderr: %v", songID, err, stderr)
 	}

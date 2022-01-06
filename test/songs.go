@@ -11,7 +11,7 @@ import (
 
 const (
 	// Hardcoded gain info used for all songs. Instead of actually running mp3gain (which may not
-	// even be installed) during testing, these values get passed to update_music via its
+	// even be installed) during testing, these values get passed to 'nup update' via its
 	// -test-gain-info flag.
 	TrackGain = -6.7
 	AlbumGain = -6.3

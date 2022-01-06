@@ -96,7 +96,7 @@ func WriteSongsToJSONFile(dir string, songs []db.Song) (string, error) {
 }
 
 // WriteSongPathsFile creates a file in dir listing filenames,
-// suitable for passing to update_music's -song-paths-file flag.
+// suitable for passing to the `nup update -song-paths-file` flag.
 func WriteSongPathsFile(dir string, filenames ...string) (string, error) {
 	f, err := ioutil.TempFile(dir, "song-list.")
 	if err != nil {

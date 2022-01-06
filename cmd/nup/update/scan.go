@@ -1,7 +1,7 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-package main
+package update
 
 import (
 	"bufio"
@@ -18,10 +18,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/derat/nup/client"
-	"github.com/derat/nup/mp3gain"
+	"github.com/derat/nup/cmd/nup/client"
+	"github.com/derat/nup/cmd/nup/mp3gain"
 	"github.com/derat/nup/server/db"
-
 	"github.com/derat/taglib-go/taglib"
 )
 

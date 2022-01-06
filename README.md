@@ -13,18 +13,16 @@ App Engine app for streaming a music collection.
        width="49%" alt="dark mode screenshot">
 </p>
 
-This repository contains a [Google App Engine] app for interacting with a
-personal music collection, along with a web client and various command-line
-tools for managing the data.
+This repository contains a [server](./server) for serving a personal music
+collection, along with a [web client](./web) and a [command-line
+program](./cmd/nup) for managing the data.
 
 The basic idea is that you mirror your music collection (and the corresponding
-album artwork) to [Google Cloud Storage] and then run the [update_music]
-command against the local copy to save metadata to a [Datastore] database.
+album artwork) to [Google Cloud Storage] and then run the `nup update` command
+against the local copy to save metadata to a [Datastore] database.
 User-generated information like ratings, tags, and playback history is also
 saved in Datastore. The App Engine app performs queries against Datastore and
 serves songs and album art from Cloud Storage.
-
-[update_music]: ./cmd/update_music
 
 An [Android client](https://github.com/derat/nup-android/) is also available.
 
@@ -99,9 +97,8 @@ At the very least, you'll need to do the following:
 *   Create Cloud Storage buckets for your songs and album art.
 *   Use the [gsutil] tool to sync songs and album art to Cloud Storage.
 *   Configure and deploy the App Engine app.
-*   Compile the [update_music] tool, create a small config file for it, and use
-    it to send song metadata to the App Engine app so it can be saved to
-    Datastore.
+*   Compile the `nup` tool, create a small config file for it, and use it to
+    send song metadata to the App Engine app so it can be saved to Datastore.
 
 As mentioned above, please let me know if you're feeling adventurous and would
 like to see detailed instructions for these steps.
@@ -161,12 +158,11 @@ All tests can be executed by running `go test ./...` from the root of the
 repository.
 
 *   Unit tests live alongside the code that they exercise.
-*   End-to-end tests that exercise the App Engine server and the [dump_music]
-    and [update_music] commands are in the [test/e2e/](./test/e2e) directory.
+*   End-to-end tests that exercise the App Engine server and the `nup`
+    executable are in the [test/e2e/](./test/e2e) directory.
 *   [Selenium] tests that exercise both the web interface (in Chrome) and the
     server are in the [test/web/](./test/web) directory. By default, Chrome runs
     headlessly using [Xvfb].
 
-[dump_music]: ./cmd/dump_music
 [Selenium]: https://www.selenium.dev/
 [Xvfb]: https://en.wikipedia.org/wiki/Xvfb

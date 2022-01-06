@@ -1,9 +1,10 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-package main
+package covers
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -14,14 +15,76 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/server/db"
 	"github.com/derat/taglib-go/taglib"
+	"github.com/google/subcommands"
 )
 
 const (
 	logInterval = 100
 	albumIDTag  = "MusicBrainz Album Id"
 )
+
+type Command struct {
+	Cfg *client.Config
+
+	coverDir    string // directory to write covers to
+	maxSongs    int    // songs to inspect
+	maxRequests int    // parallel HTTP requests
+}
+
+func (*Command) Name() string     { return "covers" }
+func (*Command) Synopsis() string { return "download album art" }
+func (*Command) Usage() string {
+	return `covers [flags]:
+	Download album art from coverartarchive.org for dumped songs from
+	stdin. Image files are written to the directory specified via
+	-cover-dir.
+
+`
+}
+
+func (cmd *Command) SetFlags(f *flag.FlagSet) {
+	f.StringVar(&cmd.coverDir, "cover-dir", "", "Directory to write covers to")
+	f.IntVar(&cmd.maxSongs, "max-songs", -1, "Maximum number of songs to inspect")
+	f.IntVar(&cmd.maxRequests, "max-requests", 2, "Maximum number of parallel HTTP requests")
+}
+
+func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
+	if cmd.coverDir == "" {
+		fmt.Fprintln(os.Stderr, "-cover-dir must be supplied")
+		return subcommands.ExitUsageError
+	}
+
+	albumIDs := make([]string, 0)
+	if len(args) > 0 {
+		ids := make(map[string]bool)
+		for _, p := range args {
+			if id, err := readSong(p.(string)); err != nil {
+				fmt.Fprintf(os.Stderr, "Failed reading %v: %v", p, err)
+				return subcommands.ExitFailure
+			} else if len(id) > 0 {
+				log.Printf("%v has album ID %v", p, id)
+				ids[id] = true
+			}
+		}
+		for id, _ := range ids {
+			albumIDs = append(albumIDs, id)
+		}
+	} else {
+		log.Print("Reading songs from stdin")
+		var err error
+		if albumIDs, err = readDumpedSongs(os.Stdin, cmd.coverDir, cmd.maxSongs); err != nil {
+			fmt.Fprintln(os.Stderr, "Failed reading dumped songs:", err)
+			return subcommands.ExitFailure
+		}
+	}
+
+	log.Printf("Downloading cover(s) for %v album(s)", len(albumIDs))
+	downloadCovers(albumIDs, cmd.coverDir, cmd.maxRequests)
+	return subcommands.ExitSuccess
+}
 
 func getCoverFilename(albumID string) string {
 	return albumID + ".jpg"
@@ -45,16 +108,9 @@ func readSong(path string) (albumID string, err error) {
 	return tag.CustomFrames()[albumIDTag], nil
 }
 
-func readDumpFile(jsonPath string, coverDir string, maxSongs int) (albumIDs []string, err error) {
+func readDumpedSongs(r io.Reader, coverDir string, maxSongs int) (albumIDs []string, err error) {
 	missingAlbumIDs := make(map[string]bool)
-
-	f, err := os.Open(jsonPath)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	d := json.NewDecoder(f)
+	d := json.NewDecoder(r)
 	numSongs := 0
 	for true {
 		if maxSongs >= 0 && numSongs >= maxSongs {
@@ -166,52 +222,4 @@ func downloadCovers(albumIDs []string, dir string, maxRequests int) {
 	}()
 
 	wg.Wait()
-}
-
-func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage %v: [flag]...\n"+
-			"Reads dumped song metadata and downloads album art from coverartarchive.org.\n\n",
-			os.Args[0])
-		flag.PrintDefaults()
-	}
-	dumpFile := flag.String("dump-file", "", "Path to file containing dumped JSON songs")
-	coverDir := flag.String("cover-dir", "", "Path to directory where cover images should be written")
-	maxSongs := flag.Int("max-songs", -1, "Maximum number of songs to inspect")
-	maxRequests := flag.Int("max-requests", 2, "Maximum number of parallel HTTP requests")
-	flag.Parse()
-
-	if len(*coverDir) == 0 {
-		log.Fatal("-cover-dir must be set")
-	}
-
-	albumIDs := make([]string, 0)
-	if len(*dumpFile) > 0 {
-		if len(flag.Args()) > 0 {
-			log.Fatal("Cannot both set -dump-file and list music files")
-		}
-		log.Printf("Reading songs from %v", *dumpFile)
-		var err error
-		if albumIDs, err = readDumpFile(*dumpFile, *coverDir, *maxSongs); err != nil {
-			log.Fatalf("Failed reading dumped songs from %v: %v", *dumpFile, err)
-		}
-	} else if len(flag.Args()) > 0 {
-		ids := make(map[string]bool)
-		for _, p := range flag.Args() {
-			if id, err := readSong(p); err != nil {
-				log.Fatalf("Failed to read %v: %v", p, err)
-			} else if len(id) > 0 {
-				log.Printf("%v has album ID %v", p, id)
-				ids[id] = true
-			}
-		}
-		for id, _ := range ids {
-			albumIDs = append(albumIDs, id)
-		}
-	} else {
-		log.Fatal("Either set -dump-file or list music files as arguments")
-	}
-
-	log.Printf("Downloading cover(s) for %v album(s)", len(albumIDs))
-	downloadCovers(albumIDs, *coverDir, *maxRequests)
 }

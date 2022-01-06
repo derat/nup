@@ -1,35 +1,40 @@
 // Copyright 2021 Daniel Erat.
 // All rights reserved.
 
-package main
+package gain
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
 
-	"github.com/derat/nup/mp3gain"
+	"github.com/derat/nup/cmd/nup/client"
+	"github.com/derat/nup/cmd/nup/mp3gain"
 	"github.com/derat/nup/server/db"
+	"github.com/google/subcommands"
 )
 
-func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage %v: [flag]...\n"+
-			"Computes gain adjustments for songs.\n"+
-			"Reads \"dump_music\" song objects from stdin and"+
-			"writes updated objects to stdout.\n\n",
-			os.Args[0])
-		flag.PrintDefaults()
-	}
-	musicDir := flag.String("music-dir", filepath.Join(os.Getenv("HOME"), "music"),
-		"Directory containing song files")
-	flag.Parse()
+type Command struct {
+	Cfg *client.Config
+}
 
+func (*Command) Name() string     { return "gain" }
+func (*Command) Synopsis() string { return "compute gain adjustments for songs" }
+func (*Command) Usage() string {
+	return `gain:
+	Compute gain adjustments for dumped songs from stdin using mp3gain.
+	Writes updated JSON song objects to stdout.
+
+`
+}
+func (cmd *Command) SetFlags(f *flag.FlagSet) {}
+
+func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	// Read the full song listing and group by album.
 	albumSongs := make(map[string][]*db.Song) // album IDs to songs in album
 	d := json.NewDecoder(os.Stdin)
@@ -38,7 +43,8 @@ func main() {
 		if err := d.Decode(&s); err == io.EOF {
 			break
 		} else if err != nil {
-			log.Fatal("Failed to read song: ", err)
+			fmt.Fprintln(os.Stderr, "Failed to read song:", err)
+			return subcommands.ExitFailure
 		}
 
 		// Clear some unneeded data.
@@ -69,24 +75,28 @@ func main() {
 		songs := albumSongs[id]
 		paths := make([]string, len(songs))
 		for i, s := range songs {
-			paths[i] = filepath.Join(*musicDir, s.Filename)
+			paths[i] = filepath.Join(cmd.Cfg.MusicDir, s.Filename)
 		}
 		gains, err := mp3gain.ComputeAlbum(paths)
 		if err != nil {
-			log.Fatalf("Failed to compute gains for %v (%q): %v", id, paths[0], err)
+			fmt.Fprintf(os.Stderr, "Failed to compute gains for %v (%q): %v\n", id, paths[0], err)
+			return subcommands.ExitFailure
 		}
 		for i, s := range songs {
 			path := paths[i]
 			info, ok := gains[path]
 			if !ok {
-				log.Fatalf("Didn't get gain info for %v", path)
+				fmt.Fprintln(os.Stderr, "Didn't get gain info for", path)
+				return subcommands.ExitFailure
 			}
 			s.TrackGain = info.TrackGain
 			s.AlbumGain = info.AlbumGain
 			s.PeakAmp = info.PeakAmp
 			if err := enc.Encode(*s); err != nil {
-				log.Fatalf("Failed encoding %v: %v", path, err)
+				fmt.Fprintf(os.Stderr, "Failed encoding %v: %v\n", path, err)
+				return subcommands.ExitFailure
 			}
 		}
 	}
+	return subcommands.ExitSuccess
 }
