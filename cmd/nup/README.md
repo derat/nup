@@ -21,7 +21,7 @@ Subcommands:
         update           send song updates to the server
 
   -config string
-        Path to config file (default "/home/danerat/.nup/config.json")
+        Path to config file (default "$HOME/.nup/config.json")
 ```
 
 ## `check` command
