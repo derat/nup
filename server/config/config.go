@@ -9,14 +9,26 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"net/http"
+	"os"
 
 	"google.golang.org/appengine/v2"
+	"google.golang.org/appengine/v2/datastore"
 	"google.golang.org/appengine/v2/user"
 )
 
-// Singleton parsed by LoadConfig().
-var baseCfg *Config
+const (
+	DatastoreKind    = "Config"
+	DatastoreKeyName = "active"
+
+	configPath = "config.json" // server config file relative to base dir
+)
+
+// SavedConfig is used to store a JSON-marshaled Config in Datastore.
+type SavedConfig struct {
+	JSON string `datastore:"json"`
+}
 
 // BasicAuthInfo contains information used for validating HTTP basic authentication.
 type BasicAuthInfo struct {
@@ -60,9 +72,6 @@ type SearchPreset struct {
 
 // Config holds the App Engine server's configuration.
 type Config struct {
-	// ProjectID is the Google Cloud project ID.
-	ProjectID string `json:"projectId"`
-
 	// GoogleUsers contains email addresses of Google accounts allowed to access
 	// the web interface.
 	GoogleUsers []string `json:"googleUsers"`
@@ -77,14 +86,70 @@ type Config struct {
 	CoverBucket string `json:"coverBucket"`
 
 	// SongBaseURL contains the slash-terminated URL under which song files are stored.
+	// This is used for testing.
 	// Exactly one of SongBucket and SongBaseURL must be set.
 	SongBaseURL string `json:"songBaseUrl"`
 	// CoverBaseURL contains the slash-terminated URL under which album cover images are stored.
+	// This is used for testing.
 	// Exactly one of CoverBucket and CoverBaseURL must be set.
 	CoverBaseURL string `json:"coverBaseUrl"`
 
 	// Presets describes search presets for the web interface.
 	Presets []SearchPreset `json:"presets"`
+}
+
+// ParseConfig unmarshals jsonData, validates it, and returns the resulting config.
+func ParseConfig(jsonData []byte) (*Config, error) {
+	var cfg Config
+	dec := json.NewDecoder(bytes.NewReader(jsonData))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&cfg); err != nil {
+		return nil, err
+	}
+
+	cleanBaseURL(&cfg.SongBaseURL)
+	haveSongBucket := len(cfg.SongBucket) > 0
+	haveSongURL := len(cfg.SongBaseURL) > 0
+	if (haveSongBucket && haveSongURL) || !(haveSongBucket || haveSongURL) {
+		return nil, errors.New("exactly one of SongBucket and SongBaseURL must be set")
+	}
+
+	cleanBaseURL(&cfg.CoverBaseURL)
+	haveCoverBucket := len(cfg.CoverBucket) > 0
+	haveCoverURL := len(cfg.CoverBaseURL) > 0
+	if (haveCoverBucket && haveCoverURL) || !(haveCoverBucket || haveCoverURL) {
+		return nil, errors.New("exactly one of CoverBucket and CoverBaseURL must be set")
+	}
+
+	return &cfg, nil
+}
+
+// LoadConfig attempts to load the server's config from various locations.
+// ctx must be an App Engine context.
+func LoadConfig(ctx context.Context) (*Config, error) {
+	b, err := func() ([]byte, error) {
+		// Tests can override the config file via a NUP_CONFIG environment variable.
+		if b := []byte(os.Getenv("NUP_CONFIG")); len(b) != 0 {
+			return b, nil
+		}
+		// Support reading a config file that was uploaded alongside the app.
+		// TODO: Consider removing this.
+		if b, err := ioutil.ReadFile(configPath); err == nil {
+			return b, nil
+		}
+		// Try to get the JSON data from Datastore by default.
+		var saved SavedConfig
+		key := datastore.NewKey(ctx, DatastoreKind, DatastoreKeyName, 0, nil)
+		if err := datastore.Get(ctx, key, &saved); err != nil {
+			return nil, err
+		}
+		return []byte(saved.JSON), nil
+	}()
+
+	if err != nil {
+		return nil, err
+	}
+	return ParseConfig(b)
 }
 
 // Auth checks that r is authorized in cfg via either HTTP basic authentication or Google
@@ -118,40 +183,4 @@ func cleanBaseURL(u *string) {
 	if len(*u) > 0 && (*u)[len(*u)-1] != '/' {
 		*u += "/"
 	}
-}
-
-// LoadConfig unmarshals jsonData, validates it, and sets baseCfg.
-// It should be called once at the start of main().
-func LoadConfig(jsonData []byte) error {
-	var cfg Config
-	dec := json.NewDecoder(bytes.NewReader(jsonData))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&cfg); err != nil {
-		return err
-	}
-
-	cleanBaseURL(&cfg.SongBaseURL)
-	haveSongBucket := len(cfg.SongBucket) > 0
-	haveSongURL := len(cfg.SongBaseURL) > 0
-	if (haveSongBucket && haveSongURL) || !(haveSongBucket || haveSongURL) {
-		return errors.New("exactly one of SongBucket and SongBaseURL must be set")
-	}
-
-	cleanBaseURL(&cfg.CoverBaseURL)
-	haveCoverBucket := len(cfg.CoverBucket) > 0
-	haveCoverURL := len(cfg.CoverBaseURL) > 0
-	if (haveCoverBucket && haveCoverURL) || !(haveCoverBucket || haveCoverURL) {
-		return errors.New("exactly one of CoverBucket and CoverBaseURL must be set")
-	}
-
-	baseCfg = &cfg
-	return nil
-}
-
-// GetConfig returns the currently-in-use Config.
-func GetConfig(ctx context.Context) (*Config, error) {
-	if baseCfg == nil {
-		return nil, errors.New("LoadConfig not called")
-	}
-	return baseCfg, nil
 }

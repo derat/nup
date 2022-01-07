@@ -15,11 +15,13 @@ import (
 
 	"github.com/derat/nup/server/config"
 
+	"google.golang.org/appengine/v2"
 	"google.golang.org/appengine/v2/aetest"
+	"google.golang.org/appengine/v2/datastore"
 	"google.golang.org/appengine/v2/user"
 )
 
-// This test also exercises a lot of code from the config page, but the aetest package is slow
+// This test also exercises a lot of code from the config package, but the aetest package is slow
 // (4+ seconds to start dev_appserver.py) so I'm minimizing the number of places I use it.
 func TestAddHandler(t *testing.T) {
 	const (
@@ -44,7 +46,7 @@ func TestAddHandler(t *testing.T) {
 	}
 	defer inst.Close()
 
-	// Load a config.
+	// Save a config to Datastore.
 	origCfg := &config.Config{
 		BasicAuthUsers: []config.BasicAuthInfo{{user1, pass1}, {user2, pass2}},
 		GoogleUsers:    []string{email1, email2},
@@ -55,8 +57,17 @@ func TestAddHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed marshaling config: ", err)
 	}
-	if err := config.LoadConfig(b); err != nil {
-		t.Fatal("Failed loading config: ", err)
+	// The aetest package makes no sense. It looks like I need to call NewRequest
+	// just to get a context.
+	req, err := inst.NewRequest("GET", "/", nil)
+	if err != nil {
+		t.Fatal("Failed creating request: ", err)
+	}
+	ctx := appengine.NewContext(req)
+	scfg := config.SavedConfig{JSON: string(b)}
+	key := datastore.NewKey(ctx, config.DatastoreKind, config.DatastoreKeyName, 0, nil)
+	if _, err := datastore.Put(ctx, key, &scfg); err != nil {
+		t.Fatal("Failed saving config: ", err)
 	}
 
 	// Set up some HTTP handlers.

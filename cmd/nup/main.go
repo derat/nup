@@ -12,6 +12,7 @@ import (
 
 	"github.com/derat/nup/cmd/nup/check"
 	"github.com/derat/nup/cmd/nup/client"
+	"github.com/derat/nup/cmd/nup/config"
 	"github.com/derat/nup/cmd/nup/covers"
 	"github.com/derat/nup/cmd/nup/dump"
 	"github.com/derat/nup/cmd/nup/gain"
@@ -35,9 +36,11 @@ func main() {
 
 	var cfg client.Config
 	subcommands.Register(&check.Command{Cfg: &cfg}, "")
+	subcommands.Register(&config.Command{Cfg: &cfg}, "")
 	subcommands.Register(&covers.Command{Cfg: &cfg}, "")
 	subcommands.Register(&dump.Command{Cfg: &cfg}, "")
 	subcommands.Register(&gain.Command{Cfg: &cfg}, "")
+	subcommands.Register(&projectidCommand{cfg: &cfg}, "")
 	subcommands.Register(&storage.Command{Cfg: &cfg}, "")
 	subcommands.Register(&update.Command{Cfg: &cfg}, "")
 
@@ -51,4 +54,27 @@ func main() {
 	}
 
 	os.Exit(int(subcommands.Execute(context.Background())))
+}
+
+// This is too simple to get its own package.
+type projectidCommand struct{ cfg *client.Config }
+
+func (*projectidCommand) Name() string     { return "projectid" }
+func (*projectidCommand) Synopsis() string { return "print GCP project ID" }
+func (*projectidCommand) Usage() string {
+	return `projectid:
+	Print the Google Cloud Platform project ID (as derived from the
+	config's serverURL field).
+
+`
+}
+func (cmd *projectidCommand) SetFlags(f *flag.FlagSet) {}
+func (cmd *projectidCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
+	pid, err := cmd.cfg.ProjectID()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed getting project ID:", err)
+		return subcommands.ExitFailure
+	}
+	fmt.Println(pid)
+	return subcommands.ExitSuccess
 }

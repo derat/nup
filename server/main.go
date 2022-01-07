@@ -8,9 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -34,8 +32,7 @@ import (
 )
 
 const (
-	configPath = "config.json"    // server config relative to base dir
-	indexPath  = "web/index.html" // path to index relative to base dir
+	indexPath = "web/index.html" // path to index relative to base dir
 
 	defaultDumpBatchSize = 100  // default size of batch of dumped entities
 	maxDumpBatchSize     = 5000 // max size of batch of dumped entities
@@ -51,18 +48,6 @@ const (
 var forceUpdateFailures = false
 
 func main() {
-	// Tests can override the config file via a NUP_CONFIG environment variable.
-	cfgData := []byte(os.Getenv("NUP_CONFIG"))
-	if len(cfgData) == 0 {
-		var err error
-		if cfgData, err = ioutil.ReadFile(configPath); err != nil {
-			panic(fmt.Sprintf("Reading config failed: %v", err))
-		}
-	}
-	if err := config.LoadConfig(cfgData); err != nil {
-		panic(fmt.Sprintf("Loading config failed: %v", err))
-	}
-
 	rand.Seed(time.Now().UnixNano())
 
 	// Use a wrapper instead of calling http.HandleFunc directly to reduce the risk

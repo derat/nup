@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/derat/nup/server/config"
@@ -20,6 +21,22 @@ import (
 // Maximum response size permitted by App Engine:
 // https://cloud.google.com/appengine/docs/standard/go111/how-requests-are-handled
 const maxResponseSize = 32 * 1024 * 1024
+
+var loadedCfg *config.Config  // previously-loaded config
+var loadedCfgMutex sync.Mutex // guards loadedCfg
+
+// getConfig returns the server's configuration, loading it if necessary.
+func getConfig(ctx context.Context) (*config.Config, error) {
+	loadedCfgMutex.Lock()
+	defer loadedCfgMutex.Unlock()
+
+	if loadedCfg != nil {
+		return loadedCfg, nil
+	}
+	var err error
+	loadedCfg, err = config.LoadConfig(ctx)
+	return loadedCfg, err
+}
 
 // writeJSONResponse serializes v to JSON and writes it to w.
 func writeJSONResponse(w http.ResponseWriter, v interface{}) {
@@ -55,7 +72,7 @@ type handlerFunc func(ctx context.Context, cfg *config.Config, w http.ResponseWr
 func addHandler(path, method string, auth handlerAuth, fn handlerFunc) {
 	http.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		ctx := appengine.NewContext(r)
-		cfg, err := config.GetConfig(ctx)
+		cfg, err := getConfig(ctx)
 		if err != nil {
 			log.Criticalf(ctx, "Failed getting config: %v", err)
 			http.Error(w, "Failed getting config", http.StatusInternalServerError)

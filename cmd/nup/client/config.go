@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Config holds configuration details for the nup client executable.
@@ -28,6 +29,7 @@ type Config struct {
 	MusicDir string `json:"musicDir"`
 	// LastUpdateInfoFile is the path to a JSON file storing info about the last update.
 	// The file will be created if it does not already exist.
+	// $HOME/nup/last_update_info.json will be used by default.
 	LastUpdateInfoFile string `json:"lastUpdateInfoFile"`
 	// ComputeGain indicates whether the mp3gain program should be used to compute per-song
 	// and per-album gain information so that volume can be normalized during playback.
@@ -38,9 +40,8 @@ type Config struct {
 	ArtistRewrites map[string]string `json:"artistRewrites"`
 }
 
-// LoadConfig loads a JSON-marshaled Config from the file at p.
-// dst must be either a *Config or a pointer to a struct that embeds Config.
-func LoadConfig(p string, dst interface{}) error {
+// LoadConfig loads a JSON-marshaled Config from the file at p and updates dst.
+func LoadConfig(p string, dst *Config) error {
 	f, err := os.Open(p)
 	if err != nil {
 		return err
@@ -51,17 +52,12 @@ func LoadConfig(p string, dst interface{}) error {
 	if err = d.Decode(dst); err != nil {
 		return err
 	}
-
-	// Go doesn't let us cast dst to (possibly-embedded) Config, so use this
-	// dumb hack to check that the ServerURL field is set properly.
-	type clientConfig interface{ checkServerURL() error }
-	cfg, ok := dst.(clientConfig)
-	if !ok {
-		return errors.New("invalid config type")
-	} else if err := cfg.checkServerURL(); err != nil {
+	if dst.LastUpdateInfoFile == "" {
+		dst.LastUpdateInfoFile = filepath.Join(os.Getenv("HOME"), ".nup/last_update_info.json")
+	}
+	if err := dst.checkServerURL(); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -84,4 +80,15 @@ func (cfg *Config) checkServerURL() error {
 		return fmt.Errorf("bad serverUrl %q: %v", cfg.ServerURL, err)
 	}
 	return nil
+}
+
+// ProjectID returns the GCP project ID as derived from cfg.ServerURL.
+func (cfg *Config) ProjectID() (string, error) {
+	if su, err := url.Parse(cfg.ServerURL); err != nil {
+		return "", err
+	} else if !strings.HasSuffix(su.Host, ".appspot.com") {
+		return "", errors.New("server hostname doesn't end in appspot.com")
+	} else {
+		return strings.TrimSuffix(su.Host, ".appspot.com"), nil
+	}
 }

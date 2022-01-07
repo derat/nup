@@ -10,16 +10,16 @@ app_engine_apis: true
 # actually serve it; this just prevents the static file from being accessed
 # directly.
 handlers:
-- url: /index\.html
-  script: auto
-  secure: always
-- url: /(.*\.(css|eot|html|gif|ico|jpe?g|js|json|png|svg|ttf|txt|woff|woff2))
-  static_files: web/\1
-  secure: always
-  upload: web/.*
-- url: /.*
-  script: auto
-  secure: always
+  - url: /index\.html
+    script: auto
+    secure: always
+  - url: /(.*\.(css|eot|html|gif|ico|jpe?g|js|json|png|svg|ttf|txt|woff|woff2))
+    static_files: web/\1
+    secure: always
+    upload: web/.*
+  - url: /.*
+    script: auto
+    secure: always
 
 # The skip\_files documentation is a self-contradictory mess:
 #

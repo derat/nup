@@ -8,7 +8,7 @@ EOF
   exit 2
 fi
 
-project=$(./project_id.sh)
+project=$(nup projectid)
 
 # As of November 2021, 'beta' is required here to use App Engine bundled
 # services (e.g. memcache) from the go115 runtime. Without it, the 'deploy'

@@ -96,30 +96,52 @@ At the very least, you'll need to do the following:
 *   Enable the Cloud Storage and App Engine APIs.
 *   Create Cloud Storage buckets for your songs and album art.
 *   Use the [gsutil] tool to sync songs and album art to Cloud Storage.
-*   Configure and deploy the App Engine app.
-*   Compile the `nup` tool, create a small config file for it, and use it to
-    send song metadata to the App Engine app so it can be saved to Datastore.
+*   Compile the `nup` tool using `go install ./cmd/nup`.
+*   Deploy the App Engine app.
+*   Write config files for the `nup` tool and the app.
+*   Use `nup update` to send song metadata to the App Engine app so it can be
+    saved to Datastore.
 
 As mentioned above, please let me know if you're feeling adventurous and would
 like to see detailed instructions for these steps.
 
 [gsutil]: https://cloud.google.com/storage/docs/gsutil
 
-Before deploying the App Engine app, create an `config.json` file in the same
-directory as `app.yaml` corresponding to the `config` struct in
-[server/config.go](./server/config.go):
+### `nup` tool
+
+Create a JSON file at `$HOME/.nup/config.json` corresponding to the `Config`
+struct in [cmd/nup/client/config.go](./cmd/nup/client/config.go):
+
+```
+{
+  "serverUrl": "https://my-project-id.appspot.com",
+  "username": "tools",
+  "password": "my-tools-password",
+  "coverDir": "/home/me/music/.covers",
+  "musicDir": "/home/me/music",
+  "computeGain": true
+}
+```
+
+### Server
+
+Create a JSON file corresponding to the `Config` struct in
+[server/config/config.go](./server/config/config.go):
 
 ```json
 {
-  "projectId": "my-project",
   "googleUsers": [
     "example@gmail.com",
     "example.2@gmail.com",
   ],
   "basicAuthUsers": [
     {
-      "username": "myuser",
-      "password": "mypass"
+      "username": "tools",
+      "password": "my-tools-password"
+    },
+    {
+      "username": "android",
+      "password": "my-android-password"
     }
   ],
   "songBucket": "my-songs",
@@ -127,16 +149,12 @@ directory as `app.yaml` corresponding to the `config` struct in
 }
 ```
 
-The `projectId` property contains the GCP project ID. It isn't used by the
-server; it's just defined here to simplify deployment commands since the
-`gcloud` program doesn't support specifying a per-directory default project ID.
-
-All other fields are documented in the Go file linked above.
+You can run `nup config -set /path/to/server_config.json` to save the server
+configuration to Datastore, or alternatively you can save it as `config.json` at
+the root of this repository to deploy it alongside the server code to App
+Engine.
 
 ## Deploying
-
-(The following command depends on the [jq] program being present and `projectId`
-being set in `config.json` as described above.)
 
 To deploy the App Engine app and delete old, non-serving versions, run the
 `deploy.sh` script.
@@ -146,8 +164,6 @@ Note that App Engine often continues serving stale versions of static files for
 long time](https://issuetracker.google.com/issues/35890923). [This Stack
 Overflow question](https://stackoverflow.com/q/2783082/6882947) has more
 discussion.
-
-[jq]: https://stedolan.github.io/jq/
 
 ## Development and testing
 

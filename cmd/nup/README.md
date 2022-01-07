@@ -12,11 +12,13 @@ Usage: nup <flags> <subcommand> <subcommand args>
 Subcommands:
         check            check for issues in songs and cover images
         commands         list all command names
+        config           manage server configuration
         covers           download album art
         dump             dump songs from the server
         flags            describe all known top-level flags
         gain             compute gain adjustments for songs
         help             describe subcommands and their syntax
+        projectid        print GCP project ID
         storage          update song storage classes
         update           send song updates to the server
 
@@ -43,6 +45,22 @@ check [flags]:
           song-cover      Songs have cover files
          (default "album-id,imported,song-cover")
 ```
+
+## `config` command
+
+The `config` command prints or updates the server's saved configuration in
+[Datastore]. See the [Config](../../server/config/config.go) struct for details.
+
+```
+config [flags]:
+        Manage the App Engine server's configuration in Datastore.
+        By default, prints the existing JSON-marshaled configuration.
+
+  -set string
+        Path of updated JSON config file to save to Datastore
+```
+
+[Datastore]: https://cloud.google.com/datastore
 
 ## `covers` command
 
@@ -106,6 +124,18 @@ only useful for backfilling missing data.
 gain:
         Compute gain adjustments for dumped songs from stdin using mp3gain.
         Writes updated JSON song objects to stdout.
+```
+
+## `projectid` command
+
+The `projectid` command prints the GCP [project ID].
+
+[project ID]: https://cloud.google.com/resource-manager/docs/creating-managing-projects#before_you_begin
+
+```
+projectid:
+        Print the Google Cloud Platform project ID (as derived from the
+        config's serverURL field).
 ```
 
 ## `storage` command
