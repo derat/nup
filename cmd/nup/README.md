@@ -56,6 +56,10 @@ config [flags]:
         Manage the App Engine server's configuration in Datastore.
         By default, prints the existing JSON-marshaled configuration.
 
+  -delete-instances
+        Delete running instances after setting config
+  -service string
+        Service name for -delete-instances (default "default")
   -set string
         Path of updated JSON config file to save to Datastore
 ```

@@ -48,10 +48,13 @@ func TestAddHandler(t *testing.T) {
 
 	// Save a config to Datastore.
 	origCfg := &config.Config{
-		BasicAuthUsers: []config.BasicAuthInfo{{user1, pass1}, {user2, pass2}},
-		GoogleUsers:    []string{email1, email2},
-		SongBucket:     "test-songs",
-		CoverBucket:    "test-covers",
+		BasicAuthUsers: []config.BasicAuthInfo{
+			{Username: user1, Password: pass1},
+			{Username: user2, Password: pass2},
+		},
+		GoogleUsers: []string{email1, email2},
+		SongBucket:  "test-songs",
+		CoverBucket: "test-covers",
 	}
 	b, err := json.Marshal(origCfg)
 	if err != nil {

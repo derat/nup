@@ -8,22 +8,27 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 
 	"cloud.google.com/go/datastore"
-	"google.golang.org/api/option"
 
 	"github.com/derat/nup/cmd/nup/client"
 	srvconfig "github.com/derat/nup/server/config"
 	"github.com/google/subcommands"
 
 	"golang.org/x/oauth2/google"
+
+	"google.golang.org/api/appengine/v1"
+	"google.golang.org/api/option"
 )
 
 type Command struct {
 	Cfg *client.Config
 
-	setPath string // path of config file to set
+	deleteInstances bool   // delete instances after set
+	setPath         string // path of config file to set
+	service         string // service name whose instances should be deleted
 }
 
 func (*Command) Name() string     { return "config" }
@@ -37,7 +42,9 @@ func (*Command) Usage() string {
 }
 
 func (cmd *Command) SetFlags(f *flag.FlagSet) {
+	f.BoolVar(&cmd.deleteInstances, "delete-instances", false, "Delete running instances after setting config")
 	f.StringVar(&cmd.setPath, "set", "", "Path of updated JSON config file to save to Datastore")
+	f.StringVar(&cmd.service, "service", "default", "Service name for -delete-instances")
 }
 
 func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
@@ -46,7 +53,10 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 		fmt.Fprintln(os.Stderr, "Failed getting project ID:", err)
 		return subcommands.ExitFailure
 	}
-	creds, err := google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/datastore")
+	creds, err := google.FindDefaultCredentials(ctx,
+		"https://www.googleapis.com/auth/datastore",
+		"https://www.googleapis.com/auth/appengine.admin",
+	)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed finding credentials:", err)
 		return subcommands.ExitFailure
@@ -108,6 +118,41 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 		return subcommands.ExitFailure
 	}
 
-	// TODO: Is there any way to restart instances so they'll pick up the new config?
+	if cmd.deleteInstances {
+		if err := deleteInstances(ctx, projectID, cmd.service, creds); err != nil {
+			fmt.Fprintln(os.Stderr, "Failed deleting instances:", err)
+			return subcommands.ExitFailure
+		}
+	}
+
 	return subcommands.ExitSuccess
+}
+
+// deleteInstances deletes all App Engine instances of service in projectID.
+func deleteInstances(ctx context.Context, projectID, service string, creds *google.Credentials) error {
+	asrv, err := appengine.NewService(ctx, option.WithCredentials(creds))
+	if err != nil {
+		return err
+	}
+
+	vsrv := appengine.NewAppsServicesVersionsService(asrv)
+	isrv := appengine.NewAppsServicesVersionsInstancesService(asrv)
+
+	resp, err := vsrv.List(projectID, service).Do()
+	if err != nil {
+		return err
+	}
+	for _, ver := range resp.Versions {
+		resp, err := isrv.List(projectID, service, ver.Id).Do()
+		if err != nil {
+			return err
+		}
+		for _, inst := range resp.Instances {
+			log.Println("Deleting instance", inst.Name)
+			if _, err := isrv.Delete(projectID, service, ver.Id, inst.Id).Do(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
