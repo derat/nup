@@ -13,11 +13,15 @@ import (
 	"os"
 
 	"cloud.google.com/go/storage"
+
 	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/server/db"
 	"github.com/google/subcommands"
 
+	"golang.org/x/oauth2/google"
+
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 )
 
 type storageClass string
@@ -58,10 +62,6 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 }
 
 func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
-	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") == "" {
-		fmt.Fprintln(os.Stderr, "Must set GOOGLE_APPLICATION_CREDENTIALS to service account key file")
-		return subcommands.ExitUsageError
-	}
 	if cmd.bucketName == "" {
 		fmt.Fprintln(os.Stderr, "Must supply bucket name with -bucket")
 		return subcommands.ExitUsageError
@@ -71,6 +71,20 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interf
 		fmt.Fprintf(os.Stderr, "Invalid -class %q (valid: %v %v %v)\n", class, nearline, coldline, archive)
 		return subcommands.ExitUsageError
 	}
+
+	creds, err := google.FindDefaultCredentials(ctx,
+		"https://www.googleapis.com/auth/devstorage.read_write",
+	)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed finding credentials:", err)
+		return subcommands.ExitFailure
+	}
+	client, err := storage.NewClient(ctx, option.WithCredentials(creds))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed creating client:", err)
+		return subcommands.ExitFailure
+	}
+	defer client.Close()
 
 	// Read songs from stdin and determine the proper storage class for each.
 	songClasses := make(map[string]storageClass)
@@ -89,13 +103,6 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interf
 		}
 		songClasses[s.Filename] = cls
 	}
-
-	client, err := storage.NewClient(ctx)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed creating client:", err)
-		return subcommands.ExitFailure
-	}
-	defer client.Close()
 
 	// List the objects synchronously so we know how many jobs we'll have.
 	var jobs []job

@@ -66,6 +66,7 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 		fmt.Fprintln(os.Stderr, "Failed creating client:", err)
 		return subcommands.ExitFailure
 	}
+	defer cl.Close()
 
 	key := &datastore.Key{
 		Kind: srvconfig.DatastoreKind,
