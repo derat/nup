@@ -749,3 +749,38 @@ func TestDeleteSong(tt *testing.T) {
 			deletedSongs[0].SongID, id2)
 	}
 }
+
+func TestMergeSongs(tt *testing.T) {
+	t, done := initTest(tt)
+	defer done()
+
+	log.Print("Posting songs")
+	s1 := Song0s
+	s1.Rating = 0.75
+	s1.Tags = []string{"guitar", "instrumental"}
+	s1.Plays = []db.Play{
+		db.NewPlay(time.Unix(1410746718, 0), "127.0.0.1"),
+	}
+	s2 := Song1s
+	s2.Rating = 0.25
+	s2.Tags = []string{"drums", "rock"}
+	s2.Plays = []db.Play{
+		db.NewPlay(time.Unix(1410746923, 0), "127.0.0.1"),
+		db.NewPlay(time.Unix(1410747184, 0), "127.0.0.1"),
+	}
+	t.PostSongs([]db.Song{s1, s2}, true, 0)
+
+	log.Print("Merging songs")
+	t.MergeSongs(t.SongID(s1.SHA1), t.SongID(s2.SHA1))
+
+	log.Print("Checking that songs were merged")
+	s2.Rating = s1.Rating
+	s2.Tags = append(s2.Tags, s1.Tags...)
+	sort.Strings(s2.Tags)
+	s2.Plays = append(s2.Plays, s1.Plays...)
+	sort.Sort(db.PlayArray(s2.Plays))
+	if err := test.CompareSongs([]db.Song{s1, s2}, t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
+		tt.Fatal("Bad songs after merging: ", err)
+	}
+
+}

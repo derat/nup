@@ -30,6 +30,7 @@ type Command struct {
 	importJSONFile  string // path to JSON file with Song objects to import
 	importUserData  bool   // replace user data when using importJSONFile
 	limit           int    // maximum number of songs to update
+	mergeSongIDs    string // IDs of songs to merge, as "from:to"
 	requireCovers   bool   // die if cover images are missing
 	songPathsFile   string // path to list of songs to force updating
 	testGainInfo    string // hardcoded gain info as "track:album:amp" for testing
@@ -45,7 +46,7 @@ func (*Command) Usage() string {
 }
 
 func (cmd *Command) SetFlags(f *flag.FlagSet) {
-	f.Int64Var(&cmd.deleteSongID, "delete-song-id", 0, "Delete song with given ID")
+	f.Int64Var(&cmd.deleteSongID, "delete-song", 0, "Delete song with given ID")
 	f.BoolVar(&cmd.dryRun, "dry-run", false, "Only print what would be updated")
 	f.StringVar(&cmd.dumpedGainsFile, "dumped-gains-file", "",
 		"Path to dump file from which songs' gains will be read (instead of being computed)")
@@ -55,7 +56,10 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 		"If non-empty, path to JSON file containing a stream of Song objects to import")
 	f.BoolVar(&cmd.importUserData, "import-user-data", true,
 		"When importing from JSON, replace user data (ratings, tags, plays, etc.)")
-	f.IntVar(&cmd.limit, "limit", 0, "If positive, limits the number of songs to update (for testing)")
+	f.IntVar(&cmd.limit, "limit", 0,
+		"If positive, limits the number of songs to update (for testing)")
+	f.StringVar(&cmd.mergeSongIDs, "merge-songs", "",
+		`Merge one song's user data into another song, with IDs as "from:to"`)
 	f.BoolVar(&cmd.requireCovers, "require-covers", false,
 		"Die if cover images aren't found for any songs that have album IDs")
 	f.StringVar(&cmd.songPathsFile, "song-paths-file", "",
@@ -65,16 +69,17 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 }
 
 func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
+	if countBools(cmd.deleteSongID > 0, cmd.importJSONFile != "", cmd.mergeSongIDs != "", cmd.songPathsFile != "") > 1 {
+		fmt.Fprintln(os.Stderr, "-delete-song, -import-json-file, -merge-songs, and -song-paths-file "+
+			"are mutually exclusive")
+		return subcommands.ExitUsageError
+	}
+
 	if cmd.deleteSongID > 0 {
-		if cmd.dryRun {
-			fmt.Fprintln(os.Stderr, "-dry-run is incompatible with -delete-song-id")
-			return subcommands.ExitUsageError
-		}
-		if err := deleteSong(cmd.Cfg, cmd.deleteSongID); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed deleting song %v: %v\n", cmd.deleteSongID, err)
-			return subcommands.ExitFailure
-		}
-		return subcommands.ExitSuccess
+		return cmd.doDeleteSong()
+	}
+	if cmd.mergeSongIDs != "" {
+		return cmd.doMergeSongs()
 	}
 
 	var err error
@@ -217,9 +222,68 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 	return subcommands.ExitSuccess
 }
 
+func (cmd *Command) doDeleteSong() subcommands.ExitStatus {
+	if cmd.dryRun {
+		fmt.Fprintln(os.Stderr, "-dry-run is incompatible with -delete-song")
+		return subcommands.ExitUsageError
+	}
+	if err := deleteSong(cmd.Cfg, cmd.deleteSongID); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed deleting song %v: %v\n", cmd.deleteSongID, err)
+		return subcommands.ExitFailure
+	}
+	return subcommands.ExitSuccess
+}
+
+func (cmd *Command) doMergeSongs() subcommands.ExitStatus {
+	var fromID, toID int64
+	if _, err := fmt.Sscanf(cmd.mergeSongIDs, "%d:%d", &fromID, &toID); err != nil {
+		fmt.Fprintln(os.Stderr, `-merge-songs needs IDs to merge as "from:to"`)
+		return subcommands.ExitUsageError
+	}
+	var err error
+	var from, to db.Song
+	if from, err = dumpSong(cmd.Cfg, fromID); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed dumping song %v: %v\n", fromID, err)
+		return subcommands.ExitFailure
+	}
+	if to, err = dumpSong(cmd.Cfg, toID); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed dumping song %v: %v\n", toID, err)
+		return subcommands.ExitFailure
+	}
+	to.Rating = from.Rating
+	to.Tags = append(to.Tags, from.Tags...)
+	to.Plays = append(to.Plays, from.Plays...)
+
+	if cmd.dryRun {
+		if err := json.NewEncoder(os.Stdout).Encode(to); err != nil {
+			fmt.Fprintln(os.Stderr, "Failed encoding song:", err)
+			return subcommands.ExitFailure
+		}
+	} else {
+		ch := make(chan db.Song, 1)
+		ch <- to
+		close(ch)
+		if err := updateSongs(cmd.Cfg, ch, true /* replaceUserData */); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed updating song %v: %v\n", toID, err)
+			return subcommands.ExitFailure
+		}
+	}
+	return subcommands.ExitSuccess
+}
+
 type songOrErr struct {
 	song *db.Song
 	err  error
+}
+
+func countBools(vals ...bool) int {
+	var cnt int
+	for _, v := range vals {
+		if v {
+			cnt++
+		}
+	}
+	return cnt
 }
 
 // lastUpdateInfo contains information about the last full update that was performed.

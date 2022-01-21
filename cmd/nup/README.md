@@ -41,6 +41,7 @@ check [flags]:
         Comma-separated list of checks to perform:
           album-id        Songs have MusicBrainz album IDs
           cover-size-400  Cover images are at least 400x400
+          cover-size-800  Cover images are at least 800x800
           imported        All songs have been imported
           song-cover      Songs have cover files
          (default "album-id,imported,song-cover")
@@ -95,6 +96,8 @@ covers [flags]:
         Maximum number of parallel HTTP requests (default 2)
   -max-songs int
         Maximum number of songs to inspect (default -1)
+  -size int
+        Image size to download (250, 500, or 1200) (default 1200)
 ```
 
 ## `dump` command
@@ -187,14 +190,14 @@ objects from a file. Note that any existing user data (ratings, tags, and
 playback history) will be replaced by default, although this behavior can be
 disabled by passing `-import-user-data=false`.
 
-The `-delete-song-id` flag can be used to delete specific songs from the server
+The `-delete-song` flag can be used to delete specific songs from the server
 (e.g. after deleting them from the music dir).
 
 ```
 update [flags]:
         Send song updates to the server.
 
-  -delete-song-id int
+  -delete-song int
         Delete song with given ID
   -dry-run
         Only print what would be updated
@@ -208,12 +211,14 @@ update [flags]:
         When importing from JSON, replace user data (ratings, tags, plays, etc.) (default true)
   -limit int
         If positive, limits the number of songs to update (for testing)
+  -merge-songs string
+        Merge one song's user data into another song, with IDs as "from:to"
   -require-covers
         Die if cover images aren't found for any songs that have album IDs
   -song-paths-file string
         Path to a file containing one relative path per line for songs to force updating
   -test-gain-info string
-        Hardcoded gain info as "track:album:amp" (for testing)
+        Hardcoded gain info as "track:album:amp" (for testing)`
 ```
 
 ### Merging songs
@@ -226,33 +231,11 @@ into the new file.
 
 1.  Run `nup update` to create a new database object for the new file.
 2.  Use `nup dump` to produce a local text file containing JSON representations
-    of all songs. Let's call it `music.txt`. This will contain objects for both
-    the old and new files.
-3.  Optionally, find the old file's line in `music.txt` and copy it into a new
-    `delete.txt` file. You can keep this as a backup in case something goes
-    wrong.
-4.  Find the new file's line in `music.txt` and copy it into a new `update.txt`
-    file.
-5.  Replace the `rating`, `plays`, and `tags` properties in `update.txt` with
-    the old file's values.
-6.  Run a command like the following to update the new file's database object:
-    ```sh
-    nup update -import-user-data -import-json-file update.txt
-    ```
-    You might want to run this with `-dry-run` first to check `update.txt`'s
-    syntax and double-check what will be done.
-7.  Run a command like the following to delete the old file's database object:
-    ```sh
-    nup update -delete-song-id <ID>
-    ```
-    `ID` corresponds to the numeric value of the old file's `songId` property.
-8.  Delete `old/song.mp3` or remove it from your local music directory.
-
-You can put multiple updated objects in `update.txt`, with each on its own line.
-If you want to delete multiple objects from a `delete.txt` file, use a command
-like the following:
-```sh
-sed -nre 's/.*"songId":"([0-9]+)".*/\1/p' <delete.txt | while read id; do
-  nup update -delete-song-id $id
-done
-```
+    of all songs and find the old and new songs' `songId` properties in it.
+    Alternatively, find the songs' IDs using the "Debug" menu item in the web
+    interface.
+3.  Run `nup update -merge-songs=<OLDID>:<NEWID>` to merge the old song's user
+    data into the new song.
+4.  Run `nup update -delete-song <OLDID>` to delete the old song from the
+    server.
+5.  Delete `old/song.mp3` or remove it from your local music directory.

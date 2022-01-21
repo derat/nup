@@ -5,6 +5,7 @@ package test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,6 +34,7 @@ const (
 	dumpBatchSize    = 2                // song/play batch size for 'nup dump'
 	androidBatchSize = 1                // song batch size when exporting for Android
 	serverTimeout    = 10 * time.Second // timeout for HTTP requests to server
+	commandTimeout   = 10 * time.Second // timeout for 'nup' commands
 )
 
 // Tester helps tests send HTTP requests to a development server and run the nup executable.
@@ -140,7 +142,9 @@ func (t *Tester) fatalf(format string, args ...interface{}) {
 
 // runCommand synchronously runs the executable at p with args and returns its output.
 func runCommand(p string, args ...string) (stdout, stderr string, err error) {
-	cmd := exec.Command(p, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, p, args...)
 	outPipe, err := cmd.StdoutPipe()
 	if err != nil {
 		return
@@ -260,8 +264,19 @@ func (t *Tester) DeleteSong(songID string) {
 		"nup",
 		"-config="+t.configFile,
 		"update",
-		"-delete-song-id="+songID); err != nil {
+		"-delete-song="+songID); err != nil {
 		t.fatalf("Failed deleting song %v: %v\nstderr: %v", songID, err, stderr)
+	}
+}
+
+// MergeSongs merges one song's user data into another song using 'nup update'.
+func (t *Tester) MergeSongs(fromID, toID string) {
+	if _, stderr, err := runCommand(
+		"nup",
+		"-config="+t.configFile,
+		"update",
+		fmt.Sprintf("-merge-songs=%s:%s", fromID, toID)); err != nil {
+		t.fatalf("Failed merging song %v into %v: %v\nstderr: %v", fromID, toID, err, stderr)
 	}
 }
 

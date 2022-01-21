@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/derat/nup/cmd/nup/client"
@@ -16,6 +17,39 @@ import (
 
 const batchSize = 100 // updateSongs HTTP request batch size
 
+// sendRequest sends the specified request to the server and returns the response body.
+// r contains the request body and may be nil.
+// ctype contains the value for the Content-Type header if non-empty.
+func sendRequest(cfg *client.Config, method, path, query string,
+	r io.Reader, ctype string) ([]byte, error) {
+	u := cfg.GetURL(path)
+	if query != "" {
+		u.RawQuery = query
+	}
+	req, err := http.NewRequest(method, u.String(), r)
+	if err != nil {
+		return nil, err
+	}
+	req.SetBasicAuth(cfg.Username, cfg.Password)
+	if ctype != "" {
+		req.Header.Set("Content-Type", ctype)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return b, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return b, fmt.Errorf("got status %q", resp.Status)
+	}
+	return b, nil
+}
+
 // updateSongs reads all songs from ch and sends them to the server.
 //
 // If replaceUserData is true, then user data (e.g. rating, tags, plays)
@@ -23,29 +57,13 @@ const batchSize = 100 // updateSongs HTTP request batch size
 // are preserved and only static fields (e.g. artist, title, album, etc.)
 // are replaced.
 func updateSongs(cfg *client.Config, ch chan db.Song, replaceUserData bool) error {
-	u := cfg.GetURL("/import")
+	var query string
 	if replaceUserData {
-		u.RawQuery = "replaceUserData=1"
+		query = "replaceUserData=1"
 	}
-
 	sendFunc := func(r io.Reader) error {
-		req, err := http.NewRequest("POST", u.String(), r)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Content-Type", "text/plain")
-		req.SetBasicAuth(cfg.Username, cfg.Password)
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return err
-		}
-
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("got status %q", resp.Status)
-		}
-		return nil
+		_, err := sendRequest(cfg, "POST", "/import", query, r, "text/plain")
+		return err
 	}
 
 	// Ideally these results could just be streamed, but dev_appserver.py doesn't seem to support
@@ -77,22 +95,19 @@ func updateSongs(cfg *client.Config, ch chan db.Song, replaceUserData bool) erro
 
 // deleteSong sends a request to the server to delete the song with the specified ID.
 func deleteSong(cfg *client.Config, songID int64) error {
-	u := cfg.GetURL("/delete_song")
-	u.RawQuery = fmt.Sprintf("songId=%v", songID)
-	req, err := http.NewRequest("POST", u.String(), nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "text/plain")
-	req.SetBasicAuth(cfg.Username, cfg.Password)
+	_, err := sendRequest(cfg, "POST", "/delete_song",
+		fmt.Sprintf("songId=%v", songID), nil, "text/plain")
+	return err
+}
 
-	resp, err := http.DefaultClient.Do(req)
+// dumpSong dumps the song with the specified ID from the server.
+// User data like ratings, tags, and plays are included.
+func dumpSong(cfg *client.Config, songID int64) (db.Song, error) {
+	b, err := sendRequest(cfg, "GET", "/dump_song", fmt.Sprintf("songId=%v", songID), nil, "")
 	if err != nil {
-		return err
+		return db.Song{}, err
 	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("got status %q", resp.Status)
-	}
-	return nil
+	var s db.Song
+	err = json.Unmarshal(b, &s)
+	return s, err
 }
