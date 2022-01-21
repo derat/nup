@@ -32,6 +32,7 @@ type Command struct {
 	coverDir    string // directory to write covers to
 	maxSongs    int    // songs to inspect
 	maxRequests int    // parallel HTTP requests
+	size        int    // image size to download (250, 500, 1200)
 }
 
 func (*Command) Name() string     { return "covers" }
@@ -49,6 +50,7 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&cmd.coverDir, "cover-dir", "", "Directory to write covers to")
 	f.IntVar(&cmd.maxSongs, "max-songs", -1, "Maximum number of songs to inspect")
 	f.IntVar(&cmd.maxRequests, "max-requests", 2, "Maximum number of parallel HTTP requests")
+	f.IntVar(&cmd.size, "size", 1200, "Image size to download (250, 500, or 1200)")
 }
 
 func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
@@ -82,7 +84,7 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interf
 	}
 
 	log.Printf("Downloading cover(s) for %v album(s)", len(albumIDs))
-	downloadCovers(albumIDs, cmd.coverDir, cmd.maxRequests)
+	downloadCovers(albumIDs, cmd.coverDir, cmd.size, cmd.maxRequests)
 	return subcommands.ExitSuccess
 }
 
@@ -156,8 +158,8 @@ func readDumpedSongs(r io.Reader, coverDir string, maxSongs int) (albumIDs []str
 
 // downloadCover downloads cover art for albumID into dir.
 // If the cover was not found, path is empty and err is nil.
-func downloadCover(albumID, dir string) (path string, err error) {
-	url := fmt.Sprintf("https://coverartarchive.org/release/%s/front-500", albumID)
+func downloadCover(albumID, dir string, size int) (path string, err error) {
+	url := fmt.Sprintf("https://coverartarchive.org/release/%s/front-%d", albumID, size)
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("Fetching %v failed: %v", url, err)
@@ -184,7 +186,7 @@ func downloadCover(albumID, dir string) (path string, err error) {
 	return path, nil
 }
 
-func downloadCovers(albumIDs []string, dir string, maxRequests int) {
+func downloadCovers(albumIDs []string, dir string, size, maxRequests int) {
 	numReq := 0
 	canStartReq := func() bool { return numReq < maxRequests }
 	cond := sync.NewCond(&sync.Mutex{})
@@ -202,7 +204,7 @@ func downloadCovers(albumIDs []string, dir string, maxRequests int) {
 			cond.L.Unlock()
 
 			go func(id string) {
-				path, err := downloadCover(id, dir)
+				path, err := downloadCover(id, dir, size)
 
 				cond.L.Lock()
 				numReq--

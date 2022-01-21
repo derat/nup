@@ -28,6 +28,7 @@ type checkSettings uint32
 const (
 	checkAlbumID checkSettings = 1 << iota
 	checkCoverSize400
+	checkCoverSize800
 	checkImported
 	checkSongCover
 )
@@ -39,6 +40,7 @@ var checkInfos = map[string]struct { // keys are values for -check flag
 }{
 	"album-id":       {checkAlbumID, "Songs have MusicBrainz album IDs", true},
 	"cover-size-400": {checkCoverSize400, "Cover images are at least 400x400", false},
+	"cover-size-800": {checkCoverSize800, "Cover images are at least 800x800", false},
 	"imported":       {checkImported, "All songs have been imported", true},
 	"song-cover":     {checkSongCover, "Songs have cover files", true},
 }
@@ -204,10 +206,10 @@ func checkCovers(songs []*db.Song, coverDir string, settings checkSettings) erro
 		return err
 	}
 
-	songFns := make(map[string]struct{})
+	songFns := make(map[string]string) // values are "[artist] - [album]"
 	for _, s := range songs {
 		if len(s.CoverFilename) > 0 {
-			songFns[s.CoverFilename] = struct{}{}
+			songFns[s.CoverFilename] = s.Artist + " - " + s.Album
 		}
 	}
 
@@ -223,7 +225,11 @@ func checkCovers(songs []*db.Song, coverDir string, settings checkSettings) erro
 		})
 	}
 
-	if settings&checkCoverSize400 != 0 {
+	if settings&(checkCoverSize400|checkCoverSize800) != 0 {
+		min := 400
+		if settings&checkCoverSize800 != 0 {
+			min = 800
+		}
 		fs = append(fs, func(fn string) error {
 			p := filepath.Join(coverDir, fn)
 			f, err := os.Open(p)
@@ -237,7 +243,7 @@ func checkCovers(songs []*db.Song, coverDir string, settings checkSettings) erro
 				return fmt.Errorf("failed to decode %v: %v", p, err)
 			}
 			b := img.Bounds()
-			if b.Dx() < 400 || b.Dy() < 400 {
+			if b.Dx() < min || b.Dy() < min {
 				return fmt.Errorf("cover is only %vx%v", b.Dx(), b.Dy())
 			}
 			return nil
@@ -247,7 +253,11 @@ func checkCovers(songs []*db.Song, coverDir string, settings checkSettings) erro
 	for _, f := range fs {
 		for _, fn := range fns {
 			if err := f(fn); err != nil {
-				log.Printf("%s: %v", fn, err)
+				key := fn
+				if s := songFns[fn]; s != "" {
+					key += " (" + s + ")"
+				}
+				log.Printf("%s: %v", key, err)
 			}
 		}
 	}
