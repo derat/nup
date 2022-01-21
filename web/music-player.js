@@ -833,8 +833,10 @@ customElements.define(
 
     onTimeUpdate_() {
       const song = this.currentSong_;
+      if (song === null) return;
+
       const pos = this.audio_.currentTime;
-      const dur = song ? song.length : this.audio_.duration;
+      const dur = song.length;
 
       // Avoid resetting |numErrors_| if we get called repeatedly without making
       // any progress.
