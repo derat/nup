@@ -10,12 +10,12 @@ const template = createTemplate(`
   @import 'dialog.css';
 
   hr.title {
-    margin-bottom: 12px;
+    margin-bottom: var(--margin);
   }
   .row {
     align-items: center;
     display: flex;
-    margin-bottom: 12px;
+    margin-bottom: var(--margin);
   }
   .label-col {
     display: inline-block;

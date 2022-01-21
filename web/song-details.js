@@ -6,7 +6,9 @@ import {
   createShadow,
   createTemplate,
   formatTime,
+  getFullCoverUrl,
   getRatingString,
+  getScaledCoverUrl,
 } from './common.js';
 
 const template = createTemplate(`
@@ -18,11 +20,27 @@ const template = createTemplate(`
     max-width: 25em;
   }
   hr.title {
-    margin-bottom: 12px;
+    margin-bottom: var(--margin);
+  }
+  #cover-link {
+    display: block;
+    text-align: center;
+  }
+  #cover-img {
+    cursor: pointer;
+    height: 192px;
+    margin-bottom: var(--margin);
+    object-fit: cover;
+    outline: solid 1px var(--border-color);
+    width: 192px;
+  }
+  #cover-img.hidden {
+    display: none;
   }
   .details-table {
     border-collapse: collapse;
     line-height: 1.2em;
+    margin-bottom: var(--margin);
   }
   .details-table td:first-child {
     color: var(--text-label-color);
@@ -35,6 +53,8 @@ const template = createTemplate(`
 
 <div class="title">Song details</div>
 <hr class="title" />
+
+<a id="cover-link"><img id="cover-img" /></a>
 
 <table class="details-table">
   <tr><td>Artist:</td><td id="artist"></td></tr>
@@ -54,6 +74,16 @@ const template = createTemplate(`
 export function showSongDetails(manager, song) {
   const container = manager.createDialog();
   const shadow = createShadow(container, template);
+
+  const cover = $('cover-img', shadow);
+  if (song.coverFilename) {
+    cover.src = getScaledCoverUrl(song.coverFilename);
+    const link = $('cover-link', shadow);
+    link.href = getFullCoverUrl(song.coverFilename);
+    link.target = '_blank';
+  } else {
+    cover.classList.add('hidden');
+  }
 
   $('artist', shadow).innerText = song.artist;
   $('title', shadow).innerText = song.title;

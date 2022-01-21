@@ -21,8 +21,7 @@ const template = createTemplate(`
   .heading {
     font-size: 15px;
     font-weight: bold;
-    margin-left: 2px;
-    margin-bottom: 8px;
+    margin-bottom: var(--margin);
     user-select: none;
   }
   #search-form {
