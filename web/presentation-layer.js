@@ -109,6 +109,7 @@ const template = createTemplate(`
   }
 
   #next {
+    cursor: pointer;
     margin-right: 40px;
     max-width: 360px;
   }
@@ -135,7 +136,6 @@ const template = createTemplate(`
   }
   #next-cover {
     box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
-    cursor: pointer;
     height: 80px;
     margin-right: 8px;
     object-fit: cover;
@@ -207,7 +207,7 @@ customElements.define(
       this.nextTitle_ = $('next-title', this.shadow_);
       this.nextAlbum_ = $('next-album', this.shadow_);
 
-      this.nextCover_.addEventListener('click', () => {
+      this.nextDiv_.addEventListener('click', () => {
         this.dispatchEvent(new Event('next'));
         this.playNextTrackFunction_ && this.playNextTrackFunction_();
       });
