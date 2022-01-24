@@ -134,6 +134,11 @@ Updates a song's rating and/or tags in Datastore.
 *   `updateDelayNsec` (optional) - Integer value containing nanoseconds to wait
     before writing to Datastore. Used by tests.
 
+### /reindex (POST)
+
+Regenerates normalized string fields used for searching across all [Song]
+objects.
+
 ### /song (GET)
 
 Returns a song's MP3 data.

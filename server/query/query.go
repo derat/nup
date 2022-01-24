@@ -5,19 +5,26 @@
 package query
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/rand"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/derat/nup/server/cache"
 	"github.com/derat/nup/server/db"
+
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 
 	"google.golang.org/appengine/v2/datastore"
 	"google.golang.org/appengine/v2/log"
@@ -364,20 +371,28 @@ func shufflePartial(a []int64, n int) {
 func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 	// First, build a base query with all of the equality filters.
 	bq := datastore.NewQuery(db.SongKind).KeysOnly()
-	if len(query.Artist) > 0 {
-		bq = bq.Filter("ArtistLower =", strings.ToLower(query.Artist))
-	}
-	if len(query.Title) > 0 {
-		bq = bq.Filter("TitleLower =", strings.ToLower(query.Title))
-	}
-	if len(query.Album) > 0 {
-		bq = bq.Filter("AlbumLower =", strings.ToLower(query.Album))
-	}
-	if len(query.AlbumID) > 0 {
-		bq = bq.Filter("AlbumId =", query.AlbumID)
+
+	type term struct{ expr, val string }
+	terms := []term{
+		{"ArtistLower =", query.Artist},
+		{"TitleLower =", query.Title},
+		{"AlbumLower =", query.Album},
 	}
 	for _, w := range query.Keywords {
-		bq = bq.Filter("Keywords =", strings.ToLower(w))
+		terms = append(terms, term{"Keywords =", w})
+	}
+	for _, t := range terms {
+		if t.val != "" {
+			if norm, err := Normalize(t.val); err != nil {
+				return nil, fmt.Errorf("normalizing %q: %v", t.val, err)
+			} else {
+				bq = bq.Filter(t.expr, norm)
+			}
+		}
+	}
+
+	if len(query.AlbumID) > 0 {
+		bq = bq.Filter("AlbumId =", query.AlbumID)
 	}
 	if query.Unrated && !query.HasMinRating {
 		bq = bq.Filter("Rating =", -1.0)
@@ -454,6 +469,28 @@ func CleanSong(s *db.Song, id int64) {
 	// but that aren't needed in search results.
 	s.SHA1 = ""
 	s.Plays = s.Plays[:0]
+}
+
+// https://go.dev/blog/normalization#performing-magic
+var normalizer = transform.Chain(norm.NFKD, runes.Remove(runes.In(unicode.Mn)))
+
+// Normalize normalizes s for searches.
+//
+// NFKD form is used. Unicode characters are decomposed (runes are broken into their components) and
+// replaced for compatibility equivalence (characters that represent the same characters but have
+// different visual representations, e.g. '9' and '⁹', are equal). Visually-similar characters from
+// different alphabets will not be equal, however (e.g. Latin 'o', Greek 'ο', and Cyrillic 'о').
+// See https://go.dev/blog/normalization for more details.
+//
+// Characters are also de-accented and lowercased, but punctuation is preserved.
+func Normalize(s string) (string, error) {
+	b := make([]byte, len(s))
+	_, _, err := normalizer.Transform(b, []byte(s), true)
+	if err != nil {
+		return "", err
+	}
+	b = bytes.TrimRight(b, "\x00")
+	return strings.ToLower(string(b)), nil
 }
 
 // sortSongs sorts songs appropriately for the client.

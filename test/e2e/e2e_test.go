@@ -301,6 +301,13 @@ func TestQueries(tt *testing.T) {
 	t.PostSongs([]db.Song{LegacySong1, LegacySong2}, true, 0)
 	t.PostSongs([]db.Song{Song0s, Song1s, Song5s}, false, 0)
 
+	// Also post a song with Unicode characters that should be normalized.
+	s10s := test.Song10s
+	s10s.Artist = "µ-Ziq" // U+00B5 (MICRO SIGN)
+	s10s.Title = "Mañana"
+	s10s.Album = "Two²"
+	t.PostSongs([]db.Song{s10s}, false, 0)
+
 	log.Print("Doing a bunch of queries")
 	for _, q := range []struct {
 		params []string
@@ -317,12 +324,17 @@ func TestQueries(tt *testing.T) {
 		{[]string{"minRating=0.75"}, []db.Song{LegacySong1}},
 		{[]string{"minRating=0.5"}, []db.Song{LegacySong2, LegacySong1}},
 		{[]string{"minRating=0.0"}, []db.Song{LegacySong2, LegacySong1}},
-		{[]string{"unrated=1"}, []db.Song{Song5s, Song0s, Song1s}},
+		{[]string{"unrated=1"}, []db.Song{Song5s, Song0s, Song1s, s10s}},
 		{[]string{"tags=instrumental"}, []db.Song{LegacySong2, LegacySong1}},
 		{[]string{"tags=electronic+instrumental"}, []db.Song{LegacySong1}},
 		{[]string{"tags=-electronic+instrumental"}, []db.Song{LegacySong2}},
 		{[]string{"tags=instrumental", "minRating=0.75"}, []db.Song{LegacySong1}},
 		{[]string{"firstTrack=1"}, []db.Song{LegacySong1, Song0s}},
+		{[]string{"artist=" + url.QueryEscape("µ-Ziq")}, []db.Song{s10s}}, // U+00B5 (MICRO SIGN)
+		{[]string{"artist=" + url.QueryEscape("μ-Ziq")}, []db.Song{s10s}}, // U+03BC (GREEK SMALL LETTER MU)
+		{[]string{"title=manana"}, []db.Song{s10s}},
+		{[]string{"title=" + url.QueryEscape("mánanä")}, []db.Song{s10s}},
+		{[]string{"album=two2"}, []db.Song{s10s}},
 	} {
 		if err := compareQueryResults(q.exp, t.QuerySongs(q.params...), test.CompareOrder); err != nil {
 			tt.Errorf("%v: %v", q.params, err)
@@ -782,5 +794,28 @@ func TestMergeSongs(tt *testing.T) {
 	if err := test.CompareSongs([]db.Song{s1, s2}, t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
 		tt.Fatal("Bad songs after merging: ", err)
 	}
+}
 
+func TestReindexSongs(tt *testing.T) {
+	t, done := initTest(tt)
+	defer done()
+
+	log.Print("Posting song")
+	s := Song0s
+	s.Rating = 0.75
+	s.Tags = []string{"guitar", "instrumental"}
+	s.Plays = []db.Play{
+		db.NewPlay(time.Unix(1410746718, 0), "127.0.0.1"),
+	}
+	t.PostSongs([]db.Song{s}, true, 0)
+
+	log.Print("Reindexing")
+	t.ReindexSongs()
+
+	// This doesn't actually check that we reindex, but it at least verifies that the server isn't
+	// dropping user data.
+	log.Print("Querying after reindex")
+	if err := compareQueryResults([]db.Song{s}, t.QuerySongs("minRating=0"), test.IgnoreOrder); err != nil {
+		tt.Error("Bad results for query: ", err)
+	}
 }

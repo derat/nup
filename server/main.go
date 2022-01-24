@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"math/rand"
 	"net"
@@ -63,6 +64,7 @@ func main() {
 	addHandler("/presets", http.MethodGet, rejectUnauth, handlePresets)
 	addHandler("/query", http.MethodGet, rejectUnauth, handleQuery)
 	addHandler("/rate_and_tag", http.MethodPost, rejectUnauth, handleRateAndTag)
+	addHandler("/reindex", http.MethodPost, rejectUnauth, handleReindex)
 	addHandler("/song", http.MethodGet, rejectUnauth, handleSong)
 	addHandler("/tags", http.MethodGet, rejectUnauth, handleTags)
 
@@ -512,6 +514,16 @@ func handleRateAndTag(ctx context.Context, cfg *config.Config, w http.ResponseWr
 		return
 	}
 	writeTextResponse(w, "ok")
+}
+
+func handleReindex(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
+	nsongs, err := update.ReindexSongs(ctx)
+	if err != nil {
+		log.Errorf(ctx, "Got error while reindexing songs: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeTextResponse(w, fmt.Sprintf("updated %d song(s)", nsongs))
 }
 
 // The existence of this endpoint makes me extremely unhappy, but it seems necessary due to

@@ -12,6 +12,7 @@ require (
 	golang.org/x/image v0.0.0-20190802002840-cff245a6509b
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/sys v0.0.0-20200223170610-d5e6a3e2c0ae
+	golang.org/x/text v0.3.2
 	google.golang.org/api v0.18.0
 	google.golang.org/appengine/v2 v2.0.1
 )

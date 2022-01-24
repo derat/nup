@@ -213,12 +213,14 @@ update [flags]:
         If positive, limits the number of songs to update (for testing)
   -merge-songs string
         Merge one song's user data into another song, with IDs as "from:to"
+  -reindex-songs
+        Ask server to reindex all songs' search fields (not typically neaded)
   -require-covers
         Die if cover images aren't found for any songs that have album IDs
   -song-paths-file string
         Path to a file containing one relative path per line for songs to force updating
   -test-gain-info string
-        Hardcoded gain info as "track:album:amp" (for testing)`
+        Hardcoded gain info as "track:album:amp" (for testing)
 ```
 
 ### Merging songs

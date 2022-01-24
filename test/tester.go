@@ -264,7 +264,8 @@ func (t *Tester) DeleteSong(songID string) {
 		"nup",
 		"-config="+t.configFile,
 		"update",
-		"-delete-song="+songID); err != nil {
+		"-delete-song="+songID,
+	); err != nil {
 		t.fatalf("Failed deleting song %v: %v\nstderr: %v", songID, err, stderr)
 	}
 }
@@ -275,8 +276,21 @@ func (t *Tester) MergeSongs(fromID, toID string) {
 		"nup",
 		"-config="+t.configFile,
 		"update",
-		fmt.Sprintf("-merge-songs=%s:%s", fromID, toID)); err != nil {
+		fmt.Sprintf("-merge-songs=%s:%s", fromID, toID),
+	); err != nil {
 		t.fatalf("Failed merging song %v into %v: %v\nstderr: %v", fromID, toID, err, stderr)
+	}
+}
+
+// ReindexSongs asks the server to reindex all songs.
+func (t *Tester) ReindexSongs() {
+	if _, stderr, err := runCommand(
+		"nup",
+		"-config="+t.configFile,
+		"update",
+		"-reindex-songs",
+	); err != nil {
+		t.fatalf("Failed reindexing songs: %v\nstderr: %v", err, stderr)
 	}
 }
 

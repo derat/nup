@@ -31,6 +31,7 @@ type Command struct {
 	importUserData  bool   // replace user data when using importJSONFile
 	limit           int    // maximum number of songs to update
 	mergeSongIDs    string // IDs of songs to merge, as "from:to"
+	reindexSongs    bool   // ask the server to reindex all songs
 	requireCovers   bool   // die if cover images are missing
 	songPathsFile   string // path to list of songs to force updating
 	testGainInfo    string // hardcoded gain info as "track:album:amp" for testing
@@ -60,6 +61,8 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 		"If positive, limits the number of songs to update (for testing)")
 	f.StringVar(&cmd.mergeSongIDs, "merge-songs", "",
 		`Merge one song's user data into another song, with IDs as "from:to"`)
+	f.BoolVar(&cmd.reindexSongs, "reindex-songs", false,
+		"Ask server to reindex all songs' search fields (not typically neaded)")
 	f.BoolVar(&cmd.requireCovers, "require-covers", false,
 		"Die if cover images aren't found for any songs that have album IDs")
 	f.StringVar(&cmd.songPathsFile, "song-paths-file", "",
@@ -69,17 +72,21 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 }
 
 func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
-	if countBools(cmd.deleteSongID > 0, cmd.importJSONFile != "", cmd.mergeSongIDs != "", cmd.songPathsFile != "") > 1 {
-		fmt.Fprintln(os.Stderr, "-delete-song, -import-json-file, -merge-songs, and -song-paths-file "+
-			"are mutually exclusive")
+	if countBools(cmd.deleteSongID > 0, cmd.importJSONFile != "", cmd.mergeSongIDs != "",
+		cmd.reindexSongs, cmd.songPathsFile != "") > 1 {
+		fmt.Fprintln(os.Stderr, "-delete-song, -import-json-file, -merge-songs, -reindex-songs, "+
+			"and -song-paths-file are mutually exclusive")
 		return subcommands.ExitUsageError
 	}
 
-	if cmd.deleteSongID > 0 {
+	// Handle flags that don't use the normal update process.
+	switch {
+	case cmd.deleteSongID > 0:
 		return cmd.doDeleteSong()
-	}
-	if cmd.mergeSongIDs != "" {
+	case cmd.mergeSongIDs != "":
 		return cmd.doMergeSongs()
+	case cmd.reindexSongs:
+		return cmd.doReindexSongs()
 	}
 
 	var err error
@@ -227,7 +234,8 @@ func (cmd *Command) doDeleteSong() subcommands.ExitStatus {
 		fmt.Fprintln(os.Stderr, "-dry-run is incompatible with -delete-song")
 		return subcommands.ExitUsageError
 	}
-	if err := deleteSong(cmd.Cfg, cmd.deleteSongID); err != nil {
+	if _, err := sendRequest(cmd.Cfg, "POST", "/delete_song",
+		fmt.Sprintf("songId=%v", cmd.deleteSongID), nil, "text/plain"); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed deleting song %v: %v\n", cmd.deleteSongID, err)
 		return subcommands.ExitFailure
 	}
@@ -268,6 +276,20 @@ func (cmd *Command) doMergeSongs() subcommands.ExitStatus {
 			return subcommands.ExitFailure
 		}
 	}
+	return subcommands.ExitSuccess
+}
+
+func (cmd *Command) doReindexSongs() subcommands.ExitStatus {
+	if cmd.dryRun {
+		fmt.Fprintln(os.Stderr, "-dry-run is incompatible with -reindex-songs")
+		return subcommands.ExitUsageError
+	}
+	b, err := sendRequest(cmd.Cfg, "POST", "/reindex", "", nil, "text/plain")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed reindexing songs:", err)
+		return subcommands.ExitFailure
+	}
+	fmt.Println("Server:", string(b))
 	return subcommands.ExitSuccess
 }
 

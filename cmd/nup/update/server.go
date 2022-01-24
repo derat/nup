@@ -93,13 +93,6 @@ func updateSongs(cfg *client.Config, ch chan db.Song, replaceUserData bool) erro
 	return nil
 }
 
-// deleteSong sends a request to the server to delete the song with the specified ID.
-func deleteSong(cfg *client.Config, songID int64) error {
-	_, err := sendRequest(cfg, "POST", "/delete_song",
-		fmt.Sprintf("songId=%v", songID), nil, "text/plain")
-	return err
-}
-
 // dumpSong dumps the song with the specified ID from the server.
 // User data like ratings, tags, and plays are included.
 func dumpSong(cfg *client.Config, songID int64) (db.Song, error) {
