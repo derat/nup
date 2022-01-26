@@ -838,7 +838,7 @@ func TestOptions(t *testing.T) {
 	show := func() { page.emitKeyDown("o", 79, true /* alt */) }
 
 	show()
-	page.checkAttr(gainTypeSelect, "value", gainAlbumValue)
+	page.checkAttr(gainTypeSelect, "value", gainAutoValue)
 	page.clickOption(gainTypeSelect, gainTrack)
 	page.checkAttr(gainTypeSelect, "value", gainTrackValue)
 

@@ -244,6 +244,7 @@ customElements.define(
       this.closeNotificationTimeoutId_ = null; // for closeNotification_()
       this.playDelayMs_ = this.constructor.PLAY_DELAY_MS_;
       this.playTimeoutId_ = 0; // for playInternal_()
+      this.shuffled_ = false; // playlist contains shuffled songs
 
       this.shadow_ = createShadow(this, template);
       const get = (id) => $(id, this.shadow_);
@@ -454,14 +455,15 @@ customElements.define(
 
     resetForTesting() {
       this.hideUpdateDiv_(false /* saveChanges */);
-      this.enqueueSongs([], true);
+      if (this.songs_.length) this.removeSongs_(0, this.songs_.length);
     }
 
     // Adds |songs| to the playlist.
     // If |clearFirst| is true, the existing playlist is cleared first.
     // If |afterCurrent| is true, |songs| are inserted immediately after the
     // current song. Otherwise, they are appended to the end of the playlist.
-    enqueueSongs(songs, clearFirst, afterCurrent) {
+    // |shuffled| is used for the 'auto' gain adjustment setting.
+    enqueueSongs(songs, clearFirst, afterCurrent, shuffled) {
       if (clearFirst) this.removeSongs_(0, this.songs_.length);
 
       let index = afterCurrent
@@ -469,9 +471,11 @@ customElements.define(
         : this.songs_.length;
       songs.forEach((s) => this.songs_.splice(index++, 0, s));
 
+      if (shuffled && songs.length) this.shuffled_ = true;
+
       this.playlistTable_.setSongs(this.songs_);
 
-      if (this.currentIndex_ == -1) {
+      if (this.currentIndex_ === -1) {
         this.selectTrack_(0, false /* delayPlay */);
       } else if (this.reachedEndOfSongs_) {
         this.cycleTrack_(1, false /* delayPlay */);
@@ -487,6 +491,8 @@ customElements.define(
 
       this.songs_.splice(start, len);
       this.playlistTable_.setSongs(this.songs_);
+
+      if (!this.songs_.length) this.shuffled_ = false;
 
       // If we're keeping the current song, things are pretty simple.
       const end = start + len - 1;
@@ -1049,7 +1055,11 @@ customElements.define(
 
       const song = this.currentSong_;
       if (song) {
-        const gainType = this.config_.get(Config.GAIN_TYPE);
+        let gainType = this.config_.get(Config.GAIN_TYPE);
+        if (gainType === Config.GAIN_AUTO) {
+          gainType = this.shuffled_ ? Config.GAIN_TRACK : Config.GAIN_ALBUM;
+        }
+
         if (gainType === Config.GAIN_ALBUM) {
           adj += song.albumGain || 0;
         } else if (gainType === Config.GAIN_TRACK) {

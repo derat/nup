@@ -17,6 +17,7 @@ export default class Config {
   static GAIN_ALBUM = 0;
   static GAIN_TRACK = 1;
   static GAIN_NONE = 2;
+  static GAIN_AUTO = 3;
 
   static CONFIG_KEY_ = 'config'; // localStorage key
   static FLOAT_NAMES_ = new Set([Config.PRE_AMP]);
@@ -26,7 +27,7 @@ export default class Config {
     this.callbacks_ = [];
     this.values_ = {
       [Config.THEME]: Config.THEME_AUTO,
-      [Config.GAIN_TYPE]: Config.GAIN_ALBUM,
+      [Config.GAIN_TYPE]: Config.GAIN_AUTO,
       [Config.PRE_AMP]: 0.0,
     };
     this.load_();

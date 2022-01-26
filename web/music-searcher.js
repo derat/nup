@@ -380,6 +380,8 @@ customElements.define(
 
       this.presets_ = [];
       this.getPresetsFromServer_();
+
+      this.resultsShuffled_ = false;
     }
 
     set overlayManager(manager) {
@@ -465,6 +467,8 @@ customElements.define(
       const url = 'query?' + terms.join('&');
       console.log(`Sending query: ${url}`);
 
+      const shuffled = this.shuffleCheckbox_.checked;
+
       if (this.fetchController_) this.fetchController_.abort();
       this.fetchController_ = new AbortController();
       const signal = this.fetchController_.signal;
@@ -478,6 +482,7 @@ customElements.define(
           console.log('Got response with ' + songs.length + ' song(s)');
           this.resultsTable_.setSongs(songs);
           this.resultsTable_.setAllCheckboxes(true);
+          this.resultsShuffled_ = shuffled;
           if (appendToQueue) this.enqueueSearchResults_(true, true);
         })
         .catch((err) => {
@@ -493,8 +498,13 @@ customElements.define(
       if (!this.resultsTable_.numSongs) return;
 
       const songs = this.resultsTable_.checkedSongs;
-      this.musicPlayer_.enqueueSongs(songs, clearFirst, afterCurrent);
-      if (songs.length == this.resultsTable_.numSongs) {
+      this.musicPlayer_.enqueueSongs(
+        songs,
+        clearFirst,
+        afterCurrent,
+        this.resultsShuffled_
+      );
+      if (songs.length === this.resultsTable_.numSongs) {
         this.resultsTable_.setSongs([]);
       }
     }

@@ -133,9 +133,11 @@ const (
 	fiveYears   = "five years"
 
 	// Text and values for gainTypeSelect options.
+	gainAuto       = "Auto"
 	gainAlbum      = "Album"
 	gainTrack      = "Track"
 	gainNone       = "None"
+	gainAutoValue  = "3"
 	gainAlbumValue = "0"
 	gainTrackValue = "1"
 	gainNoneValue  = "2"

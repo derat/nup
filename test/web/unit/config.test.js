@@ -40,7 +40,7 @@ suite('config', () => {
     // These match the defaults from the c'tor.
     const cfg = new Config();
     expectEq(cfg.get(Config.THEME), Config.THEME_AUTO);
-    expectEq(cfg.get(Config.GAIN_TYPE), Config.GAIN_ALBUM);
+    expectEq(cfg.get(Config.GAIN_TYPE), Config.GAIN_AUTO);
     expectEq(cfg.get(Config.PRE_AMP), 0);
   });
 

@@ -52,6 +52,7 @@ const template = createTemplate(`
     <span class="label-col">Gain</span>
     <div class="select-wrapper">
       <select id="gain-type-select">
+        <option value="3">Auto</option>
         <option value="0">Album</option>
         <option value="1">Track</option>
         <option value="2">None</option>
