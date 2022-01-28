@@ -30,7 +30,10 @@ import (
 	"google.golang.org/appengine/v2/log"
 )
 
-const maxResults = 100 // max songs to return for query
+const (
+	maxResults  = 100  // max songs to return for query
+	shuffleSkew = 0.25 // max offset to skew songs' positions when shuffling
+)
 
 // SongQuery describes a query returning a list of Songs.
 type SongQuery struct {
@@ -189,7 +192,7 @@ func Tags(ctx context.Context, requireCache bool) ([]string, error) {
 // Songs executes the supplied query and returns matching songs.
 // If cacheOnly is true, empty results are returned if the query's results
 // aren't cached.
-func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]db.Song, error) {
+func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]*db.Song, error) {
 	var ids []int64
 	var err error
 
@@ -222,10 +225,8 @@ func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]db.Song, er
 	}
 
 	// Asynchronously cache the results.
-	cacheWriteDone := make(chan struct{}, len(cacheWriteTypes))
-	if !query.canCache() {
-		cacheWriteTypes = nil
-	} else {
+	if query.canCache() && len(cacheWriteTypes) > 0 {
+		cacheWriteDone := make(chan struct{}, len(cacheWriteTypes))
 		for _, t := range cacheWriteTypes {
 			go func(t cache.Type, ids []int64) {
 				startTime := time.Now()
@@ -237,6 +238,22 @@ func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]db.Song, er
 				cacheWriteDone <- struct{}{}
 			}(t, append([]int64{}, ids...)) // duplicate since mutated in main body
 		}
+
+		// Wait for async cache writes to finish before returning. Otherwise, App Engine will cancel
+		// the writes when the context is canceled.
+		// TODO: Will App Engine write the response before the handler has returned? If so,
+		// it'd probably be faster to return this function so the caller can defer it instead.
+		defer func() {
+			startTime := time.Now()
+			for range cacheWriteTypes {
+				<-cacheWriteDone
+			}
+			log.Debugf(ctx, "Waited %v ms for %v cache write(s)", msecSince(startTime), len(cacheWriteTypes))
+		}()
+	}
+
+	if len(ids) == 0 {
+		return []*db.Song{}, nil // ugly: can't return nil slice since it messes up JSON response
 	}
 
 	// Shuffle and truncate the results if needed.
@@ -249,13 +266,9 @@ func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]db.Song, er
 	}
 	ids = ids[:numResults]
 
-	songs := make([]db.Song, numResults)
-	if numResults == 0 {
-		return songs, nil
-	}
-
 	// Get the songs from datastore.
 	startTime := time.Now()
+	songs := make([]*db.Song, numResults)
 	keys := make([]*datastore.Key, 0, len(songs))
 	for _, id := range ids {
 		keys = append(keys, datastore.NewKey(ctx, db.SongKind, "", id, nil))
@@ -267,19 +280,12 @@ func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]db.Song, er
 
 	// Prepare the results for the client.
 	for i, id := range ids {
-		CleanSong(&songs[i], id)
+		CleanSong(songs[i], id)
 	}
-	if !query.Shuffle {
+	if query.Shuffle {
+		spreadSongs(songs)
+	} else {
 		sortSongs(songs)
-	}
-
-	// Wait for async cache writes to finish.
-	if len(cacheWriteTypes) > 0 {
-		startTime := time.Now()
-		for range cacheWriteTypes {
-			<-cacheWriteDone
-		}
-		log.Debugf(ctx, "Waited %v ms for cache write(s)", msecSince(startTime))
 	}
 
 	return songs, nil
@@ -494,10 +500,9 @@ func Normalize(s string) (string, error) {
 }
 
 // sortSongs sorts songs appropriately for the client.
-func sortSongs(songs []db.Song) {
+func sortSongs(songs []*db.Song) {
 	sort.Slice(songs, func(i, j int) bool {
-		si := songs[i]
-		sj := songs[j]
+		si, sj := songs[i], songs[j]
 		if si.AlbumLower < sj.AlbumLower {
 			return true
 		} else if si.AlbumLower > sj.AlbumLower {
@@ -515,6 +520,46 @@ func sortSongs(songs []db.Song) {
 		}
 		return si.Track < sj.Track
 	})
+}
+
+// spreadSongs reorders songs in-place to make it unlikely that songs by the same artist will appear
+// close to each other or that an album will be repeated for a given artist.
+//
+// It assumes that the supplied slice has already been randomly shuffled (e.g. using Fisher-Yates).
+//
+// More discussion of the approach used here:
+//  http://keyj.emphy.de/balanced-shuffle/
+//  https://engineering.atspotify.com/2014/02/28/how-to-shuffle-songs/
+func spreadSongs(songs []*db.Song) {
+	type keyFunc func(s *db.Song) string // returns a key for grouping s
+	var shuf func([]*db.Song, keyFunc, keyFunc)
+	shuf = func(songs []*db.Song, outer, inner keyFunc) {
+		// Group songs using the key function.
+		groups := make(map[string][]*db.Song)
+		for _, s := range songs {
+			key := outer(s)
+			groups[key] = append(groups[key], s)
+		}
+
+		// Spread out each group across the entire range.
+		dists := make(map[*db.Song]float64, len(songs))
+		for _, group := range groups {
+			// Recursively spread out the songs within the group first if needed.
+			if inner != nil {
+				shuf(group, inner, nil)
+			}
+			// Apply a random offset at the beginning and then further skew each song's position.
+			glen := float64(len(group))
+			off := (1 - shuffleSkew) * rand.Float64()
+			for i, s := range group {
+				dists[s] = (off + float64(i) + shuffleSkew*rand.Float64()) / glen
+			}
+		}
+		sort.Slice(songs, func(i, j int) bool { return dists[songs[i]] < dists[songs[j]] })
+	}
+
+	shuf(songs, func(s *db.Song) string { return s.ArtistLower },
+		func(s *db.Song) string { return s.AlbumLower })
 }
 
 // msecSince returns the number of elapsed milliseconds since t.

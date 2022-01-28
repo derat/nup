@@ -569,7 +569,7 @@ func (p *page) checkSearchResults(songs []db.Song, checks ...songListCheck) {
 		return nil
 	}); err != nil {
 		got := p.getSongsFromTable(table)
-		msg := fmt.Sprintf("Bad search results for %v\n", p.desc())
+		msg := fmt.Sprintf("Bad search results for %v: %v\n", p.desc(), err.Error())
 		msg += "Want:\n"
 		for _, s := range want {
 			msg += "  " + s.String() + "\n"
