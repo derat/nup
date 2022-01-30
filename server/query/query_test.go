@@ -66,12 +66,14 @@ func TestSpreadSongs(t *testing.T) {
 	spreadSongs(songs)
 
 	// Check that the same artist doesn't appear back-to-back and that we don't play the same album
-	// twice in a row for a given artist. This skips checking the album of the final song. *shrug*
+	// twice in a row for a given artist.
 	lastArtistAlbum := make(map[string]string, numArtists)
-	for i, s := range songs[:len(songs)-1] {
-		next := songs[i+1]
-		if s.ArtistLower == next.ArtistLower {
-			t.Errorf("Artist %q appears at %d and %d", s.ArtistLower, i, i+1)
+	for i, s := range songs {
+		if i < len(songs)-1 {
+			next := songs[i+1]
+			if s.ArtistLower == next.ArtistLower {
+				t.Errorf("Artist %q appears at %d and %d", s.ArtistLower, i, i+1)
+			}
 		}
 		if s.AlbumLower == lastArtistAlbum[s.ArtistLower] {
 			t.Errorf("Album %q repeated for artist %q at %d", s.AlbumLower, s.ArtistLower, i)
