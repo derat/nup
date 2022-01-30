@@ -291,18 +291,19 @@ func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]*db.Song, e
 	return songs, nil
 }
 
-// runQueriesAndGetIDs runs the provided queries in parallel and returns the
-// results from each.
-func runQueriesAndGetIDs(ctx context.Context, qs []*datastore.Query) ([][]int64, error) {
+// runQueriesAndGetIDs runs the provided queries in parallel and returns the results from each.
+func runQueriesAndGetIDs(ctx context.Context, qs []*datastore.Query) ([][]int64, []time.Duration, error) {
 	type queryResult struct {
-		Index int
-		IDs   []int64
-		Error error
+		idx  int
+		ids  []int64
+		time time.Duration
+		err  error
 	}
 	ch := make(chan queryResult, len(qs))
 
 	for i, q := range qs {
-		go func(index int, q *datastore.Query) {
+		go func(idx int, q *datastore.Query) {
+			start := time.Now()
 			ids := make([]int64, 0)
 			it := q.Run(ctx)
 			for {
@@ -311,24 +312,26 @@ func runQueriesAndGetIDs(ctx context.Context, qs []*datastore.Query) ([][]int64,
 				} else if err == datastore.Done {
 					break
 				} else {
-					ch <- queryResult{index, nil, err}
+					ch <- queryResult{idx, nil, 0, err}
 					return
 				}
 			}
 			sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-			ch <- queryResult{index, ids, nil}
+			ch <- queryResult{idx, ids, time.Now().Sub(start), nil}
 		}(i, q)
 	}
 
 	res := make([][]int64, len(qs))
+	times := make([]time.Duration, len(qs))
 	for _ = range qs {
 		qr := <-ch
-		if qr.Error != nil {
-			return nil, qr.Error
+		if qr.err != nil {
+			return nil, nil, qr.err
 		}
-		res[qr.Index] = qr.IDs
+		res[qr.idx] = qr.ids
+		times[qr.idx] = qr.time
 	}
-	return res, nil
+	return res, times, nil
 }
 
 // intersectSortedIDs returns the intersection of two sorted arrays that don't have duplicate values.
@@ -442,22 +445,29 @@ func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 	}
 
 	startTime := time.Now()
-	unmergedIDs, err := runQueriesAndGetIDs(ctx, qs)
+	unmergedIDs, times, err := runQueriesAndGetIDs(ctx, qs)
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf(ctx, "Ran %v query(s) in %v ms", len(qs), msecSince(startTime))
+	details := make([]string, len(unmergedIDs))
+	for i, ids := range unmergedIDs {
+		details[i] = fmt.Sprintf("%v (%v ms)", len(ids), times[i].Milliseconds())
+	}
+	log.Debugf(ctx, "Ran %v query(s) in %v ms: %v",
+		len(qs), msecSince(startTime), strings.Join(details, ", "))
 
+	startTime = time.Now()
 	var mergedIDs []int64
-	for i, a := range unmergedIDs {
+	for i, ids := range unmergedIDs {
 		if i == 0 {
-			mergedIDs = a
+			mergedIDs = ids
 		} else if i < negativeQueryStart {
-			mergedIDs = intersectSortedIDs(mergedIDs, a)
+			mergedIDs = intersectSortedIDs(mergedIDs, ids)
 		} else {
-			mergedIDs = filterSortedIDs(mergedIDs, a)
+			mergedIDs = filterSortedIDs(mergedIDs, ids)
 		}
 	}
+	log.Debugf(ctx, "Merged to %d result(s) in %v ms", len(mergedIDs), msecSince(startTime))
 	return mergedIDs, nil
 }
 
