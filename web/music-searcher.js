@@ -398,7 +398,10 @@ customElements.define(
         );
       });
       player.addEventListener('tags', (e) => {
-        this.tagSuggester_.words = e.detail.tags;
+        // Also suggest negative tags.
+        this.tagSuggester_.words = e.detail.tags.concat(
+          e.detail.tags.map((t) => '-' + t)
+        );
       });
     }
 
