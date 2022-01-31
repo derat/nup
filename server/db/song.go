@@ -76,12 +76,12 @@ type Song struct {
 	//  https://en.wikipedia.org/wiki/ReplayGain
 	//  https://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification
 	//  https://productionadvice.co.uk/tidal-normalization-upgrade/
-	TrackGain float64 `json:"trackGain"`
+	TrackGain float64 `datastore:",noindex" json:"trackGain"`
 	// AlbumGain is the song's dB gain adjustment relative to its album.
-	AlbumGain float64 `json:"albumGain"`
+	AlbumGain float64 `datastore:",noindex" json:"albumGain"`
 	// PeakAmp is the song's peak amplitude, with 1.0 representing the highest
 	// amplitude that can be played without clipping.
-	PeakAmp float64 `json:"peakAmp"`
+	PeakAmp float64 `datastore:",noindex" json:"peakAmp"`
 
 	// Rating is the song's rating in the range [0.0, 1.0], or -1 if unrated.
 	Rating float64 `json:"rating"`
