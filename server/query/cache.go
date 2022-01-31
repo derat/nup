@@ -25,7 +25,7 @@ const (
 
 // cachedQueriesDatastoreKey returns the datastore key for caching queries.
 func cachedQueriesDatastoreKey(ctx context.Context) *datastore.Key {
-	return datastore.NewKey(ctx, cachedQueriesKey, cachedQueriesKey, 0, nil)
+	return datastore.NewKey(ctx, cachedQueriesKind, cachedQueriesKey, 0, nil)
 }
 
 // cachedTagsDatastoreKey returns the datastore key for caching tags.
