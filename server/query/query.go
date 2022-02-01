@@ -57,7 +57,8 @@ type SongQuery struct {
 	Tags    []string // present in Song.Tags
 	NotTags []string // not present in Song.Tags
 
-	Shuffle bool // randomize results set/order
+	Shuffle              bool // randomize results set/order
+	OrderByLastStartTime bool // order by Song.LastStartTime
 }
 
 // hash returns a string uniquely identifying q.
@@ -72,7 +73,8 @@ func (q *SongQuery) hash() (string, error) {
 
 // canCache returns true if the query's results can be safely cached.
 func (q *SongQuery) canCache() bool {
-	return !q.HasMaxPlays && q.MinFirstStartTime.IsZero() && q.MaxLastStartTime.IsZero()
+	return !q.HasMaxPlays && q.MinFirstStartTime.IsZero() && q.MaxLastStartTime.IsZero() &&
+		q.OrderByLastStartTime == false
 }
 
 // resultsInvalidated returns true if the updates described by ut would
@@ -88,7 +90,8 @@ func (q *SongQuery) resultsInvalidated(ut UpdateTypes) bool {
 		return true
 	}
 	if (ut&PlaysUpdate) != 0 &&
-		(q.HasMaxPlays || !q.MinFirstStartTime.IsZero() || !q.MaxLastStartTime.IsZero()) {
+		(q.HasMaxPlays || !q.MinFirstStartTime.IsZero() || !q.MaxLastStartTime.IsZero() ||
+			q.OrderByLastStartTime) {
 		return true
 	}
 	return false
@@ -278,6 +281,8 @@ func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]*db.Song, e
 	}
 	if query.Shuffle {
 		spreadSongs(songs)
+	} else if query.OrderByLastStartTime {
+		sort.Slice(songs, func(i, j int) bool { return songs[i].LastStartTime.Before(songs[j].LastStartTime) })
 	} else {
 		sortSongs(songs)
 	}
@@ -425,6 +430,11 @@ func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 		bq = bq.Filter("Tags =", t)
 	}
 
+	// This is incompatible with any of the inequality filters below.
+	if query.OrderByLastStartTime {
+		bq = bq.Order("LastStartTime").Limit(maxResults)
+	}
+
 	// Datastore doesn't allow multiple inequality filters on different properties.
 	// Run a separate query in parallel for each filter and then intersect the results.
 	var qs []*datastore.Query
@@ -440,6 +450,7 @@ func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 	if !query.MaxLastStartTime.IsZero() {
 		qs = append(qs, bq.Filter("LastStartTime <=", query.MaxLastStartTime))
 	}
+
 	if len(qs) == 0 {
 		qs = append(qs, bq)
 	}

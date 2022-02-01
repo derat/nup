@@ -116,6 +116,8 @@ Queries Datastore and returns a JSON-marshaled array of [Song]s.
     the maximmum time at which songs were last played (used to select music that
     hasn't been played recently).
 *   `maxPlays` (optional) - Integer maximum number of plays.
+*   `orderByLastPlayed` (optional) - If `1`, return songs that were last played
+    the longest ago.
 *   `shuffle` (optional) - If `1`, shuffle the order of returned songs.
 *   `unrated` (optional) - If `1`, return only songs that have no rating.
 *   `tags` (optional) - Space-separated tags, e.g. `electronic -vocals`. Tags

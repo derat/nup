@@ -61,6 +61,9 @@ type SearchPreset struct {
 	// LastPlayed limits results to songs last played before the given interval.
 	// See FirstPlayed for values.
 	LastPlayed int `json:"lastPlayed"`
+	// OrderByLastPlayed indicates that songs should be ordered by the last time
+	// they were played (in ascending order).
+	OrderByLastPlayed bool `json:"orderByLastPlayed"`
 	// FirstTrack indicates that only albums' first tracks should be returned.
 	FirstTrack bool `json:"firstTrack"`
 	// Shuffle indicates that the returned songs should be shuffled.

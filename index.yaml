@@ -26,6 +26,11 @@ indexes:
 - kind: Song
   properties:
   - name: RatingAtLeast75
+  - name: LastStartTime
+
+- kind: Song
+  properties:
+  - name: RatingAtLeast75
   - name: NumPlays
 
 - kind: Song

@@ -160,6 +160,13 @@ const template = createTemplate(`
   </div>
 
   <div class="row">
+    <label for="order-by-last-played-checkbox" class="checkbox-col">
+      <input id="order-by-last-played-checkbox" type="checkbox" value="orderByLastPlayed" />
+      Order by last played
+    </label>
+  </div>
+
+  <div class="row">
     <label for="max-plays-input">
       Played <input id="max-plays-input" type="text" /> or fewer times
     </label>
@@ -288,10 +295,17 @@ customElements.define(
       this.unratedCheckbox_.addEventListener('keydown', (e) =>
         this.handleFormKeyDown_(e)
       );
-      this.unratedCheckbox_.addEventListener('change', (e) =>
-        this.handleUnratedCheckboxChanged_(e)
+      this.unratedCheckbox_.addEventListener('change', () =>
+        this.updateFormDisabledState_()
       );
       this.minRatingSelect_ = get('min-rating-select');
+      this.orderByLastPlayedCheckbox_ = get('order-by-last-played-checkbox');
+      this.orderByLastPlayedCheckbox_.addEventListener('keydown', (e) =>
+        this.handleFormKeyDown_(e)
+      );
+      this.orderByLastPlayedCheckbox_.addEventListener('change', () =>
+        this.updateFormDisabledState_()
+      );
       this.maxPlaysInput_ = get('max-plays-input');
       this.maxPlaysInput_.addEventListener('keydown', (e) =>
         this.handleFormKeyDown_(e)
@@ -436,16 +450,25 @@ customElements.define(
       if (this.tagsInput_.value.trim()) {
         terms.push('tags=' + encodeURIComponent(this.tagsInput_.value.trim()));
       }
-      if (this.minRatingSelect_.value != 0 && !this.unratedCheckbox_.checked) {
+      if (!this.minRatingSelect_.disabled && this.minRatingSelect_.value != 0) {
         terms.push('minRating=' + this.minRatingSelect_.value);
       }
       if (this.shuffleCheckbox_.checked) terms.push('shuffle=1');
       if (this.firstTrackCheckbox_.checked) terms.push('firstTrack=1');
       if (this.unratedCheckbox_.checked) terms.push('unrated=1');
-      if (!isNaN(parseInt(this.maxPlaysInput_.value))) {
+      if (this.orderByLastPlayedCheckbox_.checked) {
+        terms.push('orderByLastPlayed=1');
+      }
+      if (
+        !this.maxPlaysInput_.disabled &&
+        !isNaN(parseInt(this.maxPlaysInput_.value))
+      ) {
         terms.push('maxPlays=' + parseInt(this.maxPlaysInput_.value));
       }
-      if (this.firstPlayedSelect_.value != 0) {
+      if (
+        !this.firstPlayedSelect_.disabled &&
+        this.firstPlayedSelect_.value != 0
+      ) {
         terms.push(
           'minFirstPlayed=' +
             parseInt(
@@ -453,7 +476,10 @@ customElements.define(
             )
         );
       }
-      if (this.lastPlayedSelect_.value != 0) {
+      if (
+        !this.lastPlayedSelect_.disabled &&
+        this.lastPlayedSelect_.value != 0
+      ) {
         terms.push(
           'maxLastPlayed=' +
             parseInt(
@@ -532,11 +558,14 @@ customElements.define(
       this.firstTrackCheckbox_.checked = false;
       this.unratedCheckbox_.checked = false;
       this.minRatingSelect_.selectedIndex = 0;
-      this.minRatingSelect_.disabled = false;
+      this.orderByLastPlayedCheckbox_.checked = false;
       this.maxPlaysInput_.value = null;
       this.firstPlayedSelect_.selectedIndex = 0;
       this.lastPlayedSelect_.selectedIndex = 0;
       this.presetSelect_.selectedIndex = 0;
+
+      this.updateFormDisabledState_();
+
       if (clearResults) this.resultsTable_.setSongs([]);
       this.scrollIntoView();
     }
@@ -570,8 +599,12 @@ customElements.define(
       }
     }
 
-    handleUnratedCheckboxChanged_(event) {
+    updateFormDisabledState_() {
       this.minRatingSelect_.disabled = this.unratedCheckbox_.checked;
+      this.maxPlaysInput_.disabled =
+        this.firstPlayedSelect_.disabled =
+        this.lastPlayedSelect_.disabled =
+          this.orderByLastPlayedCheckbox_.checked;
     }
 
     handlePresetSelectChanged_(event) {
@@ -585,10 +618,13 @@ customElements.define(
       this.tagsInput_.value = preset.tags;
       this.minRatingSelect_.selectedIndex = Math.max(preset.minRating - 1, 0);
       this.unratedCheckbox_.checked = preset.unrated;
+      this.orderByLastPlayedCheckbox_.checked = preset.orderByLastPlayed;
       this.firstPlayedSelect_.selectedIndex = preset.firstPlayed;
       this.lastPlayedSelect_.selectedIndex = preset.lastPlayed;
       this.firstTrackCheckbox_.checked = preset.firstTrack;
       this.shuffleCheckbox_.checked = preset.shuffle;
+
+      this.updateFormDisabledState_();
 
       // Unfocus the element so that arrow keys or Page Up/Down won't select new
       // presets.

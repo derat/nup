@@ -391,6 +391,20 @@ func TestFirstTrackQuery(t *testing.T) {
 	page.checkSearchResults(joinSongs(album1[0], album2[0]))
 }
 
+func TestOrderByLastPlayedQuery(t *testing.T) {
+	page, done := initWebTest(t)
+	defer done()
+	t1, t2, t3 := time.Unix(1, 0), time.Unix(2, 0), time.Unix(3, 0)
+	song1 := newSong("ar1", "ti1", "al1", withPlays(t2, t3))
+	song2 := newSong("ar2", "ti2", "al2", withPlays(t1))
+	song3 := newSong("ar3", "ti3", "al3", withPlays(t1, t2))
+	importSongs(song1, song2, song3)
+
+	page.click(orderByLastPlayedCheckbox)
+	page.click(searchButton)
+	page.checkSearchResults(joinSongs(song2, song3, song1))
+}
+
 func TestMaxPlaysQuery(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()

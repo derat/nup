@@ -171,6 +171,10 @@ input[type='checkbox'].small:checked:before {
   margin-top: 1px;
 }
 
+input:disabled {
+  opacity: 0.5;
+}
+
 .select-wrapper {
   display: inline-block;
   margin-left: 4px;

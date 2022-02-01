@@ -401,12 +401,13 @@ func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 	cacheOnly := r.FormValue("cacheOnly") == "1"
 
 	q := query.SongQuery{
-		Artist:   r.FormValue("artist"),
-		Title:    r.FormValue("title"),
-		Album:    r.FormValue("album"),
-		AlbumID:  r.FormValue("albumId"),
-		Keywords: strings.Fields(r.FormValue("keywords")),
-		Shuffle:  r.FormValue("shuffle") == "1",
+		Artist:               r.FormValue("artist"),
+		Title:                r.FormValue("title"),
+		Album:                r.FormValue("album"),
+		AlbumID:              r.FormValue("albumId"),
+		Keywords:             strings.Fields(r.FormValue("keywords")),
+		Shuffle:              r.FormValue("shuffle") == "1",
+		OrderByLastStartTime: r.FormValue("orderByLastPlayed") == "1",
 	}
 
 	if r.FormValue("firstTrack") == "1" {
@@ -448,8 +449,6 @@ func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 		}
 	}
 
-	q.Tags = make([]string, 0)
-	q.NotTags = make([]string, 0)
 	for _, t := range strings.Fields(r.FormValue("tags")) {
 		if t[0] == '-' {
 			q.NotTags = append(q.NotTags, t[1:len(t)])
