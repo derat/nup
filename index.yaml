@@ -13,81 +13,20 @@ indexes:
 
 - kind: Song
   properties:
-  - name: AlbumId
-  - name: AlbumLower
-  - name: Rating
-
-- kind: Song
-  properties:
-  - name: AlbumLower
-  - name: LastStartTime
-
-- kind: Song
-  properties:
-  - name: AlbumLower
-  - name: NumPlays
-
-- kind: Song
-  properties:
-  - name: AlbumLower
-  - name: Rating
-
-- kind: Song
-  properties:
-  - name: ArtistLower
-  - name: LastStartTime
-
-- kind: Song
-  properties:
-  - name: ArtistLower
-  - name: NumPlays
-
-- kind: Song
-  properties:
-  - name: ArtistLower
-  - name: Rating
-
-- kind: Song
-  properties:
   - name: ArtistLower
   - name: Track
   - name: Disc
 
 - kind: Song
   properties:
-  - name: Disc
+  - name: Keywords
   - name: Track
-  - name: FirstStartTime
-
-- kind: Song
-  properties:
-  - name: Keywords
-  - name: LastStartTime
-
-- kind: Song
-  properties:
-  - name: Keywords
-  - name: NumPlays
-
-- kind: Song
-  properties:
-  - name: Keywords
-  - name: Rating
-
-- kind: Song
-  properties:
-  - name: Tags
-  - name: FirstStartTime
+  - name: Disc
 
 - kind: Song
   properties:
   - name: Tags
   - name: LastStartTime
-
-- kind: Song
-  properties:
-  - name: Tags
-  - name: NumPlays
 
 - kind: Song
   properties:
