@@ -136,8 +136,7 @@ Updates a song's rating and/or tags in Datastore.
 
 ### /reindex (POST)
 
-Regenerates normalized string fields used for searching across all [Song]
-objects.
+Regenerates fields used for searching across all [Song] objects.
 
 ### /song (GET)
 

@@ -5,7 +5,6 @@
 package query
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
@@ -17,14 +16,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/derat/nup/server/cache"
 	"github.com/derat/nup/server/db"
-
-	"golang.org/x/text/runes"
-	"golang.org/x/text/transform"
-	"golang.org/x/text/unicode/norm"
 
 	"google.golang.org/appengine/v2/datastore"
 	"google.golang.org/appengine/v2/log"
@@ -392,7 +386,7 @@ func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 	}
 	for _, t := range terms {
 		if t.val != "" {
-			if norm, err := Normalize(t.val); err != nil {
+			if norm, err := db.Normalize(t.val); err != nil {
 				return nil, fmt.Errorf("normalizing %q: %v", t.val, err)
 			} else {
 				bq = bq.Filter(t.expr, norm)
@@ -403,7 +397,22 @@ func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 	if len(query.AlbumID) > 0 {
 		bq = bq.Filter("AlbumId =", query.AlbumID)
 	}
-	if query.Unrated && !query.HasMinRating {
+	if query.HasMinRating {
+		switch query.MinRating {
+		case 1.0:
+			bq = bq.Filter("Rating =", 1.0)
+		case 0.75:
+			bq = bq.Filter("RatingAtLeast75 =", true)
+		case 0.5:
+			bq = bq.Filter("RatingAtLeast50 =", true)
+		case 0.25:
+			bq = bq.Filter("RatingAtLeast25 =", true)
+		case 0.0:
+			bq = bq.Filter("RatingAtLeast0 =", true)
+		default:
+			return nil, fmt.Errorf("rating %v not in [1, 0.75, 0.5, 0.25, 0]", query.MinRating)
+		}
+	} else if query.Unrated {
 		bq = bq.Filter("Rating =", -1.0)
 	}
 	if query.Track > 0 {
@@ -417,11 +426,8 @@ func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 	}
 
 	// Datastore doesn't allow multiple inequality filters on different properties.
-	// Run a separate query in parallel for each filter and then merge the results.
-	qs := make([]*datastore.Query, 0)
-	if query.HasMinRating {
-		qs = append(qs, bq.Filter("Rating >=", query.MinRating))
-	}
+	// Run a separate query in parallel for each filter and then intersect the results.
+	var qs []*datastore.Query
 	if query.HasMaxPlays {
 		qs = append(qs, bq.Filter("NumPlays <=", query.MaxPlays))
 	}
@@ -435,10 +441,10 @@ func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 		qs = append(qs, bq.Filter("LastStartTime <=", query.MaxLastStartTime))
 	}
 	if len(qs) == 0 {
-		qs = []*datastore.Query{bq}
+		qs = append(qs, bq)
 	}
 
-	// Also run queries for tags that shouldn't be present.
+	// Also run queries for tags that shouldn't be present and subtract the results.
 	negativeQueryStart := len(qs)
 	for _, t := range query.NotTags {
 		qs = append(qs, bq.Filter("Tags =", t))
@@ -485,28 +491,6 @@ func CleanSong(s *db.Song, id int64) {
 	// but that aren't needed in search results.
 	s.SHA1 = ""
 	s.Plays = s.Plays[:0]
-}
-
-// https://go.dev/blog/normalization#performing-magic
-var normalizer = transform.Chain(norm.NFKD, runes.Remove(runes.In(unicode.Mn)))
-
-// Normalize normalizes s for searches.
-//
-// NFKD form is used. Unicode characters are decomposed (runes are broken into their components) and
-// replaced for compatibility equivalence (characters that represent the same characters but have
-// different visual representations, e.g. '9' and '⁹', are equal). Visually-similar characters from
-// different alphabets will not be equal, however (e.g. Latin 'o', Greek 'ο', and Cyrillic 'о').
-// See https://go.dev/blog/normalization for more details.
-//
-// Characters are also de-accented and lowercased, but punctuation is preserved.
-func Normalize(s string) (string, error) {
-	b := make([]byte, len(s))
-	_, _, err := normalizer.Transform(b, []byte(s), true)
-	if err != nil {
-		return "", err
-	}
-	b = bytes.TrimRight(b, "\x00")
-	return strings.ToLower(string(b)), nil
 }
 
 // sortSongs sorts songs appropriately for the client.

@@ -9,9 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
-	"unicode"
 
 	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/server/query"
@@ -36,13 +34,7 @@ func AddPlay(ctx context.Context, id int64, startTime time.Time, ip string) erro
 			return nil
 		}
 
-		s.NumPlays++
-		if s.FirstStartTime.IsZero() || startTime.Before(s.FirstStartTime) {
-			s.FirstStartTime = startTime
-		}
-		if s.LastStartTime.IsZero() || startTime.After(s.LastStartTime) {
-			s.LastStartTime = startTime
-		}
+		s.UpdatePlayStats(startTime)
 
 		newKey := datastore.NewIncompleteKey(ctx, db.PlayKind, songKey)
 		if _, err = datastore.Put(ctx, newKey, &db.Play{
@@ -67,7 +59,7 @@ func SetRatingAndTags(ctx context.Context, id int64, hasRating bool, rating floa
 	var ut query.UpdateTypes
 	err := updateExistingSong(ctx, id, func(ctx context.Context, s *db.Song) error {
 		if hasRating && rating != s.Rating {
-			s.Rating = rating
+			s.SetRating(rating)
 			ut |= query.RatingUpdate
 		}
 		if tags != nil {
@@ -134,12 +126,11 @@ func UpdateOrInsertSong(ctx context.Context, updatedSong *db.Song,
 			song.Rating = -1.0
 		}
 
-		if err := copySongFileFields(song, updatedSong); err != nil {
+		if err := song.Update(updatedSong, replaceUserData); err != nil {
 			return err
 		}
 		if replaceUserData {
-			buildSongPlayStats(updatedSong)
-			copySongUserFields(song, updatedSong)
+			song.RebuildPlayStats(updatedSong.Plays)
 		}
 		song.LastModifiedTime = time.Now()
 
@@ -205,9 +196,9 @@ func DeleteSong(ctx context.Context, id int64) error {
 	return query.FlushCacheForUpdate(ctx, query.MetadataUpdate)
 }
 
-// ReindexSongs regenerates the ArtistLower, TitleLower, AlbumLower, and Keywords fields
-// of all songs in the database. It only needs to be run after the logic for generating
-// those fields in copySongFileFields is changed. Returns the number of updated songs.
+// ReindexSongs regenerates the ArtistLower, TitleLower, AlbumLower, Keywords, and RatingAtLeast*
+// fields of all songs in the database. It only needs to be run after the logic for generating those
+// fields is changed. Returns the number of updated songs.
 func ReindexSongs(ctx context.Context) (int, error) {
 	it := datastore.NewQuery(db.SongKind).KeysOnly().Run(ctx)
 	var ids []int64
@@ -226,12 +217,15 @@ func ReindexSongs(ctx context.Context) (int, error) {
 		var update bool
 		err := updateExistingSong(ctx, id, func(ctx context.Context, s *db.Song) error {
 			var up db.Song
-			if err := copySongFileFields(&up, s); err != nil {
+			if err := up.Update(s, true /* copyUserData */); err != nil {
 				return err
 			}
+
 			// The Keywords field is derived from ArtistLower, TitleLower, and AlbumLower,
 			// so it will only change if one or more of those fields changed.
-			if up.ArtistLower == s.ArtistLower && up.TitleLower == s.TitleLower && up.AlbumLower == s.AlbumLower {
+			if up.ArtistLower == s.ArtistLower && up.TitleLower == s.TitleLower && up.AlbumLower == s.AlbumLower &&
+				up.RatingAtLeast75 == s.RatingAtLeast75 && up.RatingAtLeast50 == s.RatingAtLeast50 &&
+				up.RatingAtLeast25 == s.RatingAtLeast25 && up.RatingAtLeast0 == s.RatingAtLeast0 {
 				return errUnmodified
 			}
 
@@ -240,6 +234,10 @@ func ReindexSongs(ctx context.Context) (int, error) {
 			s.TitleLower = up.TitleLower
 			s.AlbumLower = up.AlbumLower
 			s.Keywords = up.Keywords
+			s.RatingAtLeast75 = up.RatingAtLeast75
+			s.RatingAtLeast50 = up.RatingAtLeast50
+			s.RatingAtLeast25 = up.RatingAtLeast25
+			s.RatingAtLeast0 = up.RatingAtLeast0
 
 			update = true
 			return nil
@@ -250,7 +248,7 @@ func ReindexSongs(ctx context.Context) (int, error) {
 		if update {
 			nupdates++
 		}
-		if i != 0 && i%1000 == 0 {
+		if i != 0 && (i%1000) == 0 {
 			log.Debugf(ctx, "Scanned %d songs for reindex, updated %d", i, nupdates)
 		}
 	}
@@ -291,74 +289,6 @@ func sortedStringSlicesMatch(a, b []string) bool {
 	return true
 }
 
-func copySongFileFields(dest, src *db.Song) error {
-	dest.SHA1 = src.SHA1
-	dest.Filename = src.Filename
-	dest.CoverFilename = src.CoverFilename
-	dest.Artist = src.Artist
-	dest.Title = src.Title
-	dest.Album = src.Album
-	dest.AlbumID = src.AlbumID
-	dest.Track = src.Track
-	dest.Disc = src.Disc
-	dest.Length = src.Length
-	dest.TrackGain = src.TrackGain
-	dest.AlbumGain = src.AlbumGain
-	dest.PeakAmp = src.PeakAmp
-
-	var err error
-	if dest.ArtistLower, err = query.Normalize(src.Artist); err != nil {
-		return fmt.Errorf("normalizing %q: %v", src.Artist, err)
-	}
-	if dest.TitleLower, err = query.Normalize(src.Title); err != nil {
-		return fmt.Errorf("normalizing %q: %v", src.Title, err)
-	}
-	if dest.AlbumLower, err = query.Normalize(src.Album); err != nil {
-		return fmt.Errorf("normalizing %q: %v", src.Album, err)
-	}
-
-	keywords := make(map[string]bool)
-	for _, s := range []string{dest.ArtistLower, dest.TitleLower, dest.AlbumLower} {
-		for _, w := range strings.FieldsFunc(s, func(c rune) bool { return !unicode.IsLetter(c) && !unicode.IsNumber(c) }) {
-			keywords[w] = true
-		}
-	}
-	dest.Keywords = make([]string, len(keywords))
-	i := 0
-	for w := range keywords {
-		dest.Keywords[i] = w
-		i++
-	}
-	sort.Strings(dest.Keywords)
-
-	return nil
-}
-
-func copySongUserFields(dest, src *db.Song) {
-	dest.Rating = src.Rating
-	dest.FirstStartTime = src.FirstStartTime
-	dest.LastStartTime = src.LastStartTime
-	dest.NumPlays = src.NumPlays
-	dest.Tags = src.Tags
-	sort.Strings(dest.Tags)
-}
-
-func buildSongPlayStats(s *db.Song) {
-	s.NumPlays = 0
-	s.FirstStartTime = time.Time{}
-	s.LastStartTime = time.Time{}
-
-	for _, p := range s.Plays {
-		s.NumPlays++
-		if s.FirstStartTime.IsZero() || p.StartTime.Before(s.FirstStartTime) {
-			s.FirstStartTime = p.StartTime
-		}
-		if s.LastStartTime.IsZero() || p.StartTime.After(s.LastStartTime) {
-			s.LastStartTime = p.StartTime
-		}
-	}
-}
-
 func replacePlays(ctx context.Context, songKey *datastore.Key, plays []db.Play) error {
 	playKeys, err := datastore.NewQuery(db.PlayKind).Ancestor(songKey).KeysOnly().GetAll(ctx, nil)
 	if err != nil {
@@ -379,7 +309,7 @@ func replacePlays(ctx context.Context, songKey *datastore.Key, plays []db.Play) 
 }
 
 func updateExistingSong(ctx context.Context, id int64, f func(context.Context, *db.Song) error,
-	updateDelay time.Duration, logUnchanged bool) error {
+	updateDelay time.Duration, shouldLog bool) error {
 	if updateDelay > 0 {
 		time.Sleep(updateDelay)
 	}
@@ -392,7 +322,7 @@ func updateExistingSong(ctx context.Context, id int64, f func(context.Context, *
 		}
 		if err := f(ctx, song); err != nil {
 			if err == errUnmodified {
-				if logUnchanged {
+				if shouldLog {
 					log.Debugf(ctx, "Song %v wasn't changed", id)
 				}
 				return nil
@@ -402,7 +332,9 @@ func updateExistingSong(ctx context.Context, id int64, f func(context.Context, *
 		if _, err := datastore.Put(ctx, key, song); err != nil {
 			return err
 		}
-		log.Debugf(ctx, "Updated song %v", id)
+		if shouldLog {
+			log.Debugf(ctx, "Updated song %v", id)
+		}
 		return nil
 	}, nil)
 }

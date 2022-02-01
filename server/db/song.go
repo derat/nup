@@ -4,7 +4,16 @@
 package db
 
 import (
+	"bytes"
+	"fmt"
+	"sort"
+	"strings"
 	"time"
+	"unicode"
+
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -17,7 +26,7 @@ const (
 
 // Song represents an audio file and holds metadata and user-generated data.
 //
-// When adding fields, be sure to update copySongFileFields() in server/update/update.go.
+// When adding fields, the Update method must be updated.
 type Song struct {
 	// SHA1 is a hash of the audio portion of the file.
 	SHA1 string `datastore:"Sha1" json:"sha1,omitempty"`
@@ -84,7 +93,16 @@ type Song struct {
 	PeakAmp float64 `datastore:",noindex" json:"peakAmp"`
 
 	// Rating is the song's rating in the range [0.0, 1.0], or -1 if unrated.
+	// The server should call SetRating to additionally update the RatingAtLeast* fields.
 	Rating float64 `json:"rating"`
+
+	// RatingAtLeast* are true if Rating is at least 0.75, 0.5, 0.25, or 0.
+	// These are maintained to sidestep Datastore's restriction against using multiple
+	// inequality filters in a query.
+	RatingAtLeast75 bool `json:"-"`
+	RatingAtLeast50 bool `json:"-"`
+	RatingAtLeast25 bool `json:"-"`
+	RatingAtLeast0  bool `json:"-"`
 
 	// FirstStartTime is the first time the song was played.
 	FirstStartTime time.Time `json:"-"`
@@ -105,6 +123,116 @@ type Song struct {
 	LastModifiedTime time.Time `json:"-"`
 }
 
+// Update copies fields from src to s.
+// If copyUserData is true, the Rating*, FirstStartTime, LastStartTime,
+// NupPlays, and Tags fields are also copied; otherwise they are left unchanged.
+func (s *Song) Update(src *Song, copyUserData bool) error {
+	s.SHA1 = src.SHA1
+	s.Filename = src.Filename
+	s.CoverFilename = src.CoverFilename
+	s.Artist = src.Artist
+	s.Title = src.Title
+	s.Album = src.Album
+	s.AlbumID = src.AlbumID
+	s.Track = src.Track
+	s.Disc = src.Disc
+	s.Length = src.Length
+	s.TrackGain = src.TrackGain
+	s.AlbumGain = src.AlbumGain
+	s.PeakAmp = src.PeakAmp
+
+	var err error
+	if s.ArtistLower, err = Normalize(src.Artist); err != nil {
+		return fmt.Errorf("normalizing %q: %v", src.Artist, err)
+	}
+	if s.TitleLower, err = Normalize(src.Title); err != nil {
+		return fmt.Errorf("normalizing %q: %v", src.Title, err)
+	}
+	if s.AlbumLower, err = Normalize(src.Album); err != nil {
+		return fmt.Errorf("normalizing %q: %v", src.Album, err)
+	}
+
+	keywords := make(map[string]bool)
+	for _, str := range []string{s.ArtistLower, s.TitleLower, s.AlbumLower} {
+		for _, w := range strings.FieldsFunc(str, func(c rune) bool {
+			return !unicode.IsLetter(c) && !unicode.IsNumber(c)
+		}) {
+			keywords[w] = true
+		}
+	}
+	s.Keywords = make([]string, len(keywords))
+	i := 0
+	for w := range keywords {
+		s.Keywords[i] = w
+		i++
+	}
+	sort.Strings(s.Keywords)
+
+	if copyUserData {
+		s.SetRating(src.Rating)
+		s.FirstStartTime = src.FirstStartTime
+		s.LastStartTime = src.LastStartTime
+		s.NumPlays = src.NumPlays
+		s.Tags = src.Tags
+		sort.Strings(s.Tags)
+	}
+	return nil
+}
+
+// SetRating sets Rating to r and updates RatingAtLeast*.
+func (s *Song) SetRating(r float64) {
+	s.Rating = r
+	s.RatingAtLeast75 = r >= 0.75
+	s.RatingAtLeast50 = r >= 0.5
+	s.RatingAtLeast25 = r >= 0.25
+	s.RatingAtLeast0 = r >= 0
+}
+
+// UpdatePlayStats updates NumPlays, FirstStartTime, and LastStartTime to
+// reflect an additional play starting at startTime.
+func (s *Song) UpdatePlayStats(startTime time.Time) {
+	s.NumPlays++
+	if s.FirstStartTime.IsZero() || startTime.Before(s.FirstStartTime) {
+		s.FirstStartTime = startTime
+	}
+	if s.LastStartTime.IsZero() || startTime.After(s.LastStartTime) {
+		s.LastStartTime = startTime
+	}
+}
+
+// RebuildPlayStats regenerates NumPlays, FirstStartTime, and LastStartTime based
+// on the supplied plays.
+func (s *Song) RebuildPlayStats(plays []Play) {
+	s.NumPlays = 0
+	s.FirstStartTime = time.Time{}
+	s.LastStartTime = time.Time{}
+	for _, p := range plays {
+		s.UpdatePlayStats(p.StartTime)
+	}
+}
+
+// https://go.dev/blog/normalization#performing-magic
+var normalizer = transform.Chain(norm.NFKD, runes.Remove(runes.In(unicode.Mn)))
+
+// Normalize normalizes s for searches.
+//
+// NFKD form is used. Unicode characters are decomposed (runes are broken into their components) and
+// replaced for compatibility equivalence (characters that represent the same characters but have
+// different visual representations, e.g. '9' and '⁹', are equal). Visually-similar characters from
+// different alphabets will not be equal, however (e.g. Latin 'o', Greek 'ο', and Cyrillic 'о').
+// See https://go.dev/blog/normalization for more details.
+//
+// Characters are also de-accented and lowercased, but punctuation is preserved.
+func Normalize(s string) (string, error) {
+	b := make([]byte, len(s))
+	_, _, err := normalizer.Transform(b, []byte(s), true)
+	if err != nil {
+		return "", err
+	}
+	b = bytes.TrimRight(b, "\x00")
+	return strings.ToLower(string(b)), nil
+}
+
 // Play represents one playback of a Song.
 type Play struct {
 	// StartTime is the time at which playback started.
@@ -119,7 +247,6 @@ func NewPlay(t time.Time, ip string) Play { return Play{t, ip} }
 type PlayDump struct {
 	// Song entity's key ID from Datastore.
 	SongID string `json:"songId"`
-
 	// Play information.
 	Play Play `json:"play"`
 }

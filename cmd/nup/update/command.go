@@ -62,7 +62,7 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&cmd.mergeSongIDs, "merge-songs", "",
 		`Merge one song's user data into another song, with IDs as "from:to"`)
 	f.BoolVar(&cmd.reindexSongs, "reindex-songs", false,
-		"Ask server to reindex all songs' search fields (not typically neaded)")
+		"Ask server to reindex all songs' search-related fields (not typically neaded)")
 	f.BoolVar(&cmd.requireCovers, "require-covers", false,
 		"Die if cover images aren't found for any songs that have album IDs")
 	f.StringVar(&cmd.songPathsFile, "song-paths-file", "",
