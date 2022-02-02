@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"net/url"
 
 	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/server/db"
@@ -103,4 +105,29 @@ func dumpSong(cfg *client.Config, songID int64) (db.Song, error) {
 	var s db.Song
 	err = json.Unmarshal(b, &s)
 	return s, err
+}
+
+// reindexSongs asks the server to reindex all songs' search data.
+func reindexSongs(cfg *client.Config) error {
+	var cursor string
+	var scanned, updated int // totals
+	for {
+		var res struct {
+			Scanned int    `json:"scanned"`
+			Updated int    `json:"updated"`
+			Cursor  string `json:"cursor"`
+		}
+		query := "cursor=" + url.QueryEscape(cursor)
+		if b, err := sendRequest(cfg, "POST", "/reindex", query, nil, ""); err != nil {
+			return err
+		} else if err := json.Unmarshal(b, &res); err != nil {
+			return err
+		}
+		scanned += res.Scanned
+		updated += res.Updated
+		log.Printf("Scanned %v songs, updated %v", scanned, updated)
+		if cursor = res.Cursor; cursor == "" {
+			return nil
+		}
+	}
 }

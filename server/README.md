@@ -138,7 +138,12 @@ Updates a song's rating and/or tags in Datastore.
 
 ### /reindex (POST)
 
-Regenerates fields used for searching across all [Song] objects.
+Regenerates fields used for searching across all [Song] objects. Returns a JSON
+object containing `scanned` and `updated` number properties and a `cursor`
+string property. If the returned cursor is non-empty, another request should be
+issued to continue reindexing (App Engine limits requests to 10 minutes).
+
+*   `cursor` (optional) - Query cursor returned by previous call.
 
 ### /song (GET)
 

@@ -284,12 +284,10 @@ func (cmd *Command) doReindexSongs() subcommands.ExitStatus {
 		fmt.Fprintln(os.Stderr, "-dry-run is incompatible with -reindex-songs")
 		return subcommands.ExitUsageError
 	}
-	b, err := sendRequest(cmd.Cfg, "POST", "/reindex", "", nil, "text/plain")
-	if err != nil {
+	if err := reindexSongs(cmd.Cfg); err != nil {
 		fmt.Fprintln(os.Stderr, "Failed reindexing songs:", err)
 		return subcommands.ExitFailure
 	}
-	fmt.Println("Server:", string(b))
 	return subcommands.ExitSuccess
 }
 

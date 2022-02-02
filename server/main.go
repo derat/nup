@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"math/rand"
 	"net"
@@ -516,13 +515,19 @@ func handleRateAndTag(ctx context.Context, cfg *config.Config, w http.ResponseWr
 }
 
 func handleReindex(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
-	nsongs, err := update.ReindexSongs(ctx)
+	cursor, scanned, updated, err := update.ReindexSongs(ctx, r.FormValue("cursor"))
 	if err != nil {
 		log.Errorf(ctx, "Got error while reindexing songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeTextResponse(w, fmt.Sprintf("updated %d song(s)", nsongs))
+	writeJSONResponse(w, struct {
+		Scanned int    `json:"scanned"`
+		Updated int    `json:"updated"`
+		Cursor  string `json:"cursor"`
+	}{
+		scanned, updated, cursor,
+	})
 }
 
 // The existence of this endpoint makes me extremely unhappy, but it seems necessary due to

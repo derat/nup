@@ -21,6 +21,8 @@ import (
 
 var errUnmodified = errors.New("object wasn't modified")
 
+const reindexBatchSize = 1000
+
 // AddPlay adds a play report to the song identified by id in datastore.
 func AddPlay(ctx context.Context, id int64, startTime time.Time, ip string) error {
 	err := updateExistingSong(ctx, id, func(ctx context.Context, s *db.Song) error {
@@ -198,9 +200,19 @@ func DeleteSong(ctx context.Context, id int64) error {
 
 // ReindexSongs regenerates the ArtistLower, TitleLower, AlbumLower, Keywords, and RatingAtLeast*
 // fields of all songs in the database. It only needs to be run after the logic for generating those
-// fields is changed. Returns the number of updated songs.
-func ReindexSongs(ctx context.Context) (int, error) {
-	it := datastore.NewQuery(db.SongKind).KeysOnly().Run(ctx)
+// fields is changed. If nextCursor is non-empty, ReindexSongs should be called again to continue
+// reindexing.
+func ReindexSongs(ctx context.Context, cursor string) (nextCursor string, scanned, updated int, err error) {
+	q := datastore.NewQuery(db.SongKind).KeysOnly()
+	if len(cursor) > 0 {
+		dc, err := datastore.DecodeCursor(cursor)
+		if err != nil {
+			return "", 0, 0, fmt.Errorf("decode cursor %q: %v", cursor, err)
+		}
+		q = q.Start(dc)
+	}
+
+	it := q.Run(ctx)
 	var ids []int64
 	for {
 		if k, err := it.Next(nil); err == nil {
@@ -208,14 +220,22 @@ func ReindexSongs(ctx context.Context) (int, error) {
 		} else if err == datastore.Done {
 			break
 		} else {
-			return 0, err
+			return "", 0, 0, err
+		}
+		if len(ids) == reindexBatchSize {
+			nc, err := it.Cursor()
+			if err != nil {
+				return "", 0, 0, fmt.Errorf("get cursor: %v", err)
+			}
+			nextCursor = nc.String()
+			break
 		}
 	}
 
-	var nupdates int
-	for i, id := range ids {
+	for _, id := range ids {
 		var update bool
-		err := updateExistingSong(ctx, id, func(ctx context.Context, s *db.Song) error {
+		if err := updateExistingSong(ctx, id, func(ctx context.Context, s *db.Song) error {
+			scanned++
 			var up db.Song
 			if err := up.Update(s, true /* copyUserData */); err != nil {
 				return err
@@ -241,19 +261,15 @@ func ReindexSongs(ctx context.Context) (int, error) {
 
 			update = true
 			return nil
-		}, 0, false)
-		if err != nil {
-			return nupdates, err
+		}, 0, false); err != nil {
+			return "", scanned, updated, err
 		}
 		if update {
-			nupdates++
-		}
-		if i != 0 && (i%1000) == 0 {
-			log.Debugf(ctx, "Scanned %d songs for reindex, updated %d", i, nupdates)
+			updated++
 		}
 	}
-	log.Debugf(ctx, "Scanned %d songs for reindex, updated %d", len(ids), nupdates)
-	return nupdates, nil
+	log.Debugf(ctx, "Scanned %d songs for reindex, updated %d", scanned, updated)
+	return nextCursor, scanned, updated, nil
 }
 
 // ClearData deletes all song and play objects from datastore.
