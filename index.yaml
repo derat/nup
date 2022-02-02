@@ -25,6 +25,11 @@ indexes:
 
 - kind: Song
   properties:
+  - name: Rating
+  - name: LastStartTime
+
+- kind: Song
+  properties:
   - name: RatingAtLeast75
   - name: LastStartTime
 
