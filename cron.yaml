@@ -1,0 +1,4 @@
+cron:
+  - description: update stats
+    url: /stats?update=1
+    schedule: every 24 hours

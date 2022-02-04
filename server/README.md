@@ -151,6 +151,14 @@ Returns a song's MP3 data.
 
 *   `filename` - MP3 path from [Song]'s `Filename` field.
 
+### /stats (GET)
+
+Gets previously-computed stats about the database. Returns a JSON-marshaled
+[Stats] object.
+
+*   `update` - If `1`, update stats instead of getting them. Called periodically
+    by [cron].
+
 ### /tags (GET)
 
 Returns a JSON-marshaled array of strings containing known tags.
@@ -161,3 +169,5 @@ Returns a JSON-marshaled array of strings containing known tags.
 [Play]: ./db/song.go
 [Song]: ./db/song.go
 [SearchPreset]: ./config/config.go
+[Stats]: ./db/stats.go
+[cron]: https://cloud.google.com/appengine/docs/standard/go/scheduling-jobs-with-cron-yaml

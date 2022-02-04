@@ -157,8 +157,14 @@ func LoadConfig(ctx context.Context) (*Config, error) {
 
 // Auth checks that r is authorized in cfg via either HTTP basic authentication or Google
 // authentication. A username or email address that can be used in logging is returned if found,
-// even if the the request is unauthorized.
-func (cfg *Config) Auth(r *http.Request) (ok bool, username string) {
+// even if the the request is unauthorized. If allowCron is true, requests that were initiated via
+// cron are also permitted.
+func (cfg *Config) Auth(r *http.Request, allowCron bool) (ok bool, username string) {
+	// https://cloud.google.com/appengine/docs/standard/go/scheduling-jobs-with-cron-yaml#validating_cron_requests
+	if allowCron && r.Header.Get("X-Appengine-Cron") == "true" {
+		return true, "cron"
+	}
+
 	if username, password, ok := r.BasicAuth(); ok {
 		for _, u := range cfg.BasicAuthUsers {
 			if username == u.Username && password == u.Password {

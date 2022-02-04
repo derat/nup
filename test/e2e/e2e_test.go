@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -817,5 +818,43 @@ func TestReindexSongs(tt *testing.T) {
 	log.Print("Querying after reindex")
 	if err := compareQueryResults([]db.Song{s}, t.QuerySongs("minRating=0"), test.IgnoreOrder); err != nil {
 		tt.Error("Bad results for query: ", err)
+	}
+}
+
+func TestStats(tt *testing.T) {
+	t, done := initTest(tt)
+	defer done()
+
+	log.Print("Posting songs")
+	s1 := Song1s
+	s1.Rating = 0.75
+	s1.Tags = []string{"guitar", "instrumental"}
+	s1.Plays = []db.Play{db.NewPlay(time.Unix(1410746718, 0), "127.0.0.1")}
+	s2 := Song5s
+	s2.Rating = 1.0
+	s2.Tags = []string{"guitar", "vocals"}
+	s2.Plays = []db.Play{
+		db.NewPlay(time.Unix(1379210718, 0), "127.0.0.1"),
+		db.NewPlay(time.Unix(1410746718, 0), "127.0.0.1"),
+	}
+	t.PostSongs([]db.Song{s1, s2}, true, 0)
+
+	log.Print("Updating stats")
+	t.UpdateStats()
+
+	log.Print("Checking stats")
+	got := t.GetStats()
+	want := db.Stats{
+		Songs:    2,
+		TotalSec: s1.Length + s2.Length,
+		Ratings:  map[string]int{"0.75": 1, "1.00": 1},
+		Tags:     map[string]int{"guitar": 2, "instrumental": 1, "vocals": 1},
+		Years: map[int]db.PlayStats{
+			2013: {Plays: 1, TotalSec: s2.Length},
+			2014: {Plays: 2, TotalSec: s1.Length + s2.Length},
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		tt.Errorf("Got %+v, want %+v", got, want)
 	}
 }

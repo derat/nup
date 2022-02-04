@@ -1,8 +1,8 @@
 #!/bin/sh -e
 
-if [ "$#" -ne 0 ]; then
+if [ "$1" = '-h' ] || [ "$1" = '--help' ]; then
   cat <<EOF >&2
-Usage: deploy.sh
+Usage: deploy.sh [args]...
 Deploy the App Engine app to CGP and delete old versions.
 EOF
   exit 2

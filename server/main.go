@@ -24,6 +24,7 @@ import (
 	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/server/dump"
 	"github.com/derat/nup/server/query"
+	"github.com/derat/nup/server/stats"
 	"github.com/derat/nup/server/storage"
 	"github.com/derat/nup/server/update"
 
@@ -65,6 +66,7 @@ func main() {
 	addHandler("/rate_and_tag", http.MethodPost, rejectUnauth, handleRateAndTag)
 	addHandler("/reindex", http.MethodPost, rejectUnauth, handleReindex)
 	addHandler("/song", http.MethodGet, rejectUnauth, handleSong)
+	addHandler("/stats", http.MethodGet, rejectUnauthCron, handleStats)
 	addHandler("/tags", http.MethodGet, rejectUnauth, handleTags)
 
 	if appengine.IsDevAppServer() {
@@ -115,6 +117,12 @@ func main() {
 
 func handleClear(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
 	if err := update.ClearData(ctx); err != nil {
+		log.Errorf(ctx, "Clearing songs and plays failed: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := stats.Clear(ctx); err != nil {
+		log.Errorf(ctx, "Clearing stats failed: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -149,7 +157,7 @@ func handleCover(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 	w.Header().Set("Content-Type", "image/jpeg")
 	if err := cover.Scale(ctx, cfg.CoverBucket, cfg.CoverBaseURL, fn,
 		int(size), coverJPEGQuality, w); err != nil {
-		log.Errorf(ctx, "Failed to scale cover: %v", err)
+		log.Errorf(ctx, "Scaling cover %q failed: %v", fn, err)
 		http.Error(w, "Scaling failed", http.StatusInternalServerError)
 		return
 	}
@@ -161,7 +169,7 @@ func handleDeleteSong(ctx context.Context, cfg *config.Config, w http.ResponseWr
 		return
 	}
 	if err := update.DeleteSong(ctx, id); err != nil {
-		log.Errorf(ctx, "Got error while deleting song: %v", err)
+		log.Errorf(ctx, "Deleting song %v failed: %v", id, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	writeTextResponse(w, "ok")
@@ -317,19 +325,19 @@ func handleImport(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 		if err := d.Decode(s); err == io.EOF {
 			break
 		} else if err != nil {
-			log.Errorf(ctx, "Failed to decode song: %v", err)
+			log.Errorf(ctx, "Decode song failed: %v", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		if err := update.UpdateOrInsertSong(ctx, s, replaceUserData, updateDelay); err != nil {
-			log.Errorf(ctx, "Failed to update song with SHA1 %v: %v", s.SHA1, err)
+			log.Errorf(ctx, "Update song with SHA1 %v failed: %v", s.SHA1, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		numSongs++
 	}
 	if err := query.FlushCacheForUpdate(ctx, query.MetadataUpdate); err != nil {
-		log.Errorf(ctx, "Failed to flush query cache for update: %v", err)
+		log.Errorf(ctx, "Flushing query cache for update failed: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	log.Debugf(ctx, "Updated %v song(s)", numSongs)
@@ -344,7 +352,7 @@ func handleIndex(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 
 	f, err := os.Open(indexPath)
 	if err != nil {
-		log.Errorf(ctx, "Failed to open %v: %v", indexPath, err)
+		log.Errorf(ctx, "Opening %v failed: %v", indexPath, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -352,7 +360,7 @@ func handleIndex(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 
 	w.Header().Set("Content-Type", "text/html")
 	if _, err = io.Copy(w, f); err != nil {
-		log.Errorf(ctx, "Failed to copy %v to response: %v", indexPath, err)
+		log.Errorf(ctx, "Copying %v to response failed: %v", indexPath, err)
 	}
 }
 
@@ -386,7 +394,7 @@ func handlePlayed(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 	}
 
 	if err := update.AddPlay(ctx, id, startTime, ip); err != nil {
-		log.Errorf(ctx, "Got error while recording play: %v", err)
+		log.Errorf(ctx, "Recording play of %v at %v failed: %v", id, startTime, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	writeTextResponse(w, "ok")
@@ -507,7 +515,7 @@ func handleRateAndTag(ctx context.Context, cfg *config.Config, w http.ResponseWr
 	}
 
 	if err := update.SetRatingAndTags(ctx, id, hasRating, rating, tags, updateDelay); err != nil {
-		log.Errorf(ctx, "Got error while rating/tagging song: %v", err)
+		log.Errorf(ctx, "Rating/tagging song %d failed: %v", id, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -517,7 +525,7 @@ func handleRateAndTag(ctx context.Context, cfg *config.Config, w http.ResponseWr
 func handleReindex(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
 	cursor, scanned, updated, err := update.ReindexSongs(ctx, r.FormValue("cursor"))
 	if err != nil {
-		log.Errorf(ctx, "Got error while reindexing songs: %v", err)
+		log.Errorf(ctx, "Reindexing songs failed: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -528,6 +536,28 @@ func handleReindex(ctx context.Context, cfg *config.Config, w http.ResponseWrite
 	}{
 		scanned, updated, cursor,
 	})
+}
+
+func handleStats(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
+	// Updates would be better suited to POST than to GET, but App Engine cron uses GET per
+	// https://cloud.google.com/appengine/docs/standard/go/scheduling-jobs-with-cron-yaml.
+	if r.FormValue("update") == "1" {
+		if err := stats.Update(ctx); err != nil {
+			log.Errorf(ctx, "Updating stats failed: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeTextResponse(w, "ok")
+		return
+	}
+
+	stats, err := stats.Get(ctx)
+	if err != nil {
+		log.Errorf(ctx, "Getting stats failed: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSONResponse(w, stats)
 }
 
 // The existence of this endpoint makes me extremely unhappy, but it seems necessary due to
@@ -557,7 +587,7 @@ func handleSong(ctx context.Context, cfg *config.Config, w http.ResponseWriter, 
 
 	r, err := openSong(ctx, cfg, fn)
 	if err != nil {
-		log.Errorf(ctx, "Failed opening song %q: %v", fn, err)
+		log.Errorf(ctx, "Opening song %q failed: %v", fn, err)
 		// TODO: It'd be better to report 404 when appropriate.
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -568,7 +598,7 @@ func handleSong(ctx context.Context, cfg *config.Config, w http.ResponseWriter, 
 
 	if or, ok := r.(*storage.ObjectReader); ok {
 		if err := sendObject(ctx, req, w, or); err != nil {
-			log.Errorf(ctx, "Failed copying song %q: %v", fn, err)
+			log.Errorf(ctx, "Copying song %q failed: %v", fn, err)
 		}
 	} else {
 		// Just send a 200 with the whole file if we're getting it over HTTP rather than from GCS.
@@ -576,7 +606,7 @@ func handleSong(ctx context.Context, cfg *config.Config, w http.ResponseWriter, 
 		w.Header().Set("Content-Type", "audio/mpeg")
 		if _, err := io.Copy(w, r); err != nil {
 			// Too late to report an HTTP error.
-			log.Errorf(ctx, "Failed copying song %q: %v", fn, err)
+			log.Errorf(ctx, "Copying song %q failed: %v", fn, err)
 		}
 	}
 }
@@ -584,7 +614,7 @@ func handleSong(ctx context.Context, cfg *config.Config, w http.ResponseWriter, 
 func handleTags(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
 	tags, err := query.Tags(ctx, r.FormValue("requireCache") == "1")
 	if err != nil {
-		log.Errorf(ctx, "Unable to query tags: %v", err)
+		log.Errorf(ctx, "Querying tags failed: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

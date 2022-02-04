@@ -85,37 +85,46 @@ func TestAddHandler(t *testing.T) {
 	addHandler("/", http.MethodGet, redirectUnauth, handleReq)
 	addHandler("/get", http.MethodGet, rejectUnauth, handleReq)
 	addHandler("/post", http.MethodPost, rejectUnauth, handleReq)
+	addHandler("/cron", http.MethodGet, rejectUnauthCron, handleReq)
 
 	for _, tc := range []struct {
 		method, path string
 		email        string // google auth
 		user, pass   string // basic auth
+		cron         bool   // set X-Appengine-Cron header
 		code         int    // expected HTTP status code
 	}{
-		{"GET", "/", email1, "", "", 200},
-		{"GET", "/", email2, "", "", 200},
-		{"GET", "/", "", user1, pass1, 200},
-		{"GET", "/", "", user2, pass2, 200},
-		{"GET", "/", email1, badUser, badPass, 302}, // bad basic user; don't check google
-		{"GET", "/", badEmail, "", "", 302},         // bad google user
-		{"GET", "/", "", badUser, badPass, 302},     // bad basic user
-		{"GET", "/", "", user1, pass2, 302},         // bad basic password
-		{"GET", "/", "", user2, "", 302},            // no basic password
-		{"GET", "/", "", "", "", 302},               // no auth
-		{"POST", "/", "", "", "", 302},              // no auth, wrong method
-		{"POST", "/", email1, "", "", 405},          // valid auth, wrong method
+		{"GET", "/", email1, "", "", false, 200},
+		{"GET", "/", email2, "", "", false, 200},
+		{"GET", "/", "", user1, pass1, false, 200},
+		{"GET", "/", "", user2, pass2, false, 200},
+		{"GET", "/", email1, badUser, badPass, false, 302}, // bad basic user; don't check google
+		{"GET", "/", badEmail, "", "", false, 302},         // bad google user
+		{"GET", "/", "", badUser, badPass, false, 302},     // bad basic user
+		{"GET", "/", "", user1, pass2, false, 302},         // bad basic password
+		{"GET", "/", "", user2, "", false, 302},            // no basic password
+		{"GET", "/", "", "", "", false, 302},               // no auth
+		{"POST", "/", "", "", "", false, 302},              // no auth, wrong method
+		{"POST", "/", email1, "", "", false, 405},          // valid auth, wrong method
 
-		{"GET", "/get", email1, "", "", 200},
-		{"GET", "/get", badEmail, "", "", 401},
-		{"GET", "/get", "", "", "", 401},      // no auth
-		{"POST", "/get", "", "", "", 401},     // no auth, wrong method
-		{"POST", "/get", email1, "", "", 405}, // valid auth, wrong method
+		{"GET", "/get", email1, "", "", false, 200},
+		{"GET", "/get", badEmail, "", "", false, 401},
+		{"GET", "/get", "", "", "", false, 401},      // no auth
+		{"POST", "/get", "", "", "", false, 401},     // no auth, wrong method
+		{"POST", "/get", email1, "", "", false, 405}, // valid auth, wrong method
 
-		{"POST", "/post", email1, "", "", 200},
-		{"POST", "/post", badEmail, "", "", 401},
-		{"POST", "/post", "", "", "", 401},    // no auth
-		{"GET", "/post", "", "", "", 401},     // no auth, wrong method
-		{"GET", "/post", email1, "", "", 405}, // valid auth, wrong method
+		{"POST", "/post", email1, "", "", false, 200},
+		{"POST", "/post", badEmail, "", "", false, 401},
+		{"POST", "/post", "", "", "", false, 401},    // no auth
+		{"GET", "/post", "", "", "", false, 401},     // no auth, wrong method
+		{"GET", "/post", email1, "", "", false, 405}, // valid auth, wrong method
+
+		{"GET", "/cron", email1, "", "", false, 200},
+		{"GET", "/cron", "", user1, pass1, false, 200},
+		{"GET", "/cron", "", "", "", true, 200},
+		{"GET", "/cron", "", "", "", false, 401},       // no auth
+		{"GET", "/cron", badEmail, "", "", false, 401}, // bad google user
+		{"POST", "/cron", "", "", "", true, 405},       // wrong method
 	} {
 		desc := tc.method + " " + tc.path
 		req, err := inst.NewRequest(tc.method, tc.path, nil)
@@ -133,6 +142,9 @@ func TestAddHandler(t *testing.T) {
 		if tc.user != "" {
 			req.SetBasicAuth(tc.user, tc.pass)
 			desc += fmt.Sprintf(" basic=%s/%s", tc.user, tc.pass)
+		}
+		if tc.cron {
+			req.Header.Set("X-Appengine-Cron", "true")
 		}
 
 		lastMethod, lastPath = "", ""

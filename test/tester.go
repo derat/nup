@@ -360,8 +360,7 @@ func (t *Tester) QuerySongs(params ...string) []db.Song {
 	defer resp.Body.Close()
 
 	songs := make([]db.Song, 0)
-	d := json.NewDecoder(resp.Body)
-	if err := d.Decode(&songs); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&songs); err != nil {
 		t.fatal("Decoding songs failed: ", err)
 	}
 	return songs
@@ -395,8 +394,7 @@ func (t *Tester) GetTags(requireCache bool) string {
 	defer resp.Body.Close()
 
 	tags := make([]string, 0)
-	d := json.NewDecoder(resp.Body)
-	if err := d.Decode(&tags); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&tags); err != nil {
 		t.fatal("Decoding tags failed: ", err)
 	}
 	return strings.Join(tags, ",")
@@ -501,6 +499,24 @@ func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted DeletionP
 	}
 
 	return songs
+}
+
+// GetStats gets current stats from the server.
+func (t *Tester) GetStats() db.Stats {
+	resp := t.sendRequest(t.newRequest("GET", "stats", nil))
+	defer resp.Body.Close()
+
+	var stats db.Stats
+	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
+		t.fatal("Decoding stats failed: ", err)
+	}
+	return stats
+}
+
+// UpdateStats instructs the server to update stats.
+func (t *Tester) UpdateStats() {
+	resp := t.sendRequest(t.newRequest("GET", "stats?update=1", nil))
+	resp.Body.Close()
 }
 
 // ForceUpdateFailures configures the server to reject or allow updates.

@@ -59,8 +59,9 @@ func writeTextResponse(w http.ResponseWriter, s string) {
 type handlerAuth int
 
 const (
-	rejectUnauth   handlerAuth = iota // 401 if unauthorized
-	redirectUnauth                    // 302 to login page if unauthorized
+	rejectUnauth     handlerAuth = iota // 401 if unauthorized
+	rejectUnauthCron                    // 401 if unauthorized and not from cron
+	redirectUnauth                      // 302 to login page if unauthorized
 )
 
 // handlerFunc handles HTTP requests to a single endpoint.
@@ -79,9 +80,10 @@ func addHandler(path, method string, auth handlerAuth, fn handlerFunc) {
 			return
 		}
 
-		if ok, username := cfg.Auth(r); !ok {
+		allowCron := auth == rejectUnauthCron
+		if ok, username := cfg.Auth(r, allowCron); !ok {
 			switch auth {
-			case rejectUnauth:
+			case rejectUnauth, rejectUnauthCron:
 				log.Debugf(ctx, "Unauthorized request for %v from %v (user %q)",
 					r.URL.String(), r.RemoteAddr, username)
 				http.Error(w, "Request requires authorization", http.StatusUnauthorized)
@@ -94,6 +96,9 @@ func addHandler(path, method string, auth handlerAuth, fn handlerFunc) {
 						r.URL.String(), r.RemoteAddr, username, u)
 					http.Redirect(w, r, u, http.StatusFound)
 				}
+			default:
+				log.Errorf(ctx, "Unhandled auth type %v", auth)
+				http.Error(w, "Unhandled auth type", http.StatusInternalServerError)
 			}
 			return
 		}
