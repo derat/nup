@@ -3,6 +3,8 @@
 
 package db
 
+import "time"
+
 const (
 	// StatsKind is the Stats struct's Datastore kind.
 	StatsKind = "Stats"
@@ -22,6 +24,8 @@ type Stats struct {
 	Tags map[string]int `json:"tags"`
 	// Years maps from year (e.g. 2020) to stats about plays in that year.
 	Years map[int]PlayStats `json:"years"`
+	// UpdateTime is the time at which these stats were generated.
+	UpdateTime time.Time `json:"updateTime"`
 }
 
 // NewStats returns a new Stats struct with all fields initialized to 0.

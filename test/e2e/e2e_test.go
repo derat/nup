@@ -844,6 +844,9 @@ func TestStats(tt *testing.T) {
 
 	log.Print("Checking stats")
 	got := t.GetStats()
+	if got.UpdateTime.IsZero() {
+		tt.Error("Stats update time is zero")
+	}
 	want := db.Stats{
 		Songs:    2,
 		TotalSec: s1.Length + s2.Length,
@@ -853,6 +856,7 @@ func TestStats(tt *testing.T) {
 			2013: {Plays: 1, TotalSec: s2.Length},
 			2014: {Plays: 2, TotalSec: s1.Length + s2.Length},
 		},
+		UpdateTime: got.UpdateTime, // checked for non-zero earlier
 	}
 	if !reflect.DeepEqual(got, want) {
 		tt.Errorf("Got %+v, want %+v", got, want)

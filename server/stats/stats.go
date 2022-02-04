@@ -55,6 +55,8 @@ func Get(ctx context.Context) (*db.Stats, error) {
 // periodically by a cron job instead of interactively.
 func Update(ctx context.Context) error {
 	stats := db.NewStats()
+	stats.UpdateTime = time.Now()
+
 	songLengths := make(map[int64]float64) // keys are song IDs
 
 	// Datastore doesn't seem to return any results when trying to project all three of these
