@@ -63,26 +63,37 @@ func Update(ctx context.Context) error {
 	// properties at once (probably because Tags is array-valued), and including multiple properties
 	// also requires additional indexes.
 	type songFunc func(int64, *db.Song)
-	songFuncs := map[string]songFunc{
-		"Length": func(id int64, s *db.Song) {
+	queries := []struct {
+		prop     string
+		distinct bool
+		fn       func(int64, *db.Song)
+	}{
+		{"Length", false, func(id int64, s *db.Song) {
 			stats.Songs++
 			stats.TotalSec += s.Length
 			songLengths[id] = s.Length
-		},
-		"Rating": func(id int64, s *db.Song) {
+		}},
+		{"AlbumId", true, func(id int64, s *db.Song) {
+			stats.Albums++
+		}},
+		{"Rating", false, func(id int64, s *db.Song) {
 			stats.Ratings[fmt.Sprintf("%.2f", s.Rating)]++
-		},
-		"Tags": func(id int64, s *db.Song) {
+		}},
+		{"Tags", false, func(id int64, s *db.Song) {
 			for _, t := range s.Tags {
 				stats.Tags[t]++
 			}
-		},
+		}},
 	}
-	ch := make(chan error, len(songFuncs))
-	for prop, fn := range songFuncs {
-		func(prop string, fn songFunc) {
+	ch := make(chan error, len(queries))
+	for _, query := range queries {
+		func(prop string, distinct bool, fn songFunc) {
 			start := time.Now()
-			it := datastore.NewQuery(db.SongKind).Project(prop).Run(ctx)
+			q := datastore.NewQuery(db.SongKind).Project(prop)
+			if distinct {
+				q = q.Distinct()
+			}
+			it := q.Run(ctx)
 			for {
 				var s db.Song
 				k, err := it.Next(&s)
@@ -97,9 +108,9 @@ func Update(ctx context.Context) error {
 			log.Debugf(ctx, "Computing Song.%v stats took %v ms",
 				prop, time.Now().Sub(start).Milliseconds())
 			ch <- nil
-		}(prop, fn)
+		}(query.prop, query.distinct, query.fn)
 	}
-	for i := 0; i < len(songFuncs); i++ {
+	for range queries {
 		if err := <-ch; err != nil {
 			return err
 		}

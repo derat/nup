@@ -16,6 +16,9 @@ const (
 type Stats struct {
 	// Songs is the total number of songs in the database.
 	Songs int `json:"songs"`
+	// Albums is the total number of albums in the database.
+	// This is computed by counting distinct Song.AlbumID values.
+	Albums int `json:"albums"`
 	// TotalSec is the total duration in seconds of all songs.
 	TotalSec float64 `json:"totalSec"`
 	// Ratings maps from "%.2f" rating in [0.0, 1.0] (or -1.0 for unrated) to number of songs with that rating.

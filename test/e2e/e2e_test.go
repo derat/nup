@@ -849,6 +849,7 @@ func TestStats(tt *testing.T) {
 	}
 	want := db.Stats{
 		Songs:    2,
+		Albums:   2,
 		TotalSec: s1.Length + s2.Length,
 		Ratings:  map[string]int{"0.75": 1, "1.00": 1},
 		Tags:     map[string]int{"guitar": 2, "instrumental": 1, "vocals": 1},
