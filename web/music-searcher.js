@@ -369,7 +369,7 @@ customElements.define(
         const menu = this.overlayManager_.createMenu(orig.pageX, orig.pageY, [
           {
             id: 'details',
-            text: 'Details',
+            text: 'Details…',
             cb: () =>
               showSongDetails(
                 this.overlayManager_,
@@ -378,7 +378,7 @@ customElements.define(
           },
           {
             id: 'debug',
-            text: 'Debug',
+            text: 'Debug…',
             cb: () => window.open(getDumpSongUrl(e.detail.songId), '_blank'),
           },
         ]);

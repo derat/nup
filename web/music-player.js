@@ -28,7 +28,18 @@ const template = createTemplate(`
   :host {
     display: flex;
     flex-direction: column;
+    position: relative; /* needed for menu-button */
   }
+
+  #menu-button {
+    cursor: pointer;
+    font-size: 22px;
+    padding: 0 var(--margin);
+    position: absolute;
+    right: 0;
+    top: 0;
+  }
+
   #song-info {
     display: flex;
     margin: var(--margin);
@@ -155,6 +166,8 @@ const template = createTemplate(`
 
 <presentation-layer></presentation-layer>
 
+<div id="menu-button">⋯</div>
+
 <audio type="audio/mpeg" preload="auto">
   Your browser doesn't support the audio element.
 </audio>
@@ -254,6 +267,31 @@ customElements.define(
       this.presentationLayer_.addEventListener('next', () => {
         this.cycleTrack_(1, false /* delayPlay */);
       });
+      this.presentationLayer_.addEventListener('hide', () => {
+        this.setPresentationLayerVisible_(false);
+      });
+
+      this.menuButton_ = get('menu-button');
+      this.menuButton_.addEventListener('click', (e) => {
+        const rect = this.menuButton_.getBoundingClientRect();
+        const menu = this.overlayManager_.createMenu(
+          rect.right + 12, // compensate for right padding
+          rect.bottom,
+          [
+            {
+              id: 'present',
+              text: 'Presentation',
+              cb: () => this.setPresentationLayerVisible_(true),
+            },
+            {
+              id: 'options',
+              text: 'Options…',
+              cb: () => this.showOptions_(),
+            },
+          ],
+          true /* alignRight */
+        );
+      });
 
       this.audioCtx_ = new AudioContext();
       this.gainNode_ = this.audioCtx_.createGain();
@@ -331,12 +369,12 @@ customElements.define(
           { text: '-' },
           {
             id: 'details',
-            text: 'Details',
+            text: 'Details…',
             cb: () => showSongDetails(this.overlayManager_, this.songs_[idx]),
           },
           {
             id: 'debug',
-            text: 'Debug',
+            text: 'Debug…',
             cb: () => window.open(getDumpSongUrl(e.detail.songId), '_blank'),
           },
         ]);

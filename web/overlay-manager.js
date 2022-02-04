@@ -199,7 +199,7 @@ customElements.define(
     // - text - menu item text, or '-' to insert separator instead
     // - cb   - callback to run when clicked
     // - id   - optional ID for element (used in tests)
-    createMenu(x, y, items) {
+    createMenu(x, y, items, alignRight) {
       const menu = createElement('span', 'menu', this.container_);
       this.updateLightbox_();
 
@@ -217,11 +217,15 @@ customElements.define(
         }
       }
 
-      // Keep the menu onscreen.
-      menu.style.left =
-        x + menu.clientWidth <= window.innerWidth
-          ? `${x}px`
-          : `${x - menu.clientWidth}px`;
+      if (alignRight) {
+        menu.style.right = `${x}px`;
+      } else {
+        // Keep the menu onscreen.
+        menu.style.left =
+          x + menu.clientWidth <= window.innerWidth
+            ? `${x}px`
+            : `${x - menu.clientWidth}px`;
+      }
       menu.style.top =
         y + menu.clientHeight <= window.innerHeight
           ? `${y}px`

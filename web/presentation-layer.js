@@ -180,7 +180,8 @@ const template = createTemplate(`
 // <presentation-layer> is a simple fullscreen overlay displaying information
 // about the current and next song.
 //
-// When the next track's cover image is clicked, a 'next' event is emitted.
+// When the next track information is clicked, a 'next' event is emitted.
+// When click is received anywhere else, a 'hide' event is emitted.
 customElements.define(
   'presentation-layer',
   class extends HTMLElement {
@@ -207,9 +208,15 @@ customElements.define(
       this.nextTitle_ = $('next-title', this.shadow_);
       this.nextAlbum_ = $('next-album', this.shadow_);
 
-      this.nextDiv_.addEventListener('click', () => {
+      this.shadow_.host.addEventListener('click', (e) => {
+        this.dispatchEvent(new Event('hide'));
+        e.stopPropagation();
+      });
+
+      this.nextDiv_.addEventListener('click', (e) => {
         this.dispatchEvent(new Event('next'));
         this.playNextTrackFunction_ && this.playNextTrackFunction_();
+        e.stopPropagation();
       });
 
       this.updateSongs(null, null);

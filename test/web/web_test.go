@@ -864,8 +864,10 @@ func TestOptions(t *testing.T) {
 	page.click(optionsOKButton)
 	page.checkGone(optionsOKButton)
 
-	// Escape should dismiss the dialog.
-	show()
+	// The dialog should also be available via the menu, and Escape should dismiss it.
+	page.click(menuButton)
+	page.click(menuOptions)
+	page.getOrFail(optionsOKButton)
 	page.sendKeys(body, selenium.EscapeKey, false)
 	page.checkGone(optionsOKButton)
 
@@ -944,6 +946,14 @@ func TestPresentation(t *testing.T) {
 	next()
 	page.checkPresentation(&song2, nil)
 	rate()
+	page.checkPresentation(nil, nil)
+
+	// The presentation layer should be displayable via the menu too, and clicking on the layer
+	// should hide it.
+	page.click(menuButton)
+	page.click(menuPresent)
+	page.checkPresentation(&song2, nil)
+	page.click(presentationLayer)
 	page.checkPresentation(nil, nil)
 }
 

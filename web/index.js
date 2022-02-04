@@ -59,16 +59,11 @@ musicPlayer.addEventListener('cover', (e) => {
 
 // Used by browser tests.
 document.test = {
-  rateAndTag: (songId, rating, tags) =>
-    musicPlayer.updater_.rateAndTag(songId, rating, tags),
-  reportPlay: (songId, startTime) =>
-    musicPlayer.updater_.reportPlay(songId, startTime),
   reset: () => {
     musicPlayer.resetForTesting();
     musicSearcher.resetForTesting();
     overlayManager.resetForTesting();
   },
   setPlayDelayMs: (delayMs) => (musicPlayer.playDelayMs_ = delayMs),
-  showOptions: () => musicPlayer.showOptions_(),
   updateTags: async () => await musicPlayer.updateTagsFromServer_(),
 };

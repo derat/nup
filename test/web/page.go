@@ -55,11 +55,14 @@ var (
 	gainTypeSelect  = joinLocs(optionsDialog, loc{selenium.ByID, "gain-type-select"})
 	preAmpRange     = joinLocs(optionsDialog, loc{selenium.ByID, "pre-amp-range"})
 
+	menuOptions  = joinLocs(overlayManager, loc{selenium.ByID, "options"})
+	menuPresent  = joinLocs(overlayManager, loc{selenium.ByID, "present"})
 	menuPlay     = joinLocs(overlayManager, loc{selenium.ByID, "play"})
 	menuRemove   = joinLocs(overlayManager, loc{selenium.ByID, "remove"})
 	menuTruncate = joinLocs(overlayManager, loc{selenium.ByID, "truncate"})
 
 	musicPlayer       = joinLocs(loc{selenium.ByTagName, "music-player"})
+	menuButton        = joinLocs(musicPlayer, loc{selenium.ByID, "menu-button"})
 	audio             = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "audio"})
 	coverImage        = joinLocs(musicPlayer, loc{selenium.ByID, "cover-img"})
 	ratingOverlayDiv  = joinLocs(musicPlayer, loc{selenium.ByID, "rating-overlay"})
