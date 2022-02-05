@@ -320,7 +320,7 @@ func handleImport(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 	numSongs := 0
 	replaceUserData := r.FormValue("replaceUserData") == "1"
 	d := json.NewDecoder(r.Body)
-	for true {
+	for {
 		s := &db.Song{}
 		if err := d.Decode(s); err == io.EOF {
 			break

@@ -114,7 +114,7 @@ func readDumpedSongs(r io.Reader, coverDir string, maxSongs int) (albumIDs []str
 	missingAlbumIDs := make(map[string]bool)
 	d := json.NewDecoder(r)
 	numSongs := 0
-	for true {
+	for {
 		if maxSongs >= 0 && numSongs >= maxSongs {
 			break
 		}

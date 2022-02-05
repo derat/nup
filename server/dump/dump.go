@@ -123,7 +123,7 @@ func getEntities(ctx context.Context, q *datastore.Query, cursor string, entitie
 	ids = make([]int64, 0, len(entities))
 	parentIDs = make([]int64, 0, len(entities))
 
-	for true {
+	for {
 		k, err := it.Next(nil)
 		if err == datastore.Done {
 			break
