@@ -9,6 +9,7 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -22,16 +23,20 @@ import (
 	"github.com/derat/nup/cmd/nup/mp3gain"
 	"github.com/derat/nup/server/db"
 	"github.com/derat/taglib-go/taglib"
+	"github.com/derat/taglib-go/taglib/id3"
 )
 
 const (
 	albumIDTag          = "MusicBrainz Album Id" // usually used as cover ID
 	coverIDTag          = "nup Cover Id"         // can be set for non-MusicBrainz tracks
 	recordingIDOwner    = "http://musicbrainz.org"
+	albumArtistTag      = "TPE2"
 	logProgressInterval = 100
 )
 
-func readID3Footer(f *os.File, fi os.FileInfo) (length int64, artist, title, album string, err error) {
+// readID3v1Footer reads a 128-byte ID3v1 footer from the end of f.
+// ID3v1 is a terrible format.
+func readID3v1Footer(f *os.File, fi os.FileInfo) (length int64, artist, title, album string, err error) {
 	const (
 		footerLength = 128
 		footerMagic  = "TAG"
@@ -57,6 +62,35 @@ func readID3Footer(f *os.File, fi os.FileInfo) (length int64, artist, title, alb
 	artist = clean(b.Next(artistLength))
 	album = clean(b.Next(albumLength))
 	return footerLength, artist, title, album, nil
+}
+
+// getID3v2TextFrame returns the first ID3v2 text frame with the supplied ID from gen.
+// If the frame isn't present, an empty string and nil error are returned.
+//
+// The taglib library has built-in support for some frames ("TPE1", "TIT2", "TALB", etc.)
+// and provides generic support for custom "TXXX" frames, but it doesn't seem to provide
+// an easy way to read other well-known frames like "TPE2".
+func getID3v2TextFrame(gen taglib.GenericTag, id string) (string, error) {
+	switch tag := gen.(type) {
+	case *id3.Id3v23Tag:
+		if frames := tag.Frames[id]; len(frames) == 0 {
+			return "", nil
+		} else if fields, err := id3.GetId3v23TextIdentificationFrame(frames[0]); err != nil {
+			return "", err
+		} else {
+			return fields[0], nil
+		}
+	case *id3.Id3v24Tag:
+		if frames := tag.Frames[id]; len(frames) == 0 {
+			return "", nil
+		} else if fields, err := id3.GetId3v24TextIdentificationFrame(frames[0]); err != nil {
+			return "", err
+		} else {
+			return fields[0], nil
+		}
+	default:
+		return "", errors.New("unsupported ID3 version")
+	}
 }
 
 // computeAudioSHA1 returns a SHA1 hash of the audio (i.e. non-metadata) portion of f.
@@ -211,14 +245,13 @@ func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info,
 
 	s := db.Song{Filename: relPath}
 	var footerLength int64
-	footerLength, s.Artist, s.Title, s.Album, err = readID3Footer(f, fi)
+	footerLength, s.Artist, s.Title, s.Album, err = readID3v1Footer(f, fi)
 	if err != nil {
 		return nil, err
 	}
 
 	var headerLength int64
-	tag, err := taglib.Decode(f, fi.Size())
-	if err != nil {
+	if tag, err := taglib.Decode(f, fi.Size()); err != nil {
 		// Tolerate missing ID3v2 tags if we got an artist and title from ID3v1.
 		if len(s.Artist) == 0 && len(s.Title) == 0 {
 			return nil, err
@@ -233,6 +266,13 @@ func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info,
 		s.Track = int(tag.Track())
 		s.Disc = int(tag.Disc())
 		headerLength = int64(tag.TagSize())
+
+		// Only save the album artist if it's different from the track artist.
+		if aa, err := getID3v2TextFrame(tag, albumArtistTag); err != nil {
+			return nil, err
+		} else if aa != s.Artist {
+			s.AlbumArtist = aa
+		}
 	}
 
 	if repl, ok := artistRewrites[s.Artist]; ok {

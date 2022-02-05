@@ -58,6 +58,7 @@ var Song1s = db.Song{
 	Artist:      "Second Artist",
 	Title:       "One Second",
 	Album:       "First Album",
+	AlbumArtist: "The Remixer",
 	AlbumID:     "1e477f68-c407-4eae-ad01-518528cedc2c",
 	RecordingID: "5d7e41b2-ec4b-44dd-b25a-a576d7a08adb",
 	Track:       2,
@@ -70,19 +71,20 @@ var Song1s = db.Song{
 }
 
 var Song5s = db.Song{
-	SHA1:      "63afdde2b390804562d54788865fff1bfd11cf94",
-	Filename:  "5s.mp3",
-	Artist:    "Third Artist",
-	Title:     "Five Seconds",
-	Album:     "Another Album",
-	AlbumID:   "a1d2405b-afe0-4e28-a935-b5b256f68131",
-	Track:     1,
-	Disc:      2,
-	Length:    5.041,
-	TrackGain: TrackGain,
-	AlbumGain: AlbumGain,
-	PeakAmp:   PeakAmp,
-	Rating:    -1,
+	SHA1:        "63afdde2b390804562d54788865fff1bfd11cf94",
+	Filename:    "5s.mp3",
+	Artist:      "Third Artist",
+	Title:       "Five Seconds",
+	Album:       "Another Album",
+	AlbumArtist: "", // omitted by 'nup update' since it matches Artist
+	AlbumID:     "a1d2405b-afe0-4e28-a935-b5b256f68131",
+	Track:       1,
+	Disc:        2,
+	Length:      5.041,
+	TrackGain:   TrackGain,
+	AlbumGain:   AlbumGain,
+	PeakAmp:     PeakAmp,
+	Rating:      -1,
 }
 
 var Song10s = db.Song{

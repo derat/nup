@@ -321,6 +321,8 @@ func TestQueries(tt *testing.T) {
 		{[]string{"album=Another+Album", "albumId=a1d2405b-afe0-4e28-a935-b5b256f68131"}, []db.Song{Song5s}},
 		{[]string{"keywords=arovane+thaem+atol"}, []db.Song{LegacySong1}},
 		{[]string{"keywords=arovane+foo"}, []db.Song{}},
+		{[]string{"keywords=second+artist"}, []db.Song{Song1s}}, // track artist
+		{[]string{"keywords=remixer"}, []db.Song{Song1s}},       // album artist
 		{[]string{"minRating=1.0"}, []db.Song{}},
 		{[]string{"minRating=0.75"}, []db.Song{LegacySong1}},
 		{[]string{"minRating=0.5"}, []db.Song{LegacySong2, LegacySong1}},

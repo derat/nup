@@ -56,7 +56,14 @@ type Song struct {
 	TitleLower  string `json:"-"`
 	AlbumLower  string `json:"-"`
 
-	// Keywords contains words from ArtistLower, TitleLower, and AlbumLower used for searching.
+	// AlbumArtist contains the album's artist if it isn't the same as Artist.
+	// This corresponds to the TPE2 ID3 tag, which may hold the performer name
+	// in the case of a classical album, or the remixer name in the case of an
+	// album consisting of songs remixed by a single artist.
+	AlbumArtist string `datastore:",noindex" json:"artistAlbum,omitempty"`
+
+	// Keywords contains words from ArtistLower, TitleLower, AlbumLower, and
+	// AlbumArtist (after normalization). It is used for searching.
 	Keywords []string `json:"-"`
 
 	// AlbumID is an opaque ID uniquely identifying the album
@@ -123,58 +130,66 @@ type Song struct {
 	LastModifiedTime time.Time `json:"-"`
 }
 
-// Update copies fields from src to s.
+// Update copies fields from src to dst.
 // If copyUserData is true, the Rating*, FirstStartTime, LastStartTime,
 // NupPlays, and Tags fields are also copied; otherwise they are left unchanged.
-func (s *Song) Update(src *Song, copyUserData bool) error {
-	s.SHA1 = src.SHA1
-	s.Filename = src.Filename
-	s.CoverFilename = src.CoverFilename
-	s.Artist = src.Artist
-	s.Title = src.Title
-	s.Album = src.Album
-	s.AlbumID = src.AlbumID
-	s.Track = src.Track
-	s.Disc = src.Disc
-	s.Length = src.Length
-	s.TrackGain = src.TrackGain
-	s.AlbumGain = src.AlbumGain
-	s.PeakAmp = src.PeakAmp
+func (dst *Song) Update(src *Song, copyUserData bool) error {
+	dst.SHA1 = src.SHA1
+	dst.Filename = src.Filename
+	dst.CoverFilename = src.CoverFilename
+	dst.Artist = src.Artist
+	dst.Title = src.Title
+	dst.Album = src.Album
+	dst.AlbumArtist = src.AlbumArtist
+	dst.AlbumID = src.AlbumID
+	dst.Track = src.Track
+	dst.Disc = src.Disc
+	dst.Length = src.Length
+	dst.TrackGain = src.TrackGain
+	dst.AlbumGain = src.AlbumGain
+	dst.PeakAmp = src.PeakAmp
 
 	var err error
-	if s.ArtistLower, err = Normalize(src.Artist); err != nil {
+	if dst.ArtistLower, err = Normalize(dst.Artist); err != nil {
 		return fmt.Errorf("normalizing %q: %v", src.Artist, err)
 	}
-	if s.TitleLower, err = Normalize(src.Title); err != nil {
+	if dst.TitleLower, err = Normalize(dst.Title); err != nil {
 		return fmt.Errorf("normalizing %q: %v", src.Title, err)
 	}
-	if s.AlbumLower, err = Normalize(src.Album); err != nil {
+	if dst.AlbumLower, err = Normalize(dst.Album); err != nil {
 		return fmt.Errorf("normalizing %q: %v", src.Album, err)
 	}
 
+	// AlbumArtist is empty if it's the same as Artist. The normalized
+	// version of it isn't stored, but it gets included in Keywords.
+	albumArtistNorm, err := Normalize(dst.AlbumArtist)
+	if err != nil {
+		return fmt.Errorf("normalizing %q: %v", dst.AlbumArtist, err)
+	}
+
 	keywords := make(map[string]bool)
-	for _, str := range []string{s.ArtistLower, s.TitleLower, s.AlbumLower} {
+	for _, str := range []string{dst.ArtistLower, dst.TitleLower, dst.AlbumLower, albumArtistNorm} {
 		for _, w := range strings.FieldsFunc(str, func(c rune) bool {
 			return !unicode.IsLetter(c) && !unicode.IsNumber(c)
 		}) {
 			keywords[w] = true
 		}
 	}
-	s.Keywords = make([]string, len(keywords))
+	dst.Keywords = make([]string, len(keywords))
 	i := 0
 	for w := range keywords {
-		s.Keywords[i] = w
+		dst.Keywords[i] = w
 		i++
 	}
-	sort.Strings(s.Keywords)
+	sort.Strings(dst.Keywords)
 
 	if copyUserData {
-		s.SetRating(src.Rating)
-		s.FirstStartTime = src.FirstStartTime
-		s.LastStartTime = src.LastStartTime
-		s.NumPlays = src.NumPlays
-		s.Tags = src.Tags
-		sort.Strings(s.Tags)
+		dst.SetRating(src.Rating)
+		dst.FirstStartTime = src.FirstStartTime
+		dst.LastStartTime = src.LastStartTime
+		dst.NumPlays = src.NumPlays
+		dst.Tags = src.Tags
+		sort.Strings(dst.Tags)
 	}
 	return nil
 }
