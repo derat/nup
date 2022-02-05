@@ -60,7 +60,7 @@ type Song struct {
 	// This corresponds to the TPE2 ID3 tag, which may hold the performer name
 	// in the case of a classical album, or the remixer name in the case of an
 	// album consisting of songs remixed by a single artist.
-	AlbumArtist string `datastore:",noindex" json:"artistAlbum,omitempty"`
+	AlbumArtist string `datastore:",noindex" json:"albumArtist,omitempty"`
 
 	// Keywords contains words from ArtistLower, TitleLower, AlbumLower, and
 	// AlbumArtist (after normalization). It is used for searching.
