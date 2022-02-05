@@ -50,13 +50,16 @@ var (
 
 	overlayManager = joinLocs(loc{selenium.ByTagName, "overlay-manager"})
 
-	optionsDialog   = joinLocs(overlayManager, loc{selenium.ByCSSSelector, ".dialog"})
+	optionsDialog   = joinLocs(overlayManager, loc{selenium.ByCSSSelector, ".dialog.options"})
 	optionsOKButton = joinLocs(optionsDialog, loc{selenium.ByID, "ok-button"})
 	gainTypeSelect  = joinLocs(optionsDialog, loc{selenium.ByID, "gain-type-select"})
 	preAmpRange     = joinLocs(optionsDialog, loc{selenium.ByID, "pre-amp-range"})
 
-	menuOptions  = joinLocs(overlayManager, loc{selenium.ByID, "options"})
+	statsDialog = joinLocs(overlayManager, loc{selenium.ByCSSSelector, ".dialog.stats"})
+
 	menuPresent  = joinLocs(overlayManager, loc{selenium.ByID, "present"})
+	menuOptions  = joinLocs(overlayManager, loc{selenium.ByID, "options"})
+	menuStats    = joinLocs(overlayManager, loc{selenium.ByID, "stats"})
 	menuPlay     = joinLocs(overlayManager, loc{selenium.ByID, "play"})
 	menuRemove   = joinLocs(overlayManager, loc{selenium.ByID, "remove"})
 	menuTruncate = joinLocs(overlayManager, loc{selenium.ByID, "truncate"})

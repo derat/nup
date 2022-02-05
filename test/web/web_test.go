@@ -957,6 +957,34 @@ func TestPresentation(t *testing.T) {
 	page.checkPresentation(nil, nil)
 }
 
+func TestStats(t *testing.T) {
+	page, done := initWebTest(t)
+	defer done()
+
+	song1 := newSong("artist", "track1", "album1", withRating(0.5), withLength(7200),
+		withPlays(time.Unix(86400, 0)))
+	song2 := newSong("artist", "track2", "album1", withRating(1.0), withLength(201))
+	importSongs(song1, song2)
+	tester.UpdateStats()
+
+	page.click(menuButton)
+	page.click(menuStats)
+	for _, tc := range []struct{ name, val string }{
+		{"Songs", "2"},
+		{"★★★★★", "1"},
+		{"★★★★", "0"},
+		{"★★★", "1"},
+		{"★★", "0"},
+		{"★", "0"},
+		{"Unrated", "0"},
+		{"Albums", "1"},
+		{"Duration", "0.1 days"},
+		{"1970", "1"},
+	} {
+		page.checkText(statsDialog, fmt.Sprintf(`\s+%s\s+%s\s+`, tc.name, tc.val))
+	}
+}
+
 func TestUnit(t *testing.T) {
 	// We don't care about initializing the page object, but we want to write a header
 	// to the browser log.

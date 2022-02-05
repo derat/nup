@@ -57,13 +57,13 @@ const template = createTemplate(`
 <a id="cover-link"><img id="cover-img" /></a>
 
 <table class="details-table">
-  <tr><td>Artist:</td><td id="artist"></td></tr>
-  <tr><td>Title:</td><td id="title"></td></tr>
-  <tr><td>Album:</td><td id="album"></td></tr>
-  <tr><td>Track:</td><td id="track"></td></tr>
-  <tr><td>Length:</td><td id="length"></td></tr>
-  <tr><td>Rating:</td><td id="rating"></td></tr>
-  <tr><td>Tags:</td><td id="tags"></td></tr>
+  <tr><td>Artist</td><td id="artist"></td></tr>
+  <tr><td>Title</td><td id="title"></td></tr>
+  <tr><td>Album</td><td id="album"></td></tr>
+  <tr><td>Track</td><td id="track"></td></tr>
+  <tr><td>Length</td><td id="length"></td></tr>
+  <tr><td>Rating</td><td id="rating"></td></tr>
+  <tr><td>Tags</td><td id="tags"></td></tr>
 </table>
 
 <div class="button-container">

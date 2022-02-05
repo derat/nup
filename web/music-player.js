@@ -20,6 +20,7 @@ import {
 import Config from './config.js';
 import OptionsDialog from './options-dialog.js';
 import { showSongDetails } from './song-details.js';
+import { showStats } from './stats.js';
 import Updater from './updater.js';
 
 const template = createTemplate(`
@@ -38,6 +39,7 @@ const template = createTemplate(`
     position: absolute;
     right: 0;
     top: 0;
+    user-select: none;
   }
 
   #song-info {
@@ -287,6 +289,11 @@ customElements.define(
               id: 'options',
               text: 'Options…',
               cb: () => this.showOptions_(),
+            },
+            {
+              id: 'stats',
+              text: 'Stats…',
+              cb: () => this.showStats_(),
             },
           ],
           true /* alignRight */
@@ -1076,6 +1083,11 @@ customElements.define(
           this.optionsDialog_ = null;
         }
       );
+    }
+
+    showStats_() {
+      if (!this.overlayManager_) throw new Error('No overlay manager');
+      showStats(this.overlayManager_);
     }
 
     // Shows or hides the presentation layer.

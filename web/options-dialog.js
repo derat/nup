@@ -81,6 +81,7 @@ export default class OptionsDialog {
     this.closeCallback_ = closeCallback;
 
     this.container_ = this.manager_.createDialog();
+    this.container_.classList.add('options'); // for tests
     this.shadow_ = createShadow(this.container_, template);
 
     this.themeSelect_ = $('theme-select', this.shadow_);
