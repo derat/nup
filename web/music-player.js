@@ -142,13 +142,6 @@ const template = createTemplate(`
   #rating a.star:hover {
     opacity: 0.9;
   }
-  a.debug-link {
-    color: var(--text-color);
-    font-family: Arial, Helvetica, sans-serif;
-    font-size: 10px;
-    opacity: 0.7;
-    text-decoration: none;
-  }
   #edit-tags {
     font-family: Arial, Helvetica, sans-serif;
     height: 48px;
@@ -188,19 +181,18 @@ const template = createTemplate(`
 </div>
 
 <div id="controls">
-  <button id="prev" disabled title="Previous song">⏮</button>
-  <button id="play-pause" disabled title="Pause">⏸</button>
-  <button id="next" disabled title="Next song">⏭</button>
+  <button id="prev" disabled title="Previous song (Alt+P)">⏮</button>
+  <button id="play-pause" disabled title="Pause (Space)">⏸</button>
+  <button id="next" disabled title="Next song (Alt+N)">⏭</button>
 </div>
 
 <div id="update-container">
   <span id="update-close" class="x-icon" title="Close"></span>
   <div id="rating-container">
     Rating: <span id="rating" tabindex="0"></span>
-    <a id="dump-song" class="debug-link" target="_blank">[d]</a>
   </div>
   <tag-suggester id="edit-tags-suggester">
-    <textarea id="edit-tags" slot="text"></textarea>
+    <textarea id="edit-tags" slot="text" placeholder="Tags"></textarea>
   </tag-suggester>
 </div>
 
@@ -284,16 +276,27 @@ customElements.define(
               id: 'present',
               text: 'Presentation',
               cb: () => this.setPresentationLayerVisible_(true),
+              hotkey: 'Alt+V',
             },
             {
               id: 'options',
               text: 'Options…',
               cb: () => this.showOptions_(),
+              hotkey: 'Alt+O',
             },
             {
               id: 'stats',
               text: 'Stats…',
               cb: () => this.showStats_(),
+            },
+            {
+              id: 'debug',
+              text: 'Debug…',
+              cb: () => {
+                const song = this.currentSong_;
+                if (song) window.open(getDumpSongUrl(song.songId), '_blank');
+              },
+              hotkey: 'Alt+D',
             },
           ],
           true /* alignRight */
@@ -342,7 +345,6 @@ customElements.define(
       this.ratingSpan_.addEventListener('keydown', (e) =>
         this.handleRatingSpanKeyDown_(e)
       );
-      this.dumpSongLink_ = get('dump-song');
       this.tagsTextarea_ = get('edit-tags');
       this.tagSuggester_ = get('edit-tags-suggester');
 
@@ -678,9 +680,12 @@ customElements.define(
         return;
       }
 
-      let text = getRatingString(song.rating, '★', '☆', 'Unrated', 'Rating: ');
-      if (song.tags.length > 0) text += '\nTags: ' + song.tags.sort().join(' ');
-      this.coverImage_.title = text;
+      this.coverImage_.title =
+        getRatingString(song.rating, '★', '☆', 'Unrated', 'Rating: ') +
+        '\n' +
+        (song.tags.length
+          ? 'Tags: ' + song.tags.sort().join(' ')
+          : '(Alt+R or Alt+T to edit)');
     }
 
     updateRatingOverlay_() {
@@ -872,13 +877,13 @@ customElements.define(
 
     onPause_() {
       this.playPauseButton_.innerText = '▶';
-      this.playPauseButton_.title = 'Play';
+      this.playPauseButton_.title = 'Play (Space)';
       this.lastUpdateTime_ = -1;
     }
 
     onPlay_() {
       this.playPauseButton_.innerText = '⏸';
-      this.playPauseButton_.title = 'Pause';
+      this.playPauseButton_.title = 'Pause (Space)';
       this.lastUpdateTime_ = getCurrentTimeSec();
     }
 
@@ -984,7 +989,6 @@ customElements.define(
       if (this.updateSong_) return true;
 
       this.setRating_(song.rating);
-      this.dumpSongLink_.href = getDumpSongUrl(song.songId);
       this.tagsTextarea_.value = song.tags.length
         ? song.tags.sort().join(' ') + ' ' // append space to ease editing
         : '';

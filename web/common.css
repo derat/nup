@@ -26,7 +26,7 @@
   --bg-color: #fff;
   --bg-active-color: #eee; /* song row with context menu */
   --text-color: #000;
-  --text-label-color: #666; /* field names in song details dialog */
+  --text-label-color: #666; /* song detail field names, menu hotkeys */
   --text-hover-color: #666;
   --accent-color: #42a5f5; /* song row highlight, material blue 400 */
   --accent-active-color: #1976d2; /* material blue 700 */

@@ -81,6 +81,14 @@ const template = createTemplate(`
   .menu .item:last-child {
     padding-bottom: 8px;
   }
+  .menu .item .hotkey {
+    color: var(--text-label-color);
+    display: inline-block;
+    float: right;
+    margin-left: var(--margin);
+    text-align: right;
+    min-width: 50px;
+  }
   .menu hr {
     background-color: var(--border-color);
     border: 0;
@@ -196,19 +204,22 @@ customElements.define(
     // Creates and displays a simple context menu at the specified location.
     //
     // |items| is an array of objects with the following properties:
-    // - text - menu item text, or '-' to insert separator instead
-    // - cb   - callback to run when clicked
-    // - id   - optional ID for element (used in tests)
+    // - text   - menu item text, or '-' to insert separator instead
+    // - cb     - callback to run when clicked
+    // - id     - optional ID for element (used in tests)
+    // - hotkey - optional text describing menu's accelerator
     createMenu(x, y, items, alignRight) {
       const menu = createElement('span', 'menu', this.container_);
       this.updateLightbox_();
 
+      const hotkeys = items.some((it) => it.hotkey);
       for (const item of items) {
         if (item.text === '-') {
           createElement('hr', null, menu, null);
         } else {
           const el = createElement('div', 'item', menu, item.text);
           if (item.id) el.id = item.id;
+          if (hotkeys) createElement('span', 'hotkey', el, item.hotkey || '');
           el.addEventListener('click', (e) => {
             e.stopPropagation();
             this.closeChild(menu);
