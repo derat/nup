@@ -159,7 +159,7 @@ func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]*db.Song, e
 
 		// Wait for async cache writes to finish before returning. Otherwise, App Engine will cancel
 		// the writes when the context is canceled.
-		// TODO: Will App Engine write the response before the handler has returned? If so,
+		// TODO: Will App Engine send the response before the handler has returned? If so,
 		// it'd probably be faster to return this function so the caller can defer it instead.
 		defer func() {
 			startTime := time.Now()
@@ -380,6 +380,14 @@ func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 	negativeQueryStart := len(qs)
 	for _, t := range query.NotTags {
 		qs = append(qs, bq.Filter("Tags =", t))
+	}
+
+	// If we're not shuffling the results, don't waste time getting IDs for songs that
+	// we won't return. I'm only doing this if there's a single query, since there's no
+	// guarantee about which rows will be returned, and intersections and subtractions
+	// won't work right without full results.
+	if len(qs) == 1 && !query.Shuffle && !query.OrderByLastStartTime {
+		qs[0] = qs[0].Limit(maxResults)
 	}
 
 	startTime := time.Now()
