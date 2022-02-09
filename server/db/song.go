@@ -167,19 +167,18 @@ func (dst *Song) Update(src *Song, copyUserData bool) error {
 		return fmt.Errorf("normalizing %q: %v", dst.AlbumArtist, err)
 	}
 
-	keywords := make(map[string]bool)
+	// Dedupe and sort keywords.
+	keywords := make(map[string]struct{})
 	for _, str := range []string{dst.ArtistLower, dst.TitleLower, dst.AlbumLower, albumArtistNorm} {
 		for _, w := range strings.FieldsFunc(str, func(c rune) bool {
 			return !unicode.IsLetter(c) && !unicode.IsNumber(c)
 		}) {
-			keywords[w] = true
+			keywords[w] = struct{}{}
 		}
 	}
-	dst.Keywords = make([]string, len(keywords))
-	i := 0
+	dst.Keywords = make([]string, 0, len(keywords))
 	for w := range keywords {
-		dst.Keywords[i] = w
-		i++
+		dst.Keywords = append(dst.Keywords, w)
 	}
 	sort.Strings(dst.Keywords)
 
@@ -188,7 +187,16 @@ func (dst *Song) Update(src *Song, copyUserData bool) error {
 		dst.FirstStartTime = src.FirstStartTime
 		dst.LastStartTime = src.LastStartTime
 		dst.NumPlays = src.NumPlays
-		dst.Tags = src.Tags
+
+		// Dedupe and sort tags.
+		tags := make(map[string]struct{}, len(src.Tags))
+		for _, t := range src.Tags {
+			tags[t] = struct{}{}
+		}
+		dst.Tags = make([]string, 0, len(tags))
+		for t := range tags {
+			dst.Tags = append(dst.Tags, t)
+		}
 		sort.Strings(dst.Tags)
 	}
 	return nil

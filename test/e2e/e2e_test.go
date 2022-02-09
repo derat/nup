@@ -778,7 +778,7 @@ func TestMergeSongs(tt *testing.T) {
 	}
 	s2 := Song1s
 	s2.Rating = 0.25
-	s2.Tags = []string{"drums", "rock"}
+	s2.Tags = []string{"drums", "guitar", "rock"}
 	s2.Plays = []db.Play{
 		db.NewPlay(time.Unix(1410746923, 0), "127.0.0.1"),
 		db.NewPlay(time.Unix(1410747184, 0), "127.0.0.1"),
@@ -790,8 +790,7 @@ func TestMergeSongs(tt *testing.T) {
 
 	log.Print("Checking that songs were merged")
 	s2.Rating = s1.Rating
-	s2.Tags = append(s2.Tags, s1.Tags...)
-	sort.Strings(s2.Tags)
+	s2.Tags = []string{"drums", "guitar", "instrumental", "rock"}
 	s2.Plays = append(s2.Plays, s1.Plays...)
 	sort.Sort(db.PlayArray(s2.Plays))
 	if err := test.CompareSongs([]db.Song{s1, s2}, t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {

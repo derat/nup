@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"time"
 
@@ -198,10 +199,8 @@ func DeleteSong(ctx context.Context, id int64) error {
 	return query.FlushCacheForUpdate(ctx, query.MetadataUpdate)
 }
 
-// ReindexSongs regenerates the ArtistLower, TitleLower, AlbumLower, Keywords, and RatingAtLeast*
-// fields of all songs in the database. It only needs to be run after the logic for generating those
-// fields is changed. If nextCursor is non-empty, ReindexSongs should be called again to continue
-// reindexing.
+// ReindexSongs regenerates various fields for all songs in the database and updates songs that
+// were changed. If nextCursor is non-empty, ReindexSongs should be called again to continue reindexing.
 func ReindexSongs(ctx context.Context, cursor string) (nextCursor string, scanned, updated int, err error) {
 	q := datastore.NewQuery(db.SongKind).KeysOnly()
 	if len(cursor) > 0 {
@@ -245,7 +244,8 @@ func ReindexSongs(ctx context.Context, cursor string) (nextCursor string, scanne
 			// so it will only change if one or more of those fields changed.
 			if up.ArtistLower == s.ArtistLower && up.TitleLower == s.TitleLower && up.AlbumLower == s.AlbumLower &&
 				up.RatingAtLeast75 == s.RatingAtLeast75 && up.RatingAtLeast50 == s.RatingAtLeast50 &&
-				up.RatingAtLeast25 == s.RatingAtLeast25 && up.RatingAtLeast0 == s.RatingAtLeast0 {
+				up.RatingAtLeast25 == s.RatingAtLeast25 && up.RatingAtLeast0 == s.RatingAtLeast0 &&
+				reflect.DeepEqual(up.Tags, s.Tags) {
 				return errUnmodified
 			}
 
@@ -258,6 +258,7 @@ func ReindexSongs(ctx context.Context, cursor string) (nextCursor string, scanne
 			s.RatingAtLeast50 = up.RatingAtLeast50
 			s.RatingAtLeast25 = up.RatingAtLeast25
 			s.RatingAtLeast0 = up.RatingAtLeast0
+			s.Tags = up.Tags
 
 			update = true
 			return nil
