@@ -250,6 +250,11 @@ func (cmd *Command) doMergeSongs() subcommands.ExitStatus {
 		fmt.Fprintln(os.Stderr, `-merge-songs needs IDs to merge as "src:dst"`)
 		return subcommands.ExitUsageError
 	}
+	if srcID == dstID {
+		fmt.Fprintf(os.Stderr, "Can't merge song %d into itself\n", srcID)
+		return subcommands.ExitUsageError
+	}
+
 	var err error
 	var src, dst db.Song
 	if src, err = dumpSong(cmd.Cfg, srcID); err != nil {
