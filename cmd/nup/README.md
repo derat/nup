@@ -197,6 +197,8 @@ The `-delete-song` flag can be used to delete specific songs from the server
 update [flags]:
         Send song updates to the server.
 
+  -delete-after-merge
+        Delete source song if -merge-songs is true
   -delete-song int
         Delete song with given ID
   -dry-run
@@ -212,9 +214,9 @@ update [flags]:
   -limit int
         If positive, limits the number of songs to update (for testing)
   -merge-songs string
-        Merge one song's user data into another song, with IDs as "from:to"
+        Merge one song's user data into another song, with IDs as "src:dst"
   -reindex-songs
-        Ask server to reindex all songs' search fields (not typically neaded)
+        Ask server to reindex all songs' search-related fields (not typically neaded)
   -require-covers
         Die if cover images aren't found for any songs that have album IDs
   -song-paths-file string
@@ -236,8 +238,7 @@ into the new file.
     of all songs and find the old and new songs' `songId` properties in it.
     Alternatively, find the songs' IDs using the "Debug" menu item in the web
     interface.
-3.  Run `nup update -merge-songs=<OLDID>:<NEWID>` to merge the old song's user
-    data into the new song.
-4.  Run `nup update -delete-song <OLDID>` to delete the old song from the
+3.  Run `nup update -merge-songs=<OLDID>:<NEWID> -delete-after-merge` to merge
+    the old song's user data into the new song and delete the old song from the
     server.
-5.  Delete `old/song.mp3` or remove it from your local music directory.
+4.  Delete `old/song.mp3` or remove it from your local music directory.

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"time"
@@ -23,18 +24,19 @@ import (
 type Command struct {
 	Cfg *client.Config
 
-	deleteSongID    int64  // ID of song to delete
-	dryRun          bool   // print actions instead of doing anything
-	dumpedGainsFile string // path to dump file containing pre-computed gains
-	forceGlob       string // files to force updating
-	importJSONFile  string // path to JSON file with Song objects to import
-	importUserData  bool   // replace user data when using importJSONFile
-	limit           int    // maximum number of songs to update
-	mergeSongIDs    string // IDs of songs to merge, as "from:to"
-	reindexSongs    bool   // ask the server to reindex all songs
-	requireCovers   bool   // die if cover images are missing
-	songPathsFile   string // path to list of songs to force updating
-	testGainInfo    string // hardcoded gain info as "track:album:amp" for testing
+	deleteAfterMerge bool   // delete source song if mergeSongIDs is true
+	deleteSongID     int64  // ID of song to delete
+	dryRun           bool   // print actions instead of doing anything
+	dumpedGainsFile  string // path to dump file containing pre-computed gains
+	forceGlob        string // files to force updating
+	importJSONFile   string // path to JSON file with Song objects to import
+	importUserData   bool   // replace user data when using importJSONFile
+	limit            int    // maximum number of songs to update
+	mergeSongIDs     string // IDs of songs to merge, as "from:to"
+	reindexSongs     bool   // ask the server to reindex all songs
+	requireCovers    bool   // die if cover images are missing
+	songPathsFile    string // path to list of songs to force updating
+	testGainInfo     string // hardcoded gain info as "track:album:amp" for testing
 }
 
 func (*Command) Name() string     { return "update" }
@@ -47,6 +49,7 @@ func (*Command) Usage() string {
 }
 
 func (cmd *Command) SetFlags(f *flag.FlagSet) {
+	f.BoolVar(&cmd.deleteAfterMerge, "delete-after-merge", false, "Delete source song if -merge-songs is true")
 	f.Int64Var(&cmd.deleteSongID, "delete-song", 0, "Delete song with given ID")
 	f.BoolVar(&cmd.dryRun, "dry-run", false, "Only print what would be updated")
 	f.StringVar(&cmd.dumpedGainsFile, "dumped-gains-file", "",
@@ -60,7 +63,7 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	f.IntVar(&cmd.limit, "limit", 0,
 		"If positive, limits the number of songs to update (for testing)")
 	f.StringVar(&cmd.mergeSongIDs, "merge-songs", "",
-		`Merge one song's user data into another song, with IDs as "from:to"`)
+		`Merge one song's user data into another song, with IDs as "src:dst"`)
 	f.BoolVar(&cmd.reindexSongs, "reindex-songs", false,
 		"Ask server to reindex all songs' search-related fields (not typically neaded)")
 	f.BoolVar(&cmd.requireCovers, "require-covers", false,
@@ -234,8 +237,7 @@ func (cmd *Command) doDeleteSong() subcommands.ExitStatus {
 		fmt.Fprintln(os.Stderr, "-dry-run is incompatible with -delete-song")
 		return subcommands.ExitUsageError
 	}
-	if _, err := sendRequest(cmd.Cfg, "POST", "/delete_song",
-		fmt.Sprintf("songId=%v", cmd.deleteSongID), nil, "text/plain"); err != nil {
+	if err := deleteSong(cmd.Cfg, cmd.deleteSongID); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed deleting song %v: %v\n", cmd.deleteSongID, err)
 		return subcommands.ExitFailure
 	}
@@ -243,37 +245,44 @@ func (cmd *Command) doDeleteSong() subcommands.ExitStatus {
 }
 
 func (cmd *Command) doMergeSongs() subcommands.ExitStatus {
-	var fromID, toID int64
-	if _, err := fmt.Sscanf(cmd.mergeSongIDs, "%d:%d", &fromID, &toID); err != nil {
-		fmt.Fprintln(os.Stderr, `-merge-songs needs IDs to merge as "from:to"`)
+	var srcID, dstID int64
+	if _, err := fmt.Sscanf(cmd.mergeSongIDs, "%d:%d", &srcID, &dstID); err != nil {
+		fmt.Fprintln(os.Stderr, `-merge-songs needs IDs to merge as "src:dst"`)
 		return subcommands.ExitUsageError
 	}
 	var err error
-	var from, to db.Song
-	if from, err = dumpSong(cmd.Cfg, fromID); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed dumping song %v: %v\n", fromID, err)
+	var src, dst db.Song
+	if src, err = dumpSong(cmd.Cfg, srcID); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed dumping song %v: %v\n", srcID, err)
 		return subcommands.ExitFailure
 	}
-	if to, err = dumpSong(cmd.Cfg, toID); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed dumping song %v: %v\n", toID, err)
+	if dst, err = dumpSong(cmd.Cfg, dstID); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed dumping song %v: %v\n", dstID, err)
 		return subcommands.ExitFailure
 	}
-	to.Rating = from.Rating
-	to.Tags = append(to.Tags, from.Tags...)
-	to.Plays = append(to.Plays, from.Plays...)
+	dst.Rating = math.Max(src.Rating, dst.Rating)
+	dst.Tags = append(dst.Tags, src.Tags...)
+	dst.Plays = append(dst.Plays, src.Plays...)
+	dst.Clean() // sort and dedupe Tags and Plays
 
 	if cmd.dryRun {
-		if err := json.NewEncoder(os.Stdout).Encode(to); err != nil {
+		if err := json.NewEncoder(os.Stdout).Encode(dst); err != nil {
 			fmt.Fprintln(os.Stderr, "Failed encoding song:", err)
 			return subcommands.ExitFailure
 		}
 	} else {
 		ch := make(chan db.Song, 1)
-		ch <- to
+		ch <- dst
 		close(ch)
 		if err := updateSongs(cmd.Cfg, ch, true /* replaceUserData */); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed updating song %v: %v\n", toID, err)
+			fmt.Fprintf(os.Stderr, "Failed updating song %v: %v\n", dstID, err)
 			return subcommands.ExitFailure
+		}
+		if cmd.deleteAfterMerge {
+			if err := deleteSong(cmd.Cfg, srcID); err != nil {
+				fmt.Fprintf(os.Stderr, "Failed deleting song %v: %v\n", srcID, err)
+				return subcommands.ExitFailure
+			}
 		}
 	}
 	return subcommands.ExitSuccess

@@ -796,6 +796,14 @@ func TestMergeSongs(tt *testing.T) {
 	if err := test.CompareSongs([]db.Song{s1, s2}, t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
 		tt.Fatal("Bad songs after merging: ", err)
 	}
+
+	log.Print("Merging songs again")
+	t.MergeSongs(t.SongID(s1.SHA1), t.SongID(s2.SHA1), test.DeleteAfterMergeFlag)
+
+	log.Print("Checking that first song was deleted")
+	if err := test.CompareSongs([]db.Song{s2}, t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
+		tt.Fatal("Bad songs after merging again: ", err)
+	}
 }
 
 func TestReindexSongs(tt *testing.T) {

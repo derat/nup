@@ -131,8 +131,12 @@ type Song struct {
 }
 
 // Update copies fields from src to dst.
+//
 // If copyUserData is true, the Rating*, FirstStartTime, LastStartTime,
 // NupPlays, and Tags fields are also copied; otherwise they are left unchanged.
+//
+// ArtistLower, TitleLower, AlbumLower, and Keywords are also initialized in dst,
+// and Clean is called.
 func (dst *Song) Update(src *Song, copyUserData bool) error {
 	dst.SHA1 = src.SHA1
 	dst.Filename = src.Filename
@@ -167,38 +171,24 @@ func (dst *Song) Update(src *Song, copyUserData bool) error {
 		return fmt.Errorf("normalizing %q: %v", dst.AlbumArtist, err)
 	}
 
-	// Dedupe and sort keywords.
-	keywords := make(map[string]struct{})
+	// Keywords are sorted and deduped in the later call to Clean.
 	for _, str := range []string{dst.ArtistLower, dst.TitleLower, dst.AlbumLower, albumArtistNorm} {
 		for _, w := range strings.FieldsFunc(str, func(c rune) bool {
 			return !unicode.IsLetter(c) && !unicode.IsNumber(c)
 		}) {
-			keywords[w] = struct{}{}
+			dst.Keywords = append(dst.Keywords, w)
 		}
 	}
-	dst.Keywords = make([]string, 0, len(keywords))
-	for w := range keywords {
-		dst.Keywords = append(dst.Keywords, w)
-	}
-	sort.Strings(dst.Keywords)
 
 	if copyUserData {
 		dst.SetRating(src.Rating)
 		dst.FirstStartTime = src.FirstStartTime
 		dst.LastStartTime = src.LastStartTime
 		dst.NumPlays = src.NumPlays
-
-		// Dedupe and sort tags.
-		tags := make(map[string]struct{}, len(src.Tags))
-		for _, t := range src.Tags {
-			tags[t] = struct{}{}
-		}
-		dst.Tags = make([]string, 0, len(tags))
-		for t := range tags {
-			dst.Tags = append(dst.Tags, t)
-		}
-		sort.Strings(dst.Tags)
+		dst.Tags = append([]string(nil), src.Tags...)
 	}
+
+	dst.Clean()
 	return nil
 }
 
@@ -234,6 +224,29 @@ func (s *Song) RebuildPlayStats(plays []Play) {
 	}
 }
 
+// Clean sorts and removes duplicates from slice fields in s.
+func (s *Song) Clean() {
+	sort.Strings(s.Keywords)
+	s.Keywords = dedupeSortedStrings(s.Keywords)
+
+	sort.Strings(s.Tags)
+	s.Tags = dedupeSortedStrings(s.Tags)
+
+	sort.Sort(PlayArray(s.Plays))
+	s.Plays = dedupeSortedPlays(s.Plays)
+}
+
+func dedupeSortedStrings(full []string) []string {
+	var src, dst int
+	for ; src < len(full); src++ {
+		if src == 0 || full[src] != full[src-1] {
+			full[dst] = full[src]
+			dst++
+		}
+	}
+	return full[:dst]
+}
+
 // https://go.dev/blog/normalization#performing-magic
 var normalizer = transform.Chain(norm.NFKD, runes.Remove(runes.In(unicode.Mn)))
 
@@ -266,6 +279,10 @@ type Play struct {
 
 func NewPlay(t time.Time, ip string) Play { return Play{t, ip} }
 
+func (p *Play) Equal(o *Play) bool {
+	return p.StartTime.Equal(o.StartTime) && p.IPAddress == o.IPAddress
+}
+
 // PlayDump is used when dumping data.
 type PlayDump struct {
 	// Song entity's key ID from Datastore.
@@ -279,3 +296,14 @@ type PlayArray []Play
 func (a PlayArray) Len() int           { return len(a) }
 func (a PlayArray) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a PlayArray) Less(i, j int) bool { return a[i].StartTime.Before(a[j].StartTime) }
+
+func dedupeSortedPlays(plays []Play) []Play {
+	var src, dst int
+	for ; src < len(plays); src++ {
+		if src == 0 || !plays[src].Equal(&plays[src-1]) {
+			plays[dst] = plays[src]
+			dst++
+		}
+	}
+	return plays[:dst]
+}

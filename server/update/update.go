@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"sort"
 	"time"
 
 	"github.com/derat/nup/server/db"
@@ -34,7 +33,7 @@ func AddPlay(ctx context.Context, id int64, startTime time.Time, ip string) erro
 			return fmt.Errorf("querying for existing play failed: %v", err)
 		} else if len(existingKeys) > 0 {
 			log.Debugf(ctx, "Already have play for song %v starting at %v from %v", id, startTime, ip)
-			return nil
+			return errUnmodified
 		}
 
 		s.UpdatePlayStats(startTime)
@@ -66,26 +65,18 @@ func SetRatingAndTags(ctx context.Context, id int64, hasRating bool, rating floa
 			ut |= query.RatingUpdate
 		}
 		if tags != nil {
-			sort.Strings(tags)
-			seenTags := make(map[string]bool)
-			uniqueTags := make([]string, 0, len(tags))
-			for _, tag := range tags {
-				if _, seen := seenTags[tag]; !seen {
-					uniqueTags = append(uniqueTags, tag)
-					seenTags[tag] = true
-				}
-			}
-			if !sortedStringSlicesMatch(uniqueTags, s.Tags) {
-				s.Tags = uniqueTags
+			oldTags := s.Tags
+			s.Tags = tags
+			s.Clean() // sort and dedupe
+			if !stringSlicesMatch(oldTags, s.Tags) {
 				ut |= query.TagsUpdate
 			}
 		}
-		if ut != 0 {
-			s.LastModifiedTime = time.Now()
-			return nil
-		} else {
+		if ut == 0 {
 			return errUnmodified
 		}
+		s.LastModifiedTime = time.Now()
+		return nil
 	}, updateDelay, true)
 
 	if err != nil {
@@ -294,7 +285,7 @@ func ClearData(ctx context.Context) error {
 	return nil
 }
 
-func sortedStringSlicesMatch(a, b []string) bool {
+func stringSlicesMatch(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
 	}

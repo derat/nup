@@ -270,14 +270,16 @@ func (t *Tester) DeleteSong(songID string) {
 	}
 }
 
+const DeleteAfterMergeFlag = "-delete-after-merge"
+
 // MergeSongs merges one song's user data into another song using 'nup update'.
-func (t *Tester) MergeSongs(fromID, toID string) {
-	if _, stderr, err := runCommand(
-		"nup",
-		"-config="+t.configFile,
+func (t *Tester) MergeSongs(fromID, toID string, flags ...string) {
+	args := append([]string{
+		"-config=" + t.configFile,
 		"update",
 		fmt.Sprintf("-merge-songs=%s:%s", fromID, toID),
-	); err != nil {
+	}, flags...)
+	if _, stderr, err := runCommand("nup", args...); err != nil {
 		t.fatalf("Failed merging song %v into %v: %v\nstderr: %v", fromID, toID, err, stderr)
 	}
 }

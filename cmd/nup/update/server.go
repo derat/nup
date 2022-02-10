@@ -107,6 +107,13 @@ func dumpSong(cfg *client.Config, songID int64) (db.Song, error) {
 	return s, err
 }
 
+// deleteSong deletes the song with the specified ID from the server.
+func deleteSong(cfg *client.Config, songID int64) error {
+	params := fmt.Sprintf("songId=%v", songID)
+	_, err := sendRequest(cfg, "POST", "/delete_song", params, nil, "text/plain")
+	return err
+}
+
 // reindexSongs asks the server to reindex all songs' search data.
 func reindexSongs(cfg *client.Config) error {
 	var cursor string
