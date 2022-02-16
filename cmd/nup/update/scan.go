@@ -402,7 +402,7 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDi
 
 		numMP3s++
 		if opts.logProgress && numMP3s%logProgressInterval == 0 {
-			log.Printf("Progress: scanned %v files", numMP3s)
+			log.Printf("Scanned %v files", numMP3s)
 		}
 
 		relDir := filepath.Dir(relPath)
@@ -471,7 +471,7 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDi
 	}
 
 	if opts.logProgress {
-		log.Printf("Found %v update(s) among %v files.", numUpdates, numMP3s)
+		log.Printf("Found %v update(s) among %v files", numUpdates, numMP3s)
 	}
 	for d := range newDirs {
 		seenDirs = append(seenDirs, d)
