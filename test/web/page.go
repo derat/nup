@@ -425,11 +425,9 @@ func (p *page) emitKeyDown(key string, keyCode int, alt bool) {
 // idx in the table matched by locs. If key (e.g. selenium.ShiftKey) is non-empty,
 // it is held while performing the click.
 func (p *page) clickSongRowCheckbox(locs []loc, idx int, key string) {
-	table := p.getOrFail(locs)
-	sel := fmt.Sprintf("tr:nth-child(%d) td:first-child input", idx+1)
-	cb, err := table.FindElement(selenium.ByCSSSelector, sel)
+	cb, err := p.getSongRow(locs, idx).FindElement(selenium.ByCSSSelector, "td:first-child input")
 	if err != nil {
-		p.t.Fatalf("Failed finding checkbox %d (%q) for %v: %v", idx, sel, p.desc(), err)
+		p.t.Fatalf("Failed finding checkbox in song %d for %v: %v", idx, p.desc(), err)
 	}
 	if key != "" {
 		if err := p.wd.KeyDown(key); err != nil {
@@ -446,22 +444,59 @@ func (p *page) clickSongRowCheckbox(locs []loc, idx int, key string) {
 	}
 }
 
-// rightClickSongRow right-clicks on the playlist song at the specified index
-// in the table matched by locs.
+// rightClickSongRow right-clicks on the song at the specified index in the table matched by locs.
 func (p *page) rightClickSongRow(locs []loc, idx int) {
-	table := p.getOrFail(playlistTable)
-	sel := fmt.Sprintf("tbody tr:nth-child(%d)", idx+1)
-	row, err := table.FindElement(selenium.ByCSSSelector, sel)
-	if err != nil {
-		p.t.Fatalf("Failed finding song %d (%q) for %v: %v", idx, sel, p.desc(), err)
-	}
-	// These coordinates are apparently relative to the element's upper-left corner.
+	row := p.getSongRow(locs, idx)
+	// The documentation says "MoveTo moves the mouse to relative coordinates from center of
+	// element", but these coordinates seem to be relative to the element's upper-left corner.
 	if err := row.MoveTo(3, 3); err != nil {
 		p.t.Fatalf("Failed moving mouse to song for %v: %v", p.desc(), err)
 	}
 	if err := p.wd.Click(selenium.RightButton); err != nil {
 		p.t.Fatalf("Failed right-clicking on song for %v: %v", p.desc(), err)
 	}
+}
+
+// dragSongRow drags the song at srcIdx at table locs to dstIdx.
+// dstOffsetY describes the Y offset from the center of dstIdx.
+func (p *page) dragSongRow(locs []loc, srcIdx, dstIdx, dstOffsetY int) {
+	// I initially tried using MoveTo, ButtonDown, and ButtonUp to drag the row, but this seems to
+	// be broken in WebDriver:
+	//
+	//  https://github.com/seleniumhq/selenium-google-code-issue-archive/issues/3604
+	//  https://github.com/SeleniumHQ/selenium/issues/9878
+	//  https://github.com/w3c/webdriver/issues/1488
+	//
+	// The dragstart event is emitted when I start the drag, but the page never receives dragenter,
+	// dragover, or dragend, and the button seems to remain depressed even after calling ButtonUp.
+	// Some commenters say they were able to get this to work by calling MoveTo twice, but it
+	// doesn't seem to change anything for me (regardless of whether I move relative to the source
+	// or destination row).
+	//
+	// It seems like the state of the art is to just emit fake drag events from JavaScript:
+	//
+	//  https://gist.github.com/rcorreia/2362544
+	//  https://stackoverflow.com/questions/61448931/selenium-drag-and-drop-issue-in-chrome
+	//
+	// Sigh.
+	src := p.getSongRow(locs, srcIdx)
+	dst := p.getSongRow(locs, dstIdx)
+	if _, err := p.wd.ExecuteScript(
+		"document.test.dragElement(arguments[0], arguments[1], 0, arguments[2])",
+		[]interface{}{src, dst, dstOffsetY}); err != nil {
+		p.t.Fatalf("Failed dragging song %v to %v for %v: %v", srcIdx, dstIdx, p.desc(), err)
+	}
+}
+
+// getSongRow returns the row for song at the 0-based specified index in the table matched by locs.
+func (p *page) getSongRow(locs []loc, idx int) selenium.WebElement {
+	table := p.getOrFail(locs)
+	sel := fmt.Sprintf("tbody tr:nth-child(%d)", idx+1)
+	row, err := table.FindElement(selenium.ByCSSSelector, sel)
+	if err != nil {
+		p.t.Fatalf("Failed finding song %d (%q) for %v: %v", idx, sel, p.desc(), err)
+	}
+	return row
 }
 
 type checkboxState uint32

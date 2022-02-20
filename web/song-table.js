@@ -3,6 +3,7 @@
 
 import {
   $,
+  createElement,
   createShadow,
   createStyle,
   createTemplate,
@@ -63,10 +64,10 @@ const template = createTemplate(`
     background-color: var(--accent-color);
     color: var(--accent-text-color);
   }
-  tr.menu {
+  tr.menu, tr.dragged {
     background-color: var(--bg-active-color);
   }
-  tr.active.menu {
+  tr.active.menu, tr.active.dragged {
     background-color: var(--accent-active-color);
   }
 
@@ -118,6 +119,18 @@ const template = createTemplate(`
     padding-right: 10px;
     text-overflow: clip;
   }
+
+  #drag-target {
+    background-color: var(--text-color);
+    display: none;
+    height: 2px;
+    position: absolute;
+    z-index: 1;
+  }
+
+  #drag-target.visible {
+    display: block;
+  }
 </style>
 
 <table>
@@ -132,10 +145,12 @@ const template = createTemplate(`
   </thead>
   <tbody></tbody>
 </table>
+
+<div id="drag-target"></div>
 `);
 
 const rowTemplate = createTemplate(`
-<tr>
+<tr draggable="true">
   <td class="checkbox"><input type="checkbox" class="small" /></td>
   <td class="artist"><a></a></td>
   <td class="title"></td>
@@ -157,6 +172,10 @@ const rowTemplate = createTemplate(`
 // |detail.index|, and |detail.orig| (containing the original PointerEvent)
 // properties. The receiver should call detail.orig.preventDefault() if it
 // displays its own menu.
+//
+// When a song is dragged to a new position, a 'reorder' event is emitted with
+// |detail.fromIndex| and |detail.toIndex| properties. The song is automatically
+// reordered within song-table.
 customElements.define(
   'song-table',
   class extends HTMLElement {
@@ -169,11 +188,56 @@ customElements.define(
       this.shadow_ = createShadow(this, template);
       this.table_ = this.shadow_.querySelector('table');
 
+      this.dragImage_ = createElement('img');
+      this.dragTarget_ = $('drag-target', this.shadow_);
+      this.dragFromIndex_ = -1;
+      this.dragToIndex_ = -1;
+      this.dragListRect_ = null;
+
       this.headingCheckbox_ = this.shadow_.querySelector(
         'input[type="checkbox"]'
       );
       this.headingCheckbox_.addEventListener('click', (e) => {
         this.onCheckboxClick_(this.headingCheckbox_, e.shiftKey);
+      });
+
+      document.addEventListener('dragenter', (e) => {
+        if (this.dragFromIndex_ === -1) return;
+        e.preventDefault(); // allow dropping
+        e.stopPropagation();
+      });
+      document.addEventListener('dragover', (e) => {
+        if (this.dragFromIndex_ === -1) return;
+        e.preventDefault(); // allow dropping
+        e.stopPropagation();
+        const idx = this.getDragEventIndex_(e);
+        if (idx != this.dragToIndex_) {
+          this.dragToIndex_ = idx;
+          this.moveDragTarget_();
+        }
+      });
+      document.addEventListener('dragend', (e) => {
+        if (this.dragFromIndex_ === -1) return;
+
+        e.stopPropagation();
+        const from = this.dragFromIndex_;
+        const to = this.dragToIndex_;
+        this.songRows_[from].classList.remove('dragged');
+        this.hideDragTarget_();
+        this.dragFromIndex_ = this.dragToIndex_ = -1;
+        this.dragListRect_ = null;
+
+        if (to === from) return;
+        const row = this.songRows_[from];
+        const tbody = row.parentNode;
+        if (to < from) {
+          tbody.insertBefore(row, this.songRows_[to]);
+        } else if (to < this.numSongs - 1) {
+          tbody.insertBefore(row, this.songRows_[to + 1]);
+        } else {
+          tbody.appendChild(row);
+        }
+        this.emitEvent_('reorder', { fromIndex: from, toIndex: to });
       });
     }
 
@@ -185,8 +249,14 @@ customElements.define(
       return [].slice.call(this.table_.rows, 1); // exclude header
     }
 
+    get songs() {
+      return this.songRows_.map((r) => r.song); // shallow copy
+    }
     get numSongs() {
       return this.songRows_.length;
+    }
+    getSong(index) {
+      return this.songRows_[index].song;
     }
 
     get checkedSongs() {
@@ -238,7 +308,7 @@ customElements.define(
     // Updates the table to contain |newSongs| while trying to be smart about
     // not doing any more work than necessary.
     setSongs(newSongs) {
-      const oldSongs = this.songRows_.map((r) => r.song);
+      const oldSongs = this.songs;
 
       // Walk forward from the beginning and backward from the end to look for
       // common runs of songs.
@@ -247,7 +317,7 @@ customElements.define(
       let endMatchLength = 0;
       for (
         let i = 0;
-        i < minLength && oldSongs[i].songId == newSongs[i].songId;
+        i < minLength && oldSongs[i].songId === newSongs[i].songId;
         i++
       ) {
         startMatchLength++;
@@ -255,7 +325,7 @@ customElements.define(
       for (
         let i = 0;
         i < minLength - startMatchLength &&
-        oldSongs[oldSongs.length - i - 1].songId ==
+        oldSongs[oldSongs.length - i - 1].songId ===
           newSongs[newSongs.length - i - 1].songId;
         i++
       ) {
@@ -283,11 +353,6 @@ customElements.define(
       }
 
       if (this.useCheckboxes_) this.setAllCheckboxes(false);
-    }
-
-    // Returns the song at |index|.
-    getSong(index) {
-      return this.songRows_[index].song;
     }
 
     // Emits a |name| CustomEvent with its 'detail' property set to |detail|.
@@ -327,6 +392,16 @@ customElements.define(
           index: this.songRows_.indexOf(row), // don't use orig (stale) index
           orig: e, // PointerEvent
         });
+      });
+      row.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setDragImage(this.dragImage_, 0, 0);
+        row.classList.add('dragged');
+        this.dragFromIndex_ = this.dragToIndex_ = this.songRows_.indexOf(row);
+        this.dragListRect_ = this.table_
+          .querySelector('tbody')
+          .getBoundingClientRect();
+        this.moveDragTarget_();
+        this.showDragTarget_();
       });
     }
 
@@ -413,6 +488,61 @@ customElements.define(
       } else {
         this.headingCheckbox_.classList.remove('transparent');
       }
+    }
+
+    getDragEventIndex_(e) {
+      const ey = e.clientY;
+      const list = this.dragListRect_;
+      const nsongs = this.songRows_.length;
+
+      if (ey <= list.top) return 0;
+      if (ey >= list.bottom) return nsongs - 1;
+
+      // Computing the destination row is a bit tricky:
+      //
+      //  ...   ---
+      // ------- 2
+      //  Row 2 ---
+      // ------- 3
+      //  Row 3 ---
+      // -------
+      //  Row 4  4
+      // -------
+      //  Row 5 ---
+      // ------- 5
+      //  Row 6 ---
+      // ------- 6
+      //  ...   ---
+      //
+      // Suppose that row 4 is being dragged. The destination row should be 4 as
+      // long as the cursor is between 3.5 and 5.5. The dest is 3 between 2.5
+      // and 3.5, and the dest is 5 between 5.5 and 6.5.
+
+      const pos = Math.round(((ey - list.top) / list.height) * nsongs);
+      return pos - (pos > this.dragFromIndex_ ? 1 : 0);
+    }
+
+    // Shows |dragTarget_| and updates its size and position.
+    showDragTarget_() {
+      this.dragTarget_.classList.add('visible');
+      this.dragTarget_.style.width = this.dragListRect_.width + 'px';
+      this.moveDragTarget_();
+    }
+
+    // Hides |dragTarget_|.
+    hideDragTarget_() {
+      this.dragTarget_.classList.remove('visible');
+    }
+
+    // Updates |dragTarget_|'s Y position for |dragToIndex_|.
+    moveDragTarget_() {
+      const idx =
+        this.dragToIndex_ + (this.dragToIndex_ > this.dragFromIndex_ ? 1 : 0);
+      const y =
+        this.dragListRect_.top +
+        idx * (this.dragListRect_.height / this.songRows_.length) -
+        2;
+      this.dragTarget_.style.top = `${y}px`;
     }
   }
 );

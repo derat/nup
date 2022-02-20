@@ -846,6 +846,54 @@ func TestEditTagsAutocomplete(t *testing.T) {
 	page.checkAttr(editTagsTextarea, "value", "a0 a1 b d c1 ")
 }
 
+func TestDragSongs(t *testing.T) {
+	page, done := initWebTest(t)
+	defer done()
+
+	s1 := newSong("a", "t1", "al", withTrack(1))
+	s2 := newSong("a", "t2", "al", withTrack(2))
+	s3 := newSong("a", "t3", "al", withTrack(3))
+	s4 := newSong("a", "t4", "al", withTrack(4))
+	s5 := newSong("a", "t5", "al", withTrack(5))
+	importSongs(joinSongs(s1, s2, s3, s4, s5))
+
+	page.setText(keywordsInput, s1.Artist)
+	page.click(searchButton)
+	page.checkSearchResults(joinSongs(s1, s2, s3, s4, s5))
+	page.clickSongRowCheckbox(searchResultsTable, 2, "")
+	page.checkSearchResults(
+		joinSongs(s1, s2, s3, s4, s5),
+		hasChecked(true, true, false, true, true))
+
+	// Drag the middle song up to the second song's position.
+	page.dragSongRow(searchResultsTable, 2, 1, -10)
+	page.checkSearchResults(
+		joinSongs(s1, s3, s2, s4, s5),
+		hasChecked(true, false, true, true, true))
+
+	// Now drag it to the end of the list.
+	page.dragSongRow(searchResultsTable, 1, 4, 10)
+	page.checkSearchResults(
+		joinSongs(s1, s2, s4, s5, s3),
+		hasChecked(true, true, true, true, false))
+
+	// Enqueue the songs.
+	page.click(appendButton)
+	page.checkSong(s1, isPaused(false))
+	page.checkPlaylist(joinSongs(s1, s2, s4, s5), hasActive(0))
+	page.click(playPauseButton)
+
+	// Drag the second song in the playlist above the first song.
+	page.dragSongRow(playlistTable, 1, 0, -10)
+	page.checkSong(s1, isPaused(true))
+	page.checkPlaylist(joinSongs(s2, s1, s4, s5), hasActive(1))
+
+	// Now drag the active song to the end of the playlist.
+	page.dragSongRow(playlistTable, 1, 3, 10)
+	page.checkSong(s1, isPaused(true))
+	page.checkPlaylist(joinSongs(s2, s4, s5, s1), hasActive(3))
+}
+
 func TestOptions(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()

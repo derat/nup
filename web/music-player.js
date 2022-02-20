@@ -352,6 +352,22 @@ customElements.define(
       this.playlistTable_.addEventListener('field', (e) => {
         this.dispatchEvent(new CustomEvent('field', { detail: e.detail }));
       });
+      this.playlistTable_.addEventListener('reorder', (e) => {
+        const from = e.detail.fromIndex;
+        const to = e.detail.toIndex;
+        // https://stackoverflow.com/a/2440723
+        this.songs_.splice(to, 0, this.songs_.splice(from, 1)[0]);
+        if (from === this.currentIndex_) {
+          this.currentIndex_ = to;
+        } else if (from < this.currentIndex_ && to >= this.currentIndex_) {
+          this.currentIndex_--;
+        } else if (from > this.currentIndex_ && to <= this.currentIndex_) {
+          this.currentIndex_++;
+        }
+        this.updatePresentationLayerSongs_();
+        this.updateButtonState_();
+        // TODO: Preload the next song if needed.
+      });
       this.playlistTable_.addEventListener('menu', (e) => {
         if (!this.overlayManager_) throw new Error('No overlay manager');
 
