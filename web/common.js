@@ -155,3 +155,19 @@ export function getRatingString(
   for (let i = 1; i <= 5; ++i) str += i <= numStars ? filledStar : emptyStar;
   return str;
 }
+
+// Moves the item at index |from| in |array| to index |to|.
+// If |idx| is passed, it is adjusted if needed and returned.
+export function moveItem(array, from, to, idx) {
+  if (from === to) return idx;
+
+  // https://stackoverflow.com/a/2440723
+  array.splice(to, 0, array.splice(from, 1)[0]);
+
+  if (typeof idx !== 'undefined' && idx >= 0) {
+    if (from === idx) idx = to;
+    else if (from < idx && to >= idx) idx--;
+    else if (from > idx && to <= idx) idx++;
+  }
+  return idx;
+}

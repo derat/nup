@@ -6,6 +6,7 @@ import {
   createElement,
   formatTime,
   getRatingString,
+  moveItem,
   numStarsToRating,
   ratingToNumStars,
 } from './common.js';
@@ -96,6 +97,26 @@ suite('common', () => {
       if (got !== want) {
         error(`getRatingString(${args.join(', ')}) = ${got}; want ${want}`);
       }
+    }
+  });
+
+  test('moveItem', () => {
+    for (const [array, from, to, idx, wantArray, wantIdx] of [
+      [[0, 1, 2, 3], 0, 0, 0, [0, 1, 2, 3], 0],
+      [[0, 1, 2, 3], 0, 1, 0, [1, 0, 2, 3], 1],
+      [[0, 1, 2, 3], 0, 2, 1, [1, 2, 0, 3], 0],
+      [[0, 1, 2, 3], 0, 3, 1, [1, 2, 3, 0], 0],
+      [[0, 1, 2, 3], 0, 3, 3, [1, 2, 3, 0], 2],
+      [[0, 1, 2, 3], 1, 0, 0, [1, 0, 2, 3], 1],
+      [[0, 1, 2, 3], 3, 0, 2, [3, 0, 1, 2], 3],
+      [[0, 1, 2, 3], 2, 1, 1, [0, 2, 1, 3], 2],
+      [[0, 1, 2, 3], 2, 1, undefined, [0, 2, 1, 3], undefined],
+    ]) {
+      const gotArray = array.slice();
+      const gotIdx = moveItem(gotArray, from, to, idx);
+      const desc = `moveItem([${array.join(',')}], ${from}, ${to}, ${idx})`;
+      expectEq(gotArray, wantArray, desc);
+      expectEq(gotIdx, wantIdx, desc);
     }
   });
 });

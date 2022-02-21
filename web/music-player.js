@@ -13,6 +13,7 @@ import {
   getScaledCoverUrl,
   getSongUrl,
   handleFetchError,
+  moveItem,
   numStarsToRating,
   ratingToNumStars,
   updateTitleAttributeForTruncation,
@@ -353,17 +354,12 @@ customElements.define(
         this.dispatchEvent(new CustomEvent('field', { detail: e.detail }));
       });
       this.playlistTable_.addEventListener('reorder', (e) => {
-        const from = e.detail.fromIndex;
-        const to = e.detail.toIndex;
-        // https://stackoverflow.com/a/2440723
-        this.songs_.splice(to, 0, this.songs_.splice(from, 1)[0]);
-        if (from === this.currentIndex_) {
-          this.currentIndex_ = to;
-        } else if (from < this.currentIndex_ && to >= this.currentIndex_) {
-          this.currentIndex_--;
-        } else if (from > this.currentIndex_ && to <= this.currentIndex_) {
-          this.currentIndex_++;
-        }
+        this.currentIndex_ = moveItem(
+          this.songs_,
+          e.detail.fromIndex,
+          e.detail.toIndex,
+          this.currentIndex_
+        );
         this.updatePresentationLayerSongs_();
         this.updateButtonState_();
         // TODO: Preload the next song if needed.

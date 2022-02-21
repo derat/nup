@@ -888,10 +888,16 @@ func TestDragSongs(t *testing.T) {
 	page.checkSong(s1, isPaused(true))
 	page.checkPlaylist(joinSongs(s2, s1, s4, s5), hasActive(1))
 
+	// Switch songs to check that the underlying playlist was updated.
+	page.click(prevButton)
+	page.checkSong(s2, isPaused(false))
+	page.click(playPauseButton)
+	page.checkPlaylist(joinSongs(s2, s1, s4, s5), hasActive(0))
+
 	// Now drag the active song to the end of the playlist.
-	page.dragSongRow(playlistTable, 1, 3, 10)
-	page.checkSong(s1, isPaused(true))
-	page.checkPlaylist(joinSongs(s2, s4, s5, s1), hasActive(3))
+	page.dragSongRow(playlistTable, 0, 3, 10)
+	page.checkSong(s2, isPaused(true))
+	page.checkPlaylist(joinSongs(s1, s4, s5, s2), hasActive(3))
 }
 
 func TestOptions(t *testing.T) {
