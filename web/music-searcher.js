@@ -9,7 +9,7 @@ import {
   getDumpSongUrl,
   handleFetchError,
 } from './common.js';
-import { showSongDetails } from './song-details.js';
+import { showSongInfo } from './song-info.js';
 
 const template = createTemplate(`
 <style>
@@ -368,10 +368,10 @@ customElements.define(
         orig.preventDefault();
         const menu = this.overlayManager_.createMenu(orig.pageX, orig.pageY, [
           {
-            id: 'details',
-            text: 'Details…',
+            id: 'info',
+            text: 'Info…',
             cb: () =>
-              showSongDetails(
+              showSongInfo(
                 this.overlayManager_,
                 this.resultsTable_.getSong(idx)
               ),

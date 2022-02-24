@@ -37,12 +37,12 @@ const template = createTemplate(`
   #cover-img.hidden {
     display: none;
   }
-  .details-table {
+  .info-table {
     border-collapse: collapse;
     line-height: 1.2em;
     margin-bottom: var(--margin);
   }
-  .details-table td:first-child {
+  .info-table td:first-child {
     color: var(--text-label-color);
     display: inline-block;
     margin-right: 0.5em;
@@ -51,12 +51,12 @@ const template = createTemplate(`
   }
 </style>
 
-<div class="title">Song details</div>
+<div class="title">Song info</div>
 <hr class="title" />
 
 <a id="cover-link"><img id="cover-img" /></a>
 
-<table class="details-table">
+<table class="info-table">
   <tr><td>Artist</td><td id="artist"></td></tr>
   <tr><td>Title</td><td id="title"></td></tr>
   <tr><td>Album</td><td id="album"></td></tr>
@@ -71,8 +71,9 @@ const template = createTemplate(`
 </div>
 `);
 
-export function showSongDetails(manager, song) {
+export function showSongInfo(manager, song) {
   const container = manager.createDialog();
+  container.classList.add('info'); // for tests
   const shadow = createShadow(container, template);
 
   const cover = $('cover-img', shadow);

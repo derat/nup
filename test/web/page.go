@@ -55,11 +55,22 @@ var (
 	gainTypeSelect  = joinLocs(optionsDialog, loc{selenium.ByID, "gain-type-select"})
 	preAmpRange     = joinLocs(optionsDialog, loc{selenium.ByID, "pre-amp-range"})
 
+	infoDialog        = joinLocs(overlayManager, loc{selenium.ByCSSSelector, ".dialog.info"})
+	infoArtist        = joinLocs(infoDialog, loc{selenium.ByID, "artist"})
+	infoTitle         = joinLocs(infoDialog, loc{selenium.ByID, "title"})
+	infoAlbum         = joinLocs(infoDialog, loc{selenium.ByID, "album"})
+	infoTrack         = joinLocs(infoDialog, loc{selenium.ByID, "track"})
+	infoLength        = joinLocs(infoDialog, loc{selenium.ByID, "length"})
+	infoRating        = joinLocs(infoDialog, loc{selenium.ByID, "rating"})
+	infoTags          = joinLocs(infoDialog, loc{selenium.ByID, "tags"})
+	infoDismissButton = joinLocs(infoDialog, loc{selenium.ByID, "dismiss-button"})
+
 	statsDialog = joinLocs(overlayManager, loc{selenium.ByCSSSelector, ".dialog.stats"})
 
 	menuPresent  = joinLocs(overlayManager, loc{selenium.ByID, "present"})
 	menuOptions  = joinLocs(overlayManager, loc{selenium.ByID, "options"})
 	menuStats    = joinLocs(overlayManager, loc{selenium.ByID, "stats"})
+	menuInfo     = joinLocs(overlayManager, loc{selenium.ByID, "info"})
 	menuPlay     = joinLocs(overlayManager, loc{selenium.ByID, "play"})
 	menuRemove   = joinLocs(overlayManager, loc{selenium.ByID, "remove"})
 	menuTruncate = joinLocs(overlayManager, loc{selenium.ByID, "truncate"})

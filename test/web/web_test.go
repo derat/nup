@@ -933,6 +933,45 @@ func TestOptions(t *testing.T) {
 	page.checkGone(optionsOKButton)
 }
 
+func TestSongInfo(t *testing.T) {
+	page, done := initWebTest(t)
+	defer done()
+
+	song1 := newSong("a", "t1", "al1", withTrack(1), withLength(123),
+		withRating(1.0), withTags("guitar", "instrumental"))
+	song2 := newSong("a", "t2", "al2", withTrack(5), withLength(52))
+	importSongs(song1, song2)
+
+	page.setText(keywordsInput, "a")
+	page.click(luckyButton)
+	page.checkPlaylist(joinSongs(song1, song2), hasActive(0))
+	page.click(playPauseButton)
+	page.checkSong(song1, isPaused(true))
+
+	page.emitKeyDown("i", 73, true /* alt */)
+	page.checkText(infoArtist, song1.Artist)
+	page.checkText(infoTitle, song1.Title)
+	page.checkText(infoAlbum, song1.Album)
+	page.checkText(infoTrack, strconv.Itoa(song1.Track))
+	page.checkText(infoLength, "2:03")
+	page.checkText(infoRating, "★★★★★")
+	page.checkText(infoTags, strings.Join(song1.Tags, " "))
+	page.click(infoDismissButton)
+	page.checkGone(infoDismissButton)
+
+	page.rightClickSongRow(playlistTable, 1)
+	page.click(menuInfo)
+	page.checkText(infoArtist, song2.Artist)
+	page.checkText(infoTitle, song2.Title)
+	page.checkText(infoAlbum, song2.Album)
+	page.checkText(infoTrack, strconv.Itoa(song2.Track))
+	page.checkText(infoLength, "0:52")
+	page.checkText(infoRating, "Unrated")
+	page.checkText(infoTags, "")
+	page.click(infoDismissButton)
+	page.checkGone(infoDismissButton)
+}
+
 func TestPresets(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()

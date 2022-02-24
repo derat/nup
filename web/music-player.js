@@ -20,7 +20,7 @@ import {
 } from './common.js';
 import Config from './config.js';
 import OptionsDialog from './options-dialog.js';
-import { showSongDetails } from './song-details.js';
+import { showSongInfo } from './song-info.js';
 import { showStats } from './stats.js';
 import Updater from './updater.js';
 
@@ -291,6 +291,15 @@ customElements.define(
               cb: () => this.showStats_(),
             },
             {
+              id: 'info',
+              text: 'Song info…',
+              cb: () => {
+                const song = this.currentSong_;
+                if (song) showSongInfo(this.overlayManager_, song);
+              },
+              hotkey: 'Alt+I',
+            },
+            {
               id: 'debug',
               text: 'Debug…',
               cb: () => {
@@ -389,9 +398,9 @@ customElements.define(
           },
           { text: '-' },
           {
-            id: 'details',
-            text: 'Details…',
-            cb: () => showSongDetails(this.overlayManager_, this.songs_[idx]),
+            id: 'info',
+            text: 'Info…',
+            cb: () => showSongInfo(this.overlayManager_, this.songs_[idx]),
           },
           {
             id: 'debug',
@@ -1160,6 +1169,11 @@ customElements.define(
       if (e.altKey && e.key == 'd') {
         const song = this.currentSong_;
         if (song) window.open(getDumpSongUrl(song.songId), '_blank');
+        this.setPresentationLayerVisible_(false);
+        return true;
+      } else if (e.altKey && e.key == 'i') {
+        const song = this.currentSong_;
+        if (song) showSongInfo(this.overlayManager_, song);
         this.setPresentationLayerVisible_(false);
         return true;
       } else if (e.altKey && e.key == 'n') {
