@@ -201,14 +201,19 @@ customElements.define(
         this.onCheckboxClick_(this.headingCheckbox_, e.shiftKey);
       });
 
-      document.addEventListener('dragenter', (e) => {
-        if (this.dragFromIndex_ === -1) return;
-        e.preventDefault(); // allow dropping
+      // Listen for drag-and-drop events on document.body instead of |table_| so
+      // we can still reorder songs if the user releases the button outside of
+      // the table. Only the song table that initiated the drag will process the
+      // events.
+      document.body.addEventListener('dragenter', (e) => {
+        if (!this.inDrag_) return;
+        e.preventDefault(); // needed to allow dropping
         e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
       });
-      document.addEventListener('dragover', (e) => {
-        if (this.dragFromIndex_ === -1) return;
-        e.preventDefault(); // allow dropping
+      document.body.addEventListener('dragover', (e) => {
+        if (!this.inDrag_) return;
+        e.preventDefault(); // needed to allow dropping
         e.stopPropagation();
         const idx = this.getDragEventIndex_(e);
         if (idx != this.dragToIndex_) {
@@ -216,10 +221,16 @@ customElements.define(
           this.moveDragTarget_();
         }
       });
-      document.addEventListener('dragend', (e) => {
-        if (this.dragFromIndex_ === -1) return;
-
+      // Listen for 'dragend' since 'drop' doesn't fire when the drag was
+      // canceled. Chrome 98 also seems to always misreport the drop effect as
+      // 'none' in the 'drop' event, making it impossible to tell if the drag
+      // was canceled: https://stackoverflow.com/a/43892407
+      // Firefox 95 sets the drop effect properly.
+      document.body.addEventListener('dragend', (e) => {
+        if (!this.inDrag_) return;
+        e.preventDefault();
         e.stopPropagation();
+
         const from = this.dragFromIndex_;
         const to = this.dragToIndex_;
         this.songRows_[from].classList.remove('dragged');
@@ -227,7 +238,10 @@ customElements.define(
         this.dragFromIndex_ = this.dragToIndex_ = -1;
         this.dragListRect_ = null;
 
-        if (to === from) return;
+        // The browser sets the drop effect to 'none' if the drag was aborted
+        // e.g. with the Escape key or by dropping outside the window.
+        if (e.dataTransfer.dropEffect === 'none' || to === from) return;
+
         const row = this.songRows_[from];
         const tbody = row.parentNode;
         if (to < from) {
@@ -239,6 +253,10 @@ customElements.define(
         }
         this.emitEvent_('reorder', { fromIndex: from, toIndex: to });
       });
+    }
+
+    get inDrag_() {
+      return this.dragFromIndex_ !== -1;
     }
 
     get useCheckboxes_() {
@@ -394,6 +412,7 @@ customElements.define(
         });
       });
       row.addEventListener('dragstart', (e) => {
+        e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setDragImage(this.dragImage_, 0, 0);
         row.classList.add('dragged');
         this.dragFromIndex_ = this.dragToIndex_ = this.songRows_.indexOf(row);

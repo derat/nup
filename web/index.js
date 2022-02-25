@@ -67,31 +67,36 @@ document.test = {
   setPlayDelayMs: (delayMs) => (musicPlayer.playDelayMs_ = delayMs),
   updateTags: async () => await musicPlayer.updateTagsFromServer_(),
   dragElement: (src, dest, offsetX, offsetY) => {
+    const dataTransfer = { setDragImage: () => {} };
+    let dropEffect = 'none';
+    Object.defineProperty(dataTransfer, 'dropEffect', {
+      get: () => dropEffect,
+      set: (v) => (dropEffect = v),
+    });
+
     const makeEvent = (type, clientX, clientY) => {
-      const ev = new DragEvent(type);
-      // https://stackoverflow.com/a/39066443
-      Object.defineProperty(ev, 'dataTransfer', {
-        value: { setDragImage: () => {} },
+      const ev = new DragEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        composed: true, // trigger listeners outside of shadow root
       });
+      // https://stackoverflow.com/a/39066443
+      Object.defineProperty(ev, 'dataTransfer', { value: dataTransfer });
       Object.defineProperty(ev, 'clientX', { value: clientX });
       Object.defineProperty(ev, 'clientY', { value: clientY });
       return ev;
     };
 
     const srcRect = src.getBoundingClientRect();
+    const srcX = srcRect.x + srcRect.width / 2;
+    const srcY = srcRect.y + srcRect.height / 2;
     const destRect = dest.getBoundingClientRect();
     const destX = destRect.x + destRect.width / 2 + (offsetX || 0);
     const destY = destRect.y + destRect.height / 2 + (offsetY || 0);
 
-    src.dispatchEvent(
-      makeEvent(
-        'dragstart',
-        srcRect.x + srcRect.width / 2,
-        srcRect.y + srcRect.height / 2
-      )
-    );
-    document.dispatchEvent(makeEvent('dragenter', destX, destY));
-    document.dispatchEvent(makeEvent('dragover', destX, destY));
-    document.dispatchEvent(makeEvent('dragend', destX, destY));
+    src.dispatchEvent(makeEvent('dragstart', srcX, srcY));
+    dest.dispatchEvent(makeEvent('dragenter', destX, destY));
+    dest.dispatchEvent(makeEvent('dragover', destX, destY));
+    dest.dispatchEvent(makeEvent('dragend', destX, destY));
   },
 };
