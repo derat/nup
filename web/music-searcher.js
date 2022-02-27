@@ -51,8 +51,8 @@ const template = createTemplate(`
   }
   #keywords-input,
   #tags-input {
-    padding-right: 20px;
-    width: 240px;
+    padding-right: 24px;
+    width: 230px;
   }
   #tags-input-div {
     position: relative;
@@ -68,8 +68,9 @@ const template = createTemplate(`
   #tags-clear {
     bottom: 1px;
     cursor: pointer;
+    padding: 6px 8px;
     position: relative;
-    right: 24px;
+    right: 26px;
   }
   #min-rating-select {
     /* The stars are too close together, but letter-spacing unfortunately
