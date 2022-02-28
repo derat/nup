@@ -85,6 +85,7 @@ const template = createTemplate(`
   }
   #search-buttons {
     padding-top: 5px;
+    user-select: none;
   }
   #search-buttons > *:not(:first-child) {
     margin-left: var(--button-spacing);

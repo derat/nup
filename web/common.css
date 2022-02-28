@@ -102,6 +102,7 @@ button {
   overflow: hidden; /* prevent icon from extending focus ring */
   padding: 1px 12px 0 12px;
   text-transform: uppercase;
+  user-select: none;
 }
 button:hover {
   background-color: var(--button-hover-color);
