@@ -42,8 +42,8 @@ const template = createTemplate(`
    * borders from scrolling along with table contents. */
   th:after, th:before {
     content: '';
-    position: absolute;
     left: 0;
+    position: absolute;
     width: 100%;
   }
   th:before {
@@ -53,6 +53,10 @@ const template = createTemplate(`
   th:after {
     border-bottom: solid 1px var(--border-color);
     bottom: 0;
+  }
+  table.scrolled th:after {
+    box-shadow: 0 0 3px black;
+    clip-path: inset(0 -3px -3px -3px);
   }
 
   tr {
@@ -252,6 +256,12 @@ customElements.define(
           tbody.appendChild(row);
         }
         this.emitEvent_('reorder', { fromIndex: from, toIndex: to });
+      });
+
+      // Show/hide the header shadow when scrolling.
+      this.addEventListener('scroll', (e) => {
+        if (this.scrollTop) this.table_.classList.add('scrolled');
+        else this.table_.classList.remove('scrolled');
       });
     }
 
