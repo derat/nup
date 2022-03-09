@@ -47,6 +47,7 @@ const template = createTemplate(`
     display: inline-block;
     margin-right: 0.5em;
     text-align: right;
+    user-select: none;
     width: 4em;
   }
 </style>
