@@ -3,7 +3,7 @@
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]; then
   cat <<EOF >&2
 Usage: deploy.sh [args]...
-Deploy the App Engine app to CGP and delete old versions.
+Deploy the App Engine app to GCP and delete old versions.
 EOF
   exit 2
 fi

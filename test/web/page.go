@@ -46,6 +46,8 @@ var (
 	loginEmail  = joinLocs(loc{selenium.ByID, "email"})
 	loginButton = joinLocs(loc{selenium.ByID, "submit-login"})
 
+	// Note that selenium.ByTagName doesn't seem to work within shadow roots.
+	// Use selenium.ByCSSSelector instead for referencing deeply-nested elements.
 	body = joinLocs(loc{selenium.ByTagName, "body"})
 
 	overlayManager = joinLocs(loc{selenium.ByTagName, "overlay-manager"})
@@ -77,7 +79,6 @@ var (
 
 	musicPlayer       = joinLocs(loc{selenium.ByTagName, "music-player"})
 	menuButton        = joinLocs(musicPlayer, loc{selenium.ByID, "menu-button"})
-	audio             = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "audio"})
 	coverImage        = joinLocs(musicPlayer, loc{selenium.ByID, "cover-img"})
 	ratingOverlayDiv  = joinLocs(musicPlayer, loc{selenium.ByID, "rating-overlay"})
 	ratingOneStar     = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "#rating a:nth-child(1)"})
@@ -95,6 +96,9 @@ var (
 	prevButton        = joinLocs(musicPlayer, loc{selenium.ByID, "prev"})
 	playPauseButton   = joinLocs(musicPlayer, loc{selenium.ByID, "play-pause"})
 	nextButton        = joinLocs(musicPlayer, loc{selenium.ByID, "next"})
+
+	audioWrapper = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "audio-wrapper"})
+	audio        = joinLocs(audioWrapper, loc{selenium.ByCSSSelector, "audio"})
 
 	playlistTable = joinLocs(musicPlayer, loc{selenium.ByID, "playlist"},
 		loc{selenium.ByCSSSelector, "table"})

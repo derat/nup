@@ -164,9 +164,7 @@ const template = createTemplate(`
 
 <div id="menu-button">⋯</div>
 
-<audio type="audio/mpeg" preload="auto">
-  Your browser doesn't support the audio element.
-</audio>
+<audio-wrapper></audio-wrapper>
 
 <div id="song-info">
   <div id="cover-div">
@@ -224,7 +222,6 @@ customElements.define(
     static MAX_RETRIES_ = 2; // number of consecutive playback errors to reply
     static NOTIFICATION_SEC_ = 3; // duration for song-change notification
     static PLAY_DELAY_MS_ = 500; // delay before playing when cycling track
-    static GAIN_CHANGE_SEC_ = 0.1; // duration for audio gain change between songs
     static PRELOAD_SEC_ = 20; // seconds from end of song when next song should be loaded
     static RESUME_WHEN_ONLINE_SEC_ = 30; // maximum delay for auto-resume when online
 
@@ -313,13 +310,12 @@ customElements.define(
         );
       });
 
-      this.audioCtx_ = new AudioContext();
-      this.gainNode_ = this.audioCtx_.createGain();
-      this.gainNode_.connect(this.audioCtx_.destination);
-
-      this.audio_ = this.shadow_.querySelector('audio');
-      this.configureAudio_();
-      this.nextAudio_ = null;
+      this.audio_ = this.shadow_.querySelector('audio-wrapper');
+      this.audio_.addEventListener('ended', () => this.onEnded_());
+      this.audio_.addEventListener('pause', () => this.onPause_());
+      this.audio_.addEventListener('play', () => this.onPlay_());
+      this.audio_.addEventListener('timeupdate', () => this.onTimeUpdate_());
+      this.audio_.addEventListener('error', (e) => this.onError_(e));
 
       this.coverDiv_ = get('cover-div');
       this.coverImage_ = get('cover-img');
@@ -463,27 +459,6 @@ customElements.define(
       this.updateSongDisplay_();
     }
 
-    // Adds event handlers to |audio_| and routes it through |gainNode_|.
-    configureAudio_() {
-      this.audio_.addEventListener('ended', () => this.onEnded_());
-      this.audio_.addEventListener('pause', () => this.onPause_());
-      this.audio_.addEventListener('play', () => this.onPlay_());
-      this.audio_.addEventListener('timeupdate', () => this.onTimeUpdate_());
-      this.audio_.addEventListener('error', (e) => this.onError_(e));
-
-      this.audioSrc_ = this.audioCtx_.createMediaElementSource(this.audio_);
-      this.audioSrc_.connect(this.gainNode_);
-    }
-
-    // Replaces |audio_| with |audio|.
-    swapAudio_(audio) {
-      this.audioSrc_.disconnect(this.gainNode_);
-      this.audio_.removeAttribute('src');
-      this.audio_.parentNode.replaceChild(audio, this.audio_);
-      this.audio_ = audio;
-      this.configureAudio_(); // resets |audioSrc_|
-    }
-
     set config(config) {
       this.config_ = config;
       this.config_.addCallback((name, value) => {
@@ -519,6 +494,9 @@ customElements.define(
 
     get currentSong_() {
       return this.songs_[this.currentIndex_] || null;
+    }
+    get nextSong_() {
+      return this.songs_[this.currentIndex_ + 1] || null;
     }
 
     resetForTesting() {
@@ -578,8 +556,7 @@ customElements.define(
       }
 
       // Stop playing the (just-removed) current song and choose a new one.
-      this.audio_.pause();
-      this.audio_.removeAttribute('src');
+      this.audio_.src = null;
       this.playlistTable_.setRowActive(this.currentIndex_, false);
       this.currentIndex_ = -1;
 
@@ -821,25 +798,9 @@ customElements.define(
       // element: https://stackoverflow.com/a/44547904
       const url = getSongUrl(song.filename);
       if (this.audio_.src != url || this.reachedEndOfSongs_) {
-        // Deal with "The AudioContext was not allowed to start. It must be
-        // resumed (or created) after a user gesture on the page.":
-        // https://developers.google.com/web/updates/2017/09/autoplay-policy-changes#webaudio
-        const ctx = this.gainNode_.context;
-        if (ctx.state === 'suspended') ctx.resume();
-
-        if (
-          this.nextAudio_ &&
-          this.nextAudio_.src === url &&
-          this.nextAudio_.error === null
-        ) {
-          console.log(`Starting preloaded ${song.songId} (${url})`);
-          this.swapAudio_(this.nextAudio_);
-        } else {
-          console.log(`Starting ${song.songId} (${url})`);
-          this.audio_.src = url;
-          this.audio_.currentTime = 0;
-        }
-        this.nextAudio_ = null;
+        console.log(`Starting ${song.songId} (${url})`);
+        this.audio_.src = url;
+        this.audio_.currentTime = 0;
 
         this.lastUpdateTime_ = -1;
         this.lastUpdatePosition_ = 0;
@@ -952,19 +913,13 @@ customElements.define(
       // Preload the next song once we're nearing the end of this one.
       if (
         pos >= dur - this.constructor.PRELOAD_SEC_ &&
-        !this.nextAudio_ &&
-        this.currentIndex_ < this.songs_.length - 1
+        this.nextSong_ &&
+        !this.audio_.preloadSrc
       ) {
-        this.preloadSong_(this.songs_[this.currentIndex_ + 1]);
+        const url = getSongUrl(this.nextSong_.filename);
+        console.log(`Preloading ${this.nextSong_.songId} (${url})`);
+        this.audio_.preloadSrc = url;
       }
-    }
-
-    // Configures |nextAudio_| to play |song|.
-    preloadSong_(song) {
-      const url = getSongUrl(song.filename);
-      console.log(`Preloading ${song.songId} (${url})`);
-      this.nextAudio_ = this.audio_.cloneNode(true);
-      this.nextAudio_.src = url;
     }
 
     onError_(e) {
@@ -1122,8 +1077,8 @@ customElements.define(
       this.emitPresentEvent_(visible);
     }
 
-    // Adjusts |gainNode_|'s gain appropriately for the current song and
-    // settings. This implements the approach described at
+    // Adjusts |audio|'s gain appropriately for the current song and settings.
+    // This implements the approach described at
     // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification.
     updateGain_() {
       let adj = this.config_.get(Config.PRE_AMP); // decibels
@@ -1149,16 +1104,10 @@ customElements.define(
         scale = Math.min(scale, 1 / song.peakAmp);
       }
 
-      // Per https://developer.mozilla.org/en-US/docs/Web/API/GainNode:
-      // "If modified, the new gain is instantly applied, causing unaesthetic
-      // 'clicks' in the resulting audio. To prevent this from happening, never
-      // change the value directly but use the exponential interpolation methods
-      // on the AudioParam interface."
+      // <audio>'s |volume| attribute is limited to the range [0, 1], but
+      // <audio-wrapper> uses GainNode internally to support amplification.
       console.log(`Scaling amplitude by ${scale.toFixed(3)}`);
-      this.gainNode_.gain.exponentialRampToValueAtTime(
-        scale,
-        this.audioCtx_.currentTime + this.constructor.GAIN_CHANGE_SEC_
-      );
+      this.audio_.volume = scale;
     }
 
     processAccelerator_(e) {
