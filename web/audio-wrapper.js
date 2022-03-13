@@ -40,16 +40,13 @@ customElements.define(
 
     // Adds event handlers to |audio_| and routes it through |gainNode_|.
     configureAudio_() {
-      for (const t of ['ended', 'pause', 'play', 'timeupdate']) {
-        this.audio_.addEventListener(t, (e) =>
-          this.dispatchEvent(new CustomEvent(t))
-        );
+      for (const t of ['ended', 'error', 'pause', 'play', 'timeupdate']) {
+        this.audio_.addEventListener(t, (e) => {
+          const ne = new Event(t);
+          Object.defineProperty(ne, 'target', { get: () => e.target });
+          this.dispatchEvent(ne);
+        });
       }
-      this.audio_.addEventListener('error', (e) => {
-        const ne = new CustomEvent('error');
-        ne.target = e.target;
-        this.dispatchEvent(ne);
-      });
 
       this.audioSrc_ = this.audioCtx_.createMediaElementSource(this.audio_);
       this.audioSrc_.connect(this.gainNode_);
