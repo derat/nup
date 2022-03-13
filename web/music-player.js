@@ -223,7 +223,6 @@ customElements.define(
     static NOTIFICATION_SEC_ = 3; // duration for song-change notification
     static PLAY_DELAY_MS_ = 500; // delay before playing when cycling track
     static PRELOAD_SEC_ = 20; // seconds from end of song when next song should be loaded
-    static RESUME_WHEN_ONLINE_SEC_ = 30; // maximum delay for auto-resume when online
 
     constructor() {
       super();
@@ -234,15 +233,12 @@ customElements.define(
       this.songs_ = []; // songs in the order in which they should be played
       this.tags_ = []; // available tags loaded from server
       this.currentIndex_ = -1; // index into |songs| of current track
-      this.lastUpdateTime_ = -1; // seconds since epoch for last onTimeUpdate_()
-      this.lastUpdatePosition_ = 0; // playback position at last onTimeUpdate_()
-      this.lastUpdateSong_ = null; // current song at last onTimeUpdate_()
-      this.numErrors_ = 0; // consecutive playback errors
-      this.startTime_ = -1; // seconds since epoch when current track started
+      this.lastUpdateTime_ = null; // seconds since epoch for last onTimeUpdate_()
+      this.lastUpdatePos_ = 0; // playback position at last onTimeUpdate_()
+      this.startTime_ = null; // seconds since epoch when current track started
       this.totalPlayedSec_ = 0; // total seconds playing current song
       this.reportedCurrentTrack_ = false; // already reported current as played?
       this.reachedEndOfSongs_ = false; // did we hit end of last song?
-      this.pausedForOfflineTime_ = -1; // seconds since epoch when auto-paused
       this.updateSong_ = null; // song playing when update div was opened
       this.updatedRating_ = -1.0; // rating set in update div
       this.notification_ = null; // song notification currently shown
@@ -429,20 +425,6 @@ customElements.define(
           this.cycleTrack_(1, true /* delayPlay */)
         );
       }
-
-      // Automatically resume playing if we previously paused due to going
-      // offline: https://github.com/derat/nup/issues/17
-      window.addEventListener('online', (e) => {
-        if (this.pausedForOfflineTime_ > 0) {
-          console.log('Back online');
-          const resume =
-            getCurrentTimeSec() - this.pausedForOfflineTime_ <=
-            this.constructor.RESUME_WHEN_ONLINE_SEC_;
-          this.pausedForOfflineTime_ = -1;
-          this.reloadAudio_();
-          if (resume) this.play_();
-        }
-      });
 
       document.body.addEventListener('keydown', (e) => {
         if (this.processAccelerator_(e)) {
@@ -802,10 +784,8 @@ customElements.define(
         this.audio_.src = url;
         this.audio_.currentTime = 0;
 
-        this.lastUpdateTime_ = -1;
-        this.lastUpdatePosition_ = 0;
-        this.lastUpdateSong_ = null;
-        this.numErrors_ = 0;
+        this.lastUpdateTime_ = null;
+        this.lastUpdatePos_ = 0;
         this.startTime_ = getCurrentTimeSec();
         this.totalPlayedSec_ = 0;
         this.reportedCurrentTrack_ = false;
@@ -860,7 +840,7 @@ customElements.define(
     onPause_() {
       this.playPauseButton_.innerText = '▶';
       this.playPauseButton_.title = 'Play (Space)';
-      this.lastUpdateTime_ = -1;
+      this.lastUpdateTime_ = null;
     }
 
     onPlay_() {
@@ -876,26 +856,18 @@ customElements.define(
       const pos = this.audio_.currentTime;
       const dur = song.length;
 
-      // Avoid resetting |numErrors_| if we get called repeatedly without making
-      // any progress.
-      if (song == this.lastUpdateSong_ && pos == this.lastUpdatePosition_) {
-        return;
-      }
-
       const now = getCurrentTimeSec();
-      if (this.lastUpdateTime_ > 0) {
+      if (this.lastUpdateTime_ !== null) {
         // Playback can hang if the network is flaky, so make sure that we don't
         // incorrectly increment the total played time by the wall time if the
         // position didn't move as much: https://github.com/derat/nup/issues/20
         const timeDiff = now - this.lastUpdateTime_;
-        const posDiff = pos - this.lastUpdatePosition_;
+        const posDiff = pos - this.lastUpdatePos_;
         this.totalPlayedSec_ += Math.max(Math.min(timeDiff, posDiff), 0);
       }
 
       this.lastUpdateTime_ = now;
-      this.lastUpdatePosition_ = pos;
-      this.lastUpdateSong_ = song;
-      this.numErrors_ = 0;
+      this.lastUpdatePos_ = pos;
 
       if (
         !this.reportedCurrentTrack_ &&
@@ -923,38 +895,7 @@ customElements.define(
     }
 
     onError_(e) {
-      this.numErrors_++;
-
-      const error = e.target.error;
-      console.log(`Got playback error ${error.code} (${error.message})`);
-      switch (error.code) {
-        case error.MEDIA_ERR_ABORTED: // 1
-          break;
-        case error.MEDIA_ERR_NETWORK: // 2
-        case error.MEDIA_ERR_DECODE: // 3
-        case error.MEDIA_ERR_SRC_NOT_SUPPORTED: // 4
-          if (!navigator.onLine) {
-            console.log('Currently offline');
-            this.pause_();
-            this.pausedForOfflineTime_ = getCurrentTimeSec();
-          } else if (this.numErrors_ <= this.constructor.MAX_RETRIES_) {
-            console.log(`Retrying from position ${this.lastUpdatePosition_}`);
-            this.reloadAudio_();
-            this.play_();
-          } else {
-            console.log(`Giving up after ${this.numErrors_} errors`);
-            this.cycleTrack_(1, false /* delay */);
-          }
-          break;
-      }
-    }
-
-    // Reinitializes the audio element. This is sometimes needed to get it back
-    // into a playable state after a network error -- otherwise, play() triggers
-    // a 'The element has no supported sources.' error.
-    reloadAudio_() {
-      this.audio_.load();
-      this.audio_.currentTime = this.lastUpdatePosition_;
+      this.cycleTrack_(1, false /* delay */);
     }
 
     showUpdateDiv_() {
