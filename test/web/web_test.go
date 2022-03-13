@@ -805,16 +805,10 @@ func TestRetryUpdates(t *testing.T) {
 	page.checkSong(song)
 	for _, r := range [][]loc{ratingThreeStars, ratingFourStars, ratingFiveStars} {
 		page.click(coverImage)
+		page.checkDisplayed(updateCloseImage, true)
 		page.click(r)
-		// I saw the below assertion fail once due to the song still having a rating of 0.75.
-		// An attempt to send the final 1.0 rating didn't even show up in the browser log, so
-		// I'm a bit suspicious that there might be a race in this loop. It already had a 100
-		// ms pause after clicking the close button, but I'm adding a delay before clicking it
-		// too to see if that helps. I ran this test in a loop for a while without any delays
-		// and couldn't reproduce the failure, though.
-		time.Sleep(100 * time.Millisecond)
 		page.click(updateCloseImage)
-		time.Sleep(100 * time.Millisecond)
+		page.checkDisplayed(updateCloseImage, false)
 	}
 	tester.ForceUpdateFailures(false)
 	checkServerSong(t, song, hasSrvRating(1.0))

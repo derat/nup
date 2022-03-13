@@ -318,8 +318,9 @@ func (p *page) getNoWait(locs []loc) (selenium.WebElement, error) {
 	return p.wd.DecodeElement(res)
 }
 
-// checkGone waits for the element described by locs to not be found.
+// checkGone waits for the element described by locs to not be present in the document tree.
 // It fails the test if the element remains present.
+// Use checkDisplayed for elements that use e.g. display:none.
 func (p *page) checkGone(locs []loc) {
 	if err := wait(func() error {
 		_, err := p.getNoWait(locs)
@@ -328,7 +329,7 @@ func (p *page) checkGone(locs []loc) {
 		}
 		return nil
 	}); err != nil {
-		p.t.Fatalf("Failed waiting for element to disappear for %v: %v", p.desc(), err)
+		p.t.Fatalf("Failed waiting for element to be gone for %v: %v", p.desc(), err)
 	}
 }
 
@@ -545,7 +546,23 @@ func (p *page) checkAttr(locs []loc, attr, want string) {
 		}
 		return nil
 	}); err != nil {
-		p.t.Fatalf("Bad %v attribute for %v: %v", attr, p.desc(), err)
+		p.t.Fatalf("Bad %q attribute for %v: %v", attr, p.desc(), err)
+	}
+}
+
+// checkDisplayed checks that the element matched by locs is or isn't displayed.
+// Note that the element must be present in the document tree.
+func (p *page) checkDisplayed(locs []loc, want bool) {
+	el := p.getOrFail(locs)
+	if err := wait(func() error {
+		if got, err := el.IsDisplayed(); err != nil {
+			p.t.Fatalf("Failed getting displayed state for %v: %v", p.desc(), err)
+		} else if got != want {
+			return fmt.Errorf("got %v; want %v", got, want)
+		}
+		return nil
+	}); err != nil {
+		p.t.Fatalf("Bad displayed state for %v: %v", p.desc(), err)
 	}
 }
 
