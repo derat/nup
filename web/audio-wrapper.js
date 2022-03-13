@@ -12,21 +12,23 @@ const template = createTemplate(`
 // <audio-wrapper> wraps the <audio> element to hide some of its complexity.
 //
 // It transparently forwards a subset of <audio>'s properties, events and
-// methods (but not HTML attributes), with the following changes:
+// methods (but no HTML attributes), with the following changes:
 //
 // - |gain| can be set to adjust the audio's gain. Valid values must be greater
 //   than 0, but can also exceed 1 to amplify the signal (unlike |volume|).
 // - |playtime| contains the total playtime of |src| so far in seconds.
 // - |preloadSrc| can be set to asynchronously prepare a file for playback.
-// - |src| can be set to a falsey value to pause the <audio> element and remove
+// - |src| can be set to a falsy value to pause the <audio> element and remove
 //   its |src| attribute.
+// - pause() ramps the gain down before pausing to avoid audible pops.
 // - After errors, playback is retried several times before an 'error' event is
 //   emitted. The <audio> element is paused while offline and automatically
 //   resumed if the network connection comes back soon afterward.
 customElements.define(
   'audio-wrapper',
   class extends HTMLElement {
-    static GAIN_CHANGE_SEC_ = 0.1; // duration for audio gain changes
+    static GAIN_CHANGE_SEC_ = 0.03; // duration for audio gain changes
+    static PAUSE_GAIN_ = 0.001; // target audio gain when pausing
     static RESUME_WHEN_ONLINE_SEC_ = 30; // maximum delay for auto-resume when online
 
     constructor() {
@@ -45,6 +47,8 @@ customElements.define(
       this.lastUpdateTime_ = null; // time at last 'timeupdate' or 'play' event
       this.lastUpdatePos_ = 0; // position at last 'timeupdate' event
       this.playtime_ = 0; // total playtime of |src| in seconds
+
+      this.pauseTimeoutId_ = null; // calls audio_.pause() after dropping gain
       this.pausedForOfflineTime_ = null; // seconds since epoch when auto-paused
       this.numErrors_ = 0; // consecutive playback errors
 
@@ -153,6 +157,33 @@ customElements.define(
       this.audio_.currentTime = this.lastUpdatePos_;
     }
 
+    // Sets |gainNode_|'s gain to |v|.
+    setAudioGain_(v) {
+      // Per https://developer.mozilla.org/en-US/docs/Web/API/GainNode:
+      // "If modified, the new gain is instantly applied, causing unaesthetic
+      // 'clicks' in the resulting audio. To prevent this from happening, never
+      // change the value directly but use the exponential interpolation methods
+      // on the AudioParam interface."
+      //
+      // Note also that the ramp confusingly uses the time of the "last event"
+      // as its starting point, so we need to explicitly set the gain again just
+      // before starting the ramp to avoid still having an abrupt transition:
+      // https://stackoverflow.com/a/34480323
+      // https://stackoverflow.com/a/61924161
+      // etc.
+      const g = this.gainNode_.gain;
+      const t = this.audioCtx_.currentTime;
+      g.setValueAtTime(g.value, t);
+      g.exponentialRampToValueAtTime(v, t + this.constructor.GAIN_CHANGE_SEC_);
+    }
+
+    // Cancels |pauseTimeoutId_| if non-null.
+    cancelPauseTimeout_() {
+      if (this.pauseTimeoutId_ === null) return;
+      window.clearTimeout(this.pauseTimeoutId_);
+      this.pauseTimeoutId_ = null;
+    }
+
     get src() {
       return this.audio_.src;
     }
@@ -184,54 +215,45 @@ customElements.define(
       this.pausedForOfflineTime_ = null;
       this.numErrors_ = 0;
 
+      this.cancelPauseTimeout_();
       this.preloadAudio_ = null;
     }
 
-    get currentTime() {
-      return this.audio_.currentTime;
-    }
-    set currentTime(t) {
-      this.audio_.currentTime = t;
-    }
-
-    get duration() {
-      return this.audio_.duration;
-    }
-    get paused() {
-      return this.audio_.paused;
-    }
-    get seekable() {
-      return this.audio_.seekable;
-    }
+    // Sigh: https://github.com/prettier/prettier/issues/5287
+    /* prettier-ignore */ get currentTime() { return this.audio_.currentTime; }
+    /* prettier-ignore */ set currentTime(t) { this.audio_.currentTime = t; }
+    /* prettier-ignore */ get duration() { return this.audio_.duration; }
+    /* prettier-ignore */ get paused() { return this.audio_.paused; }
+    /* prettier-ignore */ get seekable() { return this.audio_.seekable; }
+    /* prettier-ignore */ get playtime() { return this.playtime_; }
 
     play() {
+      this.cancelPauseTimeout_();
+      this.setAudioGain_(this.gain_); // restore pre-pause gain
       return this.audio_.play();
     }
+
     pause() {
-      this.audio_.pause();
+      if (this.pauseTimeoutId_ !== null) return;
+
+      // Avoid pops caused by abruptly stopping playback:
+      // https://github.com/derat/nup/issues/34
+      this.setAudioGain_(this.constructor.PAUSE_GAIN_);
+      this.pauseTimeoutId_ = window.setTimeout(() => {
+        this.pauseTimeoutId_ = null;
+        this.audio_.pause();
+      }, this.constructor.GAIN_CHANGE_SEC_ * 1000);
     }
+
     load() {
       this.audio_.load();
     }
 
-    get gain() {
-      return this.gain_;
-    }
+    // prettier-ignore
+    get gain() { return this.gain_; }
     set gain(v) {
-      // Per https://developer.mozilla.org/en-US/docs/Web/API/GainNode:
-      // "If modified, the new gain is instantly applied, causing unaesthetic
-      // 'clicks' in the resulting audio. To prevent this from happening, never
-      // change the value directly but use the exponential interpolation methods
-      // on the AudioParam interface."
-      this.gainNode_.gain.exponentialRampToValueAtTime(
-        v,
-        this.audioCtx_.currentTime + this.constructor.GAIN_CHANGE_SEC_
-      );
+      this.setAudioGain_(v);
       this.gain_ = v;
-    }
-
-    get playtime() {
-      return this.playtime_;
     }
 
     get preloadSrc() {
