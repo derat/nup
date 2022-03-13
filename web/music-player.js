@@ -233,10 +233,7 @@ customElements.define(
       this.songs_ = []; // songs in the order in which they should be played
       this.tags_ = []; // available tags loaded from server
       this.currentIndex_ = -1; // index into |songs| of current track
-      this.lastUpdateTime_ = null; // seconds since epoch for last onTimeUpdate_()
-      this.lastUpdatePos_ = 0; // playback position at last onTimeUpdate_()
       this.startTime_ = null; // seconds since epoch when current track started
-      this.totalPlayedSec_ = 0; // total seconds playing current song
       this.reportedCurrentTrack_ = false; // already reported current as played?
       this.reachedEndOfSongs_ = false; // did we hit end of last song?
       this.updateSong_ = null; // song playing when update div was opened
@@ -629,11 +626,11 @@ customElements.define(
         const url = getScaledCoverUrl(song.coverFilename);
         this.coverImage_.src = url;
         this.coverDiv_.classList.remove('empty');
-        this.emitCoverEvent_(url);
+        this.dispatchEvent(new CustomEvent('cover', { detail: { url } }));
       } else {
         this.coverImage_.src = emptyImg;
         this.coverDiv_.classList.add('empty');
-        this.emitCoverEvent_(null);
+        this.dispatchEvent(new CustomEvent('cover', { detail: { url: null } }));
       }
 
       // Cache the scaled cover images for the next song and the one after it.
@@ -784,10 +781,7 @@ customElements.define(
         this.audio_.src = url;
         this.audio_.currentTime = 0;
 
-        this.lastUpdateTime_ = null;
-        this.lastUpdatePos_ = 0;
         this.startTime_ = getCurrentTimeSec();
-        this.totalPlayedSec_ = 0;
         this.reportedCurrentTrack_ = false;
         this.reachedEndOfSongs_ = false;
         this.pausedForOfflineTime_ = -1;
@@ -840,13 +834,11 @@ customElements.define(
     onPause_() {
       this.playPauseButton_.innerText = '▶';
       this.playPauseButton_.title = 'Play (Space)';
-      this.lastUpdateTime_ = null;
     }
 
     onPlay_() {
       this.playPauseButton_.innerText = '⏸';
       this.playPauseButton_.title = 'Pause (Space)';
-      this.lastUpdateTime_ = getCurrentTimeSec();
     }
 
     onTimeUpdate_() {
@@ -854,25 +846,10 @@ customElements.define(
       if (song === null) return;
 
       const pos = this.audio_.currentTime;
+      const played = this.audio_.playtime;
       const dur = song.length;
 
-      const now = getCurrentTimeSec();
-      if (this.lastUpdateTime_ !== null) {
-        // Playback can hang if the network is flaky, so make sure that we don't
-        // incorrectly increment the total played time by the wall time if the
-        // position didn't move as much: https://github.com/derat/nup/issues/20
-        const timeDiff = now - this.lastUpdateTime_;
-        const posDiff = pos - this.lastUpdatePos_;
-        this.totalPlayedSec_ += Math.max(Math.min(timeDiff, posDiff), 0);
-      }
-
-      this.lastUpdateTime_ = now;
-      this.lastUpdatePos_ = pos;
-
-      if (
-        !this.reportedCurrentTrack_ &&
-        (this.totalPlayedSec_ >= 240 || this.totalPlayedSec_ > dur / 2)
-      ) {
+      if (!this.reportedCurrentTrack_ && (played >= 240 || played > dur / 2)) {
         this.updater_.reportPlay(song.songId, this.startTime_);
         this.reportedCurrentTrack_ = true;
       }
@@ -1015,7 +992,7 @@ customElements.define(
     setPresentationLayerVisible_(visible) {
       if (this.presentationLayer_.visible == visible) return;
       this.presentationLayer_.visible = visible;
-      this.emitPresentEvent_(visible);
+      this.dispatchEvent(new CustomEvent('present', { detail: { visible } }));
     }
 
     // Adjusts |audio|'s gain appropriately for the current song and settings.
@@ -1045,10 +1022,8 @@ customElements.define(
         scale = Math.min(scale, 1 / song.peakAmp);
       }
 
-      // <audio>'s |volume| attribute is limited to the range [0, 1], but
-      // <audio-wrapper> uses GainNode internally to support amplification.
       console.log(`Scaling amplitude by ${scale.toFixed(3)}`);
-      this.audio_.volume = scale;
+      this.audio_.gain = scale;
     }
 
     processAccelerator_(e) {
@@ -1123,14 +1098,6 @@ customElements.define(
         e.preventDefault();
         e.stopPropagation();
       }
-    }
-
-    emitCoverEvent_(url) {
-      this.dispatchEvent(new CustomEvent('cover', { detail: { url } }));
-    }
-
-    emitPresentEvent_(visible) {
-      this.dispatchEvent(new CustomEvent('present', { detail: { visible } }));
     }
   }
 );
