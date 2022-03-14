@@ -569,7 +569,7 @@ func TestAddToPlaylist(t *testing.T) {
 func TestPlaybackButtons(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
-	song1 := newSong("artist", "track1", "album", withTrack(1), withFilename(file5s))
+	song1 := newSong("artist", "track1", "album", withTrack(1), withFilename(file10s))
 	song2 := newSong("artist", "track2", "album", withTrack(2), withFilename(file1s))
 	importSongs(song1, song2)
 
@@ -593,7 +593,7 @@ func TestPlaybackButtons(t *testing.T) {
 
 	// Clicking it again shouldn't do anything.
 	page.click(nextButton)
-	page.checkSong(song2, isPaused(false))
+	page.checkSong(song2)
 	page.checkPlaylist(joinSongs(song1, song2), hasActive(1))
 
 	// Clicking the 'prev' button should go back to the first song.
@@ -637,12 +637,14 @@ func TestContextMenu(t *testing.T) {
 	page.checkPlaylist(songs, hasMenu(2))
 	page.click(menuPlay)
 	page.checkSong(song3, isPaused(false))
+	page.click(playPauseButton) // make sure we don't advance mid-test
+	page.checkSong(song3, isPaused(true))
 	page.checkPlaylist(songs, hasActive(2))
 
 	page.rightClickSongRow(playlistTable, 0)
 	page.checkPlaylist(songs, hasMenu(0))
 	page.click(menuRemove)
-	page.checkSong(song3, isPaused(false))
+	page.checkSong(song3, isPaused(true))
 	page.checkPlaylist(joinSongs(song2, song3, song4, song5), hasActive(1))
 
 	page.rightClickSongRow(playlistTable, 1)
@@ -660,6 +662,8 @@ func TestDisplayTimeWhilePlaying(t *testing.T) {
 
 	page.setText(keywordsInput, song.Artist)
 	page.click(luckyButton)
+
+	// TODO: This can be flaky when the checks happen to run slowly.
 	page.checkSong(song, isPaused(false), hasTimeStr("[ 0:00 / 0:05 ]"))
 	page.checkSong(song, isPaused(false), hasTimeStr("[ 0:01 / 0:05 ]"))
 	page.checkSong(song, isPaused(false), hasTimeStr("[ 0:02 / 0:05 ]"))
@@ -679,6 +683,7 @@ func TestReportPlayed(t *testing.T) {
 	page.setText(keywordsInput, song1.Artist)
 	page.click(luckyButton)
 	page.checkSong(song1, isPaused(false))
+	page.click(playPauseButton)
 	song2Lower := time.Now()
 	page.click(nextButton)
 	page.checkSong(song2, isEnded(true))
@@ -901,6 +906,9 @@ func TestOptions(t *testing.T) {
 
 	show()
 	page.checkAttr(gainTypeSelect, "value", gainAutoValue)
+	// TODO: This somehow fails sometimes due to the option not being found (despite clickOption()
+	// finding the correct number of options). Hopefully additional logging in clickOption() will
+	// shed light on why it isn't found.
 	page.clickOption(gainTypeSelect, gainTrack)
 	page.checkAttr(gainTypeSelect, "value", gainTrackValue)
 
@@ -923,7 +931,10 @@ func TestOptions(t *testing.T) {
 	show()
 	page.checkAttr(gainTypeSelect, "value", gainTrackValue)
 	page.checkAttr(preAmpRange, "value", origPreAmp)
-	page.click(optionsOKButton)
+	// TODO: For reasons that are unclear to me, clicking the OK button ocasionally fails at this
+	// point with "element not visible: element not interactable", so I'm speculatively dismissing
+	// the dialog with the escape key instead.
+	page.sendKeys(body, selenium.EscapeKey, false)
 	page.checkGone(optionsOKButton)
 }
 

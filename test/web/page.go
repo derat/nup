@@ -207,15 +207,15 @@ func (p *page) configPage() {
 	if btn, err := p.getNoWait(loginButton); err == nil {
 		p.setText(loginEmail, testEmail)
 		if err := btn.Click(); err != nil {
-			p.t.Fatalf("Failed clicking login button for %v: %v", p.desc(), err)
+			p.t.Fatalf("Failed clicking login button at %v: %v", p.desc(), err)
 		}
 		p.getOrFail(musicPlayer)
 	}
 	if _, err := p.wd.ExecuteScript("document.test.setPlayDelayMs(10)", nil); err != nil {
-		p.t.Fatalf("Failed setting short play delay for %v: %v", p.desc(), err)
+		p.t.Fatalf("Failed setting short play delay at %v: %v", p.desc(), err)
 	}
 	if _, err := p.wd.ExecuteScript("document.test.reset()", nil); err != nil {
-		p.t.Fatalf("Failed resetting page for %v: %v", p.desc(), err)
+		p.t.Fatalf("Failed resetting page at %v: %v", p.desc(), err)
 	}
 }
 
@@ -236,7 +236,7 @@ func (p *page) desc() string {
 // reload reloads the page.
 func (p *page) reload() {
 	if err := p.wd.Refresh(); err != nil {
-		p.t.Fatalf("Reloading page for %v failed: %v", p.desc(), err)
+		p.t.Fatalf("Reloading page at %v failed: %v", p.desc(), err)
 	}
 	p.configPage()
 }
@@ -244,7 +244,7 @@ func (p *page) reload() {
 // refreshTags instructs the page to refresh the list of available tags from the server.
 func (p *page) refreshTags() {
 	if _, err := p.wd.ExecuteScript("document.test.updateTags()", nil); err != nil {
-		p.t.Fatalf("Failed refreshing tags for %v: %v", p.desc(), err)
+		p.t.Fatalf("Failed refreshing tags at %v: %v", p.desc(), err)
 	}
 }
 
@@ -259,7 +259,7 @@ func (p *page) getOrFail(locs []loc) selenium.WebElement {
 		}
 		return nil
 	}); err != nil {
-		p.t.Fatalf("Failed getting %v for %v: %v", locs, p.desc(), err)
+		p.t.Fatalf("Failed getting %v at %v: %v", locs, p.desc(), err)
 	}
 	return el
 }
@@ -329,14 +329,14 @@ func (p *page) checkGone(locs []loc) {
 		}
 		return nil
 	}); err != nil {
-		p.t.Fatalf("Failed waiting for element to be gone for %v: %v", p.desc(), err)
+		p.t.Fatalf("Failed waiting for element to be gone at %v: %v", p.desc(), err)
 	}
 }
 
 // click clicks on the element matched by locs.
 func (p *page) click(locs []loc) {
 	if err := p.getOrFail(locs).Click(); err != nil {
-		p.t.Fatalf("Failed clicking %v for %v: %v", locs, p.desc(), err)
+		p.t.Fatalf("Failed clicking %v at %v: %v", locs, p.desc(), err)
 	}
 }
 
@@ -344,17 +344,22 @@ func (p *page) click(locs []loc) {
 func (p *page) clickOption(sel []loc, option string) {
 	opts, err := p.getOrFail(sel).FindElements(selenium.ByTagName, "option")
 	if err != nil {
-		p.t.Fatalf("Failed getting %v options for %v: %v", sel, p.desc(), err)
+		p.t.Fatalf("Failed getting %v options at %v: %v", sel, p.desc(), err)
+	} else if len(opts) == 0 {
+		p.t.Fatalf("No options for %v at %v: %v", sel, p.desc(), err)
 	}
+	names := make([]string, 0, len(opts))
 	for _, opt := range opts {
-		if strings.TrimSpace(p.getTextOrFail(opt, false)) == option {
+		name := strings.TrimSpace(p.getTextOrFail(opt, false))
+		if name == option {
 			if err := opt.Click(); err != nil {
-				p.t.Fatalf("Failed clicking %v option %q for %v: %v", sel, option, p.desc(), err)
+				p.t.Fatalf("Failed clicking %v option %q at %v: %v", sel, option, p.desc(), err)
 			}
 			return
 		}
+		names = append(names, name)
 	}
-	p.t.Fatalf("Failed finding %v option %q for %v: %v", sel, option, p.desc(), err)
+	p.t.Fatalf("Failed finding %v option %q among %q at %v", sel, option, names, p.desc())
 }
 
 // getTextOrFail returns el's text, failing the test on error.
@@ -365,7 +370,7 @@ func (p *page) getTextOrFail(el selenium.WebElement, ignoreStale bool) string {
 	if ignoreStale && isStaleElementError(err) {
 		return ""
 	} else if err != nil {
-		p.t.Fatalf("Failed getting element text for %v: %v", p.desc(), err)
+		p.t.Fatalf("Failed getting element text at %v: %v", p.desc(), err)
 	}
 	return text
 }
@@ -380,7 +385,7 @@ func (p *page) getAttrOrFail(el selenium.WebElement, name string, ignoreStale bo
 	} else if ignoreStale && isStaleElementError(err) {
 		return ""
 	} else if err != nil {
-		p.t.Fatalf("Failed getting attribute %q for %v: %v", name, p.desc(), err)
+		p.t.Fatalf("Failed getting attribute %q at %v: %v", name, p.desc(), err)
 	}
 	return val
 }
@@ -392,7 +397,7 @@ func (p *page) getSelectedOrFail(el selenium.WebElement, ignoreStale bool) bool 
 	if ignoreStale && isStaleElementError(err) {
 		return false
 	} else if err != nil {
-		p.t.Fatalf("Failed getting selected state for %v: %v", p.desc(), err)
+		p.t.Fatalf("Failed getting selected state at %v: %v", p.desc(), err)
 	}
 	return sel
 }
@@ -412,11 +417,11 @@ func (p *page) sendKeys(locs []loc, text string, clearFirst bool) {
 	el := p.getOrFail(locs)
 	if clearFirst {
 		if err := el.Clear(); err != nil {
-			p.t.Fatalf("Failed clearing %v for %v: %v", locs, p.desc(), err)
+			p.t.Fatalf("Failed clearing %v at %v: %v", locs, p.desc(), err)
 		}
 	}
 	if err := el.SendKeys(text); err != nil {
-		p.t.Fatalf("Failed sending keys to %v for %v: %v", locs, p.desc(), err)
+		p.t.Fatalf("Failed sending keys to %v at %v: %v", locs, p.desc(), err)
 	}
 }
 
@@ -433,7 +438,7 @@ func (p *page) emitKeyDown(key string, keyCode int, alt bool) {
 			"new KeyboardEvent('keydown', { key: '%s', keyCode: %d, altKey: %v }))",
 		key, keyCode, alt)
 	if _, err := p.wd.ExecuteScript(s, nil); err != nil {
-		p.t.Fatalf("Failed emitting %q key down event for %v: %v", key, p.desc(), err)
+		p.t.Fatalf("Failed emitting %q key down event at %v: %v", key, p.desc(), err)
 	}
 }
 
@@ -443,20 +448,20 @@ func (p *page) emitKeyDown(key string, keyCode int, alt bool) {
 func (p *page) clickSongRowCheckbox(locs []loc, idx int, key string) {
 	cb, err := p.getSongRow(locs, idx).FindElement(selenium.ByCSSSelector, "td:first-child input")
 	if err != nil {
-		p.t.Fatalf("Failed finding checkbox in song %d for %v: %v", idx, p.desc(), err)
+		p.t.Fatalf("Failed finding checkbox in song %d at %v: %v", idx, p.desc(), err)
 	}
 	if key != "" {
 		if err := p.wd.KeyDown(key); err != nil {
-			p.t.Fatalf("Failed pressing key before clicking checkbox %d for %v: %v", idx, p.desc(), err)
+			p.t.Fatalf("Failed pressing key before clicking checkbox %d at %v: %v", idx, p.desc(), err)
 		}
 		defer func() {
 			if err := p.wd.KeyUp(key); err != nil {
-				p.t.Fatalf("Failed releasing key after clicking checkbox %d for %v: %v", idx, p.desc(), err)
+				p.t.Fatalf("Failed releasing key after clicking checkbox %d at %v: %v", idx, p.desc(), err)
 			}
 		}()
 	}
 	if err := cb.Click(); err != nil {
-		p.t.Fatalf("Failed clicking checkbox %d for %v: %v", idx, p.desc(), err)
+		p.t.Fatalf("Failed clicking checkbox %d at %v: %v", idx, p.desc(), err)
 	}
 }
 
@@ -466,10 +471,10 @@ func (p *page) rightClickSongRow(locs []loc, idx int) {
 	// The documentation says "MoveTo moves the mouse to relative coordinates from center of
 	// element", but these coordinates seem to be relative to the element's upper-left corner.
 	if err := row.MoveTo(3, 3); err != nil {
-		p.t.Fatalf("Failed moving mouse to song for %v: %v", p.desc(), err)
+		p.t.Fatalf("Failed moving mouse to song at %v: %v", p.desc(), err)
 	}
 	if err := p.wd.Click(selenium.RightButton); err != nil {
-		p.t.Fatalf("Failed right-clicking on song for %v: %v", p.desc(), err)
+		p.t.Fatalf("Failed right-clicking on song at %v: %v", p.desc(), err)
 	}
 }
 
@@ -500,7 +505,7 @@ func (p *page) dragSongRow(locs []loc, srcIdx, dstIdx, dstOffsetY int) {
 	if _, err := p.wd.ExecuteScript(
 		"document.test.dragElement(arguments[0], arguments[1], 0, arguments[2])",
 		[]interface{}{src, dst, dstOffsetY}); err != nil {
-		p.t.Fatalf("Failed dragging song %v to %v for %v: %v", srcIdx, dstIdx, p.desc(), err)
+		p.t.Fatalf("Failed dragging song %v to %v at %v: %v", srcIdx, dstIdx, p.desc(), err)
 	}
 }
 
@@ -510,7 +515,7 @@ func (p *page) getSongRow(locs []loc, idx int) selenium.WebElement {
 	sel := fmt.Sprintf("tbody tr:nth-child(%d)", idx+1)
 	row, err := table.FindElement(selenium.ByCSSSelector, sel)
 	if err != nil {
-		p.t.Fatalf("Failed finding song %d (%q) for %v: %v", idx, sel, p.desc(), err)
+		p.t.Fatalf("Failed finding song %d (%q) at %v: %v", idx, sel, p.desc(), err)
 	}
 	return row
 }
@@ -533,7 +538,7 @@ func (p *page) checkText(locs []loc, wantRegexp string) {
 		}
 		return nil
 	}); err != nil {
-		p.t.Fatalf("Bad text in element for %v: %v", p.desc(), err)
+		p.t.Fatalf("Bad text in element at %v: %v", p.desc(), err)
 	}
 }
 
@@ -546,7 +551,7 @@ func (p *page) checkAttr(locs []loc, attr, want string) {
 		}
 		return nil
 	}); err != nil {
-		p.t.Fatalf("Bad %q attribute for %v: %v", attr, p.desc(), err)
+		p.t.Fatalf("Bad %q attribute at %v: %v", attr, p.desc(), err)
 	}
 }
 
@@ -556,13 +561,13 @@ func (p *page) checkDisplayed(locs []loc, want bool) {
 	el := p.getOrFail(locs)
 	if err := wait(func() error {
 		if got, err := el.IsDisplayed(); err != nil {
-			p.t.Fatalf("Failed getting displayed state for %v: %v", p.desc(), err)
+			p.t.Fatalf("Failed getting displayed state at %v: %v", p.desc(), err)
 		} else if got != want {
 			return fmt.Errorf("got %v; want %v", got, want)
 		}
 		return nil
 	}); err != nil {
-		p.t.Fatalf("Bad displayed state for %v: %v", p.desc(), err)
+		p.t.Fatalf("Bad displayed state at %v: %v", p.desc(), err)
 	}
 }
 
@@ -571,11 +576,11 @@ func (p *page) checkDisplayed(locs []loc, want bool) {
 func (p *page) checkCheckbox(locs []loc, state checkboxState) {
 	el := p.getOrFail(locs)
 	if got, want := p.getSelectedOrFail(el, false), state&checkboxChecked != 0; got != want {
-		p.t.Fatalf("Checkbox %v has checked state %v for %v; want %v", locs, got, p.desc(), want)
+		p.t.Fatalf("Checkbox %v has checked state %v at %v; want %v", locs, got, p.desc(), want)
 	}
 	class := p.getAttrOrFail(el, "class", false)
 	if got, want := strings.Contains(class, "transparent"), state&checkboxTransparent != 0; got != want {
-		p.t.Fatalf("Checkbox %v has transparent state %v for %v; want %v", locs, got, p.desc(), want)
+		p.t.Fatalf("Checkbox %v has transparent state %v at %v; want %v", locs, got, p.desc(), want)
 	}
 }
 
@@ -584,7 +589,7 @@ func (p *page) getSongsFromTable(table selenium.WebElement) []songInfo {
 	var songs []songInfo
 	rows, err := table.FindElements(selenium.ByTagName, "tr")
 	if err != nil {
-		p.t.Fatalf("Failed getting song rows for %v: %v", p.desc(), err)
+		p.t.Fatalf("Failed getting song rows at %v: %v", p.desc(), err)
 	}
 	if len(rows) == 0 {
 		return nil
@@ -594,7 +599,7 @@ func (p *page) getSongsFromTable(table selenium.WebElement) []songInfo {
 		if isStaleElementError(err) {
 			break // table was modified while we were reading it
 		} else if err != nil {
-			p.t.Fatalf("Failed getting song columns for %v: %v", p.desc(), err)
+			p.t.Fatalf("Failed getting song columns at %v: %v", p.desc(), err)
 		}
 		// Final column is time; first column may be checkbox.
 		song := songInfo{
@@ -616,7 +621,7 @@ func (p *page) getSongsFromTable(table selenium.WebElement) []songInfo {
 				checked := p.getSelectedOrFail(el, true)
 				song.checked = &checked
 			} else if !isStaleElementError(err) {
-				p.t.Fatalf("Failed getting checkbox for %v: %v", p.desc(), err)
+				p.t.Fatalf("Failed getting checkbox at %v: %v", p.desc(), err)
 			}
 		}
 		songs = append(songs, song)
@@ -643,7 +648,7 @@ func (p *page) checkSearchResults(songs []db.Song, checks ...songListCheck) {
 		return nil
 	}); err != nil {
 		got := p.getSongsFromTable(table)
-		msg := fmt.Sprintf("Bad search results for %v: %v\n", p.desc(), err.Error())
+		msg := fmt.Sprintf("Bad search results at %v: %v\n", p.desc(), err.Error())
 		msg += "Want:\n"
 		for _, s := range want {
 			msg += "  " + s.String() + "\n"
@@ -675,7 +680,7 @@ func (p *page) checkPlaylist(songs []db.Song, checks ...songListCheck) {
 		return nil
 	}); err != nil {
 		got := p.getSongsFromTable(table)
-		msg := fmt.Sprintf("Bad playlist for %v\n", p.desc())
+		msg := fmt.Sprintf("Bad playlist at %v\n", p.desc())
 		msg += "Want:\n"
 		for _, s := range want {
 			msg += "  " + s.String() + "\n"
@@ -702,7 +707,7 @@ func (p *page) checkPresentation(cur, next *db.Song) {
 
 	getSongs := func() (cur, next *songInfo) {
 		if d, err := p.getOrFail(currentArtistDiv).IsDisplayed(); err != nil {
-			p.t.Fatalf("Failed checking visibility of current artist for %v: %v", p.desc(), err)
+			p.t.Fatalf("Failed checking visibility of current artist at %v: %v", p.desc(), err)
 		} else if d {
 			cur = &songInfo{
 				artist: p.getTextOrFail(p.getOrFail(currentArtistDiv), false),
@@ -711,7 +716,7 @@ func (p *page) checkPresentation(cur, next *db.Song) {
 			}
 		}
 		if d, err := p.getOrFail(nextArtistDiv).IsDisplayed(); err != nil {
-			p.t.Fatalf("Failed checking visibility of next artist for %v: %v", p.desc(), err)
+			p.t.Fatalf("Failed checking visibility of next artist at %v: %v", p.desc(), err)
 		} else if d {
 			next = &songInfo{
 				artist: p.getTextOrFail(p.getOrFail(nextArtistDiv), false),
@@ -738,7 +743,7 @@ func (p *page) checkPresentation(cur, next *db.Song) {
 		return nil
 	}); err != nil {
 		curGot, nextGot := getSongs()
-		msg := fmt.Sprintf("Bad presentation songs for %v\n", p.desc())
+		msg := fmt.Sprintf("Bad presentation songs at %v\n", p.desc())
 		msg += "Want:\n"
 		msg += "  " + curWant.String() + "\n"
 		msg += "  " + nextWant.String() + "\n"
@@ -789,7 +794,7 @@ func (p *page) checkSong(s db.Song, checks ...songCheck) {
 		}
 		return nil
 	}); err != nil {
-		msg := fmt.Sprintf("Bad song for %v: %v\n", p.desc(), err)
+		msg := fmt.Sprintf("Bad song at %v: %v\n", p.desc(), err)
 		msg += "Want: " + want.String() + "\n"
 		msg += "Got:  " + got.String()
 		p.t.Fatal(msg)

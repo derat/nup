@@ -146,7 +146,7 @@ func (s *songInfo) String() string {
 		{"title", s.imgTitle},
 	} {
 		if f.val != nil {
-			str += fmt.Sprintf(" %s=%s", f.name, *f.val)
+			str += fmt.Sprintf(" %s=%q", f.name, *f.val)
 		}
 	}
 
@@ -348,7 +348,7 @@ func checkServerSong(t *testing.T, song db.Song, checks ...songCheck) {
 		}
 		return nil
 	}); err != nil {
-		msg := fmt.Sprintf("Bad server %q data for %v:\n", song.SHA1, test.Caller())
+		msg := fmt.Sprintf("Bad server %q data at %v:\n", song.SHA1, test.Caller())
 		msg += "  Want: " + want.String() + "\n"
 		msg += "  Got:  " + got.String() + "\n"
 		t.Fatal(msg)

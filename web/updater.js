@@ -103,11 +103,18 @@ export default class Updater {
   // leave them unchanged. Returns a promise that is resolved once the update
   // attempt is completed (possibly unsuccessfully).
   rateAndTag(songId, rating, tags) {
-    if (rating == null && tags == null) return Promise.resolve();
+    if (rating === null && tags === null) return Promise.resolve();
 
-    delete this.queuedRatingsAndTags_[songId];
+    // Handle the case where there's a queued rating and we're only updating
+    // tags, or queued tags and we're only updating the rating.
+    const queued = this.queuedRatingsAndTags_[songId];
+    if (queued) {
+      if (rating === null && queued.rating !== null) rating = queued.rating;
+      if (tags === null && queued.tags !== null) tags = queued.tags;
+      delete this.queuedRatingsAndTags_[songId];
+    }
 
-    if (this.inProgressRatingsAndTags_[songId] != null) {
+    if (this.inProgressRatingsAndTags_.hasOwnProperty(songId)) {
       addRatingAndTags(this.queuedRatingsAndTags_, songId, rating, tags);
       return Promise.resolve();
     }
@@ -116,8 +123,8 @@ export default class Updater {
     this.writeState_();
 
     let url = `rate_and_tag?songId=${encodeURIComponent(songId)}`;
-    if (rating != null) url += `&rating=${encodeURIComponent(rating)}`;
-    if (tags != null) url += `&tags=${encodeURIComponent(tags.join(' '))}`;
+    if (rating !== null) url += `&rating=${encodeURIComponent(rating)}`;
+    if (tags !== null) url += `&tags=${encodeURIComponent(tags.join(' '))}`;
     console.log(`Rating/tagging song: ${url}`);
 
     return fetch(url, { method: 'POST' })
@@ -130,7 +137,16 @@ export default class Updater {
       .catch((err) => {
         console.log(`Rating/tagging to ${url} failed: ${err}`);
         delete this.inProgressRatingsAndTags_[songId];
-        addRatingAndTags(this.queuedRatingsAndTags_, songId, rating, tags);
+
+        // If another update was queued in the meantime, don't overwrite it.
+        const queued = this.queuedRatingsAndTags_[songId];
+        if (queued) {
+          if (queued.rating === null && rating !== null) queued.rating = rating;
+          if (queued.tags === null && tags !== null) queued.tags = tags;
+        } else {
+          addRatingAndTags(this.queuedRatingsAndTags_, songId, rating, tags);
+        }
+
         this.writeState_();
         this.scheduleRetry_(false /* immediate */);
       });
@@ -234,7 +250,7 @@ function addPlayReport(list, songId, startTime) {
 // Removes the specified play report from |list|.
 function removePlayReport(list, songId, startTime) {
   for (let i = 0; i < list.length; i++) {
-    if (list[i].songId == songId && list[i].startTime == startTime) {
+    if (list[i].songId === songId && list[i].startTime === startTime) {
       list.splice(i, 1);
       return;
     }
