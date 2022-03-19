@@ -578,12 +578,13 @@ customElements.define(
       if (index < 0) index = 0;
       else if (index >= this.songs_.length) index = this.songs_.length - 1;
 
-      if (index == this.currentIndex_) return;
+      if (index === this.currentIndex_) return;
 
       this.playlistTable_.setRowActive(this.currentIndex_, false);
       this.playlistTable_.setRowActive(index, true);
       this.playlistTable_.scrollToRow(index);
       this.currentIndex_ = index;
+      this.audio_.src = null;
 
       this.updateSongDisplay_();
       this.updatePresentationLayerSongs_();

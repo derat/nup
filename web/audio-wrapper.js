@@ -188,8 +188,6 @@ customElements.define(
       return this.audio_.src;
     }
     set src(src) {
-      if (src === this.audio_.src) return;
-
       // Deal with "The AudioContext was not allowed to start. It must be
       // resumed (or created) after a user gesture on the page.":
       // https://developers.google.com/web/updates/2017/09/autoplay-policy-changes#webaudio
@@ -204,11 +202,13 @@ customElements.define(
         this.audio_.removeAttribute('src');
         this.audio_.parentNode.replaceChild(this.preloadAudio_, this.audio_);
         this.audio_ = this.preloadAudio_;
+        this.preloadAudio_ = null;
         this.configureAudio_(); // resets |audioSrc_|
       } else {
         this.audio_.src = src;
       }
 
+      this.currentTime = 0;
       this.lastUpdateTime_ = null;
       this.lastUpdatePos_ = 0;
       this.playtime_ = 0;
@@ -216,7 +216,6 @@ customElements.define(
       this.numErrors_ = 0;
 
       this.cancelPauseTimeout_();
-      this.preloadAudio_ = null;
     }
 
     // Sigh: https://github.com/prettier/prettier/issues/5287
