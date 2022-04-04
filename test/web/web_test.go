@@ -113,7 +113,7 @@ func runTests(m *testing.M) (res int, err error) {
 			Presets:        presets,
 		}
 		storageDir := filepath.Join(outDir, "app_storage")
-		appSrv, err := test.NewDevAppserver(0, storageDir, appLog, cfg)
+		appSrv, err := test.NewDevAppserver(cfg, storageDir, appLog)
 		if err != nil {
 			return -1, fmt.Errorf("dev_appserver: %v", err)
 		}

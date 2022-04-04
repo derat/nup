@@ -5,6 +5,7 @@
 package e2e
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net/url"
@@ -53,6 +54,9 @@ func TestMain(m *testing.M) {
 }
 
 func runTests(m *testing.M) (res int, err error) {
+	createIndexes := flag.Bool("create-indexes", false, "Update datastore indexes in index.yaml")
+	flag.Parse()
+
 	test.HandleSignals([]os.Signal{unix.SIGINT, unix.SIGTERM}, nil)
 
 	var keepOutDir bool
@@ -79,7 +83,7 @@ func runTests(m *testing.M) (res int, err error) {
 		CoverBucket:    coverBucket,
 	}
 	storageDir := filepath.Join(outDir, "app_storage")
-	srv, err := test.NewDevAppserver(0, storageDir, appLog, cfg)
+	srv, err := test.NewDevAppserver(cfg, storageDir, appLog, test.DevAppserverCreateIndexes(*createIndexes))
 	if err != nil {
 		return -1, fmt.Errorf("dev_appserver: %v", err)
 	}
@@ -309,37 +313,51 @@ func TestQueries(tt *testing.T) {
 	s10s.Album = "Two²"
 	t.PostSongs([]db.Song{s10s}, false, 0)
 
-	log.Print("Doing a bunch of queries")
 	for _, q := range []struct {
-		params []string
+		params string
 		exp    []db.Song
 	}{
-		{[]string{"artist=AROVANE"}, []db.Song{LegacySong1}},
-		{[]string{"title=thaem+nue"}, []db.Song{LegacySong1}},
-		{[]string{"album=ATOL+scrap"}, []db.Song{LegacySong1}},
-		{[]string{"albumId=1e477f68-c407-4eae-ad01-518528cedc2c"}, []db.Song{Song0s, Song1s}},
-		{[]string{"album=Another+Album", "albumId=a1d2405b-afe0-4e28-a935-b5b256f68131"}, []db.Song{Song5s}},
-		{[]string{"keywords=arovane+thaem+atol"}, []db.Song{LegacySong1}},
-		{[]string{"keywords=arovane+foo"}, []db.Song{}},
-		{[]string{"keywords=second+artist"}, []db.Song{Song1s}}, // track artist
-		{[]string{"keywords=remixer"}, []db.Song{Song1s}},       // album artist
-		{[]string{"minRating=1.0"}, []db.Song{}},
-		{[]string{"minRating=0.75"}, []db.Song{LegacySong1}},
-		{[]string{"minRating=0.5"}, []db.Song{LegacySong2, LegacySong1}},
-		{[]string{"minRating=0.0"}, []db.Song{LegacySong2, LegacySong1}},
-		{[]string{"unrated=1"}, []db.Song{Song5s, Song0s, Song1s, s10s}},
-		{[]string{"tags=instrumental"}, []db.Song{LegacySong2, LegacySong1}},
-		{[]string{"tags=electronic+instrumental"}, []db.Song{LegacySong1}},
-		{[]string{"tags=-electronic+instrumental"}, []db.Song{LegacySong2}},
-		{[]string{"tags=instrumental", "minRating=0.75"}, []db.Song{LegacySong1}},
-		{[]string{"firstTrack=1"}, []db.Song{LegacySong1, Song0s}},
-		{[]string{"artist=" + url.QueryEscape("µ-Ziq")}, []db.Song{s10s}}, // U+00B5 (MICRO SIGN)
-		{[]string{"artist=" + url.QueryEscape("μ-Ziq")}, []db.Song{s10s}}, // U+03BC (GREEK SMALL LETTER MU)
-		{[]string{"title=manana"}, []db.Song{s10s}},
-		{[]string{"title=" + url.QueryEscape("mánanä")}, []db.Song{s10s}},
-		{[]string{"album=two2"}, []db.Song{s10s}},
+		{"artist=AROVANE", []db.Song{LegacySong1}},
+		{"title=thaem+nue", []db.Song{LegacySong1}},
+		{"album=ATOL+scrap", []db.Song{LegacySong1}},
+		{"albumId=1e477f68-c407-4eae-ad01-518528cedc2c", []db.Song{Song0s, Song1s}},
+		{"album=Another+Album&albumId=a1d2405b-afe0-4e28-a935-b5b256f68131", []db.Song{Song5s}},
+		{"keywords=arovane+thaem+atol", []db.Song{LegacySong1}},
+		{"keywords=arovane+foo", []db.Song{}},
+		{"keywords=second+artist", []db.Song{Song1s}}, // track artist
+		{"keywords=remixer", []db.Song{Song1s}},       // album artist
+		{"minRating=1.0", []db.Song{}},
+		{"minRating=0.75", []db.Song{LegacySong1}},
+		{"minRating=0.5", []db.Song{LegacySong2, LegacySong1}},
+		{"minRating=0.0", []db.Song{LegacySong2, LegacySong1}},
+		{"unrated=1", []db.Song{Song5s, Song0s, Song1s, s10s}},
+		{"tags=instrumental", []db.Song{LegacySong2, LegacySong1}},
+		{"tags=electronic+instrumental", []db.Song{LegacySong1}},
+		{"tags=-electronic+instrumental", []db.Song{LegacySong2}},
+		{"tags=instrumental&minRating=0.75", []db.Song{LegacySong1}},
+		{"firstTrack=1", []db.Song{LegacySong1, Song0s}},
+		{"artist=" + url.QueryEscape("µ-Ziq"), []db.Song{s10s}}, // U+00B5 (MICRO SIGN)
+		{"artist=" + url.QueryEscape("μ-Ziq"), []db.Song{s10s}}, // U+03BC (GREEK SMALL LETTER MU)
+		{"title=manana", []db.Song{s10s}},
+		{"title=" + url.QueryEscape("mánanä"), []db.Song{s10s}},
+		{"album=two2", []db.Song{s10s}},
+		// Ensure that Datastore indexes exist to satisfy various queries.
+		{"tags=-bogus&minRating=1.0&shuffle=1&orderByLastPlayed=1", []db.Song{}},
+		{"tags=instrumental&minRating=0.75&shuffle=1&orderByLastPlayed=1", []db.Song{LegacySong1}},
+		{"tags=instrumental+-bogus&minRating=0.75&shuffle=1&orderByLastPlayed=1", []db.Song{LegacySong1}},
+		{"minRating=0.75&shuffle=1&orderByLastPlayed=1", []db.Song{LegacySong1}}, // old songs
+		{"minRating=0.75&maxPlays=1&shuffle=1", []db.Song{}},
+		{"tags=instrumental&minRating=0.75&shuffle=1&maxLastPlayed=1649256074", []db.Song{LegacySong1}},
+		{"tags=instrumental&minRating=0.75&shuffle=1&maxPlays=1", []db.Song{}},
+		{"firstTrack=1&minFirstPlayed=1276057170", []db.Song{LegacySong1}}, // new albums
+		{"keywords=arovane&minRating=0.75", []db.Song{LegacySong1}},
+		{"keywords=arovane&tags=instrumental&minRating=0.75&shuffle=1", []db.Song{LegacySong1}},
+		{"artist=arovane&firstTrack=1", []db.Song{LegacySong1}},
+		{"artist=arovane&minRating=0.75", []db.Song{LegacySong1}},
+		{"artist=arovane&minRating=0.75&maxPlays=1", []db.Song{}},
 	} {
-		if err := compareQueryResults(q.exp, t.QuerySongs(q.params...), test.CompareOrder); err != nil {
+		log.Printf("Doing query %q", q.params)
+		if err := compareQueryResults(q.exp, t.QuerySongs(q.params), test.CompareOrder); err != nil {
 			tt.Errorf("%v: %v", q.params, err)
 		}
 	}

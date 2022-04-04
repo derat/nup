@@ -76,7 +76,8 @@ func run() (int, error) {
 		CoverBaseURL:   fileSrv.URL + "/covers/",
 		Presets:        presets,
 	}
-	appSrv, err := test.NewDevAppserver(*port, filepath.Join(tmpDir, "app_storage"), appOut, cfg)
+	appSrv, err := test.NewDevAppserver(cfg, filepath.Join(tmpDir, "app_storage"), appOut,
+		test.DevAppserverPort(*port))
 	if err != nil {
 		return -1, fmt.Errorf("dev_appserver: %v", err)
 	}

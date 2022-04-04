@@ -24,18 +24,18 @@ const appserverTimeout = 15 * time.Second
 
 // DevAppserver wraps a dev_appserver.py process.
 type DevAppserver struct {
-	addr string    // address of app's HTTP server, e.g. "localhost:8080".
-	cmd  *exec.Cmd // dev_appserver.py process
+	appPort       int       // app's port for HTTP requests
+	cmd           *exec.Cmd // dev_appserver.py process
+	createIndexes bool      // update index.yaml
 }
 
 // NewDevAppserver starts a dev_appserver.py process using the supplied configuration.
 //
-// If appPort is 0 or negative, an unused port will be chosen.
 // storageDir is used to hold Datastore data and will be created if it doesn't exist.
 // dev_appserver.py's noisy output will be sent to out (which may be nil).
 // Close must be called later to kill the process.
-func NewDevAppserver(appPort int, storageDir string, out io.Writer,
-	cfg *config.Config) (*DevAppserver, error) {
+func NewDevAppserver(cfg *config.Config, storageDir string, out io.Writer,
+	opts ...DevAppserverOption) (*DevAppserver, error) {
 	libDir, err := CallerDir()
 	if err != nil {
 		return nil, err
@@ -48,24 +48,35 @@ func NewDevAppserver(appPort int, storageDir string, out io.Writer,
 		return nil, err
 	}
 
+	var srv DevAppserver
+	for _, o := range opts {
+		o(&srv)
+	}
+
 	// Prevent multiple instances from trying to bind to the same ports.
 	ports, err := FindUnusedPorts(2)
 	if err != nil {
 		return nil, err
 	}
-	if appPort <= 0 {
-		appPort = ports[0]
+	if srv.appPort <= 0 {
+		srv.appPort = ports[0]
 	}
 	adminPort := ports[1]
+
+	reqIndexes := "yes"
+	if srv.createIndexes {
+		reqIndexes = "no"
+	}
 
 	cmd := exec.Command(
 		"dev_appserver.py",
 		"--application", "nup-test",
-		"--port", strconv.Itoa(appPort),
+		"--port", strconv.Itoa(srv.appPort),
 		"--admin_port", strconv.Itoa(adminPort),
 		"--storage_path", storageDir,
 		"--env_var", "NUP_CONFIG="+string(cfgData),
 		"--datastore_consistency_policy", "consistent",
+		"--require_indexes="+reqIndexes,
 		// TODO: This is a hack to work around forceUpdateFailures in server/main.go.
 		"--max_module_instances", "1",
 		".")
@@ -76,15 +87,12 @@ func NewDevAppserver(appPort int, storageDir string, out io.Writer,
 		return nil, err
 	}
 
-	srv := &DevAppserver{
-		addr: net.JoinHostPort("localhost", strconv.Itoa(appPort)),
-		cmd:  cmd,
-	}
+	srv.cmd = cmd
 
 	// Wait for the server to accept connections.
 	start := time.Now()
 	for {
-		if conn, err := net.DialTimeout("tcp", srv.addr, time.Second); err == nil {
+		if conn, err := net.DialTimeout("tcp", srv.Addr(), time.Second); err == nil {
 			conn.Close()
 			break
 		} else if time.Now().Sub(start) > appserverTimeout {
@@ -109,7 +117,7 @@ func NewDevAppserver(appPort int, storageDir string, out io.Writer,
 	// though.
 	time.Sleep(3 * time.Second)
 
-	return srv, nil
+	return &srv, nil
 }
 
 // Close stops dev_appserver.py and cleans up its resources.
@@ -152,5 +160,26 @@ func (srv *DevAppserver) Close() error {
 
 // URL returns the app's slash-terminated URL.
 func (srv *DevAppserver) URL() string {
-	return fmt.Sprintf("http://%v/", srv.addr)
+	return fmt.Sprintf("http://%v/", srv.Addr())
+}
+
+// Addr returns the address of app's HTTP server, e.g. "localhost:8080".
+func (srv *DevAppserver) Addr() string {
+	return net.JoinHostPort("localhost", strconv.Itoa(srv.appPort))
+}
+
+// DevAppserverOption can be passed to NewDevAppserver to configure dev_appserver.py.
+type DevAppserverOption func(*DevAppserver)
+
+// DevAppserverPort sets the port that the app will listen on for HTTP requests.
+// If this option is not supplied, an arbitrary open port will be used.
+func DevAppserverPort(port int) DevAppserverOption {
+	return func(srv *DevAppserver) { srv.appPort = port }
+}
+
+// DevAppserverCreateIndexes specifies whether dev_appserver.py should automatically
+// create datastore indexes in index.yaml. By default, queries fail if they can not
+// be satisfied using the existing indexes.
+func DevAppserverCreateIndexes(create bool) DevAppserverOption {
+	return func(srv *DevAppserver) { srv.createIndexes = create }
 }
