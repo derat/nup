@@ -349,8 +349,11 @@ func TestQueries(tt *testing.T) {
 		{"minRating=0.75&maxPlays=1&shuffle=1", []db.Song{}},
 		{"tags=instrumental&minRating=0.75&shuffle=1&maxLastPlayed=1649256074", []db.Song{LegacySong1}},
 		{"tags=instrumental&minRating=0.75&shuffle=1&maxPlays=1", []db.Song{}},
+		{"tags=instrumental&maxLastPlayed=1649256074", []db.Song{LegacySong2, LegacySong1}},
 		{"firstTrack=1&minFirstPlayed=1276057170", []db.Song{LegacySong1}}, // new albums
 		{"keywords=arovane&minRating=0.75", []db.Song{LegacySong1}},
+		{"keywords=arovane&minRating=0.75&maxPlays=2", []db.Song{LegacySong1}},
+		{"keywords=arovane&firstTrack=1", []db.Song{LegacySong1}},
 		{"keywords=arovane&tags=instrumental&minRating=0.75&shuffle=1", []db.Song{LegacySong1}},
 		{"artist=arovane&firstTrack=1", []db.Song{LegacySong1}},
 		{"artist=arovane&minRating=0.75", []db.Song{LegacySong1}},
