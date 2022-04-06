@@ -273,6 +273,13 @@ func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info,
 		} else if aa != s.Artist {
 			s.AlbumArtist = aa
 		}
+
+		// Some old files might be missing the TPOS "part of set" frame.
+		// Assume that they're from a single-disc album in that case:
+		// https://github.com/derat/nup/issues/37
+		if s.Track > 0 && s.Disc == 0 {
+			s.Disc = 1
+		}
 	}
 
 	if repl, ok := artistRewrites[s.Artist]; ok {

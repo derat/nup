@@ -27,7 +27,7 @@ var Song0s = db.Song{
 	AlbumID:     "1e477f68-c407-4eae-ad01-518528cedc2c",
 	RecordingID: "392cea06-94c2-416b-80aa-f5b1e7d0fb1c",
 	Track:       1,
-	Disc:        0,
+	Disc:        1, // 0 in file, but automatically set to 1
 	Length:      0.026,
 	TrackGain:   TrackGain,
 	AlbumGain:   AlbumGain,
@@ -62,7 +62,7 @@ var Song1s = db.Song{
 	AlbumID:     "1e477f68-c407-4eae-ad01-518528cedc2c",
 	RecordingID: "5d7e41b2-ec4b-44dd-b25a-a576d7a08adb",
 	Track:       2,
-	Disc:        0,
+	Disc:        1, // 0 in file, but automatically set to 1
 	Length:      1.071,
 	TrackGain:   TrackGain,
 	AlbumGain:   AlbumGain,

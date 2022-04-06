@@ -48,10 +48,7 @@ type SongQuery struct {
 	MaxLastStartTime  time.Time // Song.LastStartTime
 
 	Track int64 // Song.Track
-	Disc  int64 // Song.Disc (may be 0 or 1 for single-disc albums)
-
-	MaxDisc    int64 // Song.Disc
-	HasMaxDisc bool  // MaxDisc is set
+	Disc  int64 // Song.Disc
 
 	Tags    []string // present in Song.Tags
 	NotTags []string // not present in Song.Tags
@@ -361,9 +358,6 @@ func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 	var qs []*datastore.Query
 	if query.HasMaxPlays {
 		qs = append(qs, bq.Filter("NumPlays <=", query.MaxPlays))
-	}
-	if query.HasMaxDisc {
-		qs = append(qs, bq.Filter("Disc <=", query.MaxDisc))
 	}
 	if !query.MinFirstStartTime.IsZero() {
 		qs = append(qs, bq.Filter("FirstStartTime >=", query.MinFirstStartTime))

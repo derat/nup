@@ -419,8 +419,7 @@ func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 
 	if r.FormValue("firstTrack") == "1" {
 		q.Track = 1
-		q.MaxDisc = 1 // also match tracks with an unset disc number
-		q.HasMaxDisc = true
+		q.Disc = 1
 	}
 
 	if len(r.FormValue("minRating")) > 0 {
