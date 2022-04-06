@@ -29,8 +29,10 @@ import (
 const (
 	albumIDTag          = "MusicBrainz Album Id" // usually used as cover ID
 	coverIDTag          = "nup Cover Id"         // can be set for non-MusicBrainz tracks
+	albumArtistTag      = "TPE2"                 // "Band/Orchestra/Accompaniment"
 	recordingIDOwner    = "http://musicbrainz.org"
-	albumArtistTag      = "TPE2"
+	nonAlbumTracksValue = "[non-album tracks]" // MusicBrainz/Picard album name
+
 	logProgressInterval = 100
 )
 
@@ -277,7 +279,7 @@ func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info,
 		// Some old files might be missing the TPOS "part of set" frame.
 		// Assume that they're from a single-disc album in that case:
 		// https://github.com/derat/nup/issues/37
-		if s.Track > 0 && s.Disc == 0 {
+		if s.Disc == 0 && s.Track > 0 && s.Album != nonAlbumTracksValue {
 			s.Disc = 1
 		}
 	}
