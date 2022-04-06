@@ -20,6 +20,9 @@ project=$(nup projectid)
 # suppressing output (which we don't want).
 gcloud beta app --project="$project" --quiet deploy "$@"
 
+# Also update datastore indexes.
+gcloud beta datastore --project="$project" --quiet indexes create index.yaml
+
 # Clean up stale versions of the app so they aren't sitting around.
 versions=$(
   gcloud app --project="$project" versions list |
