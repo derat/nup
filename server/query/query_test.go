@@ -6,6 +6,7 @@ package query
 import (
 	"math/rand"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/derat/nup/server/db"
@@ -46,5 +47,40 @@ func TestSpreadSongs(t *testing.T) {
 			t.Errorf("Album %q repeated for artist %q at %d", s.AlbumLower, s.ArtistLower, i)
 		}
 		lastArtistAlbum[s.ArtistLower] = s.AlbumLower
+	}
+}
+
+func TestSpreadSongs_AlbumArtist(t *testing.T) {
+	mk := func(artist, album, albumArtist string) *db.Song {
+		return &db.Song{
+			Artist:      artist,
+			Album:       album,
+			ArtistLower: strings.ToLower(artist),
+			AlbumLower:  strings.ToLower(album),
+			AlbumArtist: albumArtist,
+		}
+	}
+	songs := []*db.Song{
+		mk("Foo", "Album 1", ""),
+		mk("Foo feat. Bar", "Album 2", "Foo"),
+		mk("Foo", "Album 2", "Foo"),
+		mk("Foo feat. Baz", "Album 2", "Foo"),
+		mk("Foo feat. Someone", "Album 2", "Foo"),
+		mk("Foo", "Album 1", ""),
+	}
+	// Throw in enough songs by "Bar" that the songs by "Foo" and friends
+	// probably won't be adjacent if we properly group them together.
+	for i := 0; i < 20; i++ {
+		songs = append(songs, mk("Bar", "Album 3", ""))
+	}
+	spreadSongs(songs)
+
+	var last string
+	for i, s := range songs {
+		name := strings.Fields(s.Artist)[0]
+		if i > 0 && name == "Foo" && last == "Foo" {
+			t.Errorf("Song %d has artist %q; last was %q", i, s.Artist, songs[i-1].Artist)
+		}
+		last = name
 	}
 }

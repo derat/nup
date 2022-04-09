@@ -486,8 +486,16 @@ func spreadSongs(songs []*db.Song) {
 		sort.Slice(songs, func(i, j int) bool { return dists[songs[i]] < dists[songs[j]] })
 	}
 
-	shuf(songs, func(s *db.Song) string { return s.ArtistLower },
-		func(s *db.Song) string { return s.AlbumLower })
+	shuf(songs, func(s *db.Song) string {
+		// Try to group songs by by "Foo" and "Foo feat. Bar" together: if Artist is prefixed
+		// by AlbumArtist, just use the normalized (lowercased) version of AlbumArtist.
+		if s.AlbumArtist != "" && strings.HasPrefix(s.Artist, s.AlbumArtist) {
+			if n, err := db.Normalize(s.AlbumArtist); err == nil {
+				return n
+			}
+		}
+		return s.ArtistLower
+	}, func(s *db.Song) string { return s.AlbumLower })
 }
 
 // msecSince returns the number of elapsed milliseconds since t.
