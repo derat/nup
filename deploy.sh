@@ -6,7 +6,7 @@ Usage: deploy.sh [flags]... [gcloud args]...
 Deploy the App Engine app to GCP and delete old versions.
 
 Flags:
-  -i, --indexes    Deploy datastore indexes rather than app
+  -i, --indexes    Update Datastore indexes rather than deploying app
 EOF
   exit 2
 fi
@@ -14,7 +14,9 @@ fi
 project=$(nup projectid)
 
 if [ "$1" = '-i' ] || [ "$1" = '--indexes' ]; then
+  echo 'Creating new indexes...'
   gcloud beta datastore --project="$project" --quiet indexes create index.yaml
+  echo 'Deleting old indexes...'
   gcloud beta datastore --project="$project" --quiet indexes cleanup index.yaml
   exit 0
 fi
@@ -27,9 +29,11 @@ fi
 #
 # Surprisingly, --quiet only disables yes/no prompts (which we want) rather than
 # suppressing output (which we don't want).
+echo 'Deploying app...'
 gcloud beta app --project="$project" --quiet deploy "$@"
 
 # Clean up stale versions of the app so they aren't sitting around.
+echo 'Deleting old versions...'
 versions=$(
   gcloud app --project="$project" versions list |
     sed -nre 's/^default +([^ ]+) +0\.00 .*/\1/p'

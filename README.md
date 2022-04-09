@@ -165,6 +165,9 @@ long time](https://issuetracker.google.com/issues/35890923). [This Stack
 Overflow question](https://stackoverflow.com/q/2783082/6882947) has more
 discussion.
 
+After changes to [index.yaml](./index.yaml), run `deploy.sh --indexes` to create
+new Datastore indexes and delete old ones.
+
 You should also run `deploy.sh cron.yaml` once to deploy the daily
 stats-updating cron job described in [cron.yaml](./cron.yaml).
 
