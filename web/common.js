@@ -46,8 +46,14 @@ export function getCurrentTimeSec() {
   return new Date().getTime() / 1000.0;
 }
 
+// Sets |element|'s 'title' attribute to |text| if the row's content overflows
+// its area or removes it otherwise.
+//
+// Note that this can be slow, as accessing |scrollWidth| and |offsetWidth| may
+// trigger a reflow: https://stackoverflow.com/a/70871905/6882947
 export function updateTitleAttributeForTruncation(element, text) {
-  element.title = element.scrollWidth > element.offsetWidth ? text : '';
+  if (element.scrollWidth > element.offsetWidth) element.title = text;
+  else element.removeAttribute('title');
 }
 
 // Creates and returns a new |type| element. All other parameters are optional.

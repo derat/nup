@@ -101,6 +101,38 @@ suite('songTable', () => {
     }
   });
 
+  test('setSongs (title attributes)', () => {
+    const longSong = {
+      songId: 6,
+      artist:
+        'Very very long artist name, really far too long to fit in any reasonably-sized window',
+      title:
+        "This song also has a very long title, I can't believe it, can you, probably not",
+      album:
+        'Even the album name is too long, I kid you not. Why would someone do this?',
+      albumId: 'ai6',
+      length: 360,
+    };
+    table.setSongs([song1, longSong, song2]);
+
+    // Longs strings should be copied to the title attribute so they'll be
+    // displayed in tooltips, but short ones shouldn't.
+    const rowAttrs = Array.from(
+      table.shadowRoot.querySelectorAll('tbody tr')
+    ).map((tr) => [
+      tr.querySelector('td.artist').getAttribute('title'),
+      tr.querySelector('td.title').getAttribute('title'),
+      tr.querySelector('td.album').getAttribute('title'),
+    ]);
+    expectEq(rowAttrs, [
+      [null, null, null],
+      [longSong.artist, longSong.title, longSong.album],
+      [null, null, null],
+    ]);
+
+    console.log(JSON.stringify(rowAttrs));
+  });
+
   test('checkboxes', () => {
     // All of the rows should initially be unchecked.
     table.setAttribute('use-checkboxes', '');

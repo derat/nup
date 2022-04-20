@@ -377,7 +377,14 @@ customElements.define(
       // Update all of the rows in the middle to contain the correct data.
       for (let i = 0; i < numNewMiddleSongs; i++) {
         const index = startMatchLength + i;
-        this.updateSongRow_(index, newSongs[index]);
+        this.updateSongRow_(index, newSongs[index], true /* deferTitles */);
+      }
+      // Show or hide title attributes. Do this after updating all the rows so
+      // we trigger a single reflow instead of |numNewMiddleSongs|.
+      // TODO: Also update the attributes whenever the table is resized.
+      for (let i = 0; i < numNewMiddleSongs; i++) {
+        const index = startMatchLength + i;
+        this.updateSongRowTitleAttributes_(index);
       }
 
       if (this.useCheckboxes_) this.setAllCheckboxes(false);
@@ -439,8 +446,10 @@ customElements.define(
       this.table_.deleteRow(index + 1); // skip header
     }
 
-    // Updates |row| to display data about |song|. Also attaches |song|.
-    updateSongRow_(index, song) {
+    // Updates the row at |index| to display data about |song| and attaches
+    // |song| to the row. Also updates the row's title attributes (which can
+    // trigger a reflow) unless |deferTitles| is true.
+    updateSongRow_(index, song, deferTitles) {
       const row = this.songRows_[index];
       row.classList.remove('active');
 
@@ -449,14 +458,29 @@ customElements.define(
       // an option but seems like it may have performance concerns.)
       row.song = song;
 
-      const update = (cell, text, updateChild) => {
-        (updateChild ? cell.children[0] : cell).innerText = text;
-        updateTitleAttributeForTruncation(cell, text);
-      };
+      const update = (cell, text, textInChild) =>
+        ((textInChild ? cell.firstChild : cell).innerText = text);
       update(row.cells[1], song.artist, true);
       update(row.cells[2], song.title, false);
       update(row.cells[3], song.album, true);
       update(row.cells[4], formatTime(parseFloat(song.length)), false);
+
+      if (!deferTitles) this.updateSongRowTitleAttributes_(index);
+    }
+
+    // Adds or removes 'title' attributes from each of the specified row's cells
+    // depending on whether its text is elided or not.
+    updateSongRowTitleAttributes_(index) {
+      const update = (cell, textInChild) =>
+        updateTitleAttributeForTruncation(
+          cell,
+          (textInChild ? cell.firstChild : cell).innerText
+        );
+      const row = this.songRows_[index];
+      update(row.cells[1], true);
+      update(row.cells[2], false);
+      update(row.cells[3], true);
+      // The time shouldn't overflow.
     }
 
     // Handles one of the checkboxes being clicked.
