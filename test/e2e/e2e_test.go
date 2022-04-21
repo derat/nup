@@ -335,6 +335,8 @@ func TestQueries(tt *testing.T) {
 		{"tags=electronic+instrumental", []db.Song{LegacySong1}},
 		{"tags=-electronic+instrumental", []db.Song{LegacySong2}},
 		{"tags=instrumental&minRating=0.75", []db.Song{LegacySong1}},
+		{"tags=instrumental&minRating=0.75&maxPlays=1", []db.Song{}},
+		{"tags=instrumental&minRating=0.75&maxPlays=2", []db.Song{LegacySong1}},
 		{"firstTrack=1", []db.Song{LegacySong1, Song0s}},
 		{"artist=" + url.QueryEscape("µ-Ziq"), []db.Song{s10s}}, // U+00B5 (MICRO SIGN)
 		{"artist=" + url.QueryEscape("μ-Ziq"), []db.Song{s10s}}, // U+03BC (GREEK SMALL LETTER MU)
@@ -351,8 +353,9 @@ func TestQueries(tt *testing.T) {
 		{"tags=instrumental&minRating=0.75&shuffle=1&maxPlays=1", []db.Song{}},
 		{"tags=instrumental&maxLastPlayed=1649256074", []db.Song{LegacySong2, LegacySong1}},
 		{"firstTrack=1&minFirstPlayed=1276057170", []db.Song{LegacySong1}}, // new albums
+		{"firstTrack=1&minFirstPlayed=1276057170&maxPlays=1", []db.Song{}},
 		{"keywords=arovane&minRating=0.75", []db.Song{LegacySong1}},
-		{"keywords=arovane&minRating=0.75&maxPlays=2", []db.Song{LegacySong1}},
+		{"keywords=arovane&minRating=0.75&maxPlays=1", []db.Song{}},
 		{"keywords=arovane&firstTrack=1", []db.Song{LegacySong1}},
 		{"keywords=arovane&tags=instrumental&minRating=0.75&shuffle=1", []db.Song{LegacySong1}},
 		{"artist=arovane&firstTrack=1", []db.Song{LegacySong1}},
