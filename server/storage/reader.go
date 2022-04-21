@@ -6,6 +6,7 @@ package storage
 import (
 	"context"
 	"io"
+	"os"
 	"time"
 
 	"google.golang.org/appengine/v2/log"
@@ -37,6 +38,9 @@ func NewObjectReader(ctx context.Context, bucket, name string) (*ObjectReader, e
 	attrs, err := handle.Attrs(ctx)
 	if err != nil {
 		client.Close()
+		if err == storage.ErrObjectNotExist {
+			return nil, os.ErrNotExist
+		}
 		return nil, err
 	}
 	log.Debugf(ctx, "Creating reader for %v:%v with size %d", bucket, name, attrs.Size)

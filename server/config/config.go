@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"net/http"
 	"os"
 
@@ -21,8 +20,6 @@ import (
 const (
 	DatastoreKind    = "Config"
 	DatastoreKeyName = "active"
-
-	configPath = "config.json" // server config file relative to base dir
 )
 
 // SavedConfig is used to store a JSON-marshaled Config in Datastore.
@@ -133,11 +130,6 @@ func LoadConfig(ctx context.Context) (*Config, error) {
 	b, err := func() ([]byte, error) {
 		// Tests can override the config file via a NUP_CONFIG environment variable.
 		if b := []byte(os.Getenv("NUP_CONFIG")); len(b) != 0 {
-			return b, nil
-		}
-		// Support reading a config file that was uploaded alongside the app.
-		// TODO: Consider removing this.
-		if b, err := ioutil.ReadFile(configPath); err == nil {
 			return b, nil
 		}
 		// Try to get the JSON data from Datastore by default.

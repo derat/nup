@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -22,7 +23,8 @@ import (
 
 const maxFileRangeSize = maxResponseSize - 32*1024 // save space for headers
 
-// openSong opens the song at fn.
+// openSong opens the song at fn (using either Cloud Storage or HTTP).
+// os.ErrNotExist is returned if the file is not present.
 func openSong(ctx context.Context, cfg *config.Config, fn string) (io.ReadCloser, error) {
 	if cfg.SongBucket != "" {
 		return storage.NewObjectReader(ctx, cfg.SongBucket, fn)
@@ -31,6 +33,12 @@ func openSong(ctx context.Context, cfg *config.Config, fn string) (io.ReadCloser
 		log.Debugf(ctx, "Opening %v", u)
 		if resp, err := http.Get(u); err != nil {
 			return nil, err
+		} else if resp.StatusCode >= 300 {
+			resp.Body.Close()
+			if resp.StatusCode == 404 {
+				return nil, os.ErrNotExist
+			}
+			return nil, fmt.Errorf("server replied with %q", resp.Status)
 		} else {
 			return resp.Body, nil
 		}

@@ -15,6 +15,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -58,6 +59,7 @@ func cacheKey(fn string, size int) string {
 // size, and writes it in JPEG format to w. If size is zero or negative, the
 // original (possibly non-square) cover data is written.
 // The bucket and baseURL args correspond to CoverBucket and CoverBaseURL in ServerConfig.
+// os.ErrNotExist is replied if the specified file does not exist.
 func Scale(ctx context.Context, bucket, baseURL, fn string,
 	size, quality int, w io.Writer) error {
 	var data []byte
@@ -132,8 +134,7 @@ func Scale(ctx context.Context, bucket, baseURL, fn string,
 	return nil
 }
 
-// load loads and returns the cover image with the supplied original
-// filename (see Song.CoverFilename).
+// load loads and returns the cover image with the supplied original filename (see Song.CoverFilename).
 func load(ctx context.Context, bucket, baseURL, fn string) ([]byte, error) {
 	var r io.ReadCloser
 	if bucket != "" {
@@ -158,7 +159,9 @@ func load(ctx context.Context, bucket, baseURL, fn string) ([]byte, error) {
 			return nil, err
 		}
 		log.Debugf(ctx, "Opening object %q from bucket %q", fn, bucket)
-		if r, err = client.Bucket(bucket).Object(fn).NewReader(ctx); err != nil {
+		if r, err = client.Bucket(bucket).Object(fn).NewReader(ctx); err == storage.ErrObjectNotExist {
+			return nil, os.ErrNotExist
+		} else if err != nil {
 			return nil, err
 		}
 	} else if baseURL != "" {
@@ -167,6 +170,12 @@ func load(ctx context.Context, bucket, baseURL, fn string) ([]byte, error) {
 		resp, err := http.Get(url)
 		if err != nil {
 			return nil, err
+		} else if resp.StatusCode >= 300 {
+			resp.Body.Close()
+			if resp.StatusCode == 404 {
+				return nil, os.ErrNotExist
+			}
+			return nil, fmt.Errorf("server replied with %q", resp.Status)
 		}
 		r = resp.Body
 	} else {

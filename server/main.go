@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"math/rand"
 	"net"
@@ -155,10 +156,13 @@ func handleCover(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 
 	addLongCacheHeaders(w)
 	w.Header().Set("Content-Type", "image/jpeg")
-	if err := cover.Scale(ctx, cfg.CoverBucket, cfg.CoverBaseURL, fn,
-		int(size), coverJPEGQuality, w); err != nil {
+	if err := cover.Scale(ctx, cfg.CoverBucket, cfg.CoverBaseURL, fn, int(size), coverJPEGQuality, w); err != nil {
 		log.Errorf(ctx, "Scaling cover %q failed: %v", fn, err)
-		http.Error(w, "Scaling failed", http.StatusInternalServerError)
+		if os.IsNotExist(err) {
+			http.Error(w, "Not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "Scaling failed", http.StatusInternalServerError)
+		}
 		return
 	}
 }
@@ -587,8 +591,11 @@ func handleSong(ctx context.Context, cfg *config.Config, w http.ResponseWriter, 
 	r, err := openSong(ctx, cfg, fn)
 	if err != nil {
 		log.Errorf(ctx, "Opening song %q failed: %v", fn, err)
-		// TODO: It'd be better to report 404 when appropriate.
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if os.IsNotExist(err) {
+			http.Error(w, "Not found", http.StatusNotFound)
+		} else {
+			http.Error(w, fmt.Sprintf("Failed opening song: %v", err), http.StatusInternalServerError)
+		}
 		return
 	}
 	defer r.Close()
