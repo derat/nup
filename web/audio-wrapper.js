@@ -11,8 +11,8 @@ const template = createTemplate(`
 
 // <audio-wrapper> wraps the <audio> element to hide some of its complexity.
 //
-// It transparently forwards a subset of <audio>'s properties, events and
-// methods (but no HTML attributes), with the following changes:
+// It transparently forwards a subset of <audio>'s properties, events, and
+// methods (but not HTML attributes), with the following changes:
 //
 // - |gain| can be set to adjust the audio's gain. Valid values must be greater
 //   than 0, but can also exceed 1 to amplify the signal (unlike |volume|).
@@ -24,6 +24,25 @@ const template = createTemplate(`
 // - After errors, playback is retried several times before an 'error' event is
 //   emitted. The <audio> element is paused while offline and automatically
 //   resumed if the network connection comes back soon afterward.
+//
+// Just to document it somewhere, the way that Chrome requests media files over
+// HTTP seems pretty annoying and wasteful, resulting in the server reading and
+// sending the same bytes multiple times.
+//
+// For example, I saw Chrome 100.0.4896.93 do the following when requesting a
+// 4434715-byte file:
+// - Request "bytes=0-", get a 206, and drop the connection.
+// - Request "bytes=3276800-" 55 seconds later to get the rest.
+//
+// For a 8435194-byte file:
+// - Request "bytes=0-" but drop the connection.
+// - Request "bytes=3276800-3806618" 55 seconds later and get a 304 response.
+// - Request "bytes=3806619-8435193" 130 milliseconds later to get the rest.
+//
+// I think I've occasionally seen Chrome get the whole file in a single request,
+// but it's rare. https://support.google.com/chrome/thread/25510119 complains
+// about this too. I didn't find any Chromium issues discussing this when I
+// looked in April 2022.
 customElements.define(
   'audio-wrapper',
   class extends HTMLElement {
@@ -255,6 +274,10 @@ customElements.define(
       this.gain_ = v;
     }
 
+    // TODO: Maybe try to implement proper gapless playback?
+    // http://dalecurtis.github.io/llama-demo/index.html provides some guidance
+    // about doing this using MSE, although it seems pretty complicated and the
+    // current approach here seems to work reasonably well most of the time.
     get preloadSrc() {
       return this.preloadAudio_ ? this.preloadAudio_.src : null;
     }
