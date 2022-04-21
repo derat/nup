@@ -273,12 +273,17 @@ customElements.define(
       return this.hasAttribute('use-checkboxes');
     }
 
+    // |songRows_| is efficient, but it's regrettably an HTMLCollection.
     get songRows_() {
-      return [].slice.call(this.table_.rows, 1); // exclude header
+      return this.table_.tBodies[0].rows;
+    }
+    // |songRowsArray_| is convenient (map, indexOf, etc.) but slow.
+    get songRowsArray_() {
+      return [...this.songRows_];
     }
 
     get songs() {
-      return this.songRows_.map((r) => r.song); // shallow copy
+      return this.songRowsArray_.map((r) => r.song); // shallow copy
     }
     get numSongs() {
       return this.songRows_.length;
@@ -290,7 +295,7 @@ customElements.define(
     get checkedSongs() {
       return !this.useCheckboxes_
         ? []
-        : this.songRows_
+        : this.songRowsArray_
             .filter((r) => r.cells[0].children[0].checked)
             .map((r) => r.song);
     }
@@ -424,7 +429,7 @@ customElements.define(
       row.addEventListener('contextmenu', (e) => {
         this.emitEvent_('menu', {
           songId: row.song.songId,
-          index: this.songRows_.indexOf(row), // don't use orig (stale) index
+          index: this.songRowsArray_.indexOf(row), // don't use orig (stale) index
           orig: e, // PointerEvent
         });
       });
@@ -432,7 +437,8 @@ customElements.define(
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setDragImage(this.dragImage_, 0, 0);
         row.classList.add('dragged');
-        this.dragFromIndex_ = this.dragToIndex_ = this.songRows_.indexOf(row);
+        this.dragFromIndex_ = this.dragToIndex_ =
+          this.songRowsArray_.indexOf(row);
         this.dragListRect_ = this.table_
           .querySelector('tbody')
           .getBoundingClientRect();
