@@ -46,13 +46,17 @@ func openSong(ctx context.Context, cfg *config.Config, fn string) (io.ReadCloser
 	return nil, errors.New("neither SongBucket nor SongBaseURL is set")
 }
 
-// sendObject copies data from r to w, handling range requests and setting any necesarry headers.
-// If the request can't be satisfied writes an HTTP error to w.
+// sendObject copies data from r to w, handling range requests and setting any necessary headers.
+// If the request can't be satisfied, writes an HTTP error to w.
 func sendObject(ctx context.Context, req *http.Request, w http.ResponseWriter, r *storage.ObjectReader) error {
 	// If the file fits within App Engine's limit, just use http.ServeContent,
 	// which handles range requests and last-modified/conditional stuff.
 	if r.Size <= maxFileRangeSize {
-		log.Debugf(ctx, "Sending file of size %d", r.Size)
+		var rng string
+		if v := req.Header.Get("Range"); v != "" {
+			rng = " (" + v + ")"
+		}
+		log.Debugf(ctx, "Sending file of size %d%v", r.Size, rng)
 		http.ServeContent(w, req, filepath.Base(r.Name()), r.LastMod, r)
 		return nil
 	}

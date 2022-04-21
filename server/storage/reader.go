@@ -58,12 +58,14 @@ func (or *ObjectReader) Name() string {
 }
 
 func (or *ObjectReader) Close() error {
-	// TODO: Report errors, maybe.
+	var err error
 	if or.r != nil {
-		or.r.Close()
+		err = or.r.Close()
 	}
-	or.cl.Close()
-	return nil
+	if cerr := or.cl.Close(); err == nil {
+		err = cerr
+	}
+	return err
 }
 
 func (or *ObjectReader) Read(buf []byte) (int, error) {
