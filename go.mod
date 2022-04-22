@@ -14,5 +14,5 @@ require (
 	golang.org/x/sys v0.0.0-20200223170610-d5e6a3e2c0ae
 	golang.org/x/text v0.3.2
 	google.golang.org/api v0.18.0
-	google.golang.org/appengine/v2 v2.0.1
+	google.golang.org/appengine/v2 v2.0.2-0.20211230222314-e0054249252f
 )
