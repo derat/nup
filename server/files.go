@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/derat/nup/server/config"
@@ -21,14 +23,110 @@ import (
 	"google.golang.org/appengine/v2/log"
 )
 
-const maxFileRangeSize = maxResponseSize - 32*1024 // save space for headers
+const (
+	// openSong saves song data in-memory if it's this many bytes or smaller.
+	// Per https://cloud.google.com/appengine/docs/standard, F1 second-gen
+	// runtimes have a 256 MB memory limit.
+	maxSongMemSize = 32 * 1024 * 1024
+
+	// Maximum range request size to service in a single response.
+	// Per https://cloud.google.com/appengine/docs/standard/go/how-requests-are-handled,
+	// App Engine permits 32 MB responses, but we need to reserve a bit of extra space
+	// to make sure we don't go over the limit with headers.
+	maxFileRangeSize = 32*1024*1024 - 32*1024
+)
+
+var (
+	// These correspond to the Cloud Storage object that was last accessed via openSong.
+	// Chrome can send multiple requests for a single file, so holding song data in memory lets us
+	// avoid reading the same bytes from GCS multiple times. Returning stale objects hopefully isn't
+	// a concern, since clients will probably already have a bad time if a song changes while
+	// they're in the process of playing it.
+	lastSongName    string     // name of object in lastSongData
+	lastSongData    []byte     // contents of last object from openSong
+	lastSongModTime time.Time  // object's last-modified time
+	lastSongMutex   sync.Mutex // guards other lastSong variables
+)
+
+// getSongData atomically returns lastSongData and lastSongModTime if lastSongName matches name.
+// nil and a zero time are returned if the names don't match.
+func getSongData(name string) ([]byte, time.Time) {
+	lastSongMutex.Lock()
+	defer lastSongMutex.Unlock()
+	if name == lastSongName {
+		return lastSongData, lastSongModTime
+	}
+	return nil, time.Time{}
+}
+
+// setSongData atomically updates lastSongName, lastSongData, and lastSongModTime.
+func setSongData(name string, data []byte, lastMod time.Time) {
+	lastSongMutex.Lock()
+	lastSongName = name
+	lastSongData = data
+	lastSongModTime = lastMod
+	lastSongMutex.Unlock()
+}
+
+// songReader implements io.ReadSeekCloser along with methods needed by sendSong.
+type songReader interface {
+	Read(b []byte) (n int, err error)
+	Seek(offset int64, whence int) (int64, error)
+	Close() error
+	Name() string
+	LastMod() time.Time
+	Size() int64
+}
+
+// byteSongReader implements songReader for a byte slice.
+type bytesSongReader struct {
+	r       *bytes.Reader
+	name    string
+	lastMod time.Time
+}
+
+func newBytesSongReader(b []byte, name string, lastMod time.Time) *bytesSongReader {
+	return &bytesSongReader{bytes.NewReader(b), name, lastMod}
+}
+func (br *bytesSongReader) Read(b []byte) (int, error) { return br.r.Read(b) }
+func (br *bytesSongReader) Seek(offset int64, whence int) (int64, error) {
+	return br.r.Seek(offset, whence)
+}
+func (br *bytesSongReader) Close() error       { return nil }
+func (br *bytesSongReader) Name() string       { return br.name }
+func (br *bytesSongReader) LastMod() time.Time { return br.lastMod }
+func (br *bytesSongReader) Size() int64        { return br.r.Size() }
+
+var _ songReader = (*bytesSongReader)(nil) // verify that interface is implemented
 
 // openSong opens the song at fn (using either Cloud Storage or HTTP).
+// The returned reader will also implement songReader when reading from Cloud Storage
+// or serving an in-memory song that was previously read from Cloud Storage.
 // os.ErrNotExist is returned if the file is not present.
 func openSong(ctx context.Context, cfg *config.Config, fn string) (io.ReadCloser, error) {
-	if cfg.SongBucket != "" {
-		return storage.NewObjectReader(ctx, cfg.SongBucket, fn)
-	} else if cfg.SongBaseURL != "" {
+	switch {
+	case cfg.SongBucket != "":
+		// If we already have the song in memory, return it.
+		if b, t := getSongData(fn); b != nil {
+			log.Debugf(ctx, "Using in-memory copy of %q", fn)
+			return newBytesSongReader(b, fn, t), nil
+		}
+		or, err := storage.NewObjectReader(ctx, cfg.SongBucket, fn)
+		if err != nil {
+			return nil, err
+		} else if or.Size() > maxSongMemSize {
+			return or, nil // too big to load into memory
+		}
+		log.Debugf(ctx, "Reading %q into memory", fn)
+		defer or.Close()
+		setSongData("", nil, time.Time{}) // clear old buffer
+		b := make([]byte, or.Size())
+		if _, err := io.ReadFull(or, b); err != nil {
+			return nil, err
+		}
+		setSongData(fn, b, or.LastMod())
+		return newBytesSongReader(b, fn, or.LastMod()), nil
+	case cfg.SongBaseURL != "":
 		u := cfg.SongBaseURL + fn
 		log.Debugf(ctx, "Opening %v", u)
 		if resp, err := http.Get(u); err != nil {
@@ -42,22 +140,24 @@ func openSong(ctx context.Context, cfg *config.Config, fn string) (io.ReadCloser
 		} else {
 			return resp.Body, nil
 		}
+	default:
+		return nil, errors.New("neither SongBucket nor SongBaseURL is set")
 	}
-	return nil, errors.New("neither SongBucket nor SongBaseURL is set")
 }
 
-// sendObject copies data from r to w, handling range requests and setting any necessary headers.
+// sendSong copies data from r to w, handling range requests and setting any necessary headers.
 // If the request can't be satisfied, writes an HTTP error to w.
-func sendObject(ctx context.Context, req *http.Request, w http.ResponseWriter, r *storage.ObjectReader) error {
+func sendSong(ctx context.Context, req *http.Request, w http.ResponseWriter, r songReader) error {
 	// If the file fits within App Engine's limit, just use http.ServeContent,
 	// which handles range requests and last-modified/conditional stuff.
-	if r.Size <= maxFileRangeSize {
+	size := r.Size()
+	if size <= maxFileRangeSize {
 		var rng string
 		if v := req.Header.Get("Range"); v != "" {
 			rng = " (" + v + ")"
 		}
-		log.Debugf(ctx, "Sending file of size %d%v", r.Size, rng)
-		http.ServeContent(w, req, filepath.Base(r.Name()), r.LastMod, r)
+		log.Debugf(ctx, "Sending file of size %d%v", size, rng)
+		http.ServeContent(w, req, filepath.Base(r.Name()), r.LastMod(), r)
 		return nil
 	}
 
@@ -72,22 +172,22 @@ func sendObject(ctx context.Context, req *http.Request, w http.ResponseWriter, r
 	// Parse the Range header if one was supplied.
 	rng := req.Header.Get("Range")
 	start, end, ok := parseRangeHeader(rng)
-	if !ok || start >= r.Size {
+	if !ok || start >= size {
 		// Fall back to using ServeContent for non-trivial requests. We may hit the 32 MB limit here.
-		log.Debugf(ctx, "Unable to handle range %q for file of size %d", rng, r.Size)
-		http.ServeContent(w, req, filepath.Base(r.Name()), r.LastMod, r)
+		log.Debugf(ctx, "Unable to handle range %q for file of size %d", rng, size)
+		http.ServeContent(w, req, filepath.Base(r.Name()), r.LastMod(), r)
 		return nil
 	}
 
 	// Rewrite open-ended requests.
 	if end == -1 {
-		end = r.Size - 1
+		end = size - 1
 	}
 	// If the requested range is too large, limit it to the max response size.
 	if end-start+1 > maxFileRangeSize {
 		end = start + maxFileRangeSize - 1
 	}
-	log.Debugf(ctx, "Sending bytes %d-%d/%d for requested range %q", start, end, r.Size, rng)
+	log.Debugf(ctx, "Sending bytes %d-%d/%d for requested range %q", start, end, size, rng)
 
 	if _, err := r.Seek(start, 0); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -95,9 +195,9 @@ func sendObject(ctx context.Context, req *http.Request, w http.ResponseWriter, r
 	}
 
 	w.Header().Set("Accept-Ranges", "bytes")
-	w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, r.Size))
+	w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, size))
 	w.Header().Set("Content-Type", "audio/mpeg")
-	w.Header().Set("Last-Modified", r.LastMod.UTC().Format(time.RFC1123))
+	w.Header().Set("Last-Modified", r.LastMod().UTC().Format(time.RFC1123))
 	w.WriteHeader(http.StatusPartialContent)
 
 	_, err := io.CopyN(w, r, end-start+1)

@@ -18,10 +18,6 @@ import (
 	"google.golang.org/appengine/v2/user"
 )
 
-// Maximum response size permitted by App Engine:
-// https://cloud.google.com/appengine/docs/standard/go111/how-requests-are-handled
-const maxResponseSize = 32 * 1024 * 1024
-
 var loadedCfg *config.Config  // previously-loaded config
 var loadedCfgMutex sync.Mutex // guards loadedCfg
 

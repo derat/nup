@@ -16,17 +16,13 @@ import (
 
 // ObjectReader implements io.ReadCloser and io.ReadSeeker for reading a Cloud Storage object.
 type ObjectReader struct {
-	ctx context.Context
-	cl  *storage.Client
-	obj *storage.ObjectHandle
-	r   *storage.Reader
-	pos int64
-
-	// Size is the object's full size in bytes.
-	Size int64
-
-	// LastMod is the object's last-modified time.
-	LastMod time.Time
+	ctx     context.Context
+	cl      *storage.Client
+	obj     *storage.ObjectHandle
+	r       *storage.Reader
+	pos     int64
+	size    int64
+	lastMod time.Time
 }
 
 func NewObjectReader(ctx context.Context, bucket, name string) (*ObjectReader, error) {
@@ -43,19 +39,26 @@ func NewObjectReader(ctx context.Context, bucket, name string) (*ObjectReader, e
 		}
 		return nil, err
 	}
-	log.Debugf(ctx, "Creating reader for %v:%v with size %d", bucket, name, attrs.Size)
+	log.Debugf(ctx, "Creating reader for %q in %v with size %d", name, bucket, attrs.Size)
 	return &ObjectReader{
 		ctx:     ctx,
 		cl:      client,
 		obj:     handle,
-		Size:    attrs.Size,
-		LastMod: attrs.Updated,
+		size:    attrs.Size,
+		lastMod: attrs.Updated,
 	}, nil
 }
 
+// Name returns the object's name within its bucket.
 func (or *ObjectReader) Name() string {
 	return or.obj.ObjectName()
 }
+
+// Size returns the object's full size in bytes.
+func (or *ObjectReader) Size() int64 { return or.size }
+
+// LastMod returns the object's last-modified time.
+func (or *ObjectReader) LastMod() time.Time { return or.lastMod }
 
 func (or *ObjectReader) Close() error {
 	var err error
@@ -89,7 +92,7 @@ func (or *ObjectReader) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekCurrent:
 		or.pos += offset
 	case io.SeekEnd:
-		or.pos = or.Size + offset
+		or.pos = or.size + offset
 	}
 	if or.r != nil {
 		or.r.Close()

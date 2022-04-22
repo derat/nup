@@ -26,7 +26,6 @@ import (
 	"github.com/derat/nup/server/dump"
 	"github.com/derat/nup/server/query"
 	"github.com/derat/nup/server/stats"
-	"github.com/derat/nup/server/storage"
 	"github.com/derat/nup/server/update"
 
 	"google.golang.org/appengine/v2"
@@ -602,9 +601,9 @@ func handleSong(ctx context.Context, cfg *config.Config, w http.ResponseWriter, 
 
 	addLongCacheHeaders(w)
 
-	if or, ok := r.(*storage.ObjectReader); ok {
-		if err := sendObject(ctx, req, w, or); err != nil {
-			log.Errorf(ctx, "Copying song %q failed: %v", fn, err)
+	if sr, ok := r.(songReader); ok {
+		if err := sendSong(ctx, req, w, sr); err != nil {
+			log.Errorf(ctx, "Sending song %q failed: %v", fn, err)
 		}
 	} else {
 		// Just send a 200 with the whole file if we're getting it over HTTP rather than from GCS.
@@ -612,7 +611,7 @@ func handleSong(ctx context.Context, cfg *config.Config, w http.ResponseWriter, 
 		w.Header().Set("Content-Type", "audio/mpeg")
 		if _, err := io.Copy(w, r); err != nil {
 			// Too late to report an HTTP error.
-			log.Errorf(ctx, "Copying song %q failed: %v", fn, err)
+			log.Errorf(ctx, "Sending song %q failed: %v", fn, err)
 		}
 	}
 }
