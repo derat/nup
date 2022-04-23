@@ -33,6 +33,7 @@ type Command struct {
 	importUserData   bool   // replace user data when using importJSONFile
 	limit            int    // maximum number of songs to update
 	mergeSongIDs     string // IDs of songs to merge, as "from:to"
+	printCoverID     string // path to song file whose cover ID should be printed
 	reindexSongs     bool   // ask the server to reindex all songs
 	requireCovers    bool   // die if cover images are missing
 	songPathsFile    string // path to list of songs to force updating
@@ -64,21 +65,22 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 		"If positive, limits the number of songs to update (for testing)")
 	f.StringVar(&cmd.mergeSongIDs, "merge-songs", "",
 		`Merge one song's user data into another song, with IDs as "src:dst"`)
+	f.StringVar(&cmd.printCoverID, "print-cover-id", "", `Print cover ID for specified song file`)
 	f.BoolVar(&cmd.reindexSongs, "reindex-songs", false,
 		"Ask server to reindex all songs' search-related fields (not typically neaded)")
 	f.BoolVar(&cmd.requireCovers, "require-covers", false,
 		"Die if cover images aren't found for any songs that have album IDs")
 	f.StringVar(&cmd.songPathsFile, "song-paths-file", "",
-		"Path to a file containing one relative path per line for songs to force updating")
+		"Path to file containing one relative path per line for songs to force updating")
 	f.StringVar(&cmd.testGainInfo, "test-gain-info", "",
 		"Hardcoded gain info as \"track:album:amp\" (for testing)")
 }
 
 func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	if countBools(cmd.deleteSongID > 0, cmd.importJSONFile != "", cmd.mergeSongIDs != "",
-		cmd.reindexSongs, cmd.songPathsFile != "") > 1 {
-		fmt.Fprintln(os.Stderr, "-delete-song, -import-json-file, -merge-songs, -reindex-songs, "+
-			"and -song-paths-file are mutually exclusive")
+		cmd.printCoverID != "", cmd.reindexSongs, cmd.songPathsFile != "") > 1 {
+		fmt.Fprintln(os.Stderr, "-delete-song, -import-json-file, -merge-songs, -print-cover-id, "+
+			"-reindex-songs, and -song-paths-file are mutually exclusive")
 		return subcommands.ExitUsageError
 	}
 
@@ -88,6 +90,8 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 		return cmd.doDeleteSong()
 	case cmd.mergeSongIDs != "":
 		return cmd.doMergeSongs()
+	case cmd.printCoverID != "":
+		return cmd.doPrintCoverID()
 	case cmd.reindexSongs:
 		return cmd.doReindexSongs()
 	}
@@ -293,6 +297,26 @@ func (cmd *Command) doMergeSongs() subcommands.ExitStatus {
 	return subcommands.ExitSuccess
 }
 
+func (cmd *Command) doPrintCoverID() subcommands.ExitStatus {
+	fi, err := os.Stat(cmd.printCoverID)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed stat:", err)
+		return subcommands.ExitFailure
+	}
+	s, err := readSong(cmd.printCoverID, "", fi, nil, nil)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed reading song:", err)
+		return subcommands.ExitFailure
+	}
+	ids := getCoverIDs(s)
+	if len(ids) == 0 {
+		fmt.Fprintln(os.Stderr, "Couldn't find cover ID in metadata")
+		return subcommands.ExitFailure
+	}
+	fmt.Println(ids[0])
+	return subcommands.ExitSuccess
+}
+
 func (cmd *Command) doReindexSongs() subcommands.ExitStatus {
 	if cmd.dryRun {
 		fmt.Fprintln(os.Stderr, "-dry-run is incompatible with -reindex-songs")
@@ -359,14 +383,24 @@ func writeLastUpdateInfo(p string, info lastUpdateInfo) error {
 	return f.Close()
 }
 
+// getCoverIDs returns IDs for song's cover in their preferred order.
+func getCoverIDs(song *db.Song) []string {
+	var ids []string
+	for _, id := range []string{song.CoverID, song.AlbumID, song.RecordingID} {
+		if len(id) > 0 {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
 // getCoverFilename returns the relative path under dir for song's cover image.
 func getCoverFilename(dir string, song *db.Song) string {
-	for _, s := range []string{song.CoverID, song.AlbumID, song.RecordingID} {
-		if len(s) > 0 {
-			fn := s + ".jpg"
-			if _, err := os.Stat(filepath.Join(dir, fn)); err == nil {
-				return fn
-			}
+	for _, id := range getCoverIDs(song) {
+		// TODO: Support other image formats, maybe (server will also need to be updated).
+		fn := id + ".jpg"
+		if _, err := os.Stat(filepath.Join(dir, fn)); err == nil {
+			return fn
 		}
 	}
 	return ""
