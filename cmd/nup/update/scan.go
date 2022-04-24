@@ -40,16 +40,16 @@ const (
 // ID3v1 is a terrible format.
 func readID3v1Footer(f *os.File, fi os.FileInfo) (length int64, artist, title, album string, err error) {
 	const (
-		footerLength = 128
-		footerMagic  = "TAG"
-		titleLength  = 30
-		artistLength = 30
-		albumLength  = 30
+		footerLen   = 128
+		footerMagic = "TAG"
+		titleLen    = 30
+		artistLen   = 30
+		albumLen    = 30
 		// TODO: Add year (4 bytes), comment (30), and genre (1) if I ever care about them.
 	)
 
 	// Check for an ID3v1 footer.
-	buf := make([]byte, footerLength)
+	buf := make([]byte, footerLen)
 	if _, err := f.ReadAt(buf, fi.Size()-int64(len(buf))); err != nil {
 		return 0, "", "", "", err
 	}
@@ -60,10 +60,10 @@ func readID3v1Footer(f *os.File, fi os.FileInfo) (length int64, artist, title, a
 	}
 
 	clean := func(b []byte) string { return string(bytes.TrimSpace(bytes.TrimRight(b, "\x00"))) }
-	title = clean(b.Next(titleLength))
-	artist = clean(b.Next(artistLength))
-	album = clean(b.Next(albumLength))
-	return footerLength, artist, title, album, nil
+	title = clean(b.Next(titleLen))
+	artist = clean(b.Next(artistLen))
+	album = clean(b.Next(albumLen))
+	return footerLen, artist, title, album, nil
 }
 
 // getID3v2TextFrame returns the first ID3v2 text frame with the supplied ID from gen.
@@ -96,92 +96,145 @@ func getID3v2TextFrame(gen taglib.GenericTag, id string) (string, error) {
 }
 
 // computeAudioSHA1 returns a SHA1 hash of the audio (i.e. non-metadata) portion of f.
-func computeAudioSHA1(f *os.File, fi os.FileInfo, headerLength, footerLength int64) (string, error) {
-	if _, err := f.Seek(headerLength, 0); err != nil {
+func computeAudioSHA1(f *os.File, fi os.FileInfo, headerLen, footerLen int64) (string, error) {
+	if _, err := f.Seek(headerLen, 0); err != nil {
 		return "", err
 	}
 	hasher := sha1.New()
-	if _, err := io.CopyN(hasher, f, fi.Size()-headerLength-footerLength); err != nil {
+	if _, err := io.CopyN(hasher, f, fi.Size()-headerLen-footerLen); err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
-// computeAudioDuration reads Xing data from the first frame in f to return the audio length.
-// Only supports MPEG Audio 1, Layer 3.
+// frameInfo contains information about an MP3 audio frame header.
+type frameInfo struct {
+	kbitRate    int64 // in 1000 bits per second (not 1024)
+	sampleRate  int64 // in hertz
+	channelMode uint8 // 0x0 stereo, 0x1 joint stereo, 0x2 dual channel, 0x3 single channel
+	hasCRC      bool  // 16-bit CRC follows header
+	hasPadding  bool  // frame is padded with one extra bit
+}
+
+func (fi *frameInfo) size() int64 {
+	// See https://www.opennet.ru/docs/formats/mpeghdr.html. Calculation may be more complicated per
+	// https://www.codeproject.com/Articles/8295/MPEG-Audio-Frame-Header, but if we're off we'll
+	// probably see a problem when reading the next frame.
+	s := (samplesPerFrame / 8) * (fi.kbitRate * 1000) / fi.sampleRate
+	if fi.hasPadding {
+		s++
+	}
+	return s
+}
+
+func (fi *frameInfo) duration() time.Duration {
+	return (time.Second / time.Duration(fi.sampleRate)) * samplesPerFrame
+}
+
+// This constant is specific to MPEG 1, Layer 3.
+const samplesPerFrame = 1152
+
+// This table is specific to MPEG 1, Layer 3.
+var kbitRates = [...]int64{0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0}
+
+// This table is specific to MPEG 1.
+var sampleRates = [...]int64{44100, 48000, 32000, 0}
+
+// readFrameInfo reads an MPEG audio frame header at start in f.
 // Format details at http://www.codeproject.com/Articles/8295/MPEG-Audio-Frame-Header.
-func computeAudioDuration(f *os.File, fi os.FileInfo, headerLength, footerLength int64) (time.Duration, error) {
-	if _, err := f.Seek(headerLength, 0); err != nil {
-		return 0, fmt.Errorf("unable to seek to %#x: %v", headerLength, err)
+func readFrameInfo(f *os.File, start int64) (*frameInfo, error) {
+	if _, err := f.Seek(start, 0); err != nil {
+		return nil, err
 	}
 	var header uint32
 	if err := binary.Read(f, binary.BigEndian, &header); err != nil {
-		return 0, fmt.Errorf("unable to read frame header at %#x: %v", headerLength, err)
+		return nil, err
 	}
 	getBits := func(startBit, numBits uint) uint32 {
 		return (header << startBit) >> (32 - numBits)
 	}
-	if getBits(0, 11) != 0x7ff {
-		return 0, fmt.Errorf("missing sync at %#x (got %#x instead of 0x7ff)", headerLength, getBits(0, 11))
+	if v := getBits(0, 11); v != 0x7ff {
+		return nil, fmt.Errorf("missing sync (got %#x instead of 0x7ff)", v)
 	}
-	if getBits(11, 2) != 0x3 {
-		return 0, fmt.Errorf("unsupported MPEG Audio version at %#x (got %#x instead of 0x3)", headerLength, getBits(11, 2))
+	if v := getBits(11, 2); v != 0x3 {
+		return nil, fmt.Errorf("unsupported MPEG Audio version (got %#x instead of 0x3)", v)
 	}
-	if getBits(13, 2) != 0x1 {
-		return 0, fmt.Errorf("unsupported layer at %#x (got %#x instead of 0x1)", headerLength, getBits(13, 2))
-	}
-
-	// This table is specific to MPEG 1, Layer 3.
-	var kbitRates = [...]int64{0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0}
-	kbitRate := kbitRates[getBits(16, 4)]
-	if kbitRate == 0 {
-		return 0, fmt.Errorf("unsupported bitrate at %#x (got index %d)", headerLength, getBits(16, 4))
+	if v := getBits(13, 2); v != 0x1 {
+		return nil, fmt.Errorf("unsupported layer (got %#x instead of 0x1)", v)
 	}
 
-	// This table is specific to MPEG 1.
-	var sampleRates = [...]int64{44100, 48000, 32000, 0}
-	sampleRate := sampleRates[getBits(20, 2)]
-	if sampleRate == 0 {
-		return 0, fmt.Errorf("unsupported sample rate at %#x (got index %d)", headerLength, getBits(20, 2))
+	return &frameInfo{
+		kbitRate:    kbitRates[getBits(16, 4)],
+		sampleRate:  sampleRates[getBits(20, 2)],
+		channelMode: uint8(getBits(24, 2)),
+		hasCRC:      getBits(15, 1) == 0x0,
+		hasPadding:  getBits(22, 1) == 0x1,
+	}, nil
+}
+
+// durationInfo contains extra information read by computeAudioDuration.
+type durationInfo struct {
+	kbitRate   int64
+	sampleRate int64
+	xingFlags  uint32
+	numFrames  uint32 // from xing header
+	numBytes   uint32 // from xing header
+}
+
+// computeAudioDuration reads Xing data from the frame at headerLen in f to return the audio length.
+// Only supports MPEG Audio 1, Layer 3.
+func computeAudioDuration(f *os.File, fi os.FileInfo, headerLen, footerLen int64) (
+	time.Duration, *durationInfo, error) {
+	finfo, err := readFrameInfo(f, headerLen)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed reading header at %#x: %v", headerLen, err)
 	}
 
-	xingHeaderStart := headerLength + 4
-	// Skip "side information".
-	if getBits(24, 2) == 0x3 { // Channel mode; 0x3 is mono.
-		xingHeaderStart += 17
+	info := durationInfo{
+		kbitRate:   finfo.kbitRate,
+		sampleRate: finfo.sampleRate,
+	}
+
+	xingStart := headerLen + 4
+	if finfo.channelMode == 0x3 { // mono
+		xingStart += 17
 	} else {
-		xingHeaderStart += 32
+		xingStart += 32
 	}
-	// Skip 16-bit CRC if present.
-	if getBits(15, 1) == 0x0 { // 0x0 means "has protection".
-		xingHeaderStart += 2
+	if finfo.hasCRC {
+		xingStart += 2
 	}
 
-	b := make([]byte, 12, 12)
-	if _, err := f.ReadAt(b, xingHeaderStart); err != nil {
-		return 0, fmt.Errorf("unable to read Xing header at %#x: %v", xingHeaderStart, err)
+	b := make([]byte, 16)
+	if _, err := f.ReadAt(b, xingStart); err != nil {
+		return 0, &info, fmt.Errorf("unable to read Xing header at %#x: %v", xingStart, err)
 	}
-	xingHeaderName := string(b[0:4])
-	if xingHeaderName == "Xing" || xingHeaderName == "Info" {
+	xingName := string(b[0:4])
+	if xingName == "Xing" || xingName == "Info" {
 		r := bytes.NewReader(b[4:])
-		var xingFlags uint32
-		binary.Read(r, binary.BigEndian, &xingFlags)
-		if xingFlags&0x1 == 0x0 {
-			return 0, fmt.Errorf("Xing header at %#x lacks number of frames", xingHeaderStart)
+		if err := binary.Read(r, binary.BigEndian, &info.xingFlags); err != nil {
+			return 0, &info, err
 		}
-		var numFrames uint32
-		binary.Read(r, binary.BigEndian, &numFrames)
+		if info.xingFlags&0x1 == 0 {
+			return 0, &info, fmt.Errorf("Xing header at %#x lacks number of frames", xingName)
+		}
+		if err := binary.Read(r, binary.BigEndian, &info.numFrames); err != nil {
+			return 0, &info, err
+		}
+		if info.xingFlags&0x2 != 0 {
+			if err := binary.Read(r, binary.BigEndian, &info.numBytes); err != nil {
+				return 0, &info, err
+			}
+		}
 
-		// This constant is specific to MPEG 1, Layer 3.
-		const samplesPerFrame = 1152
-		ms := int64(samplesPerFrame) * int64(numFrames) * 1000 / sampleRate
-		return time.Duration(ms) * time.Millisecond, nil
+		ms := samplesPerFrame * int64(info.numFrames) * 1000 / info.sampleRate
+		return time.Duration(ms) * time.Millisecond, &info, nil
 	}
 
 	// Okay, no Xing VBR header. Assume that the file has a fixed bitrate.
 	// (The other alternative is to read the whole file to count the number of frames.)
-	ms := (fi.Size() - headerLength - footerLength) / kbitRate * 8
-	return time.Duration(ms) * time.Millisecond, nil
+	ms := (fi.Size() - headerLen - footerLen) / info.kbitRate * 8
+	return time.Duration(ms) * time.Millisecond, &info, nil
 }
 
 // computeDirGains computes gain adjustments for all MP3 files in dir.
@@ -246,13 +299,13 @@ func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info,
 	defer f.Close()
 
 	s := db.Song{Filename: relPath}
-	var footerLength int64
-	footerLength, s.Artist, s.Title, s.Album, err = readID3v1Footer(f, fi)
+	var footerLen int64
+	footerLen, s.Artist, s.Title, s.Album, err = readID3v1Footer(f, fi)
 	if err != nil {
 		return nil, err
 	}
 
-	var headerLength int64
+	var headerLen int64
 	if tag, err := taglib.Decode(f, fi.Size()); err != nil {
 		// Tolerate missing ID3v2 tags if we got an artist and title from ID3v1.
 		if len(s.Artist) == 0 && len(s.Title) == 0 {
@@ -267,7 +320,7 @@ func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info,
 		s.RecordingID = tag.UniqueFileIdentifiers()[recordingIDOwner]
 		s.Track = int(tag.Track())
 		s.Disc = int(tag.Disc())
-		headerLength = int64(tag.TagSize())
+		headerLen = int64(tag.TagSize())
 
 		// Only save the album artist if it's different from the track artist.
 		if aa, err := getID3v2TextFrame(tag, albumArtistTag); err != nil {
@@ -288,11 +341,11 @@ func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info,
 		s.Artist = repl
 	}
 
-	s.SHA1, err = computeAudioSHA1(f, fi, headerLength, footerLength)
+	s.SHA1, err = computeAudioSHA1(f, fi, headerLen, footerLen)
 	if err != nil {
 		return nil, err
 	}
-	dur, err := computeAudioDuration(f, fi, headerLength, footerLength)
+	dur, _, err := computeAudioDuration(f, fi, headerLen, footerLen)
 	if err != nil {
 		return nil, err
 	}
