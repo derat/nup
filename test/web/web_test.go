@@ -569,6 +569,8 @@ func TestAddToPlaylist(t *testing.T) {
 func TestPlaybackButtons(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
+	// Using a 10-second song here makes this test slow, but I've seen flakiness
+	// when using the 5-second song.
 	song1 := newSong("artist", "track1", "album", withTrack(1), withFilename(file10s))
 	song2 := newSong("artist", "track2", "album", withTrack(2), withFilename(file1s))
 	importSongs(song1, song2)
