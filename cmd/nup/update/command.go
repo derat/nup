@@ -257,7 +257,7 @@ func (cmd *Command) doDebugSongFile() subcommands.ExitStatus {
 	fmt.Printf("Actual: %s (%d frames, %d data)\n",
 		format(info.actualDur), info.actualFrames, info.actualBytes)
 	if info.emptyFrame >= 0 {
-		fmt.Printf("Valid:  %s (%d frames, then empty starting at offset %d)\n",
+		fmt.Printf("Audio:  %s (%d frames, then empty starting at offset %d)\n",
 			format(info.emptyTime), info.emptyFrame, info.emptyOffset)
 	}
 	return subcommands.ExitSuccess
