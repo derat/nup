@@ -152,7 +152,7 @@ func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info,
 	if err != nil {
 		return nil, err
 	}
-	dur, _, err := computeAudioDuration(f, fi, headerLen, footerLen)
+	dur, _, _, err := computeAudioDuration(f, fi, headerLen, footerLen)
 	if err != nil {
 		return nil, err
 	}

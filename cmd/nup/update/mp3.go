@@ -76,8 +76,8 @@ func getID3v2TextFrame(gen taglib.GenericTag, id string) (string, error) {
 
 // frameInfo contains information about an MP3 audio frame header.
 type frameInfo struct {
-	kbitRate    int64 // in 1000 bits per second (not 1024)
-	sampleRate  int64 // in hertz
+	kbitRate    int   // in 1000 bits per second (not 1024)
+	sampleRate  int   // in hertz
 	channelMode uint8 // 0x0 stereo, 0x1 joint stereo, 0x2 dual channel, 0x3 single channel
 	hasCRC      bool  // 16-bit CRC follows header
 	hasPadding  bool  // frame is padded with one extra bit
@@ -87,27 +87,27 @@ func (fi *frameInfo) size() int64 {
 	// See https://www.opennet.ru/docs/formats/mpeghdr.html. Calculation may be more complicated per
 	// https://www.codeproject.com/Articles/8295/MPEG-Audio-Frame-Header, but if we're off we'll
 	// probably see a problem when reading the next frame.
-	s := (samplesPerFrame / 8) * (fi.kbitRate * 1000) / fi.sampleRate
+	s := (samplesPerFrame / 8) * int64(fi.kbitRate*1000) / int64(fi.sampleRate)
 	if fi.hasPadding {
 		s++
 	}
 	return s
 }
 
-func (fi *frameInfo) duration() time.Duration {
-	return (time.Second / time.Duration(fi.sampleRate)) * samplesPerFrame
+func (fi *frameInfo) empty() bool {
+	return fi.size() == 104
 }
 
 // This constant is specific to MPEG 1, Layer 3.
 const samplesPerFrame = 1152
 
 // This table is specific to MPEG 1, Layer 3.
-var kbitRates = [...]int64{0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0}
+var kbitRates = [...]int{0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0}
 
 // This table is specific to MPEG 1.
-var sampleRates = [...]int64{44100, 48000, 32000, 0}
+var sampleRates = [...]int{44100, 48000, 32000, 0}
 
-// readFrameInfo reads an MPEG audio frame header at start in f.
+// readFrameInfo reads an MPEG audio frame header at the specified offset in f.
 // Format details at http://www.codeproject.com/Articles/8295/MPEG-Audio-Frame-Header.
 func readFrameInfo(f *os.File, start int64) (*frameInfo, error) {
 	if _, err := f.Seek(start, 0); err != nil {
@@ -139,27 +139,14 @@ func readFrameInfo(f *os.File, start int64) (*frameInfo, error) {
 	}, nil
 }
 
-// durationInfo contains extra information read by computeAudioDuration.
-type durationInfo struct {
-	kbitRate   int64
-	sampleRate int64
-	xingFlags  uint32
-	numFrames  uint32 // from xing header
-	numBytes   uint32 // from xing header
-}
-
 // computeAudioDuration reads Xing data from the frame at headerLen in f to return the audio length.
+// If no Xing header is present, it assumes that the file has a constant bitrate.
 // Only supports MPEG Audio 1, Layer 3.
 func computeAudioDuration(f *os.File, fi os.FileInfo, headerLen, footerLen int64) (
-	time.Duration, *durationInfo, error) {
+	dur time.Duration, xingFrames int, xingBytes int64, err error) {
 	finfo, err := readFrameInfo(f, headerLen)
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed reading header at %#x: %v", headerLen, err)
-	}
-
-	info := durationInfo{
-		kbitRate:   finfo.kbitRate,
-		sampleRate: finfo.sampleRate,
+		return 0, 0, 0, fmt.Errorf("failed reading header at %#x: %v", headerLen, err)
 	}
 
 	xingStart := headerLen + 4
@@ -174,32 +161,132 @@ func computeAudioDuration(f *os.File, fi os.FileInfo, headerLen, footerLen int64
 
 	b := make([]byte, 16)
 	if _, err := f.ReadAt(b, xingStart); err != nil {
-		return 0, &info, fmt.Errorf("unable to read Xing header at %#x: %v", xingStart, err)
+		return 0, 0, 0, fmt.Errorf("unable to read Xing header at %#x: %v", xingStart, err)
 	}
-	xingName := string(b[0:4])
-	if xingName == "Xing" || xingName == "Info" {
-		r := bytes.NewReader(b[4:])
-		if err := binary.Read(r, binary.BigEndian, &info.xingFlags); err != nil {
-			return 0, &info, err
+	if s := string(b[:4]); s != "Xing" && s != "Info" {
+		// Okay, no Xing VBR header. Assume that the file has a fixed bitrate.
+		// (The other alternative is to read the whole file to count the number of frames.)
+		ms := (fi.Size() - headerLen - footerLen) / int64(finfo.kbitRate) * 8
+		return time.Duration(ms) * time.Millisecond, 0, 0, nil
+	}
+
+	r := bytes.NewReader(b[4:])
+	var flags uint32
+	if err := binary.Read(r, binary.BigEndian, &flags); err != nil {
+		return 0, 0, 0, err
+	}
+	if flags&0x1 == 0 {
+		return 0, 0, 0, errors.New("Xing header lacks number of frames")
+	}
+	var nframes uint32
+	if err := binary.Read(r, binary.BigEndian, &nframes); err != nil {
+		return 0, 0, 0, err
+	}
+	var nbytes uint32
+	if flags&0x2 != 0 {
+		if err := binary.Read(r, binary.BigEndian, &nbytes); err != nil {
+			return 0, 0, 0, err
 		}
-		if info.xingFlags&0x1 == 0 {
-			return 0, &info, fmt.Errorf("Xing header at %#x lacks number of frames", xingName)
+	}
+	ms := samplesPerFrame * int64(nframes) * 1000 / int64(finfo.sampleRate)
+	return time.Duration(ms) * time.Millisecond, int(nframes), int64(nbytes), nil
+}
+
+// debugInfo contains debugging info about an MP3 file.
+type debugInfo struct {
+	size         int64         // entire file
+	header       int64         // ID3v2 header size
+	footer       int64         // ID3v1 footer size
+	kbitRate     int           // from first audio frame
+	sampleRate   int           // from first audio frame
+	xingFrames   int           // number of frames from Xing header
+	xingBytes    int64         // audio data size from Xing header
+	xingDur      time.Duration // audio duration from Xing header (or CBR)
+	actualFrames int           // actual frame count
+	actualBytes  int64         // actual audio data size
+	actualDur    time.Duration // actual duration
+	emptyFrame   int           // first empty frame at end of file
+	emptyOffset  int64         // offset of emptyFrame from start of file
+	emptyTime    time.Duration // time of emptyFrame
+}
+
+// getSongDebugInfo returns debug information about the MP3 file at p.
+func getSongDebugInfo(p string) (*debugInfo, error) {
+	f, err := os.Open(p)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	info := debugInfo{size: fi.Size(), emptyFrame: -1}
+	if n, _, _, _, err := readID3v1Footer(f, fi); err == nil {
+		info.footer = n
+	}
+	if tag, err := taglib.Decode(f, fi.Size()); err == nil {
+		info.header = int64(tag.TagSize())
+	}
+
+	// Read the Xing header.
+	info.xingDur, info.xingFrames, info.xingBytes, err = computeAudioDuration(
+		f, fi, info.header, info.footer)
+	if err != nil {
+		return &info, fmt.Errorf("failed computing duration: %v", err)
+	}
+
+	// Read all of the frames in the file.
+	off := info.header
+	for i := 0; off < info.size-info.footer; i++ {
+		finfo, err := readFrameInfo(f, off)
+		if err != nil {
+			return &info, fmt.Errorf("frame %d at %d: %v", i, off, err)
 		}
-		if err := binary.Read(r, binary.BigEndian, &info.numFrames); err != nil {
-			return 0, &info, err
+
+		if i == 0 {
+			info.kbitRate = finfo.kbitRate
+			info.sampleRate = finfo.sampleRate
 		}
-		if info.xingFlags&0x2 != 0 {
-			if err := binary.Read(r, binary.BigEndian, &info.numBytes); err != nil {
-				return 0, &info, err
+
+		// Check for empty frames at the end of the file.
+		if finfo.empty() {
+			if info.emptyFrame < 0 {
+				info.emptyFrame = i
+				info.emptyOffset = off
 			}
+		} else {
+			info.emptyFrame = -1
 		}
-
-		ms := samplesPerFrame * int64(info.numFrames) * 1000 / info.sampleRate
-		return time.Duration(ms) * time.Millisecond, &info, nil
+		info.actualFrames++
+		info.actualBytes += finfo.size()
+		off += finfo.size()
 	}
 
-	// Okay, no Xing VBR header. Assume that the file has a fixed bitrate.
-	// (The other alternative is to read the whole file to count the number of frames.)
-	ms := (fi.Size() - headerLen - footerLen) / info.kbitRate * 8
-	return time.Duration(ms) * time.Millisecond, &info, nil
+	// The Xing header apparently doesn't include itself in the frame count
+	// (but confusingly *does* include itself in the bytes count):
+	// https://www.mail-archive.com/mp3encoder@minnie.tuhs.org/msg02868.html
+	// https://hydrogenaud.io/index.php?topic=85690.0
+	// If it was present, adjust fields so they'll be comparable to xingFrames.
+	if info.xingFrames != 0 {
+		info.actualFrames--
+		if info.emptyFrame > 0 {
+			info.emptyFrame--
+		}
+	}
+
+	// Compute durations. The sample rate is fixed and there's a constant number
+	// of samples per frame, so we just need the number of frames.
+	computeDur := func(frames int) time.Duration {
+		return time.Duration(samplesPerFrame*frames) * time.Second /
+			time.Duration(info.sampleRate)
+	}
+	info.actualDur = computeDur(info.actualFrames)
+	if info.emptyFrame >= 0 {
+		info.emptyTime = computeDur(info.emptyFrame)
+	}
+
+	return &info, nil
 }
