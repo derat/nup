@@ -42,7 +42,7 @@ type SearchPreset struct {
 	// MinRating contains a minimum rating as number of stars in [1, 5].
 	// 0 is equivalent to 1, i.e. any rating is accepted.
 	MinRating int `json:"minRating"`
-	// Unrated indicates that only unrated songs should be returned.
+	// Unrated specifies that only unrated songs should be returned.
 	Unrated bool `json:"unrated"`
 	// FirstPlayed limits results to songs first played within the given interval:
 	//   0 - no restriction
@@ -58,16 +58,30 @@ type SearchPreset struct {
 	// LastPlayed limits results to songs last played before the given interval.
 	// See FirstPlayed for values.
 	LastPlayed int `json:"lastPlayed"`
-	// OrderByLastPlayed indicates that songs should be ordered by the last time
+	// OrderByLastPlayed specifies that songs should be ordered by the last time
 	// they were played (in ascending order).
 	OrderByLastPlayed bool `json:"orderByLastPlayed"`
-	// FirstTrack indicates that only albums' first tracks should be returned.
+	// MaxPlays specifies the maximum number of times that each song has been played.
+	// -1 specifies that there is no restriction on the number of plays.
+	MaxPlays int `json:"maxPlays"`
+	// FirstTrack specifies that only albums' first tracks should be returned.
 	FirstTrack bool `json:"firstTrack"`
-	// Shuffle indicates that the returned songs should be shuffled.
+	// Shuffle specifies that the returned songs should be shuffled.
 	Shuffle bool `json:"shuffle"`
-	// Play indicates that returned songs should be played automatically.
+	// Play specifies that returned songs should be played automatically.
 	// The current playlist is replaced.
 	Play bool `json:"play"`
+}
+
+func (p *SearchPreset) UnmarshalJSON(data []byte) error {
+	// Set defaults for unspecified fields.
+	*p = SearchPreset{MaxPlays: -1}
+
+	// Use json.Decoder rather than json.Unmarshal so we can reject unknown fields.
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	type searchPreset *SearchPreset // avoid stack overflow
+	return dec.Decode(searchPreset(p))
 }
 
 // Config holds the App Engine server's configuration.
@@ -98,8 +112,8 @@ type Config struct {
 	Presets []SearchPreset `json:"presets"`
 }
 
-// ParseConfig unmarshals jsonData, validates it, and returns the resulting config.
-func ParseConfig(jsonData []byte) (*Config, error) {
+// Parse unmarshals jsonData, validates it, and returns the resulting config.
+func Parse(jsonData []byte) (*Config, error) {
 	var cfg Config
 	dec := json.NewDecoder(bytes.NewReader(jsonData))
 	dec.DisallowUnknownFields()
@@ -124,9 +138,9 @@ func ParseConfig(jsonData []byte) (*Config, error) {
 	return &cfg, nil
 }
 
-// LoadConfig attempts to load the server's config from various locations.
+// Load attempts to load the server's config from various locations.
 // ctx must be an App Engine context.
-func LoadConfig(ctx context.Context) (*Config, error) {
+func Load(ctx context.Context) (*Config, error) {
 	b, err := func() ([]byte, error) {
 		// Tests can override the config file via a NUP_CONFIG environment variable.
 		if b := []byte(os.Getenv("NUP_CONFIG")); len(b) != 0 {
@@ -144,7 +158,7 @@ func LoadConfig(ctx context.Context) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ParseConfig(b)
+	return Parse(b)
 }
 
 // Auth checks that r is authorized in cfg via either HTTP basic authentication or Google

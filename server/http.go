@@ -30,7 +30,7 @@ func getConfig(ctx context.Context) (*config.Config, error) {
 		return loadedCfg, nil
 	}
 	var err error
-	loadedCfg, err = config.LoadConfig(ctx)
+	loadedCfg, err = config.Load(ctx)
 	return loadedCfg, err
 }
 

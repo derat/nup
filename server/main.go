@@ -416,6 +416,8 @@ func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 		Album:                r.FormValue("album"),
 		AlbumID:              r.FormValue("albumId"),
 		Keywords:             strings.Fields(r.FormValue("keywords")),
+		MinRating:            -1,
+		MaxPlays:             -1,
 		Shuffle:              r.FormValue("shuffle") == "1",
 		OrderByLastStartTime: r.FormValue("orderByLastPlayed") == "1",
 	}
@@ -430,7 +432,6 @@ func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 		if q.MinRating, ok = parseFloatParam(ctx, w, r, "minRating"); !ok {
 			return
 		}
-		q.HasMinRating = true
 	} else if r.FormValue("unrated") == "1" {
 		q.Unrated = true
 	}
@@ -440,7 +441,6 @@ func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 		if q.MaxPlays, ok = parseIntParam(ctx, w, r, "maxPlays"); !ok {
 			return
 		}
-		q.HasMaxPlays = true
 	}
 
 	if len(r.FormValue("minFirstPlayed")) > 0 {

@@ -168,6 +168,7 @@ const (
 	// These match the presets defined in sendConfig() in web_test.go.
 	presetInstrumentalOld = "instrumental old"
 	presetMellow          = "mellow"
+	presetPlayedOnce      = "played once"
 	presetNewAlbums       = "new albums"
 	presetUnrated         = "unrated"
 )

@@ -37,12 +37,10 @@ type SongQuery struct {
 
 	Keywords []string // Song.Keywords
 
-	MinRating    float64 // Song.Rating
-	HasMinRating bool    // MinRating is set
-	Unrated      bool    // Song.Rating is -1
+	MinRating float64 // Song.Rating (-1 if unspecified)
+	Unrated   bool    // Song.Rating is -1
 
-	MaxPlays    int64 // Song.NumPlays
-	HasMaxPlays bool  // MaxPlays is set
+	MaxPlays int64 // Song.NumPlays (-1 if unspecified)
 
 	MinFirstStartTime time.Time // Song.FirstStartTime
 	MaxLastStartTime  time.Time // Song.LastStartTime
@@ -57,6 +55,9 @@ type SongQuery struct {
 	OrderByLastStartTime bool // order by Song.LastStartTime
 }
 
+func (q *SongQuery) hasMinRating() bool { return q.MinRating >= 0 }
+func (q *SongQuery) hasMaxPlays() bool  { return q.MaxPlays >= 0 }
+
 // hash returns a string uniquely identifying q.
 func (q *SongQuery) hash() (string, error) {
 	b, err := json.Marshal(q)
@@ -69,8 +70,8 @@ func (q *SongQuery) hash() (string, error) {
 
 // canCache returns true if the query's results can be safely cached.
 func (q *SongQuery) canCache() bool {
-	return !q.HasMaxPlays && q.MinFirstStartTime.IsZero() && q.MaxLastStartTime.IsZero() &&
-		q.OrderByLastStartTime == false
+	return !q.hasMaxPlays() && q.MinFirstStartTime.IsZero() && q.MaxLastStartTime.IsZero() &&
+		!q.OrderByLastStartTime
 }
 
 // resultsInvalidated returns true if the updates described by ut would
@@ -79,14 +80,14 @@ func (q *SongQuery) resultsInvalidated(ut UpdateTypes) bool {
 	if (ut & MetadataUpdate) != 0 {
 		return true
 	}
-	if (ut&RatingUpdate) != 0 && (q.HasMinRating || q.Unrated) {
+	if (ut&RatingUpdate) != 0 && (q.hasMinRating() || q.Unrated) {
 		return true
 	}
 	if (ut&TagsUpdate) != 0 && (len(q.Tags) > 0 || len(q.NotTags) > 0) {
 		return true
 	}
 	if (ut&PlaysUpdate) != 0 &&
-		(q.HasMaxPlays || !q.MinFirstStartTime.IsZero() || !q.MaxLastStartTime.IsZero() ||
+		(q.hasMaxPlays() || !q.MinFirstStartTime.IsZero() || !q.MaxLastStartTime.IsZero() ||
 			q.OrderByLastStartTime) {
 		return true
 	}
@@ -320,7 +321,7 @@ func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 	if len(query.AlbumID) > 0 {
 		bq = bq.Filter("AlbumId =", query.AlbumID)
 	}
-	if query.HasMinRating {
+	if query.hasMinRating() {
 		switch query.MinRating {
 		case 1.0:
 			bq = bq.Filter("Rating =", 1.0)
@@ -356,7 +357,7 @@ func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 	// Datastore doesn't allow multiple inequality filters on different properties.
 	// Run a separate query in parallel for each filter and then intersect the results.
 	var qs []*datastore.Query
-	if query.HasMaxPlays {
+	if query.hasMaxPlays() {
 		qs = append(qs, bq.Filter("NumPlays <=", query.MaxPlays))
 	}
 	if !query.MinFirstStartTime.IsZero() {

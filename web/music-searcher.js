@@ -272,7 +272,7 @@ customElements.define(
       );
       get('keywords-clear').addEventListener(
         'click',
-        () => (this.keywordsInput_.value = null)
+        () => (this.keywordsInput_.value = '')
       );
 
       this.tagSuggester_ = get('tags-suggester');
@@ -282,7 +282,7 @@ customElements.define(
       );
       get('tags-clear').addEventListener(
         'click',
-        () => (this.tagsInput_.value = null)
+        () => (this.tagsInput_.value = '')
       );
 
       this.shuffleCheckbox_ = get('shuffle-checkbox');
@@ -463,7 +463,7 @@ customElements.define(
       }
       if (
         !this.maxPlaysInput_.disabled &&
-        !isNaN(parseInt(this.maxPlaysInput_.value))
+        parseInt(this.maxPlaysInput_.value) >= 0
       ) {
         terms.push('maxPlays=' + parseInt(this.maxPlaysInput_.value));
       }
@@ -555,13 +555,13 @@ customElements.define(
       if (newAlbumId) keywords.push('albumId:' + clean(newAlbumId));
 
       this.keywordsInput_.value = keywords.join(' ');
-      this.tagsInput_.value = null;
+      this.tagsInput_.value = '';
       this.shuffleCheckbox_.checked = false;
       this.firstTrackCheckbox_.checked = false;
       this.unratedCheckbox_.checked = false;
       this.minRatingSelect_.selectedIndex = 0;
       this.orderByLastPlayedCheckbox_.checked = false;
-      this.maxPlaysInput_.value = null;
+      this.maxPlaysInput_.value = '';
       this.firstPlayedSelect_.selectedIndex = 0;
       this.lastPlayedSelect_.selectedIndex = 0;
       this.presetSelect_.selectedIndex = 0;
@@ -575,15 +575,15 @@ customElements.define(
     // Handles the "I'm Feeling Lucky" button being clicked.
     doLuckySearch_() {
       if (
-        !this.keywordsInput_.value &&
-        !this.tagsInput_.value &&
+        this.keywordsInput_.value.trim() === '' &&
+        this.tagsInput_.value.trim() === '' &&
         !this.shuffleCheckbox_.checked &&
         !this.firstTrackCheckbox_.checked &&
         !this.unratedCheckbox_.checked &&
         this.minRatingSelect_.selectedIndex == 0 &&
-        !this.maxPlaysInput_.value &&
-        this.firstPlayedSelect_.selectedIndex == 0 &&
-        this.lastPlayedSelect_.selectedIndex == 0
+        !(parseInt(this.maxPlaysInput_.value) >= 0) &&
+        this.firstPlayedSelect_.selectedIndex === 0 &&
+        this.lastPlayedSelect_.selectedIndex === 0
       ) {
         this.reset_(null, null, null, false /* clearResults */);
         this.shuffleCheckbox_.checked = true;
@@ -623,6 +623,7 @@ customElements.define(
       this.orderByLastPlayedCheckbox_.checked = preset.orderByLastPlayed;
       this.firstPlayedSelect_.selectedIndex = preset.firstPlayed;
       this.lastPlayedSelect_.selectedIndex = preset.lastPlayed;
+      this.maxPlaysInput_.value = preset.maxPlays >= 0 ? preset.maxPlays : '';
       this.firstTrackCheckbox_.checked = preset.firstTrack;
       this.shuffleCheckbox_.checked = preset.shuffle;
 

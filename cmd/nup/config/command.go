@@ -85,12 +85,13 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 	}
 
 	// Check that the server code will be happy with the new config.
+	// The Parse function also assign defaults to unspecified fields.
 	data, err := ioutil.ReadFile(cmd.setPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed reading config:", err)
 		return subcommands.ExitFailure
 	}
-	cfg, err := srvconfig.ParseConfig(data)
+	cfg, err := srvconfig.Parse(data)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Bad config:", err)
 		return subcommands.ExitFailure

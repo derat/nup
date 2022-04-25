@@ -239,12 +239,16 @@ func initWebTest(t *testing.T) (p *page, done func()) {
 	return newPage(t, webDrv, appURL), func() { tester.T = nil }
 }
 
+// MaxPlays needs to be explicitly set to -1 here since these structs are
+// declared literally rather than being unmarshaled from JSON by config.Parse
+// (which assigns a default of -1 if the field isn't specified).
 var presets = []config.SearchPreset{
 	{
 		Name:       "instrumental old",
 		Tags:       "instrumental",
 		MinRating:  4,
 		LastPlayed: 6,
+		MaxPlays:   -1,
 		Shuffle:    true,
 		Play:       true,
 	},
@@ -252,18 +256,28 @@ var presets = []config.SearchPreset{
 		Name:      "mellow",
 		Tags:      "mellow",
 		MinRating: 4,
+		MaxPlays:  -1,
+		Shuffle:   true,
+		Play:      true,
+	},
+	{
+		Name:      "played once",
+		MinRating: 4,
+		MaxPlays:  1,
 		Shuffle:   true,
 		Play:      true,
 	},
 	{
 		Name:        "new albums",
 		FirstPlayed: 3,
+		MaxPlays:    -1,
 		FirstTrack:  true,
 	},
 	{
-		Name:    "unrated",
-		Unrated: true,
-		Play:    true,
+		Name:     "unrated",
+		Unrated:  true,
+		MaxPlays: -1,
+		Play:     true,
 	},
 }
 
@@ -983,12 +997,14 @@ func TestPresets(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
 	now := time.Now()
+	now2 := now.Add(-5 * time.Minute)
 	old := now.Add(-2 * 365 * 24 * time.Hour)
+	old2 := old.Add(-5 * time.Minute)
 	song1 := newSong("a", "t1", "unrated")
-	song2 := newSong("a", "t1", "new", withRating(0.25), withTrack(1), withDisc(1), withPlays(now))
-	song3 := newSong("a", "t2", "new", withRating(1.0), withTrack(2), withDisc(1), withPlays(now))
-	song4 := newSong("a", "t1", "old", withRating(0.75), withPlays(old))
-	song5 := newSong("a", "t2", "old", withRating(0.75), withTags("instrumental"), withPlays(old))
+	song2 := newSong("a", "t1", "new", withRating(0.25), withTrack(1), withDisc(1), withPlays(now, now2))
+	song3 := newSong("a", "t2", "new", withRating(1.0), withTrack(2), withDisc(1), withPlays(now, now2))
+	song4 := newSong("a", "t1", "old", withRating(0.75), withPlays(old, old2))
+	song5 := newSong("a", "t2", "old", withRating(0.75), withTags("instrumental"), withPlays(old, old2))
 	song6 := newSong("a", "t1", "mellow", withRating(0.75), withTags("mellow"))
 	importSongs(song1, song2, song3, song4, song5, song6)
 
@@ -1000,6 +1016,8 @@ func TestPresets(t *testing.T) {
 	page.checkSearchResults(joinSongs(song2))
 	page.clickOption(presetSelect, presetUnrated)
 	page.checkSong(song1)
+	page.clickOption(presetSelect, presetPlayedOnce)
+	page.checkSong(song6)
 
 	if active, err := page.wd.ActiveElement(); err != nil {
 		t.Error("Failed getting active element: ", err)
