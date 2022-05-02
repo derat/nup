@@ -78,7 +78,7 @@ func TestUpdate(t *testing.T) {
 		ch <- s1
 		close(ch)
 	}()
-	if err := updateSongs(cfg, ch, true); err != nil {
+	if err := updateSongs(cfg, ch, true, false); err != nil {
 		t.Fatalf("Failed to send songs: %v", err)
 	}
 	if err := test.CompareSongs([]db.Song{s0, s1}, recv, test.CompareOrder); err != nil {
@@ -98,7 +98,7 @@ func TestUpdate(t *testing.T) {
 		}
 		close(ch)
 	}()
-	if err := updateSongs(cfg, ch, false); err != nil {
+	if err := updateSongs(cfg, ch, false, false); err != nil {
 		t.Fatalf("Failed to send songs: %v", err)
 	}
 	if err := test.CompareSongs(sent, recv, test.CompareOrder); err != nil {

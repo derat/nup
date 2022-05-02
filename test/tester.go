@@ -227,6 +227,7 @@ func (t *Tester) SongID(sha1 string) string {
 }
 
 const KeepUserDataFlag = "-import-user-data=false"
+const UseFilenamesFlag = "-use-filenames"
 
 func DumpedGainsFlag(p string) string  { return "-dumped-gains-file=" + p }
 func ForceGlobFlag(glob string) string { return "-force-glob=" + glob }

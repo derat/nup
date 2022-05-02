@@ -197,6 +197,8 @@ The `-delete-song` flag can be used to delete specific songs from the server
 update [flags]:
         Send song updates to the server.
 
+  -debug-song-file string
+        Path to song file to print debug info about
   -delete-after-merge
         Delete source song if -merge-songs is true
   -delete-song int
@@ -225,6 +227,8 @@ update [flags]:
         Path to file containing one relative path per line for songs to force updating
   -test-gain-info string
         Hardcoded gain info as "track:album:amp" (for testing)
+  -use-filenames
+        Identify songs by filename rather than audio data hash (useful when modifying files)
 ```
 
 ### Merging songs

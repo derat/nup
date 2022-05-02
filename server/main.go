@@ -311,17 +311,26 @@ func handleFlushCache(ctx context.Context, cfg *config.Config, w http.ResponseWr
 }
 
 func handleImport(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
-	var updateDelayNsec int64
+	dataPolicy := update.PreserveUserData
+	if r.FormValue("replaceUserData") == "1" {
+		dataPolicy = update.ReplaceUserData
+	}
+
+	keyType := update.UpdateBySHA1
+	if r.FormValue("useFilenames") == "1" {
+		keyType = update.UpdateByFilename
+	}
+
+	var delay time.Duration
 	if len(r.FormValue("updateDelayNsec")) > 0 {
-		var ok bool
-		if updateDelayNsec, ok = parseIntParam(ctx, w, r, "updateDelayNsec"); !ok {
+		if ns, ok := parseIntParam(ctx, w, r, "updateDelayNsec"); !ok {
 			return
+		} else {
+			delay = time.Nanosecond * time.Duration(ns)
 		}
 	}
-	updateDelay := time.Nanosecond * time.Duration(updateDelayNsec)
 
 	numSongs := 0
-	replaceUserData := r.FormValue("replaceUserData") == "1"
 	d := json.NewDecoder(r.Body)
 	for {
 		s := &db.Song{}
@@ -332,7 +341,7 @@ func handleImport(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := update.UpdateOrInsertSong(ctx, s, replaceUserData, updateDelay); err != nil {
+		if err := update.UpdateOrInsertSong(ctx, s, dataPolicy, keyType, delay); err != nil {
 			log.Errorf(ctx, "Update song with SHA1 %v failed: %v", s.SHA1, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -481,13 +490,14 @@ func handleRateAndTag(ctx context.Context, cfg *config.Config, w http.ResponseWr
 		return
 	}
 
-	var updateDelayNsec int64
+	var delay time.Duration
 	if len(r.FormValue("updateDelayNsec")) > 0 {
-		if updateDelayNsec, ok = parseIntParam(ctx, w, r, "updateDelayNsec"); !ok {
+		if ns, ok := parseIntParam(ctx, w, r, "updateDelayNsec"); !ok {
 			return
+		} else {
+			delay = time.Nanosecond * time.Duration(ns)
 		}
 	}
-	updateDelay := time.Nanosecond * time.Duration(updateDelayNsec)
 
 	hasRating := false
 	var rating float64
@@ -516,7 +526,7 @@ func handleRateAndTag(ctx context.Context, cfg *config.Config, w http.ResponseWr
 		return
 	}
 
-	if err := update.SetRatingAndTags(ctx, id, hasRating, rating, tags, updateDelay); err != nil {
+	if err := update.SetRatingAndTags(ctx, id, hasRating, rating, tags, delay); err != nil {
 		log.Errorf(ctx, "Rating/tagging song %d failed: %v", id, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

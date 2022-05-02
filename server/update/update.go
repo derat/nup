@@ -39,7 +39,7 @@ func AddPlay(ctx context.Context, id int64, startTime time.Time, ip string) erro
 		s.UpdatePlayStats(startTime)
 
 		newKey := datastore.NewIncompleteKey(ctx, db.PlayKind, songKey)
-		if _, err = datastore.Put(ctx, newKey, &db.Play{
+		if _, err = datastore.Put(ctx, newKey, &db.Play{ // must pass pointer
 			StartTime: startTime,
 			IPAddress: ip,
 		}); err != nil {
@@ -55,9 +55,9 @@ func AddPlay(ctx context.Context, id int64, startTime time.Time, ip string) erro
 
 // SetRatingAndTags updates the rating and tags of the song identified by id in datastore.
 // The rating is only updated if hasRating is true, and tags are not updated if tags is nil.
-// If updateDelay is nonzero, the server will wait before writing to datastore.
+// If delay is nonzero, the server will wait before writing to datastore.
 func SetRatingAndTags(ctx context.Context, id int64, hasRating bool, rating float64,
-	tags []string, updateDelay time.Duration) error {
+	tags []string, delay time.Duration) error {
 	var ut query.UpdateTypes
 	err := updateExistingSong(ctx, id, func(ctx context.Context, s *db.Song) error {
 		if hasRating && rating != s.Rating {
@@ -77,7 +77,7 @@ func SetRatingAndTags(ctx context.Context, id int64, hasRating bool, rating floa
 		}
 		s.LastModifiedTime = time.Now()
 		return nil
-	}, updateDelay, true)
+	}, delay, true)
 
 	if err != nil {
 		return err
@@ -88,57 +88,96 @@ func SetRatingAndTags(ctx context.Context, id int64, hasRating bool, rating floa
 	return nil
 }
 
-// UpdateOrInsertSong stores updatedSong in datastore.
-// If replaceUserData is true, the existing song (if any) will have its ratings,
-// tags, and play history replaced by updatedSong's. If updateDelay is nonzero,
-// the server will wait before writing to datastore.
-func UpdateOrInsertSong(ctx context.Context, updatedSong *db.Song,
-	replaceUserData bool, updateDelay time.Duration) error {
-	sha1 := updatedSong.SHA1
-	queryKeys, err := datastore.NewQuery(db.SongKind).KeysOnly().Filter("Sha1 =", sha1).GetAll(ctx, nil)
+// UserDataPolicy indicates what UpdateOrInsertSong should do with existing user data
+// (e.g. ratings, tags, plays) when updating a song.
+type UserDataPolicy int
+
+const (
+	// PreserveUserData indicates that the current user data should not be changed.
+	PreserveUserData UserDataPolicy = iota
+	// ReplaceUserData indicates that user data should be replaced by data from the imported song.
+	ReplaceUserData
+)
+
+// UpdateKeyType indicates the key that UpdateOrInsertSong should use to determine which
+// song to update.
+type UpdateKeyType int
+
+const (
+	// UpdateBySHA1 indicates that the Song.SHA1 field should be used.
+	// This identifies songs by their audio data, so they will be tracked across renames or moves.
+	UpdateBySHA1 UpdateKeyType = iota
+	// UpdateByFilename indicates that the Song.Filename field should be used.
+	// This is useful when a file's audio data has been deliberately updated.
+	UpdateByFilename
+)
+
+// UpdateOrInsertSong stores the supplied song in datastore.
+// If delay is nonzero, the server will wait before writing to datastore.
+func UpdateOrInsertSong(ctx context.Context, updated *db.Song,
+	dataPolicy UserDataPolicy, keyType UpdateKeyType, delay time.Duration) error {
+	base := datastore.NewQuery(db.SongKind).KeysOnly()
+	queryKeys, err := base.Filter("Sha1 =", updated.SHA1).GetAll(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("querying for SHA1 %v failed: %v", sha1, err)
-	}
-	if len(queryKeys) > 1 {
-		return fmt.Errorf("found %v songs with SHA1 %v; expected 0 or 1", len(queryKeys), sha1)
+		return fmt.Errorf("querying for SHA1 %v failed: %v", updated.SHA1, err)
+	} else if len(queryKeys) > 1 {
+		return fmt.Errorf("found %v songs with SHA1 %v", len(queryKeys), updated.SHA1)
 	}
 
+	if keyType == UpdateByFilename {
+		var oldKey *datastore.Key
+		if len(queryKeys) > 0 {
+			oldKey = queryKeys[0]
+		}
+		if queryKeys, err = base.Filter("Filename =", updated.Filename).GetAll(ctx, nil); err != nil {
+			return fmt.Errorf("querying for %q failed: %v", updated.Filename, err)
+		} else if len(queryKeys) > 1 {
+			return fmt.Errorf("found %v songs with filename %q", len(queryKeys), updated.Filename)
+		} else if oldKey != nil && (len(queryKeys) == 0 || queryKeys[0].IntID() != oldKey.IntID()) {
+			// If the song's SHA1 is already present in the database with a different filename,
+			// avoid inserting or updating another entity to have the same SHA1.
+			return fmt.Errorf("existing song %v already has SHA1 %v", oldKey.IntID(), updated.SHA1)
+		}
+	}
+
+	replace := dataPolicy == ReplaceUserData
 	return datastore.RunInTransaction(ctx, func(ctx context.Context) error {
 		var key *datastore.Key
-		song := &db.Song{}
+		var song db.Song
 		if len(queryKeys) == 1 {
-			log.Debugf(ctx, "Updating %v with SHA1 %v", updatedSong.Filename, sha1)
 			key = queryKeys[0]
-			if !replaceUserData {
-				if err := datastore.Get(ctx, key, song); err != nil {
-					return fmt.Errorf("getting %v with key %v failed: %v", sha1, key.IntID(), err)
+			log.Debugf(ctx, "Updating song %v with SHA1 %v and filename %q",
+				key.IntID(), updated.SHA1, updated.Filename)
+			if !replace {
+				// If we're preserving the existing user data, we need to load it first.
+				if err := datastore.Get(ctx, key, &song); err != nil {
+					return fmt.Errorf("getting song %v failed: %v", key.IntID(), err)
 				}
 			}
 		} else {
-			log.Debugf(ctx, "Inserting %v with SHA1 %v", updatedSong.Filename, sha1)
+			log.Debugf(ctx, "Inserting song with SHA1 %v and filename %q",
+				updated.SHA1, updated.Filename)
 			key = datastore.NewIncompleteKey(ctx, db.SongKind, nil)
-			song.Rating = -1.0
+			song.Rating = -1.0 // unrated
 		}
 
-		if err := song.Update(updatedSong, replaceUserData); err != nil {
+		if err := song.Update(updated, replace); err != nil {
 			return err
 		}
-		if replaceUserData {
-			song.RebuildPlayStats(updatedSong.Plays)
+		if replace {
+			song.RebuildPlayStats(updated.Plays)
 		}
 		song.LastModifiedTime = time.Now()
 
-		if updateDelay > 0 {
-			time.Sleep(updateDelay)
-		}
-		key, err = datastore.Put(ctx, key, song)
+		time.Sleep(delay)
+		key, err = datastore.Put(ctx, key, &song) // must pass pointer
 		if err != nil {
 			return fmt.Errorf("putting %v failed: %v", key.IntID(), err)
 		}
-		log.Debugf(ctx, "Put %v with key %v", db.SongKind, key.IntID())
+		log.Debugf(ctx, "Put song %v", key.IntID())
 
-		if replaceUserData {
-			if err = replacePlays(ctx, key, updatedSong.Plays); err != nil {
+		if replace {
+			if err := replacePlays(ctx, key, updated.Plays); err != nil {
 				return err
 			}
 		}
@@ -171,7 +210,7 @@ func DeleteSong(ctx context.Context, id int64) error {
 		// Put the deleted song and plays.
 		song.LastModifiedTime = time.Now()
 		delSongKey := datastore.NewKey(ctx, db.DeletedSongKind, "", id, nil)
-		if _, err := datastore.Put(ctx, delSongKey, &song); err != nil {
+		if _, err := datastore.Put(ctx, delSongKey, &song); err != nil { // must pass pointer
 			return fmt.Errorf("putting deleted song %v failed: %v", id, err)
 		}
 		delPlayKeys := make([]*datastore.Key, len(plays))
@@ -317,18 +356,16 @@ func replacePlays(ctx context.Context, songKey *datastore.Key, plays []db.Play) 
 }
 
 func updateExistingSong(ctx context.Context, id int64, f func(context.Context, *db.Song) error,
-	updateDelay time.Duration, shouldLog bool) error {
-	if updateDelay > 0 {
-		time.Sleep(updateDelay)
-	}
+	delay time.Duration, shouldLog bool) error {
+	time.Sleep(delay)
 
 	return datastore.RunInTransaction(ctx, func(ctx context.Context) error {
 		key := datastore.NewKey(ctx, db.SongKind, "", id, nil)
-		song := &db.Song{}
-		if err := datastore.Get(ctx, key, song); err != nil {
+		var song db.Song
+		if err := datastore.Get(ctx, key, &song); err != nil {
 			return err
 		}
-		if err := f(ctx, song); err != nil {
+		if err := f(ctx, &song); err != nil {
 			if err == errUnmodified {
 				if shouldLog {
 					log.Debugf(ctx, "Song %v wasn't changed", id)
@@ -337,7 +374,7 @@ func updateExistingSong(ctx context.Context, id int64, f func(context.Context, *
 			}
 			return err
 		}
-		if _, err := datastore.Put(ctx, key, song); err != nil {
+		if _, err := datastore.Put(ctx, key, &song); err != nil { // must pass pointer
 			return err
 		}
 		if shouldLog {

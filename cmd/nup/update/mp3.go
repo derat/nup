@@ -197,6 +197,7 @@ type debugInfo struct {
 	size         int64         // entire file
 	header       int64         // ID3v2 header size
 	footer       int64         // ID3v1 footer size
+	sha1         string        // SHA1 of data between header and footer
 	kbitRate     int           // from first audio frame
 	sampleRate   int           // from first audio frame
 	xingFrames   int           // number of frames from Xing header
@@ -229,6 +230,9 @@ func getSongDebugInfo(p string) (*debugInfo, error) {
 	}
 	if tag, err := taglib.Decode(f, fi.Size()); err == nil {
 		info.header = int64(tag.TagSize())
+	}
+	if info.sha1, err = computeAudioSHA1(f, fi, info.header, info.footer); err != nil {
+		return &info, fmt.Errorf("failed computing SHA1: %v", err)
 	}
 
 	// Read the Xing header.

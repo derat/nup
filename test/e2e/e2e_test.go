@@ -298,6 +298,63 @@ func TestUserData(tt *testing.T) {
 	}
 }
 
+func TestUpdateUseFilenames(tt *testing.T) {
+	t, done := initTest(tt)
+	defer done()
+
+	mv := func(oldFn, newFn string) {
+		if err := os.Rename(filepath.Join(t.MusicDir, oldFn), filepath.Join(t.MusicDir, newFn)); err != nil {
+			tt.Error("Failed renaming song: ", err)
+		}
+	}
+
+	const (
+		oldFn  = "old.mp3"
+		newFn  = "new.mp3"
+		rating = 0.75
+	)
+
+	log.Print("Importing song from music dir")
+	test.Must(tt, test.CopySongs(t.MusicDir, Song0s.Filename))
+	mv(Song0s.Filename, oldFn)
+	song := Song0s
+	song.Filename = oldFn
+	t.UpdateSongs()
+	if err := test.CompareSongs([]db.Song{song}, t.DumpSongs(test.StripIDs),
+		test.IgnoreOrder); err != nil {
+		tt.Error("Bad songs after import: ", err)
+	}
+
+	log.Print("Rating song")
+	song.Rating = rating
+	t.RateAndTag(t.SongID(song.SHA1), song.Rating, nil)
+
+	// If we just rename the file, its hash will remain the same, so the existing
+	// datastore entity should be reused.
+	log.Print("Renaming song and checking that rating is preserved")
+	mv(oldFn, newFn)
+	song.Filename = newFn
+	t.UpdateSongs()
+	if err := test.CompareSongs([]db.Song{song}, t.DumpSongs(test.StripIDs),
+		test.IgnoreOrder); err != nil {
+		tt.Error("Bad songs after renaming song: ", err)
+	}
+
+	// If we replace the file (changing its hash) but pass -use-filenames,
+	// the datastore entity should be looked up by filename rather than by hash,
+	// so we should still update the existing entity.
+	test.Must(tt, test.CopySongs(t.MusicDir, Song5s.Filename))
+	mv(Song5s.Filename, newFn)
+	song = Song5s
+	song.Filename = newFn
+	song.Rating = rating
+	t.UpdateSongs(test.UseFilenamesFlag)
+	if err := test.CompareSongs([]db.Song{song}, t.DumpSongs(test.StripIDs),
+		test.IgnoreOrder); err != nil {
+		tt.Error("Bad songs after replacing song: ", err)
+	}
+}
+
 func TestQueries(tt *testing.T) {
 	t, done := initTest(tt)
 	defer done()

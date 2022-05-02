@@ -75,6 +75,10 @@ into Datastore.
     songs. Otherwise, the existing data is preserved.
 *   `updateDelayNsec` (optional) - Integer value containing nanoseconds to wait
     before writing to Datastore. Used by tests.
+*   `useFilenames` (optional) - If `1`, identify songs by filenames rather than
+    hashes of their audio data. This is useful after updating a file's data
+    (e.g. to correct errors): as long as its path renames the same, the existing
+    entity will be updated rather than a new one being inserted.
 
 ### /now (GET)
 

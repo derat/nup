@@ -101,7 +101,7 @@ var Song10s = db.Song{
 }
 
 var ID3V1Song = db.Song{
-	SHA1:      "fefac74a1d5928316d7131747107c8a61b71ffe4",
+	SHA1:      "fefac74a1d5928316d7131747107c8a61b71ffe4", // same as Song0s
 	Filename:  "id3v1.mp3",
 	Artist:    "The Legacy Formats",
 	Title:     "Give It Up For ID3v1",

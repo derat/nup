@@ -39,6 +39,7 @@ type Command struct {
 	requireCovers    bool   // die if cover images are missing
 	songPathsFile    string // path to list of songs to force updating
 	testGainInfo     string // hardcoded gain info as "track:album:amp" for testing
+	useFilenames     bool   // use filenames instead of SHA1s to identify songs
 }
 
 func (*Command) Name() string     { return "update" }
@@ -76,6 +77,8 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 		"Path to file containing one relative path per line for songs to force updating")
 	f.StringVar(&cmd.testGainInfo, "test-gain-info", "",
 		"Hardcoded gain info as \"track:album:amp\" (for testing)")
+	f.BoolVar(&cmd.useFilenames, "use-filenames", false,
+		"Identify songs by filename rather than audio data hash (useful when modifying files)")
 }
 
 func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
@@ -219,7 +222,7 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 			}
 		}
 	} else {
-		if err := updateSongs(cmd.Cfg, updateChan, replaceUserData); err != nil {
+		if err := updateSongs(cmd.Cfg, updateChan, replaceUserData, cmd.useFilenames); err != nil {
 			fmt.Fprintln(os.Stderr, "Failed updating songs:", err)
 		}
 		if didFullScan {
@@ -250,8 +253,8 @@ func (cmd *Command) doDebugSongFile() subcommands.ExitStatus {
 	format := func(d time.Duration) string {
 		return fmt.Sprintf("%d:%06.3f", int(d.Minutes()), (d % time.Minute).Seconds())
 	}
-	fmt.Printf("%d bytes: %d header, %d data, %d footer\n",
-		info.size, info.header, info.size-info.header-info.footer, info.footer)
+	fmt.Printf("%d bytes: %d header, %d data, %d footer (%v)\n",
+		info.size, info.header, info.size-info.header-info.footer, info.footer, info.sha1)
 	fmt.Printf("Xing:   %s (%d frames, %d data)\n",
 		format(info.xingDur), info.xingFrames, info.xingBytes)
 	fmt.Printf("Actual: %s (%d frames, %d data)\n",
@@ -310,7 +313,8 @@ func (cmd *Command) doMergeSongs() subcommands.ExitStatus {
 		ch := make(chan db.Song, 1)
 		ch <- dst
 		close(ch)
-		if err := updateSongs(cmd.Cfg, ch, true /* replaceUserData */); err != nil {
+		if err := updateSongs(cmd.Cfg, ch, true, /* replaceUserData */
+			false /* useFilenames */); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed updating song %v: %v\n", dstID, err)
 			return subcommands.ExitFailure
 		}

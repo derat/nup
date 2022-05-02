@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/server/db"
@@ -54,15 +55,25 @@ func sendRequest(cfg *client.Config, method, path, query string,
 
 // updateSongs reads all songs from ch and sends them to the server.
 //
-// If replaceUserData is true, then user data (e.g. rating, tags, plays)
-// are replaced with data from ch; otherwise the user data on the server
-// are preserved and only static fields (e.g. artist, title, album, etc.)
+// replaceUserData indicates that user data (e.g. rating, tags, plays)
+// should be replaced with data from ch; otherwise the existing data is
+// preserved and only static fields (e.g. artist, title, album, etc.)
 // are replaced.
-func updateSongs(cfg *client.Config, ch chan db.Song, replaceUserData bool) error {
-	var query string
+//
+// useFilenames indicates that the server should identify songs to update
+// by their filenames rather than by SHA1s of their audio data. This can
+// be used to avoid creating a new database object after deliberately
+// modifying a song file's audio data.
+func updateSongs(cfg *client.Config, ch chan db.Song, replaceUserData, useFilenames bool) error {
+	var args []string
 	if replaceUserData {
-		query = "replaceUserData=1"
+		args = append(args, "replaceUserData=1")
 	}
+	if useFilenames {
+		args = append(args, "useFilenames=1")
+	}
+	query := strings.Join(args, "&")
+
 	sendFunc := func(r io.Reader) error {
 		_, err := sendRequest(cfg, "POST", "/import", query, r, "text/plain")
 		return err
@@ -71,7 +82,6 @@ func updateSongs(cfg *client.Config, ch chan db.Song, replaceUserData bool) erro
 	// Ideally these results could just be streamed, but dev_appserver.py doesn't seem to support
 	// chunked encoding: https://code.google.com/p/googleappengine/issues/detail?id=129
 	// Might be for the best, as the max request duration could probably be hit otherwise.
-
 	var numSongs int
 	var buf bytes.Buffer
 	e := json.NewEncoder(&buf)

@@ -45,6 +45,8 @@ func computeAudioSHA1(f *os.File, fi os.FileInfo, headerLen, footerLen int64) (s
 }
 
 // computeDirGains computes gain adjustments for all MP3 files in dir.
+// TODO: Accept an optional album ID (or file path) that can be used to limit which files are processed?
+// Otherwise, "misc" directories can take forever when a single file is added to them.
 func computeDirGains(dir string) (map[string]mp3gain.Info, error) {
 	paths, err := filepath.Glob(filepath.Join(dir, "*.[mM][pP]3")) // case-insensitive :-/
 	if err != nil {
