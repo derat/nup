@@ -1,7 +1,12 @@
 // Copyright 2022 Daniel Erat.
 // All rights reserved.
 
-import { createShadow, createTemplate, getCurrentTimeSec } from './common.js';
+import {
+  clamp,
+  createShadow,
+  createTemplate,
+  getCurrentTimeSec,
+} from './common.js';
 
 const template = createTemplate(`
 <audio type="audio/mpeg" preload="auto">
@@ -151,7 +156,7 @@ customElements.define(
         // didn't move as much: https://github.com/derat/nup/issues/20
         const timeDiff = now - this.lastUpdateTime_;
         const posDiff = pos - this.lastUpdatePos_;
-        this.playtime_ += Math.max(Math.min(timeDiff, posDiff), 0);
+        this.playtime_ += clamp(timeDiff, 0, posDiff);
       }
 
       this.lastUpdateTime_ = now;

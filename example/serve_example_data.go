@@ -123,23 +123,28 @@ func killProcs(re *regexp.Regexp) error {
 	return nil
 }
 
+// MaxPlays needs to be set explicitly since Go's zero value (i.e. 0) isn't the default.
+// The server handles this automatically when unmarshaling from JSON.
 var presets = []config.SearchPreset{
 	{
 		Name:       "old",
 		MinRating:  4,
 		LastPlayed: 6,
+		MaxPlays:   -1,
 		Shuffle:    true,
 		Play:       true,
 	},
 	{
 		Name:        "new albums",
 		FirstPlayed: 3,
+		MaxPlays:    -1,
 		FirstTrack:  true,
 	},
 	{
-		Name:    "unrated",
-		Unrated: true,
-		Play:    true,
+		Name:     "unrated",
+		Unrated:  true,
+		MaxPlays: -1,
+		Play:     true,
 	},
 }
 

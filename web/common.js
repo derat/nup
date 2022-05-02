@@ -28,8 +28,14 @@ export const emptyImg =
 //   https://stackoverflow.com/a/26807004
 export const scaledCoverSize = 512;
 
+// Returns the element under |root| with ID |id|.
 export function $(id, root) {
   return (root || document).getElementById(id);
+}
+
+// Clamps number |val| between |min| and |max|.
+export function clamp(val, min, max) {
+  return Math.min(Math.max(val, min), max);
 }
 
 function pad(num, width) {
@@ -38,10 +44,12 @@ function pad(num, width) {
   return str;
 }
 
+// Formats |sec| as "m:ss".
 export function formatTime(sec) {
   return parseInt(sec / 60) + ':' + pad(parseInt(sec % 60), 2);
 }
 
+// Returns the number of milliseconds since the Unix epoch.
 export function getCurrentTimeSec() {
   return new Date().getTime() / 1000.0;
 }

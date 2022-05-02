@@ -3,6 +3,7 @@
 
 import {
   $,
+  clamp,
   createShadow,
   createTemplate,
   getCurrentTimeSec,
@@ -151,11 +152,12 @@ const template = createTemplate(`
       Min rating
       <div class="select-wrapper">
         <select id="min-rating-select">
-          <option value="0.00">★</option>
+          <option value=""></option>
+          <option value="0">★</option>
           <option value="0.25">★★</option>
-          <option value="0.50">★★★</option>
+          <option value="0.5">★★★</option>
           <option value="0.75">★★★★</option>
-          <option value="1.00">★★★★★</option>
+          <option value="1">★★★★★</option>
         </select>
       </div>
     </label>
@@ -452,7 +454,10 @@ customElements.define(
       if (this.tagsInput_.value.trim()) {
         terms.push('tags=' + encodeURIComponent(this.tagsInput_.value.trim()));
       }
-      if (!this.minRatingSelect_.disabled && this.minRatingSelect_.value != 0) {
+      if (
+        !this.minRatingSelect_.disabled &&
+        this.minRatingSelect_.value !== ''
+      ) {
         terms.push('minRating=' + this.minRatingSelect_.value);
       }
       if (this.shuffleCheckbox_.checked) terms.push('shuffle=1');
@@ -581,13 +586,14 @@ customElements.define(
         !this.firstTrackCheckbox_.checked &&
         !this.unratedCheckbox_.checked &&
         this.minRatingSelect_.selectedIndex == 0 &&
+        !this.orderByLastPlayedCheckbox_.checked &&
         !(parseInt(this.maxPlaysInput_.value) >= 0) &&
         this.firstPlayedSelect_.selectedIndex === 0 &&
         this.lastPlayedSelect_.selectedIndex === 0
       ) {
         this.reset_(null, null, null, false /* clearResults */);
         this.shuffleCheckbox_.checked = true;
-        this.minRatingSelect_.selectedIndex = 3;
+        this.minRatingSelect_.selectedIndex = 4; // 4 stars
       }
       this.submitQuery_(true);
     }
@@ -618,7 +624,7 @@ customElements.define(
       this.presetSelect_.selectedIndex = index;
 
       this.tagsInput_.value = preset.tags;
-      this.minRatingSelect_.selectedIndex = Math.max(preset.minRating - 1, 0);
+      this.minRatingSelect_.selectedIndex = clamp(preset.minRating, 0, 5);
       this.unratedCheckbox_.checked = preset.unrated;
       this.orderByLastPlayedCheckbox_.checked = preset.orderByLastPlayed;
       this.firstPlayedSelect_.selectedIndex = preset.firstPlayed;

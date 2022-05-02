@@ -358,7 +358,7 @@ func TestRatingQuery(t *testing.T) {
 	allSongs := joinSongs(song1, song2, song3, song4, song5, song6)
 	importSongs(allSongs)
 
-	page.setStage(oneStar)
+	page.setStage("unset")
 	page.setText(keywordsInput, "t") // need to set at least one search term
 	page.click(searchButton)
 	page.checkSearchResults(allSongs)
@@ -368,6 +368,7 @@ func TestRatingQuery(t *testing.T) {
 		option string
 		want   []db.Song
 	}{
+		{oneStar, joinSongs(song1, song2, song3, song4, song5)},
 		{twoStars, joinSongs(song2, song3, song4, song5)},
 		{threeStars, joinSongs(song3, song4, song5)},
 		{fourStars, joinSongs(song4, song5)},
