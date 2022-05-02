@@ -24,9 +24,10 @@ const appserverTimeout = 15 * time.Second
 
 // DevAppserver wraps a dev_appserver.py process.
 type DevAppserver struct {
-	appPort       int       // app's port for HTTP requests
-	cmd           *exec.Cmd // dev_appserver.py process
-	createIndexes bool      // update index.yaml
+	appPort         int       // app's port for HTTP requests
+	cmd             *exec.Cmd // dev_appserver.py process
+	createIndexes   bool      // update index.yaml
+	watchForChanges bool      // rebuild app when files changed
 }
 
 // NewDevAppserver starts a dev_appserver.py process using the supplied configuration.
@@ -63,23 +64,25 @@ func NewDevAppserver(cfg *config.Config, storageDir string, out io.Writer,
 	}
 	adminPort := ports[1]
 
-	reqIndexes := "yes"
-	if srv.createIndexes {
-		reqIndexes = "no"
-	}
-
-	cmd := exec.Command(
-		"dev_appserver.py",
-		"--application", "nup-test",
-		"--port", strconv.Itoa(srv.appPort),
-		"--admin_port", strconv.Itoa(adminPort),
-		"--storage_path", storageDir,
-		"--env_var", "NUP_CONFIG="+string(cfgData),
-		"--datastore_consistency_policy", "consistent",
-		"--require_indexes="+reqIndexes,
+	args := []string{
+		"--application=nup-test",
+		"--port=" + strconv.Itoa(srv.appPort),
+		"--admin_port=" + strconv.Itoa(adminPort),
+		"--storage_path=" + storageDir,
+		"--env_var", "NUP_CONFIG=" + string(cfgData),
+		"--datastore_consistency_policy=consistent",
 		// TODO: This is a hack to work around forceUpdateFailures in server/main.go.
-		"--max_module_instances", "1",
-		".")
+		"--max_module_instances=1",
+	}
+	if !srv.createIndexes {
+		args = append(args, "--require_indexes=yes")
+	}
+	if !srv.watchForChanges {
+		args = append(args, "--watcher_ignore_re=.*")
+	}
+	args = append(args, ".")
+
+	cmd := exec.Command("dev_appserver.py", args...)
 	cmd.Dir = filepath.Join(libDir, "..") // directory containing app.yaml
 	cmd.Stdout = out
 	cmd.Stderr = out
@@ -182,4 +185,10 @@ func DevAppserverPort(port int) DevAppserverOption {
 // be satisfied using the existing indexes.
 func DevAppserverCreateIndexes(create bool) DevAppserverOption {
 	return func(srv *DevAppserver) { srv.createIndexes = create }
+}
+
+// DevAppserverWatchForChanges specifies whether dev_appserver.py should watch for
+// changes to the app and rebuild it automatically. Defaults to false.
+func DevAppserverWatchForChanges(watch bool) DevAppserverOption {
+	return func(srv *DevAppserver) { srv.watchForChanges = watch }
 }

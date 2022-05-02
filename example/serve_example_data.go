@@ -77,7 +77,7 @@ func run() (int, error) {
 		Presets:        presets,
 	}
 	appSrv, err := test.NewDevAppserver(cfg, filepath.Join(tmpDir, "app_storage"), appOut,
-		test.DevAppserverPort(*port))
+		test.DevAppserverPort(*port), test.DevAppserverWatchForChanges(true))
 	if err != nil {
 		return -1, fmt.Errorf("dev_appserver: %v", err)
 	}

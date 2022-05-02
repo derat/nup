@@ -16,11 +16,9 @@
 
 .prettierrc
 LICENSE
+web/fontello/LICENSE.txt
 
 build/
-client/
 cmd/
 example/
-mp3gain/
 test/
-web/fontello/LICENSE.txt
