@@ -136,15 +136,17 @@ var presets = []config.SearchPreset{
 	},
 	{
 		Name:        "new albums",
+		MinRating:   -1,
 		FirstPlayed: 3,
 		MaxPlays:    -1,
 		FirstTrack:  true,
 	},
 	{
-		Name:     "unrated",
-		Unrated:  true,
-		MaxPlays: -1,
-		Play:     true,
+		Name:      "unrated",
+		MinRating: -1,
+		Unrated:   true,
+		MaxPlays:  -1,
+		Play:      true,
 	},
 }
 

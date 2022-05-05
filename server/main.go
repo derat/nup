@@ -417,7 +417,15 @@ func handlePresets(ctx context.Context, cfg *config.Config, w http.ResponseWrite
 }
 
 func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
-	cacheOnly := r.FormValue("cacheOnly") == "1"
+	var flags query.SongsFlags
+	if r.FormValue("cacheOnly") == "1" {
+		flags |= query.CacheOnly
+	}
+	if v := r.FormValue("fallback"); v == "force" {
+		flags |= query.ForceFallback
+	} else if v == "never" {
+		flags |= query.NoFallback
+	}
 
 	q := query.SongQuery{
 		Artist:               r.FormValue("artist"),
@@ -475,7 +483,7 @@ func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 		}
 	}
 
-	songs, err := query.Songs(ctx, &q, cacheOnly)
+	songs, err := query.Songs(ctx, &q, flags)
 	if err != nil {
 		log.Errorf(ctx, "Unable to query songs: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

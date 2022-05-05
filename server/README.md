@@ -109,6 +109,9 @@ Queries Datastore and returns a JSON-marshaled array of [Song]s.
 *   `cacheOnly` (optional) - If `1`, only return cached data. Used by tests.
 *   `keywords` (optional) - Space-separated keywords to match against artists,
     titles, and albums.
+*   `fallback` (optional) - If `force`, only uses the fallback mode that tries
+    to avoid using composite indexes in Datastore. If `never`, doesn't use the
+    fallback mode at all. Used by tests.
 *   `firstTrack` (optional) - If `1`, only returns songs that are the first
     tracks of first discs.
 *   `minFirstPlayed` (optional) - Float seconds since the Unix epoch specifying

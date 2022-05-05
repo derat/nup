@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -96,7 +97,7 @@ func (q *SongQuery) resultsInvalidated(ut UpdateTypes) bool {
 
 // UpdateTypes is a bitfield describing what was changed by an update.
 // It is used for invalidating cached data.
-type UpdateTypes uint8
+type UpdateTypes uint32
 
 const (
 	MetadataUpdate UpdateTypes = 1 << iota // song metadata
@@ -105,10 +106,22 @@ const (
 	PlaysUpdate
 )
 
+// SongsFlags is a bitfield controlling the behavior of the Songs function.
+type SongsFlags uint32
+
+const (
+	// CacheOnly indicates that empty results should be returned if the query's results aren't
+	// already cached.
+	CacheOnly SongsFlags = 1 << iota
+	// ForceFallback indicates that the fallback mode that tries to avoid requiring composite
+	// indexes should be used instead of the normal mode.
+	ForceFallback
+	// NoFallback indicates that the fallback mode should never be used.
+	NoFallback
+)
+
 // Songs executes the supplied query and returns matching songs.
-// If cacheOnly is true, empty results are returned if the query's results
-// aren't cached.
-func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]*db.Song, error) {
+func Songs(ctx context.Context, query *SongQuery, flags SongsFlags) ([]*db.Song, error) {
 	var ids []int64
 	var err error
 
@@ -128,14 +141,24 @@ func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]*db.Song, e
 	}
 
 	// If we were asked to only return cached results, create an empty result set.
-	if ids == nil && cacheOnly {
+	if ids == nil && flags&CacheOnly != 0 {
 		ids = make([]int64, 0)
 		cacheWriteTypes = nil // don't write empty results to cache
 	}
 
 	// If we still don't have results, actually run the query against datastore.
 	if ids == nil {
-		if ids, err = runQuery(ctx, query); err != nil {
+		forceFallback := flags&ForceFallback != 0
+		noFallback := flags&NoFallback != 0
+		if ids, err = runQuery(ctx, query, forceFallback); err != nil {
+			// Error code 4 corresponds to "NEED_INDEX":
+			// https://github.com/golang/appengine/blob/8f83b321/internal/datastore/datastore_v3.proto#L351
+			if code, ok := getErrorCode(err); ok && code == 4 && !forceFallback && !noFallback {
+				log.Debugf(ctx, "Rerunning query due to missing composite index")
+				ids, err = runQuery(ctx, query, true)
+			}
+		}
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -210,6 +233,7 @@ func Songs(ctx context.Context, query *SongQuery, cacheOnly bool) ([]*db.Song, e
 }
 
 // runQueriesAndGetIDs runs the provided queries in parallel and returns the results from each.
+// Each result set (consisting of key integer IDs) is sorted in ascending order.
 func runQueriesAndGetIDs(ctx context.Context, qs []*datastore.Query) ([][]int64, []time.Duration, error) {
 	type queryResult struct {
 		idx  int
@@ -295,9 +319,16 @@ func shufflePartial(a []int64, n int) {
 	}
 }
 
-func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
+// runQuery performs the supplied query against datastore and returns the corresponding songs'
+// integer IDs in an unspecified order. The results are not necessarily truncated to maxResults
+// songs yet (since e.g. the full result set is needed when shuffling).
+//
+// If fallback is true, each inequality filter is executed in its own query. This is slow (since
+// some queries may match all rows), but it will hopefully work even if an appropriate composite
+// index isn't present: https://cloud.google.com/datastore/docs/concepts/indexes
+func runQuery(ctx context.Context, query *SongQuery, fallback bool) ([]int64, error) {
 	// First, build a base query with all of the equality filters.
-	bq := datastore.NewQuery(db.SongKind).KeysOnly()
+	eq := datastore.NewQuery(db.SongKind).KeysOnly()
 
 	type term struct{ expr, val string }
 	terms := []term{
@@ -313,76 +344,90 @@ func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 			if norm, err := db.Normalize(t.val); err != nil {
 				return nil, fmt.Errorf("normalizing %q: %v", t.val, err)
 			} else {
-				bq = bq.Filter(t.expr, norm)
+				eq = eq.Filter(t.expr, norm)
 			}
 		}
 	}
 
 	if len(query.AlbumID) > 0 {
-		bq = bq.Filter("AlbumId =", query.AlbumID)
+		eq = eq.Filter("AlbumId =", query.AlbumID)
 	}
 	if query.hasMinRating() {
 		switch query.MinRating {
 		case 1.0:
-			bq = bq.Filter("Rating =", 1.0)
+			eq = eq.Filter("Rating =", 1.0)
 		case 0.75:
-			bq = bq.Filter("RatingAtLeast75 =", true)
+			eq = eq.Filter("RatingAtLeast75 =", true)
 		case 0.5:
-			bq = bq.Filter("RatingAtLeast50 =", true)
+			eq = eq.Filter("RatingAtLeast50 =", true)
 		case 0.25:
-			bq = bq.Filter("RatingAtLeast25 =", true)
+			eq = eq.Filter("RatingAtLeast25 =", true)
 		case 0.0:
-			bq = bq.Filter("RatingAtLeast0 =", true)
+			eq = eq.Filter("RatingAtLeast0 =", true)
 		default:
 			return nil, fmt.Errorf("rating %v not in [1, 0.75, 0.5, 0.25, 0]", query.MinRating)
 		}
 	} else if query.Unrated {
-		bq = bq.Filter("Rating =", -1.0)
+		eq = eq.Filter("Rating =", -1.0)
+	}
+	if query.MaxPlays == 0 {
+		eq = eq.Filter("NumPlays =", 0)
 	}
 	if query.Track > 0 {
-		bq = bq.Filter("Track =", query.Track)
+		eq = eq.Filter("Track =", query.Track)
 	}
 	if query.Disc > 0 {
-		bq = bq.Filter("Disc =", query.Disc)
+		eq = eq.Filter("Disc =", query.Disc)
 	}
 	for _, t := range query.Tags {
-		bq = bq.Filter("Tags =", t)
+		eq = eq.Filter("Tags =", t)
 	}
 
-	// This is incompatible with any of the inequality filters below.
-	if query.OrderByLastStartTime {
-		bq = bq.Order("LastStartTime").Limit(maxResults)
+	var qs []*datastore.Query // underlying queries to run in parallel
+
+	// Now add inequality filters. Datastore doesn't allow multiple inequality filters on different
+	// properties, so we run a separate query in parallel for each filter and then intersect the
+	// results.
+	var iq *datastore.Query // base query
+	if fallback {
+		// If we already determined that we don't have the proper composite index needed to mix
+		// equality and inequality filters, then run a separate slow query for each inequality
+		// filter.
+		qs = append(qs, eq)
+		iq = datastore.NewQuery(db.SongKind).KeysOnly()
+	} else {
+		// Otherwise, include the equality filters with the inequality filters.
+		iq = eq
 	}
 
-	// Datastore doesn't allow multiple inequality filters on different properties.
-	// Run a separate query in parallel for each filter and then intersect the results.
-	var qs []*datastore.Query
-	if query.hasMaxPlays() {
-		qs = append(qs, bq.Filter("NumPlays <=", query.MaxPlays))
+	if query.MaxPlays >= 1 {
+		qs = append(qs, iq.Filter("NumPlays <=", query.MaxPlays))
 	}
 	if !query.MinFirstStartTime.IsZero() {
-		qs = append(qs, bq.Filter("FirstStartTime >=", query.MinFirstStartTime))
+		qs = append(qs, iq.Filter("FirstStartTime >=", query.MinFirstStartTime))
 	}
 	if !query.MaxLastStartTime.IsZero() {
-		qs = append(qs, bq.Filter("LastStartTime <=", query.MaxLastStartTime))
+		qs = append(qs, iq.Filter("LastStartTime <=", query.MaxLastStartTime))
 	}
 
+	// If we don't have any queries that incorporate the equality filters and inequality filters,
+	// just run a query with the equality filters by itself.
 	if len(qs) == 0 {
-		qs = append(qs, bq)
+		q := eq
+		// Limit the number of the results if we know that we we won't need to intersect multiple
+		// queries or shuffle a big result set.
+		if query.OrderByLastStartTime {
+			q = q.Order("LastStartTime").Limit(maxResults)
+		} else if len(query.NotTags) == 0 && !query.Shuffle {
+			q = q.Limit(maxResults)
+		}
+		qs = append(qs, q)
 	}
 
-	// Also run queries for tags that shouldn't be present and subtract the results.
+	// Also run a query for each tag that shouldn't be present and subtract it from the results.
 	negativeQueryStart := len(qs)
 	for _, t := range query.NotTags {
-		qs = append(qs, bq.Filter("Tags =", t))
-	}
-
-	// If we're not shuffling the results, don't waste time getting IDs for songs that
-	// we won't return. I'm only doing this if there's a single query, since there's no
-	// guarantee about which rows will be returned, and intersections and subtractions
-	// won't work right without full results.
-	if len(qs) == 1 && !query.Shuffle && !query.OrderByLastStartTime {
-		qs[0] = qs[0].Limit(maxResults)
+		qs = append(qs, eq.Filter("Tags =", t))
 	}
 
 	startTime := time.Now()
@@ -409,7 +454,42 @@ func runQuery(ctx context.Context, query *SongQuery) ([]int64, error) {
 		}
 	}
 	log.Debugf(ctx, "Merged to %d result(s) in %v ms", len(mergedIDs), msecSince(startTime))
+
+	// If we weren't able to use datastore to limit the number of results,
+	// do another query to get the correct ordering.
+	if fallback && query.OrderByLastStartTime && len(mergedIDs) > maxResults {
+		startTime := time.Now()
+		if mergedIDs, err = truncateIDsByLastStartTime(ctx, mergedIDs); err != nil {
+			return nil, err
+		}
+		log.Debugf(ctx, "Truncated by last start time to %d result(s) in %v ms",
+			len(mergedIDs), msecSince(startTime))
+	}
+
 	return mergedIDs, nil
+}
+
+// truncateIDsByLastStartTime returns the first maxResults (at most) of the supplied IDs
+// after ordering by LastStartTime.
+func truncateIDsByLastStartTime(ctx context.Context, ids []int64) ([]int64, error) {
+	matched := func(id int64) bool {
+		i := sort.Search(len(ids), func(i int) bool { return ids[i] >= id })
+		return i < len(ids) && ids[i] == id
+	}
+	res := make([]int64, 0, maxResults)
+	it := datastore.NewQuery(db.SongKind).KeysOnly().Order("LastStartTime").Run(ctx)
+	for len(res) < maxResults {
+		if k, err := it.Next(nil); err == datastore.Done {
+			break
+		} else if err != nil {
+			return nil, err
+		} else {
+			if id := k.IntID(); matched(id) {
+				res = append(res, id)
+			}
+		}
+	}
+	return res, nil
 }
 
 // CleanSong prepares s to be returned in results.
@@ -502,4 +582,24 @@ func spreadSongs(songs []*db.Song) {
 // msecSince returns the number of elapsed milliseconds since t.
 func msecSince(t time.Time) int64 {
 	return time.Now().Sub(t).Nanoseconds() / int64(time.Millisecond/time.Nanosecond)
+}
+
+// getErrorCode attempts to extract an internal datastore error code from an error returned by the
+// google.golang.org/appengine/v2/datastore package.
+//
+// Codes correspond to the ErrorCode enum:
+// https://github.com/golang/appengine/blob/8f83b321/internal/datastore/datastore_v3.proto#L347
+//
+// It's really annoying that the package doesn't export a dedicated error for "NEED_INDEX".
+func getErrorCode(err error) (code int, ok bool) {
+	ev := reflect.Indirect(reflect.ValueOf(err))
+	if ev.Kind() != reflect.Struct {
+		return 0, false
+	}
+	fv := ev.FieldByName("Code")
+	// TODO: Use CanInt() in Go 1.18 (field is currently int32).
+	if k := fv.Kind(); k != reflect.Int && k != reflect.Int32 && k != reflect.Int64 {
+		return 0, false
+	}
+	return int(fv.Int()), true
 }

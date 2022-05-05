@@ -41,6 +41,9 @@ type SearchPreset struct {
 	Tags string `json:"tags"`
 	// MinRating contains a minimum rating as number of stars in [1, 5].
 	// 0 is equivalent to 1, i.e. any rating is accepted.
+	// TODO: This should probably be called MinStars instead to make it clear
+	// that it's different from the Song.Rating field with its values in [0.0, 1.0].
+	// Or maybe just use stars everywhere? ¯\_(ツ)_/¯
 	MinRating int `json:"minRating"`
 	// Unrated specifies that only unrated songs should be returned.
 	Unrated bool `json:"unrated"`
