@@ -25,8 +25,9 @@ import (
 )
 
 const (
-	maxResults  = 100  // max songs to return for query
-	shuffleSkew = 0.25 // max offset to skew songs' positions when shuffling
+	maxResults        = 100  // max songs to return for query
+	truncateMapThresh = 1000 // max song ID map size for truncateIDsByLastStartTime
+	shuffleSkew       = 0.25 // max offset to skew songs' positions when shuffling
 )
 
 // SongQuery describes a query returning a list of Songs.
@@ -278,7 +279,12 @@ func runQueriesAndGetIDs(ctx context.Context, qs []*datastore.Query) ([][]int64,
 
 // intersectSortedIDs returns the intersection of two sorted arrays that don't have duplicate values.
 func intersectSortedIDs(a, b []int64) []int64 {
-	m := make([]int64, 0)
+	ml := len(a)
+	if len(b) < ml {
+		ml = len(b)
+	}
+	m := make([]int64, 0, ml)
+
 	var i, j int
 	for i < len(a) && j < len(b) {
 		if a[i] == b[j] {
@@ -294,10 +300,10 @@ func intersectSortedIDs(a, b []int64) []int64 {
 	return m
 }
 
-// filterSortedIDs returns values present in a but not in b (i.e. the intersection of a and !b).
+// subtractSortedIDs returns values present in a but not in b (i.e. the intersection of a and !b).
 // Both arrays must be sorted.
-func filterSortedIDs(a, b []int64) []int64 {
-	m := make([]int64, 0)
+func subtractSortedIDs(a, b []int64) []int64 {
+	m := make([]int64, 0, len(a))
 	var i, j int
 	for i < len(a) {
 		for j < len(b) && a[i] > b[j] {
@@ -430,52 +436,72 @@ func runQuery(ctx context.Context, query *SongQuery, fallback bool) ([]int64, er
 		qs = append(qs, eq.Filter("Tags =", t))
 	}
 
-	startTime := time.Now()
-	unmergedIDs, times, err := runQueriesAndGetIDs(ctx, qs)
+	start := time.Now()
+	unmerged, times, err := runQueriesAndGetIDs(ctx, qs)
 	if err != nil {
 		return nil, err
 	}
-	details := make([]string, len(unmergedIDs))
-	for i, ids := range unmergedIDs {
+	details := make([]string, len(unmerged))
+	for i, ids := range unmerged {
 		details[i] = fmt.Sprintf("%v (%v ms)", len(ids), times[i].Milliseconds())
 	}
 	log.Debugf(ctx, "Ran %v query(s) in %v ms: %v",
-		len(qs), msecSince(startTime), strings.Join(details, ", "))
+		len(qs), msecSince(start), strings.Join(details, ", "))
 
-	startTime = time.Now()
-	var mergedIDs []int64
-	for i, ids := range unmergedIDs {
-		if i == 0 {
-			mergedIDs = ids
-		} else if i < negativeQueryStart {
-			mergedIDs = intersectSortedIDs(mergedIDs, ids)
-		} else {
-			mergedIDs = filterSortedIDs(mergedIDs, ids)
+	// Intersect and subtract the queries to get a single ordered result set.
+	merged := unmerged[0]
+	if len(unmerged) > 1 {
+		start := time.Now()
+		for i, ids := range unmerged[1:] {
+			if i+1 < negativeQueryStart {
+				merged = intersectSortedIDs(merged, ids)
+			} else {
+				merged = subtractSortedIDs(merged, ids)
+			}
 		}
+		log.Debugf(ctx, "Merged to %d result(s) in %v ms", len(merged), msecSince(start))
 	}
-	log.Debugf(ctx, "Merged to %d result(s) in %v ms", len(mergedIDs), msecSince(startTime))
 
 	// If we weren't able to use datastore to limit the number of results,
-	// do another query to get the correct ordering.
-	if fallback && query.OrderByLastStartTime && len(mergedIDs) > maxResults {
-		startTime := time.Now()
-		if mergedIDs, err = truncateIDsByLastStartTime(ctx, mergedIDs); err != nil {
+	// do another query to get the correct ordering so we can truncate.
+	if query.OrderByLastStartTime && len(merged) > maxResults {
+		start := time.Now()
+		if merged, err = truncateIDsByLastStartTime(ctx, merged); err != nil {
 			return nil, err
 		}
 		log.Debugf(ctx, "Truncated by last start time to %d result(s) in %v ms",
-			len(mergedIDs), msecSince(startTime))
+			len(merged), msecSince(start))
 	}
 
-	return mergedIDs, nil
+	return merged, nil
 }
 
-// truncateIDsByLastStartTime returns the first maxResults (at most) of the supplied IDs
-// after ordering by LastStartTime.
+// truncateIDsByLastStartTime returns the first maxResults (at most) of the supplied sorted
+// IDs after ordering by LastStartTime.
 func truncateIDsByLastStartTime(ctx context.Context, ids []int64) ([]int64, error) {
-	matched := func(id int64) bool {
-		i := sort.Search(len(ids), func(i int) bool { return ids[i] >= id })
-		return i < len(ids) && ids[i] == id
+	// If we don't have many IDs, we'll probably need to read a bunch of the LastStartTime
+	// results before get to maxResults songs. Put the IDs into a map so we don't need to
+	// binary search over and over.
+	var check func(int64) bool
+	if len(ids) <= truncateMapThresh {
+		idsMap := make(map[int64]struct{}, len(ids))
+		for _, id := range ids {
+			idsMap[id] = struct{}{}
+		}
+		check = func(id int64) bool {
+			_, ok := idsMap[id]
+			return ok
+		}
+	} else {
+		check = func(id int64) bool {
+			i := sort.Search(len(ids), func(i int) bool { return ids[i] >= id })
+			return i < len(ids) && ids[i] == id
+		}
 	}
+
+	// This query matches all entities, but its running time fortunately appears to depend on the
+	// number of results that we read (which depends on how soon we encounter maxResults of the
+	// passed-in songs).
 	res := make([]int64, 0, maxResults)
 	it := datastore.NewQuery(db.SongKind).KeysOnly().Order("LastStartTime").Run(ctx)
 	for len(res) < maxResults {
@@ -484,7 +510,8 @@ func truncateIDsByLastStartTime(ctx context.Context, ids []int64) ([]int64, erro
 		} else if err != nil {
 			return nil, err
 		} else {
-			if id := k.IntID(); matched(id) {
+			id := k.IntID()
+			if check(id) {
 				res = append(res, id)
 			}
 		}
@@ -493,7 +520,7 @@ func truncateIDsByLastStartTime(ctx context.Context, ids []int64) ([]int64, erro
 }
 
 // CleanSong prepares s to be returned in results.
-// This is exported so it can be called by tests.
+// This is exported so it can be called by tests in other packages.
 func CleanSong(s *db.Song, id int64) {
 	s.SongID = strconv.FormatInt(id, 10)
 
@@ -580,9 +607,7 @@ func spreadSongs(songs []*db.Song) {
 }
 
 // msecSince returns the number of elapsed milliseconds since t.
-func msecSince(t time.Time) int64 {
-	return time.Now().Sub(t).Nanoseconds() / int64(time.Millisecond/time.Nanosecond)
-}
+func msecSince(t time.Time) int64 { return time.Since(t).Milliseconds() }
 
 // getErrorCode attempts to extract an internal datastore error code from an error returned by the
 // google.golang.org/appengine/v2/datastore package.

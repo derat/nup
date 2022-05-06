@@ -307,9 +307,6 @@ customElements.define(
       this.orderByLastPlayedCheckbox_.addEventListener('keydown', (e) =>
         this.handleFormKeyDown_(e)
       );
-      this.orderByLastPlayedCheckbox_.addEventListener('change', () =>
-        this.updateFormDisabledState_()
-      );
       this.maxPlaysInput_ = get('max-plays-input');
       this.maxPlaysInput_.addEventListener('keydown', (e) =>
         this.handleFormKeyDown_(e)
@@ -466,16 +463,10 @@ customElements.define(
       if (this.orderByLastPlayedCheckbox_.checked) {
         terms.push('orderByLastPlayed=1');
       }
-      if (
-        !this.maxPlaysInput_.disabled &&
-        parseInt(this.maxPlaysInput_.value) >= 0
-      ) {
+      if (parseInt(this.maxPlaysInput_.value) >= 0) {
         terms.push('maxPlays=' + parseInt(this.maxPlaysInput_.value));
       }
-      if (
-        !this.firstPlayedSelect_.disabled &&
-        this.firstPlayedSelect_.value != 0
-      ) {
+      if (this.firstPlayedSelect_.value != 0) {
         terms.push(
           'minFirstPlayed=' +
             parseInt(
@@ -483,10 +474,7 @@ customElements.define(
             )
         );
       }
-      if (
-        !this.lastPlayedSelect_.disabled &&
-        this.lastPlayedSelect_.value != 0
-      ) {
+      if (this.lastPlayedSelect_.value != 0) {
         terms.push(
           'maxLastPlayed=' +
             parseInt(
@@ -609,10 +597,6 @@ customElements.define(
 
     updateFormDisabledState_() {
       this.minRatingSelect_.disabled = this.unratedCheckbox_.checked;
-      this.maxPlaysInput_.disabled =
-        this.firstPlayedSelect_.disabled =
-        this.lastPlayedSelect_.disabled =
-          this.orderByLastPlayedCheckbox_.checked;
     }
 
     handlePresetSelectChanged_(event) {

@@ -199,6 +199,11 @@ customElements.define(
       const button = $('ok-button', shadow);
       button.addEventListener('click', () => this.closeChild(dialog));
       button.focus();
+
+      // TODO: Right now, if an error dialog is shown by music-searcher,
+      // pressing Enter performs another search. Figure out why this is
+      // happening -- we're focusing the button, so why is the music-searcher
+      // form receiving key events?
     }
 
     // Creates and displays a simple context menu at the specified location.

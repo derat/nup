@@ -5,12 +5,43 @@ package query
 
 import (
 	"math/rand"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/derat/nup/server/db"
 )
+
+func TestIntersectSortedIDs(t *testing.T) {
+	for _, tc := range []struct{ a, b, want []int64 }{
+		{nil, nil, []int64{}},
+		{[]int64{1, 2}, nil, []int64{}},
+		{nil, []int64{1, 2}, []int64{}},
+		{[]int64{1, 2}, []int64{1, 2}, []int64{1, 2}},
+		{[]int64{0, 1, 2, 3}, []int64{1, 2}, []int64{1, 2}},
+		{[]int64{0, 1, 2, 3, 4}, []int64{-1, 1, 3, 5}, []int64{1, 3}},
+	} {
+		if got := intersectSortedIDs(tc.a, tc.b); !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("intersectSortedIDs(%v, %v) = %v; want %v", tc.a, tc.b, got, tc.want)
+		}
+	}
+}
+
+func TestSubtractSortedIDs(t *testing.T) {
+	for _, tc := range []struct{ a, b, want []int64 }{
+		{nil, nil, []int64{}},
+		{[]int64{1, 2}, nil, []int64{1, 2}},
+		{nil, []int64{1, 2}, []int64{}},
+		{[]int64{1, 2}, []int64{1, 2}, []int64{}},
+		{[]int64{0, 1, 2, 3}, []int64{1, 2}, []int64{0, 3}},
+		{[]int64{0, 1, 2, 3, 4}, []int64{-1, 1, 3, 5}, []int64{0, 2, 4}},
+	} {
+		if got := subtractSortedIDs(tc.a, tc.b); !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("subtractSortedIDs(%v, %v) = %v; want %v", tc.a, tc.b, got, tc.want)
+		}
+	}
+}
 
 func TestSpreadSongs(t *testing.T) {
 	const (

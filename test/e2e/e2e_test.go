@@ -403,7 +403,8 @@ func TestQueries(tt *testing.T) {
 		{"title=manana", 0, []db.Song{s10s}},
 		{"title=" + url.QueryEscape("mánanä"), 0, []db.Song{s10s}},
 		{"album=two2", 0, []db.Song{s10s}},
-		// Ensure that Datastore indexes exist to satisfy various queries.
+		// Ensure that Datastore indexes exist to satisfy various queries (or if not, that the
+		// server's fallback mode is still able to handle them).
 		{"tags=-bogus&minRating=1.0&shuffle=1&orderByLastPlayed=1", 0, []db.Song{}},
 		{"tags=instrumental&minRating=0.75&shuffle=1&orderByLastPlayed=1", 0, []db.Song{LegacySong1}},
 		{"tags=instrumental+-bogus&minRating=0.75&shuffle=1&orderByLastPlayed=1", 0, []db.Song{LegacySong1}},
@@ -422,14 +423,14 @@ func TestQueries(tt *testing.T) {
 		{"artist=arovane&firstTrack=1", 0, []db.Song{LegacySong1}},
 		{"artist=arovane&minRating=0.75", 0, []db.Song{LegacySong1}},
 		{"artist=arovane&minRating=0.75&maxPlays=1", noIndex, []db.Song{}},
+		{"orderByLastPlayed=1&minFirstPlayed=1276057160&maxLastPlayed=1649256074", noIndex, []db.Song{LegacySong1, LegacySong2}},
+		{"orderByLastPlayed=1&maxPlays=1&minFirstPlayed=1276057160&maxLastPlayed=1649256074", noIndex, []db.Song{LegacySong2}},
 	} {
-		// Always check that we get the expected results with the default fallback behavior and when
-		// only using the slower fallback mode.
-		suffixes := []string{"", "&fallback=force"}
+		suffixes := []string{""}
 		if tc.flags&noIndex == 0 {
-			// Unless the query has been marked otherwise, also check that there are indexes to
-			// satisfy it.
-			suffixes = append(suffixes, "&fallback=never")
+			// If we should have an index, also verify that the query works both without
+			// falling back and (for good measure) when only using the fallback path.
+			suffixes = append(suffixes, "&fallback=never", "&fallback=force")
 		}
 		for _, suf := range suffixes {
 			query := tc.params + suf
