@@ -842,7 +842,7 @@ func TestEditTagsAutocomplete(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
 	song1 := newSong("ar", "t1", "al", withTags("a0", "a1", "b"))
-	song2 := newSong("ar", "t2", "al", withTags("c0", "c1", "d"))
+	song2 := newSong("ar", "t2", "al", withTags("c0", "c1", "d", "long"))
 	importSongs(song1, song2)
 
 	page.refreshTags()
@@ -862,6 +862,12 @@ func TestEditTagsAutocomplete(t *testing.T) {
 
 	page.sendKeys(editTagsTextarea, "1"+selenium.TabKey, false)
 	page.checkAttr(editTagsTextarea, "value", "a0 a1 b d c1 ")
+
+	// Position the caret at the beginning of the "c1" tag and complete "long".
+	// The caret strangely seems to get moved to the end of the textarea for each
+	// sendKeys call, so do this all in one go.
+	page.sendKeys(editTagsTextarea, strings.Repeat(selenium.LeftArrowKey, 3)+"l"+selenium.TabKey, false)
+	page.checkAttr(editTagsTextarea, "value", "a0 a1 b d long c1 ")
 }
 
 func TestDragSongs(t *testing.T) {

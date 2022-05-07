@@ -887,6 +887,8 @@ customElements.define(
       this.tagsTextarea_.value = song.tags.length
         ? song.tags.sort().join(' ') + ' ' // append space to ease editing
         : '';
+      this.tagsTextarea_.selectionStart = this.tagsTextarea_.selectionEnd =
+        this.tagsTextarea_.value.length;
       this.updateSong_ = song;
       this.updateDiv_.classList.add('shown');
       return true;

@@ -163,6 +163,7 @@ var songs = []db.Song{
 		Disc:     1,
 		Length:   1,
 		Rating:   1,
+		Tags:     []string{"electronic", "instrumental", "drum-and-bass"},
 	},
 	{
 		SHA1:     "74057828e637cdaa60338c220ad3f59e4262c3f2",
@@ -175,7 +176,8 @@ var songs = []db.Song{
 		Track:    1,
 		Disc:     1,
 		Length:   1,
-		Rating:   1,
+		Rating:   0.75,
+		Tags:     []string{"drums", "guitar", "rock", "vocals"},
 	},
 	{
 		SHA1:     "0358287496e475b2e812e882b7885be665b604d1",
@@ -188,7 +190,8 @@ var songs = []db.Song{
 		Track:    1,
 		Disc:     1,
 		Length:   1,
-		Rating:   1,
+		Rating:   0.5,
+		Tags:     []string{"electronic", "vocals"},
 	},
 	{
 		SHA1:     "22aa5c0ad793e7a86852cfb7e0aa6b41aa98e99c",
@@ -201,7 +204,8 @@ var songs = []db.Song{
 		Track:    1,
 		Disc:     1,
 		Length:   1,
-		Rating:   1,
+		Rating:   0.25,
+		Tags:     []string{"annoying", "pop", "vocals"},
 	},
 	{
 		SHA1:     "11551e3ebd919e5ef2329d9d3716c3e453d98c7d",
@@ -214,6 +218,6 @@ var songs = []db.Song{
 		Track:    1,
 		Disc:     1,
 		Length:   1,
-		Rating:   1,
+		Rating:   -1,
 	},
 }

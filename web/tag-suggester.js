@@ -61,8 +61,10 @@ customElements.define(
       this.target_ = slotElements[0];
       this.target_.addEventListener('keydown', (e) => this.handleKeyDown_(e));
       this.target_.addEventListener('focus', () => {
-        this.target_.selectionStart = this.target_.selectionEnd =
-          this.target_.value.length;
+        // Preserve the caret position but remove the selection. Otherwise,
+        // tabbing to the field selects its contents, which makes it too easy to
+        // accidentally clear it.
+        this.target_.selectionStart = this.target_.selectionEnd;
       });
       this.target_.spellcheck = false;
 
@@ -73,23 +75,31 @@ customElements.define(
       this.words_ = words.slice(0);
     }
 
+    // Breaks |target_|'s text up into the current word (based on the caret
+    // position) and the parts before and after it.
     getTextParts_() {
       const text = this.target_.value;
-      const res = {};
+      const caret = this.target_.selectionStart;
 
-      res.wordStart = this.target_.selectionStart;
-      while (res.wordStart > 0 && text[res.wordStart - 1] != ' ')
-        res.wordStart--;
+      let start = caret;
+      while (start > 0 && text[start - 1] !== ' ') start--;
 
-      res.wordEnd = this.target_.selectionStart;
-      while (res.wordEnd < text.length && text[res.wordEnd] != ' ')
-        res.wordEnd++;
+      let end = caret;
+      while (end < text.length && text[end] !== ' ') end++;
 
-      res.word = text.substring(res.wordStart, res.wordEnd);
-      res.before = text.substring(0, res.wordStart);
-      res.after = text.substring(res.wordEnd, text.length);
+      // If we're in the middle of the word and the part to the right of the
+      // caret is already a known word, then just use the part to the left of
+      // the caret as the word that we're trying to complete.
+      if (caret < end) {
+        const rest = text.slice(caret, end);
+        if (this.words_.includes(rest)) end = caret;
+      }
 
-      return res;
+      return {
+        before: text.slice(0, start),
+        word: text.slice(start, end),
+        after: text.slice(end, text.length),
+      };
     }
 
     handleKeyDown_(e) {
@@ -100,45 +110,38 @@ customElements.define(
       }
 
       const parts = this.getTextParts_();
-      if (parts.word.length == 0 && this.tabAdvancesFocus_) return;
+      if (!parts.word.length && this.tabAdvancesFocus_) return;
 
-      const matchingWords = findWordsWithPrefix(this.words_, parts.word);
-
-      if (matchingWords.length == 1) {
-        const word = matchingWords[0];
-        if (word == parts.word && this.tabAdvancesFocus_) return;
-
-        const text =
-          parts.before + word + (parts.after.length == 0 ? ' ' : parts.after);
+      const matches = this.findMatches_(parts.word);
+      if (matches.length === 1) {
+        // If there's a single match, use it.
+        const word = matches[0];
+        const old = this.target_.value;
+        const text = parts.before + word + prependSpace(parts.after);
         this.target_.value = text;
 
-        let nextWordStart = parts.wordStart + word.length;
-        while (nextWordStart < text.length && text[nextWordStart] == ' ') {
-          nextWordStart++;
-        }
-        this.target_.selectionStart = this.target_.selectionEnd = nextWordStart;
-      } else if (matchingWords.length > 1) {
-        let longestSharedPrefix = parts.word;
-        for (
-          let length = parts.word.length + 1;
-          length <= matchingWords[0].length;
-          ++length
-        ) {
-          const newPrefix = matchingWords[0].substring(0, length);
-          if (
-            findWordsWithPrefix(matchingWords, newPrefix).length ==
-            matchingWords.length
-          ) {
-            longestSharedPrefix = newPrefix;
-          } else {
-            break;
-          }
+        // Bail out before stopping the event if we want tab to advance the
+        // focus and we didn't do anything.
+        if (text === old && this.tabAdvancesFocus_) return;
+
+        // Move the caret to the beginning of the next word.
+        let next = parts.before.length + word.length;
+        while (next < text.length && text[next] === ' ') next++;
+        this.target_.selectionStart = this.target_.selectionEnd = next;
+      } else if (matches.length > 1) {
+        // Complete as much of the word as we can and show suggestions.
+        let prefix = parts.word;
+        for (let len = parts.word.length + 1; len <= matches[0].length; ++len) {
+          const newPrefix = matches[0].slice(0, len);
+          if (this.findMatches_(newPrefix).length !== matches.length) break;
+          prefix = newPrefix;
         }
 
-        this.target_.value = parts.before + longestSharedPrefix + parts.after;
+        this.target_.value =
+          parts.before + prefix + prependSpace(parts.after, false);
         this.target_.selectionStart = this.target_.selectionEnd =
-          parts.before.length + longestSharedPrefix.length;
-        this.showSuggestions_(matchingWords.sort());
+          parts.before.length + prefix.length;
+        this.showSuggestions_(matches.sort());
       }
 
       e.preventDefault();
@@ -158,7 +161,7 @@ customElements.define(
         item.addEventListener('click', () => {
           this.hideSuggestions_();
           const parts = this.getTextParts_();
-          this.target_.value = parts.before + word + parts.after;
+          this.target_.value = parts.before + word + prependSpace(parts.after);
           this.target_.focus();
         });
         cont.appendChild(item);
@@ -178,13 +181,14 @@ customElements.define(
     hideSuggestions_() {
       this.suggestionsDiv_.classList.remove('shown');
     }
+
+    findMatches_(prefix) {
+      return this.words_.filter((w) => w.startsWith(prefix));
+    }
   }
 );
 
-function findWordsWithPrefix(words, prefix) {
-  const matchingWords = [];
-  for (let i = 0; i < words.length; ++i) {
-    if (words[i].indexOf(prefix) == 0) matchingWords.push(words[i]);
-  }
-  return matchingWords;
-}
+// Adds a space to the beginning of |s| if it doesn't already start with one.
+// If |ifEmpty| is false, doesn't add spaces to empty strings.
+const prependSpace = (s, ifEmpty = true) =>
+  (s.startsWith(' ') || (s === '' && !ifEmpty) ? '' : ' ') + s;
