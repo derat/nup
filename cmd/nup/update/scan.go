@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/derat/nup/cmd/nup/client"
-	"github.com/derat/nup/cmd/nup/mp3gain"
 	"github.com/derat/nup/server/db"
 	"github.com/derat/taglib-go/taglib"
 )
@@ -29,6 +28,7 @@ const (
 	recordingIDOwner    = "http://musicbrainz.org"
 	nonAlbumTracksValue = "[non-album tracks]" // MusicBrainz/Picard album name
 
+	maxScanWorkers      = 8 // maximum number of songs to read at once
 	logProgressInterval = 100
 )
 
@@ -44,63 +44,8 @@ func computeAudioSHA1(f *os.File, fi os.FileInfo, headerLen, footerLen int64) (s
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
-// computeDirGains computes gain adjustments for all MP3 files in dir.
-// TODO: Accept an optional album ID (or file path) that can be used to limit which files are processed?
-// Otherwise, "misc" directories can take forever when a single file is added to them.
-func computeDirGains(dir string) (map[string]mp3gain.Info, error) {
-	paths, err := filepath.Glob(filepath.Join(dir, "*.[mM][pP]3")) // case-insensitive :-/
-	if err != nil {
-		return nil, err
-	}
-
-	// Group files by album.
-	albums := make(map[string][]string) // paths grouped by album ID
-	for _, p := range paths {
-		f, err := os.Open(p)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-
-		fi, err := f.Stat()
-		if err != nil {
-			return nil, err
-		}
-		if !fi.Mode().IsRegular() {
-			continue
-		}
-
-		// TODO: Consider caching tags so we don't need to decode again in readSong.
-		// In practice, computing gains is so incredibly slow (at least on my computer)
-		// that caching probably doesn't matter in the big scheme of things.
-		var album string
-		if tag, err := taglib.Decode(f, fi.Size()); err == nil {
-			album = tag.CustomFrames()[albumIDTag]
-		}
-		// If we didn't get an album ID, just use the path so the file will be in its own group.
-		if album == "" {
-			album = p
-		}
-		albums[album] = append(albums[album], p)
-	}
-
-	// Compute gains for each album.
-	gains := make(map[string]mp3gain.Info, len(paths))
-	for _, paths := range albums {
-		infos, err := mp3gain.ComputeAlbum(paths)
-		if err != nil {
-			return nil, err
-		}
-		for p, info := range infos {
-			gains[p] = info
-		}
-	}
-	return gains, nil
-}
-
 // readSong creates a Song for the file at the supplied path.
-func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info,
-	artistRewrites map[string]string) (*db.Song, error) {
+func readSong(path, relPath string, fi os.FileInfo, opts *scanOptions, gains *gainsCache) (*db.Song, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -146,7 +91,7 @@ func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info,
 		}
 	}
 
-	if repl, ok := artistRewrites[s.Artist]; ok {
+	if repl, ok := opts.artistRewrites[s.Artist]; ok {
 		s.Artist = repl
 	}
 
@@ -160,75 +105,56 @@ func readSong(path, relPath string, fi os.FileInfo, gain *mp3gain.Info,
 	}
 	s.Length = dur.Seconds()
 
-	if gain != nil {
+	if opts.computeGain {
+		gain, err := gains.get(path, s.Album, s.AlbumID)
+		if err != nil {
+			return nil, err
+		}
 		s.TrackGain = gain.TrackGain
 		s.AlbumGain = gain.AlbumGain
 		s.PeakAmp = gain.PeakAmp
 	}
+
 	return &s, nil
 }
 
 // readSongList reads a list of relative (to musicDir) paths from listPath
 // and asynchronously sends the resulting Song structs to ch.
 // The number of songs that will be sent to the channel is returned.
-func readSongList(listPath, musicDir string, ch chan songOrErr,
-	opts *scanOptions) (numSongs int, err error) {
+func readSongList(listPath, musicDir string, ch chan songOrErr, opts *scanOptions) (numSongs int, err error) {
 	f, err := os.Open(listPath)
 	if err != nil {
 		return 0, err
 	}
 	defer f.Close()
 
-	var paths []string                     // relative paths
-	gains := make(map[string]mp3gain.Info) // keyed by full path
-
-	// Read the list synchronously first so we can compute all of the gain adjustments if needed.
+	// Read the list synchronously first to get the number of songs.
+	var paths []string // relative paths
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
-		rel := sc.Text()
-		paths = append(paths, rel)
-
-		if opts.computeGain {
-			if opts.dumpedGains != nil {
-				gi, ok := opts.dumpedGains[rel]
-				if !ok {
-					return 0, fmt.Errorf("no dumped gain info for %q", rel)
-				}
-				gains[filepath.Join(musicDir, rel)] = gi
-			} else {
-				// Scan the file's directory if we don't already have its gain info.
-				full := filepath.Join(musicDir, rel)
-				if _, ok := gains[full]; !ok {
-					dir := filepath.Dir(full)
-					log.Printf("Computing gain adjustments for %v", dir)
-					m, err := computeDirGains(dir)
-					if err != nil {
-						return 0, err
-					}
-					for p, gi := range m {
-						gains[p] = gi
-					}
-				}
-			}
-		}
+		paths = append(paths, sc.Text())
+	}
+	if err := sc.Err(); err != nil {
+		return 0, err
 	}
 
-	// Now read the files asynchronously.
-	for _, rel := range paths {
-		go func(rel string) {
+	gains, err := newGainsCache(opts.dumpedGainsPath, musicDir)
+	if err != nil {
+		return 0, err
+	}
+
+	// Now read the files asynchronously (but one at a time).
+	go func() {
+		for _, rel := range paths {
 			full := filepath.Join(musicDir, rel)
 			if fi, err := os.Stat(full); err != nil {
 				ch <- songOrErr{nil, err}
 			} else {
-				var gain *mp3gain.Info
-				if gi, ok := gains[full]; ok {
-					gain = &gi
-				}
-				s, err := readSong(full, rel, fi, gain, opts.artistRewrites)
+				s, err := readSong(full, rel, fi, opts, gains)
 				ch <- songOrErr{s, err}
 			}
-		}(rel)
-	}
+		}
+	}()
 
 	return len(paths), nil
 }
@@ -236,11 +162,11 @@ func readSongList(listPath, musicDir string, ch chan songOrErr,
 // scanOptions contains options for scanForUpdatedSongs and readSongList.
 // Some of the options aren't used by readSongList.
 type scanOptions struct {
-	computeGain    bool                    // use mp3gain to compute gain adjustments
-	forceGlob      string                  // glob matching files to update even if unchanged
-	logProgress    bool                    // periodically log progress while scanning
-	artistRewrites map[string]string       // artist names from tags to rewrite
-	dumpedGains    map[string]mp3gain.Info // precomputed gains keyed by Song.Filename
+	computeGain     bool              // use mp3gain to compute gain adjustments
+	forceGlob       string            // glob matching files to update even if unchanged
+	logProgress     bool              // periodically log progress while scanning
+	artistRewrites  map[string]string // artist names from tags to rewrite
+	dumpedGainsPath string            // file with JSON-marshaled db.Song objects
 }
 
 // scanForUpdatedSongs looks for songs under musicDir updated more recently than lastUpdateTime or
@@ -249,9 +175,7 @@ type scanOptions struct {
 // musicDir) are returned.
 func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDirs []string,
 	ch chan songOrErr, opts *scanOptions) (numUpdates int, seenDirs []string, err error) {
-	var numMP3s int                   // total number of songs under musicDir
-	var gains map[string]mp3gain.Info // keys are full paths
-	var gainsDir string               // directory for gains
+	var numMP3s int // total number of songs under musicDir
 
 	oldDirs := make(map[string]struct{}, len(lastUpdateDirs))
 	for _, d := range lastUpdateDirs {
@@ -259,7 +183,13 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDi
 	}
 	newDirs := make(map[string]struct{})
 
-	err = filepath.Walk(musicDir, func(path string, fi os.FileInfo, err error) error {
+	gains, err := newGainsCache(opts.dumpedGainsPath, musicDir)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	workers := make(chan struct{}, maxScanWorkers)
+	if err := filepath.Walk(musicDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -305,39 +235,17 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDi
 			}
 		}
 
-		var gain *mp3gain.Info
-		if opts.computeGain {
-			if opts.dumpedGains != nil {
-				gi, ok := opts.dumpedGains[relPath]
-				if !ok {
-					return fmt.Errorf("no dumped gain info for %q", relPath)
-				}
-				gain = &gi
-			} else {
-				// Compute the gains for this directory if we didn't already do it.
-				if dir := filepath.Dir(path); gainsDir != dir {
-					log.Printf("Computing gain adjustments for %v", dir)
-					if gains, err = computeDirGains(dir); err != nil {
-						return fmt.Errorf("failed computing gains for %q: %v", dir, err)
-					}
-					gainsDir = dir
-				}
-				gi, ok := gains[path]
-				if !ok {
-					return fmt.Errorf("missing gain info for %q after computing", relPath)
-				}
-				gain = &gi
-			}
-		}
-
 		go func() {
-			s, err := readSong(path, relPath, fi, gain, opts.artistRewrites)
+			// Avoid having too many parallel readSong calls, as we can run out of FDs.
+			workers <- struct{}{}
+			s, err := readSong(path, relPath, fi, opts, gains)
+			<-workers
 			ch <- songOrErr{s, err}
 		}()
+
 		numUpdates++
 		return nil
-	})
-	if err != nil {
+	}); err != nil {
 		return 0, nil, err
 	}
 

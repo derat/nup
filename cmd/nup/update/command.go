@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"os"
@@ -135,18 +134,11 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 		// Not all these options will necessarily be used (e.g. readSongList doesn't need forceGlob
 		// or logProgress), but it doesn't hurt to pass them.
 		opts := scanOptions{
-			computeGain:    cmd.Cfg.ComputeGain,
-			forceGlob:      cmd.forceGlob,
-			logProgress:    true,
-			artistRewrites: cmd.Cfg.ArtistRewrites,
-		}
-
-		if len(cmd.dumpedGainsFile) > 0 {
-			opts.dumpedGains, err = readDumpedGains(cmd.dumpedGainsFile)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, "Failed reading dumped gains:", err)
-				return subcommands.ExitFailure
-			}
+			computeGain:     cmd.Cfg.ComputeGain,
+			forceGlob:       cmd.forceGlob,
+			logProgress:     true,
+			artistRewrites:  cmd.Cfg.ArtistRewrites,
+			dumpedGainsPath: cmd.dumpedGainsFile,
 		}
 
 		if len(cmd.songPathsFile) > 0 {
@@ -435,34 +427,4 @@ func getCoverFilename(dir string, song *db.Song) string {
 		}
 	}
 	return ""
-}
-
-// readDumpedGains reads gains from a song dump file at p.
-// The returned map is keyed by song filename.
-func readDumpedGains(p string) (map[string]mp3gain.Info, error) {
-	f, err := os.Open(p)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	gains := make(map[string]mp3gain.Info)
-	d := json.NewDecoder(f)
-	for {
-		var s db.Song
-		if err := d.Decode(&s); err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, err
-		}
-		if s.TrackGain == 0 && s.AlbumGain == 0 && s.PeakAmp == 0 {
-			return nil, fmt.Errorf("missing gain info for %q", s.Filename)
-		}
-		gains[s.Filename] = mp3gain.Info{
-			TrackGain: s.TrackGain,
-			AlbumGain: s.AlbumGain,
-			PeakAmp:   s.PeakAmp,
-		}
-	}
-	return gains, nil
 }
