@@ -22,13 +22,19 @@ import (
 )
 
 const (
-	albumIDTag          = "MusicBrainz Album Id" // usually used as cover ID
-	coverIDTag          = "nup Cover Id"         // can be set for non-MusicBrainz tracks
-	albumArtistTag      = "TPE2"                 // "Band/Orchestra/Accompaniment"
-	recordingIDOwner    = "http://musicbrainz.org"
-	nonAlbumTracksValue = "[non-album tracks]" // MusicBrainz/Picard album name
+	albumIDTag          = "MusicBrainz Album Id"   // usually used as cover ID
+	coverIDTag          = "nup Cover Id"           // can be set for non-MusicBrainz tracks
+	albumArtistTag      = "TPE2"                   // "Band/Orchestra/Accompaniment"
+	recordingIDOwner    = "http://musicbrainz.org" // UFID for Song.RecordingID
+	nonAlbumTracksValue = "[non-album tracks]"     // MusicBrainz/Picard album name
 
-	maxScanWorkers      = 8 // maximum number of songs to read at once
+	// Maximum number of songs to read at once. This needs to not be too high to avoid
+	// running out of FDs when readSong calls block on computing gain adjustments (my system
+	// has a default soft limit of 1024 per "ulimit -Sn"), but it should also be high enough
+	// that we're processing songs from different albums simultaneously so we can run
+	// multiple copies of mp3gain in parallel on multicore systems.
+	maxScanWorkers = 64
+
 	logProgressInterval = 100
 )
 
@@ -45,7 +51,9 @@ func computeAudioSHA1(f *os.File, fi os.FileInfo, headerLen, footerLen int64) (s
 }
 
 // readSong creates a Song for the file at the supplied path.
-func readSong(path, relPath string, fi os.FileInfo, opts *scanOptions, gains *gainsCache) (*db.Song, error) {
+// If onlyTags is true, only fields derived from the file's MP3 tags will be filled.
+func readSong(path, relPath string, fi os.FileInfo, onlyTags bool,
+	opts *scanOptions, gains *gainsCache) (*db.Song, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -89,6 +97,10 @@ func readSong(path, relPath string, fi os.FileInfo, opts *scanOptions, gains *ga
 		if s.Disc == 0 && s.Track > 0 && s.Album != nonAlbumTracksValue {
 			s.Disc = 1
 		}
+	}
+
+	if onlyTags {
+		return &s, nil
 	}
 
 	if repl, ok := opts.artistRewrites[s.Artist]; ok {
@@ -150,7 +162,7 @@ func readSongList(listPath, musicDir string, ch chan songOrErr, opts *scanOption
 			if fi, err := os.Stat(full); err != nil {
 				ch <- songOrErr{nil, err}
 			} else {
-				s, err := readSong(full, rel, fi, opts, gains)
+				s, err := readSong(full, rel, fi, false, opts, gains)
 				ch <- songOrErr{s, err}
 			}
 		}
@@ -238,7 +250,7 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDi
 		go func() {
 			// Avoid having too many parallel readSong calls, as we can run out of FDs.
 			workers <- struct{}{}
-			s, err := readSong(path, relPath, fi, opts, gains)
+			s, err := readSong(path, relPath, fi, false, opts, gains)
 			<-workers
 			ch <- songOrErr{s, err}
 		}()

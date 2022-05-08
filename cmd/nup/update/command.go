@@ -326,7 +326,7 @@ func (cmd *Command) doPrintCoverID() subcommands.ExitStatus {
 		fmt.Fprintln(os.Stderr, "Failed stat:", err)
 		return subcommands.ExitFailure
 	}
-	s, err := readSong(cmd.printCoverID, "", fi, nil, nil)
+	s, err := readSong(cmd.printCoverID, "", fi, true /* onlyTags */, nil, nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed reading song:", err)
 		return subcommands.ExitFailure

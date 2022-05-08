@@ -5,17 +5,16 @@ package update
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
-	"sync"
+	"runtime"
 
+	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/cmd/nup/mp3gain"
 	"github.com/derat/nup/server/db"
-	"github.com/derat/taglib-go/taglib"
 )
 
 // gainsCache computes and stores gain adjustments for MP3 files.
@@ -23,19 +22,24 @@ import (
 // Gain adjustments need to be computed across entire albums, so adjustments are cached
 // so they won't need to be computed multiple times.
 type gainsCache struct {
-	infos map[string]mp3gain.Info // keyed by absolute path
-	mu    sync.Mutex              // guards infos
+	dumped map[string]mp3gain.Info // read from dumped db.Songs
+	cache  *client.TaskCache       // computes and stores gain adjustments
 }
 
 // newGainsCache returns a new gainsCache.
 //
 // If dumpPath is non-empty, db.Song objects are JSON-unmarshaled from it to initialize the cache
-// with previously-computed gain adjustments. musicDir should contain the base music directory
-// (since db.Song only contains relative paths).
+// with previously-computed gain adjustments. In this case, musicDir should also contain the base
+// music directory (needed since db.Song only contains relative paths).
 func newGainsCache(dumpPath, musicDir string) (*gainsCache, error) {
-	gc := &gainsCache{infos: make(map[string]mp3gain.Info)}
+	// mp3gain doesn't seem to take advantage of multiple cores, so run multiple copies in parallel:
+	//  https://hydrogenaud.io/index.php?topic=72197.0
+	//  https://sound.stackexchange.com/questions/33069/multi-core-batch-volume-gain
+	gc := gainsCache{cache: client.NewTaskCache(runtime.NumCPU())}
 
 	if dumpPath != "" {
+		gc.dumped = make(map[string]mp3gain.Info)
+
 		f, err := os.Open(dumpPath)
 		if err != nil {
 			return nil, err
@@ -53,7 +57,7 @@ func newGainsCache(dumpPath, musicDir string) (*gainsCache, error) {
 			if s.TrackGain == 0 && s.AlbumGain == 0 && s.PeakAmp == 0 {
 				return nil, fmt.Errorf("missing gain info for %q", s.Filename)
 			}
-			gc.infos[filepath.Join(musicDir, s.Filename)] = mp3gain.Info{
+			gc.dumped[filepath.Join(musicDir, s.Filename)] = mp3gain.Info{
 				TrackGain: s.TrackGain,
 				AlbumGain: s.AlbumGain,
 				PeakAmp:   s.PeakAmp,
@@ -61,86 +65,79 @@ func newGainsCache(dumpPath, musicDir string) (*gainsCache, error) {
 		}
 	}
 
-	return gc, nil
+	return &gc, nil
 }
 
-// get returns gain adjustments for the file at songPath, computing them if needed.
+// get returns gain adjustments for the file at p, computing them if needed.
 //
-// songAlbum and songAlbumID correspond to songPath and are used to process additional
+// album and albumID correspond to p and are used to process additional
 // songs from the same album in the directory.
-func (gc *gainsCache) get(songPath, songAlbum, songAlbumID string) (mp3gain.Info, error) {
-	// TODO: I think that mp3gain isn't multithreaded, so this should probably support
-	// running multiple processes in parallel for different albums. Unfortunately, doing
-	// this seems likely to make the code super-complicated.
-	gc.mu.Lock()
-	defer gc.mu.Unlock()
-
-	// If we already computed info for this song, we're done.
-	if info, ok := gc.infos[songPath]; ok {
+func (gc *gainsCache) get(p, album, albumID string) (mp3gain.Info, error) {
+	// If we already loaded this file's adjustments from a dump, use them.
+	if info, ok := gc.dumped[p]; ok {
 		return info, nil
 	}
-
-	albumPaths := []string{songPath}
 
 	// If the requested song was part of an album, we also need to process all of the other
 	// songs in the album in order to compute gain adjustments relative to the entire album.
-	if (songAlbumID != "" || songAlbum != "") && songAlbum != nonAlbumTracksValue {
-		glob := filepath.Join(filepath.Dir(songPath), "*.[mM][pP]3") // case-insensitive
-		dirPaths, err := filepath.Glob(glob)
-		if err != nil {
-			return mp3gain.Info{}, err
-		}
-		for _, p := range dirPaths {
-			if p == songPath {
-				continue
-			}
-
-			f, err := os.Open(p)
-			if err != nil {
-				return mp3gain.Info{}, err
-			}
-			defer f.Close()
-
-			fi, err := f.Stat()
-			if err != nil {
-				return mp3gain.Info{}, err
-			}
-			if !fi.Mode().IsRegular() {
-				continue
-			}
-
-			// TODO: Consider caching tags since we're also reading them in readSong.
-			// In practice, computing gains is so incredibly slow (at least on my computer)
-			// that reading tags twice probably doesn't matter in the big scheme of things.
-			var album, albumID string
-			if tag, err := taglib.Decode(f, fi.Size()); err == nil {
-				album = tag.Album()
-				albumID = tag.CustomFrames()[albumIDTag]
-			} else {
-				_, _, _, album, _ = readID3v1Footer(f, fi)
-			}
-
-			if album == songAlbum && albumID == songAlbumID {
-				albumPaths = append(albumPaths, p)
-			}
-		}
-	}
-
-	if len(albumPaths) == 1 {
-		log.Printf("Computing gain adjustments for %v", songPath)
+	// The task key here is arbitrary but needs to be the same for all files in the album.
+	dir := filepath.Dir(p)
+	hasAlbum := (albumID != "" || album != "") && album != nonAlbumTracksValue
+	var key string
+	if hasAlbum {
+		key = fmt.Sprintf("%q %q %q", dir, album, albumID)
 	} else {
-		log.Printf("Computing gain adjustments for %d songs in %v",
-			len(albumPaths), filepath.Dir(songPath))
+		key = fmt.Sprintf("%q", p)
 	}
-	infos, err := mp3gain.ComputeAlbum(albumPaths)
+
+	// Request the adjustments from the TaskCache. The supplied task will only be run
+	// if the adjustments aren't already available and there isn't already another task
+	// with the same key.
+	info, err := gc.cache.Get(p, key, func() (map[string]interface{}, error) {
+		var paths []string
+		if hasAlbum {
+			dirPaths, err := filepath.Glob(filepath.Join(dir, "*.[mM][pP]3")) // case-insensitive
+			if err != nil {
+				return nil, err
+			}
+			for _, p := range dirPaths {
+				fi, err := os.Stat(p)
+				if err != nil {
+					return nil, err
+				} else if !fi.Mode().IsRegular() {
+					continue
+				}
+				// TODO: Consider caching tags somewhere since we're also reading them in the
+				// original readSong call. In practice, computing gains is so incredibly slow (at
+				// least on my computer) that reading tags twice probably doesn't matter in the big
+				// scheme of things.
+				s, err := readSong(p, "", fi, true /* onlyTags */, nil, nil)
+				if err != nil {
+					return nil, err
+				}
+				if s.Album == album && s.AlbumID == albumID {
+					paths = append(paths, p)
+				}
+			}
+			log.Printf("Computing gain adjustments for %d songs in %v", len(paths), dir)
+		} else {
+			paths = []string{p}
+			log.Printf("Computing gain adjustments for %v", p)
+		}
+
+		infos, err := mp3gain.ComputeAlbum(paths)
+		if err != nil {
+			return nil, err
+		}
+		res := make(map[string]interface{}, len(infos))
+		for p, info := range infos {
+			res[p] = info
+		}
+		return res, nil
+	})
+
 	if err != nil {
 		return mp3gain.Info{}, err
 	}
-	for p, gi := range infos {
-		gc.infos[p] = gi
-	}
-	if info, ok := gc.infos[songPath]; ok {
-		return info, nil
-	}
-	return mp3gain.Info{}, errors.New("missing gain info")
+	return info.(mp3gain.Info), nil
 }

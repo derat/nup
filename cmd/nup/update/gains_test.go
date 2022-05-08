@@ -44,9 +44,9 @@ func TestGainsCache(t *testing.T) {
 	}
 
 	// We should've also saved adjustments for the other song in the album.
-	if len(gc.infos) != 2 {
-		t.Errorf("Computed gain adjustments for %v file(s); want 2", len(gc.infos))
-	} else if got, ok := gc.infos[p1]; !ok {
+	if sz := gc.cache.Size(); sz != 2 {
+		t.Errorf("Computed gain adjustments for %v file(s); want 2", sz)
+	} else if got, ok := gc.cache.GetIfExists(p1); !ok {
 		t.Errorf("Didn't compute gain adjustment for %v", p1)
 	} else if got != info {
 		t.Errorf("Gain adjustment for %v is %+v; want %+v", p1, got, info)
@@ -58,7 +58,7 @@ func TestGainsCache(t *testing.T) {
 	} else if got != info {
 		t.Errorf("gc.get(%q, %q, %q) = %+v; want %+v", p5, s5.Album, s5.AlbumID, got, info)
 	}
-	if len(gc.infos) != 3 {
-		t.Errorf("Computed gain adjustments for %v file(s); want 3", len(gc.infos))
+	if sz := gc.cache.Size(); sz != 3 {
+		t.Errorf("Computed gain adjustments for %v file(s); want 3", sz)
 	}
 }

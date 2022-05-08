@@ -111,7 +111,7 @@ func readSong(path string) (albumID string, err error) {
 }
 
 func readDumpedSongs(r io.Reader, coverDir string, maxSongs int) (albumIDs []string, err error) {
-	missingAlbumIDs := make(map[string]bool)
+	missingAlbumIDs := make(map[string]struct{})
 	d := json.NewDecoder(r)
 	numSongs := 0
 	for {
@@ -141,7 +141,7 @@ func readDumpedSongs(r io.Reader, coverDir string, maxSongs int) (albumIDs []str
 			continue
 		}
 
-		missingAlbumIDs[s.AlbumID] = true
+		missingAlbumIDs[s.AlbumID] = struct{}{}
 	}
 	if numSongs%logInterval != 0 {
 		log.Printf("Scanned %v songs", numSongs)
@@ -187,41 +187,27 @@ func downloadCover(albumID, dir string, size int) (path string, err error) {
 }
 
 func downloadCovers(albumIDs []string, dir string, size, maxRequests int) {
-	numReq := 0
-	canStartReq := func() bool { return numReq < maxRequests }
-	cond := sync.NewCond(&sync.Mutex{})
-
+	cache := client.NewTaskCache(maxRequests)
 	wg := sync.WaitGroup{}
 	wg.Add(len(albumIDs))
 
-	go func() {
-		for _, id := range albumIDs {
-			cond.L.Lock()
-			for !canStartReq() {
-				cond.Wait()
-			}
-			numReq++
-			cond.L.Unlock()
-
-			go func(id string) {
-				path, err := downloadCover(id, dir, size)
-
-				cond.L.Lock()
-				numReq--
-				cond.Signal()
-				cond.L.Unlock()
-
-				if err != nil {
-					log.Printf("Failed to get %v: %v", id, err)
-				} else if len(path) == 0 {
-					log.Printf("Didn't find %v", id)
+	for _, id := range albumIDs {
+		go func(id string) {
+			if path, err := cache.Get(id, id, func() (map[string]interface{}, error) {
+				if p, err := downloadCover(id, dir, size); err != nil {
+					return nil, err
 				} else {
-					log.Printf("Wrote %v", path)
+					return map[string]interface{}{id: p}, nil
 				}
-				wg.Done()
-			}(id)
-		}
-	}()
-
+			}); err != nil {
+				log.Printf("Failed to get %v: %v", id, err)
+			} else if len(path.(string)) == 0 {
+				log.Printf("Didn't find %v", id)
+			} else {
+				log.Printf("Wrote %v", path.(string))
+			}
+			wg.Done()
+		}(id)
+	}
 	wg.Wait()
 }
