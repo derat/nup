@@ -178,8 +178,6 @@ const (
 	KeepIDs                     // preserve SongID
 )
 
-const DumpCoversFlag = "-covers=true"
-
 // DumpSongs runs 'nup dump' with the supplied flags and returns unmarshaled songs.
 func (t *Tester) DumpSongs(strip StripPolicy, flags ...string) []db.Song {
 	args := append([]string{

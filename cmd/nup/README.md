@@ -108,8 +108,6 @@ Engine server] and writes JSON-marshaled [Song] objects to stdout.
 dump [flags]:
 	Dump JSON-marshaled song data from the server to stdout.
 
-  -covers
-    	Include cover filenames
   -play-batch-size int
     	Size for each batch of entities (default 800)
   -song-batch-size int

@@ -674,17 +674,14 @@ func TestCovers(tt *testing.T) {
 		tt.Error("Bad results after using recording ID: ", err)
 	}
 
-	log.Print("Checking that covers are dumped (or not) as requested")
-	if err := test.CompareSongs([]db.Song{s0, s1, s5},
-		t.DumpSongs(test.StripIDs, test.DumpCoversFlag), test.IgnoreOrder); err != nil {
-		tt.Error("Bad songs when dumping covers: ", err)
-	}
-	s0.CoverFilename = ""
-	s1.CoverFilename = ""
-	s5.CoverFilename = ""
+	log.Print("Checking that covers are dumped")
 	if err := test.CompareSongs([]db.Song{s0, s1, s5},
 		t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
-		tt.Error("Bad songs when not dumping covers: ", err)
+		tt.Error("Bad songs when dumping covers: ", err)
+	}
+	if err := test.CompareSongs([]db.Song{s0, s1, s5},
+		t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
+		tt.Error("Bad songs when dumping covers: ", err)
 	}
 }
 

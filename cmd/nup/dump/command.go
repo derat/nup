@@ -31,9 +31,8 @@ const (
 type Command struct {
 	Cfg *client.Config
 
-	songBatchSize int  // batch size for Song entities
-	playBatchSize int  // batch size for Play entities
-	includeCovers bool // include cover filenames in dumped songs
+	songBatchSize int // batch size for Song entities
+	playBatchSize int // batch size for Play entities
 }
 
 func (*Command) Name() string     { return "dump" }
@@ -48,12 +47,11 @@ func (*Command) Usage() string {
 func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	f.IntVar(&cmd.songBatchSize, "song-batch-size", defaultSongBatchSize, "Size for each batch of entities")
 	f.IntVar(&cmd.playBatchSize, "play-batch-size", defaultPlayBatchSize, "Size for each batch of entities")
-	f.BoolVar(&cmd.includeCovers, "covers", false, "Include cover filenames")
 }
 
 func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	songChan := make(chan *db.Song, chanSize)
-	go getSongs(cmd.Cfg, cmd.songBatchSize, cmd.includeCovers, songChan)
+	go getSongs(cmd.Cfg, cmd.songBatchSize, songChan)
 
 	playChan := make(chan *db.PlayDump, chanSize)
 	go getPlays(cmd.Cfg, cmd.playBatchSize, playChan)
@@ -136,13 +134,8 @@ func getEntities(cfg *client.Config, entityType string, extraArgs []string, batc
 	}
 }
 
-func getSongs(cfg *client.Config, batchSize int, includeCovers bool, ch chan *db.Song) {
-	var extraArgs []string
-	if !includeCovers {
-		extraArgs = append(extraArgs, "omit=coverFilename")
-	}
-
-	getEntities(cfg, "song", extraArgs, batchSize, func(b []byte) {
+func getSongs(cfg *client.Config, batchSize int, ch chan *db.Song) {
+	getEntities(cfg, "song", nil, batchSize, func(b []byte) {
 		var s db.Song
 		if err := json.Unmarshal(b, &s); err == nil {
 			ch <- &s
