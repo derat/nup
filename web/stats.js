@@ -68,6 +68,11 @@ const template = createTemplate(`
   #years-table th:not(:first-child), #years-div td:not(:first-child) {
     text-align: right;
   }
+
+  #updated-div {
+    font-size: 90%;
+    opacity: 50%;
+  }
 </style>
 
 <div class="title">Stats</div>
@@ -100,6 +105,8 @@ const template = createTemplate(`
   </div>
 </div>
 
+<div id="updated-div"></div>
+
 <div class="button-container">
   <button id="dismiss-button">Dismiss</button>
 </div>
@@ -115,6 +122,7 @@ export function showStats(manager) {
     .then((res) => handleFetchError(res))
     .then((res) => res.json())
     .then((stats) => {
+      // This corresponds to the Stats struct in server/db/stats.go.
       $('songs', shadow).innerText = parseInt(stats.songs).toLocaleString();
       for (const rating of ['-1.00', '0.00', '0.25', '0.50', '0.75', '1.00']) {
         const td = $(`rating-${rating}`, shadow);
@@ -134,7 +142,25 @@ export function showStats(manager) {
         createElement('td', null, row, days);
       }
 
-      // TODO: Display stats-updated time.
+      const sec = (Date.now() - Date.parse(stats.updateTime)) / 1000;
+      const days = sec / 86400;
+      const hours = sec / 3600;
+      const min = sec / 60;
+      const age =
+        days >= 1.5
+          ? `${Math.round(days)} days ago`
+          : days >= 1
+          ? '1 day ago'
+          : hours >= 1.5
+          ? `${Math.round(hours)} hours ago`
+          : hours >= 1
+          ? '1 hour ago'
+          : min >= 1.5
+          ? `${Math.round(min)} minutes ago`
+          : min >= 1
+          ? '1 minute ago'
+          : 'just now';
+      $('updated-div', shadow).innerText = `Updated ${age}`;
     });
 
   const dismiss = $('dismiss-button', shadow);
