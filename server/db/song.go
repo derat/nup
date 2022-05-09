@@ -130,6 +130,25 @@ type Song struct {
 	LastModifiedTime time.Time `json:"-"`
 }
 
+// MetadataEquals returns true if s and o have identical metadata.
+// User data (ratings, plays, tags) and server-managed fields are not checked.
+func (s *Song) MetadataEquals(o *Song) bool {
+	return s.SHA1 == o.SHA1 &&
+		s.Filename == o.Filename &&
+		s.CoverFilename == o.CoverFilename &&
+		s.Artist == o.Artist &&
+		s.Title == o.Title &&
+		s.Album == o.Album &&
+		s.AlbumArtist == o.AlbumArtist &&
+		s.AlbumID == o.AlbumID &&
+		s.Track == o.Track &&
+		s.Disc == o.Disc &&
+		s.Length == o.Length &&
+		s.TrackGain == o.TrackGain &&
+		s.AlbumGain == o.AlbumGain &&
+		s.PeakAmp == o.PeakAmp
+}
+
 // Update copies fields from src to dst.
 //
 // If copyUserData is true, the Rating*, FirstStartTime, LastStartTime,

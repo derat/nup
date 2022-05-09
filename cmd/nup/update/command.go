@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"os"
@@ -23,11 +24,12 @@ import (
 type Command struct {
 	Cfg *client.Config
 
+	compareDumpFile  string // path of file with song dumps to compare against
 	debugSongFile    string // path of song file to print debug info about
 	deleteAfterMerge bool   // delete source song if mergeSongIDs is true
 	deleteSongID     int64  // ID of song to delete
 	dryRun           bool   // print actions instead of doing anything
-	dumpedGainsFile  string // path to dump file containing pre-computed gains
+	dumpedGainsFile  string // path to dump file with pre-computed gains
 	forceGlob        string // files to force updating
 	importJSONFile   string // path to JSON file with Song objects to import
 	importUserData   bool   // replace user data when using importJSONFile
@@ -51,6 +53,7 @@ func (*Command) Usage() string {
 }
 
 func (cmd *Command) SetFlags(f *flag.FlagSet) {
+	f.StringVar(&cmd.compareDumpFile, "compare-dump-file", "", "Path to JSON file with songs to compare updates against")
 	f.StringVar(&cmd.debugSongFile, "debug-song-file", "", "Path to song file to print debug info about")
 	f.BoolVar(&cmd.deleteAfterMerge, "delete-after-merge", false, "Delete source song if -merge-songs is true")
 	f.Int64Var(&cmd.deleteSongID, "delete-song", 0, "Delete song with given ID")
@@ -59,12 +62,10 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 		"Path to dump file from which songs' gains will be read (instead of being computed)")
 	f.StringVar(&cmd.forceGlob, "force-glob", "",
 		"Glob pattern relative to music dir for files to scan and update even if they haven't changed")
-	f.StringVar(&cmd.importJSONFile, "import-json-file", "",
-		"If non-empty, path to JSON file containing a stream of Song objects to import")
+	f.StringVar(&cmd.importJSONFile, "import-json-file", "", "Path to JSON file with songs to import")
 	f.BoolVar(&cmd.importUserData, "import-user-data", true,
 		"When importing from JSON, replace user data (ratings, tags, plays, etc.)")
-	f.IntVar(&cmd.limit, "limit", 0,
-		"If positive, limits the number of songs to update (for testing)")
+	f.IntVar(&cmd.limit, "limit", 0, "Limit the number of songs to update (for testing)")
 	f.StringVar(&cmd.mergeSongIDs, "merge-songs", "",
 		`Merge one song's user data into another song, with IDs as "src:dst"`)
 	f.StringVar(&cmd.printCoverID, "print-cover-id", "", `Print cover ID for specified song file`)
@@ -73,7 +74,7 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&cmd.requireCovers, "require-covers", false,
 		"Die if cover images aren't found for any songs that have album IDs")
 	f.StringVar(&cmd.songPathsFile, "song-paths-file", "",
-		"Path to file containing one relative path per line for songs to force updating")
+		"Path to file with one relative path per line for songs to force updating")
 	f.StringVar(&cmd.testGainInfo, "test-gain-info", "",
 		"Hardcoded gain info as \"track:album:amp\" (for testing)")
 	f.BoolVar(&cmd.useFilenames, "use-filenames", false,
@@ -106,10 +107,11 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 	var numSongs int
 	var scannedDirs []string
 	var replaceUserData, didFullScan bool
+	var oldSongs map[string]*db.Song
 	readChan := make(chan songOrErr)
 	startTime := time.Now()
 
-	if len(cmd.testGainInfo) > 0 {
+	if cmd.testGainInfo != "" {
 		var info mp3gain.Info
 		if _, err := fmt.Sscanf(cmd.testGainInfo, "%f:%f:%f",
 			&info.TrackGain, &info.AlbumGain, &info.PeakAmp); err != nil {
@@ -117,6 +119,13 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 			return subcommands.ExitUsageError
 		}
 		mp3gain.SetInfoForTest(&info)
+	}
+
+	if cmd.compareDumpFile != "" {
+		if oldSongs, err = readDumpedSongs(cmd.compareDumpFile, cmd.useFilenames); err != nil {
+			fmt.Fprintln(os.Stderr, "Failed reading songs from -compare-dump-file:", err)
+			return subcommands.ExitFailure
+		}
 	}
 
 	if len(cmd.importJSONFile) > 0 {
@@ -172,7 +181,7 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 		numSongs = cmd.limit
 	}
 
-	log.Printf("Sending %v song(s)", numSongs)
+	log.Printf("Processing %v song(s)", numSongs)
 
 	// Look up covers and feed songs to the updater.
 	updateChan := make(chan db.Song)
@@ -197,6 +206,16 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 				return
 			}
 			s.RecordingID = ""
+
+			// Check that the metadata actually changed to avoid unnecessary datastore writes.
+			key := s.SHA1
+			if cmd.useFilenames {
+				key = s.Filename
+			}
+			if old, ok := oldSongs[key]; ok && s.MetadataEquals(old) {
+				log.Print("Skipping unchanged ", s.Filename)
+				continue
+			}
 
 			log.Print("Sending ", s.Filename)
 			updateChan <- s
@@ -370,7 +389,7 @@ func countBools(vals ...bool) int {
 // lastUpdateInfo contains information about the last full update that was performed.
 // It is used to identify new music files.
 type lastUpdateInfo struct {
-	// Time contains the time at which the last update was started.
+	// Time is the time at which the last update was started.
 	Time time.Time `json:"time"`
 	// Dirs contains all song-containing directories that were seen (relative to config.MusicDir).
 	Dirs []string `json:"dirs"`
@@ -427,4 +446,34 @@ func getCoverFilename(dir string, song *db.Song) string {
 		}
 	}
 	return ""
+}
+
+// readDumpedSongs JSON-unmarshals db.Song objects from p and returns them in a map.
+// If useFilenames is true, the map is keyed by each song's Filename field; otherwise
+// it is keyed by the SHA1 field.
+func readDumpedSongs(p string, useFilenames bool) (map[string]*db.Song, error) {
+	f, err := os.Open(p)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	songs := make(map[string]*db.Song)
+	d := json.NewDecoder(f)
+	for {
+		var s db.Song
+		if err := d.Decode(&s); err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+
+		if useFilenames {
+			songs[s.Filename] = &s
+		} else {
+			songs[s.SHA1] = &s
+		}
+	}
+
+	return songs, nil
 }

@@ -14,7 +14,7 @@ func TestJSON(t *testing.T) {
 	dir := t.TempDir()
 	songs := []db.Song{test.LegacySong1, test.LegacySong2}
 	ch := make(chan songOrErr)
-	p, err := test.WriteSongsToJSONFile(dir, songs)
+	p, err := test.WriteSongsToJSONFile(dir, songs...)
 	if err != nil {
 		t.Error("Failed writing JSON file: ", err)
 	}

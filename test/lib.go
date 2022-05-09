@@ -80,7 +80,7 @@ func DeleteSongs(dir string, filenames ...string) error {
 
 // WriteSongsToJSONFile creates a file in dir containing JSON-marshaled songs.
 // The file's path is returned.
-func WriteSongsToJSONFile(dir string, songs []db.Song) (string, error) {
+func WriteSongsToJSONFile(dir string, songs ...db.Song) (string, error) {
 	f, err := ioutil.TempFile(dir, "songs-json.")
 	if err != nil {
 		return "", err

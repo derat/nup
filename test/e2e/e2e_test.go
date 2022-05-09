@@ -185,7 +185,7 @@ func TestUpdate(tt *testing.T) {
 	// verify that it worked as expected.
 	log.Print("Importing dumped gain with glob")
 	glob := strings.TrimSuffix(gs5.Filename, ".mp3") + ".*"
-	dumpPath, err := test.WriteSongsToJSONFile(tt.TempDir(), []db.Song{gs5})
+	dumpPath, err := test.WriteSongsToJSONFile(tt.TempDir(), gs5)
 	if err != nil {
 		tt.Fatal("Failed writing JSON file: ", err)
 	}
@@ -352,6 +352,32 @@ func TestUpdateUseFilenames(tt *testing.T) {
 	if err := test.CompareSongs([]db.Song{song}, t.DumpSongs(test.StripIDs),
 		test.IgnoreOrder); err != nil {
 		tt.Error("Bad songs after replacing song: ", err)
+	}
+}
+
+func TestUpdateCompare(tt *testing.T) {
+	t, done := initTest(tt)
+	defer done()
+
+	test.Must(tt, test.CopySongs(t.MusicDir, Song0s.Filename, Song1s.Filename, Song5s.Filename))
+
+	// Dump 0s (with changed user data) and 1s (with changed metadata) to a file.
+	s0 := Song0s
+	s0.Rating = 0.5
+	s0.Tags = []string{"instrumental"}
+	s1 := Song1s
+	s1.Artist = s1.Artist + " (old)"
+	dump, err := test.WriteSongsToJSONFile(tt.TempDir(), s0, s1)
+	if err != nil {
+		tt.Fatal("Failed writing songs: ", err)
+	}
+
+	// The update should send 1s (since the actual metadata differs from the dump)
+	// and 5s (since it wasn't present in the dump).
+	t.UpdateSongs(test.CompareDumpFileFlag(dump))
+	if err := test.CompareSongs([]db.Song{Song1s, Song5s}, t.DumpSongs(test.StripIDs),
+		test.IgnoreOrder); err != nil {
+		tt.Error("Bad songs after update: ", err)
 	}
 }
 
@@ -742,7 +768,7 @@ func TestUpdateList(tt *testing.T) {
 
 	// When a dump file is passed, its gain info should be sent to the server.
 	log.Print("Updating songs from list with dumped gains")
-	dumpPath, err := test.WriteSongsToJSONFile(tempDir, []db.Song{gs0, gs5})
+	dumpPath, err := test.WriteSongsToJSONFile(tempDir, gs0, gs5)
 	if err != nil {
 		tt.Fatal("Failed writing JSON file: ", err)
 	}

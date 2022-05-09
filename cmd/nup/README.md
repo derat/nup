@@ -10,20 +10,19 @@ described below.
 Usage: nup <flags> <subcommand> <subcommand args>
 
 Subcommands:
-        check            check for issues in songs and cover images
-        commands         list all command names
-        config           manage server configuration
-        covers           download album art
-        dump             dump songs from the server
-        flags            describe all known top-level flags
-        gain             compute gain adjustments for songs
-        help             describe subcommands and their syntax
-        projectid        print GCP project ID
-        storage          update song storage classes
-        update           send song updates to the server
+	check            check for issues in songs and cover images
+	commands         list all command names
+	config           manage server configuration
+	covers           download album art
+	dump             dump songs from the server
+	flags            describe all known top-level flags
+	help             describe subcommands and their syntax
+	projectid        print GCP project ID
+	storage          update song storage classes
+	update           send song updates to the server
 
   -config string
-        Path to config file (default "$HOME/.nup/config.json")
+    	Path to config file (default "$HOME/.nup/config.json")
 ```
 
 ## `check` command
@@ -35,16 +34,16 @@ the `dump` command or in cover images.
 
 ```
 check [flags]:
-        Check for issues in dumped songs from stdin.
+	Check for issues in dumped songs from stdin.
 
   -check string
-        Comma-separated list of checks to perform:
-          album-id        Songs have MusicBrainz album IDs
-          cover-size-400  Cover images are at least 400x400
-          cover-size-800  Cover images are at least 800x800
-          imported        All songs have been imported
-          song-cover      Songs have cover files
-         (default "album-id,imported,song-cover")
+    	Comma-separated list of checks to perform:
+    	  album-id        Songs have MusicBrainz album IDs
+    	  cover-size-400  Cover images are at least 400x400
+    	  cover-size-800  Cover images are at least 800x800
+    	  imported        All songs have been imported
+    	  song-cover      Songs have cover files
+    	 (default "album-id,imported,song-cover")
 ```
 
 ## `config` command
@@ -54,15 +53,15 @@ The `config` command prints or updates the server's saved configuration in
 
 ```
 config [flags]:
-        Manage the App Engine server's configuration in Datastore.
-        By default, prints the existing JSON-marshaled configuration.
+	Manage the App Engine server's configuration in Datastore.
+	By default, prints the existing JSON-marshaled configuration.
 
   -delete-instances
-        Delete running instances after setting config
+    	Delete running instances after setting config
   -service string
-        Service name for -delete-instances (default "default")
+    	Service name for -delete-instances (default "default")
   -set string
-        Path of updated JSON config file to save to Datastore
+    	Path of updated JSON config file to save to Datastore
 ```
 
 [Datastore]: https://cloud.google.com/datastore
@@ -86,18 +85,18 @@ following information:
 
 ```
 covers [flags]:
-        Download album art from coverartarchive.org for dumped songs from
-        stdin. Image files are written to the directory specified via
-        -cover-dir.
+	Download album art from coverartarchive.org for dumped songs from
+	stdin. Image files are written to the directory specified via
+	-cover-dir.
 
   -cover-dir string
-        Directory to write covers to
+    	Directory to write covers to
   -max-requests int
-        Maximum number of parallel HTTP requests (default 2)
+    	Maximum number of parallel HTTP requests (default 2)
   -max-songs int
-        Maximum number of songs to inspect (default -1)
+    	Maximum number of songs to inspect (default -1)
   -size int
-        Image size to download (250, 500, or 1200) (default 1200)
+    	Image size to download (250, 500, or 1200) (default 1200)
 ```
 
 ## `dump` command
@@ -107,30 +106,14 @@ Engine server] and writes JSON-marshaled [Song] objects to stdout.
 
 ```
 dump [flags]:
-        Dump JSON-marshaled song data from the server to stdout.
+	Dump JSON-marshaled song data from the server to stdout.
 
   -covers
-        Include cover filenames
+    	Include cover filenames
   -play-batch-size int
-        Size for each batch of entities (default 800)
+    	Size for each batch of entities (default 800)
   -song-batch-size int
-        Size for each batch of entities (default 400)
-```
-
-## `gain` command
-
-The `gain` command uses the [mp3gain] program to compute gain adjustments and
-peak amplitudes for dumped songs.
-
-The `update` command computes the same data when importing songs. `gain` is
-only useful for backfilling missing data.
-
-[mp3gain]: http://mp3gain.sourceforge.net/
-
-```
-gain:
-        Compute gain adjustments for dumped songs from stdin using mp3gain.
-        Writes updated JSON song objects to stdout.
+    	Size for each batch of entities (default 400)
 ```
 
 ## `projectid` command
@@ -141,8 +124,8 @@ The `projectid` command prints the GCP [project ID].
 
 ```
 projectid:
-        Print the Google Cloud Platform project ID (as derived from the
-        config's serverURL field).
+	Print the Google Cloud Platform project ID (as derived from the
+	config's serverURL field).
 ```
 
 ## `storage` command
@@ -161,19 +144,19 @@ Coldline and use that for all songs.
 
 ```
 storage [flags]:
-        Update song files' storage classes in Google Cloud Storage based on
-        ratings in dumped songs from stdin.
+	Update song files' storage classes in Google Cloud Storage based on
+	ratings in dumped songs from stdin.
 
   -bucket string
-        Google Cloud Storage bucket containing songs
+    	Google Cloud Storage bucket containing songs
   -class string
-        Storage class for infrequently-accessed files (default "COLDLINE")
+    	Storage class for infrequently-accessed files (default "COLDLINE")
   -max-updates int
-        Maximum number of files to update (default -1)
+    	Maximum number of files to update (default -1)
   -rating-cutoff float
-        Minimum song rating for standard storage class (default 0.75)
+    	Minimum song rating for standard storage class (default 0.75)
   -workers int
-        Maximum concurrent Google Cloud Storage updates (default 10)
+    	Maximum concurrent Google Cloud Storage updates (default 10)
 ```
 
 ## `update` command
@@ -195,40 +178,42 @@ The `-delete-song` flag can be used to delete specific songs from the server
 
 ```
 update [flags]:
-        Send song updates to the server.
+	Send song updates to the server.
 
+  -compare-dump-file string
+    	Path to JSON file with songs to compare updates against
   -debug-song-file string
-        Path to song file to print debug info about
+    	Path to song file to print debug info about
   -delete-after-merge
-        Delete source song if -merge-songs is true
+    	Delete source song if -merge-songs is true
   -delete-song int
-        Delete song with given ID
+    	Delete song with given ID
   -dry-run
-        Only print what would be updated
+    	Only print what would be updated
   -dumped-gains-file string
-        Path to dump file from which songs' gains will be read (instead of being computed)
+    	Path to dump file from which songs' gains will be read (instead of being computed)
   -force-glob string
-        Glob pattern relative to music dir for files to scan and update even if they haven't changed
+    	Glob pattern relative to music dir for files to scan and update even if they haven't changed
   -import-json-file string
-        If non-empty, path to JSON file containing a stream of Song objects to import
+    	Path to JSON file with songs to import
   -import-user-data
-        When importing from JSON, replace user data (ratings, tags, plays, etc.) (default true)
+    	When importing from JSON, replace user data (ratings, tags, plays, etc.) (default true)
   -limit int
-        If positive, limits the number of songs to update (for testing)
+    	Limit the number of songs to update (for testing)
   -merge-songs string
-        Merge one song's user data into another song, with IDs as "src:dst"
+    	Merge one song's user data into another song, with IDs as "src:dst"
   -print-cover-id string
-        Print cover ID for specified song file
+    	Print cover ID for specified song file
   -reindex-songs
-        Ask server to reindex all songs' search-related fields (not typically neaded)
+    	Ask server to reindex all songs' search-related fields (not typically neaded)
   -require-covers
-        Die if cover images aren't found for any songs that have album IDs
+    	Die if cover images aren't found for any songs that have album IDs
   -song-paths-file string
-        Path to file containing one relative path per line for songs to force updating
+    	Path to file with one relative path per line for songs to force updating
   -test-gain-info string
-        Hardcoded gain info as "track:album:amp" (for testing)
+    	Hardcoded gain info as "track:album:amp" (for testing)
   -use-filenames
-        Identify songs by filename rather than audio data hash (useful when modifying files)
+    	Identify songs by filename rather than audio data hash (useful when modifying files)
 ```
 
 ### Merging songs
@@ -248,3 +233,6 @@ into the new file.
     the old song's user data into the new song and delete the old song from the
     server.
 4.  Delete `old/song.mp3` or remove it from your local music directory.
+
+Alternatively, you can just overwrite the old file with the new one and use `nup
+update -use-filenames`.

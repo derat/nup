@@ -229,8 +229,9 @@ func (t *Tester) SongID(sha1 string) string {
 const KeepUserDataFlag = "-import-user-data=false"
 const UseFilenamesFlag = "-use-filenames"
 
-func DumpedGainsFlag(p string) string  { return "-dumped-gains-file=" + p }
-func ForceGlobFlag(glob string) string { return "-force-glob=" + glob }
+func CompareDumpFileFlag(p string) string { return "-compare-dump-file=" + p }
+func DumpedGainsFlag(p string) string     { return "-dumped-gains-file=" + p }
+func ForceGlobFlag(glob string) string    { return "-force-glob=" + glob }
 
 // UpdateSongs runs 'nup update' with the supplied flags.
 func (t *Tester) UpdateSongs(flags ...string) {
@@ -252,7 +253,7 @@ func (t *Tester) UpdateSongsFromList(path string, flags ...string) {
 // ImportSongsFromJSON serializes the supplied songs to JSON and sends them
 // to the server using 'nup update'.
 func (t *Tester) ImportSongsFromJSONFile(songs []db.Song, flags ...string) {
-	p, err := WriteSongsToJSONFile(t.tempDir, songs)
+	p, err := WriteSongsToJSONFile(t.tempDir, songs...)
 	if err != nil {
 		t.fatal("Failed writing songs to JSON file: ", err)
 	}
