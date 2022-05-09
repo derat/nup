@@ -71,6 +71,9 @@ func (c *TaskCache) Get(itemKey, taskKey string, task Task) (interface{}, error)
 		return nil, err
 	}
 	for k, v := range m {
+		if _, ok := c.items[k]; ok {
+			return nil, fmt.Errorf("task %q produced already-present item %q", taskKey, k)
+		}
 		c.items[k] = v
 	}
 	if v, ok := c.items[itemKey]; ok {
