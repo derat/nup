@@ -25,6 +25,10 @@ const template = createTemplate(`
     align-items: flex-start;
     display: flex;
     gap: 30px;
+    visibility: hidden;
+  }
+  #top-div.ready {
+    visibility: visible;
   }
 
   table {
@@ -106,7 +110,7 @@ const template = createTemplate(`
   </div>
 </div>
 
-<div id="updated-div"></div>
+<div id="updated-div">Loading stats...</div>
 
 <form method="dialog">
   <div class="button-container">
@@ -120,7 +124,6 @@ export function showStats() {
   const dialog = createDialog(template, 'stats');
   const shadow = dialog.firstChild.shadowRoot;
 
-  // TODO: Display loading message.
   fetch('stats', { method: 'GET' })
     .then((res) => handleFetchError(res))
     .then((res) => res.json())
@@ -145,6 +148,11 @@ export function showStats() {
 
       const updateSec = (Date.now() - Date.parse(stats.updateTime)) / 1000;
       $('updated-div', shadow).innerText = `Updated ${formatAgo(updateSec)}`;
+
+      $('top-div', shadow).classList.add('ready');
+    })
+    .catch((err) => {
+      $('updated-div', shadow).innerText = err.toString();
     });
 }
 
