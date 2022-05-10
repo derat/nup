@@ -43,7 +43,6 @@
   --header-color: #f5f5f5; /* song table header */
   --icon-color: #aaa; /* clear button, select arrow */
   --icon-hover-color: #666;
-  --lightbox-dimming-opacity: 0.1; /* used by overlay-manager */
   --menu-hover-color: #eee;
   --suggestions-color: #eee; /* tag suggestions background */
 }
@@ -69,7 +68,6 @@
   --header-color: #333;
   --icon-color: #aaa;
   --icon-hover-color: #ccc;
-  --lightbox-dimming-opacity: 0.5;
   --menu-hover-color: #444;
   --suggestions-color: #444;
 }

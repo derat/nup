@@ -10,6 +10,8 @@ import {
   getDumpSongUrl,
   handleFetchError,
 } from './common.js';
+import { showMessageDialog } from './dialog.js';
+import { createMenu } from './menu.js';
 import { showSongInfo } from './song-info.js';
 
 const template = createTemplate(`
@@ -362,23 +364,17 @@ customElements.define(
             !checked;
       });
       this.resultsTable_.addEventListener('menu', (e) => {
-        if (!this.overlayManager_) throw new Error('No overlay manager');
-
         const idx = e.detail.index;
         const orig = e.detail.orig;
         orig.preventDefault();
-        const menu = this.overlayManager_.createMenu(orig.pageX, orig.pageY, [
+        const menu = createMenu(orig.pageX, orig.pageY, [
           {
-            id: 'info',
+            id: 'menu-info',
             text: 'Info…',
-            cb: () =>
-              showSongInfo(
-                this.overlayManager_,
-                this.resultsTable_.getSong(idx)
-              ),
+            cb: () => showSongInfo(this.resultsTable_.getSong(idx)),
           },
           {
-            id: 'debug',
+            id: 'menu-debug',
             text: 'Debug…',
             cb: () => window.open(getDumpSongUrl(e.detail.songId), '_blank'),
           },
@@ -399,9 +395,6 @@ customElements.define(
       this.resultsShuffled_ = false;
     }
 
-    set overlayManager(manager) {
-      this.overlayManager_ = manager;
-    }
     set musicPlayer(player) {
       this.musicPlayer_ = player;
       player.addEventListener('field', (e) => {
@@ -484,7 +477,7 @@ customElements.define(
       }
 
       if (!terms.length) {
-        this.showMessage_('Invalid Search', 'You must supply search terms.');
+        showMessageDialog('Invalid Search', 'You must supply search terms.');
         return;
       }
 
@@ -510,7 +503,7 @@ customElements.define(
           if (appendToQueue) this.enqueueSearchResults_(true, true);
         })
         .catch((err) => {
-          this.showMessage_('Search Failed', err.toString());
+          showMessageDialog('Search Failed', err.toString());
         })
         .finally(() => {
           this.waitingDiv_.classList.remove('shown');
@@ -627,7 +620,6 @@ customElements.define(
     }
 
     handleBodyKeyDown_(e) {
-      if (this.overlayManager_ && this.overlayManager_.numChildren) return;
       if (this.musicPlayer_ && this.musicPlayer_.updateDivShown) return;
 
       if (e.key === '/') {
@@ -635,12 +627,6 @@ customElements.define(
         e.preventDefault();
         e.stopPropagation();
       }
-    }
-
-    // Displays a dialog with the supplied title and message.
-    showMessage_(title, message) {
-      if (!this.overlayManager_) return;
-      this.overlayManager_.createMessageDialog(title, message);
     }
   }
 );

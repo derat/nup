@@ -19,6 +19,7 @@ import {
   updateTitleAttributeForTruncation,
 } from './common.js';
 import Config from './config.js';
+import { createMenu } from './menu.js';
 import OptionsDialog from './options-dialog.js';
 import { showSongInfo } from './song-info.js';
 import { showStats } from './stats.js';
@@ -259,38 +260,38 @@ customElements.define(
       this.menuButton_ = get('menu-button');
       this.menuButton_.addEventListener('click', (e) => {
         const rect = this.menuButton_.getBoundingClientRect();
-        const menu = this.overlayManager_.createMenu(
+        const menu = createMenu(
           rect.right + 12, // compensate for right padding
           rect.bottom,
           [
             {
-              id: 'present',
+              id: 'menu-present',
               text: 'Presentation',
               cb: () => this.setPresentationLayerVisible_(true),
               hotkey: 'Alt+V',
             },
             {
-              id: 'options',
+              id: 'menu-options',
               text: 'Options…',
               cb: () => this.showOptions_(),
               hotkey: 'Alt+O',
             },
             {
-              id: 'stats',
+              id: 'menu-stats',
               text: 'Stats…',
-              cb: () => this.showStats_(),
+              cb: () => showStats(),
             },
             {
-              id: 'info',
+              id: 'menu-info',
               text: 'Song info…',
               cb: () => {
                 const song = this.currentSong_;
-                if (song) showSongInfo(this.overlayManager_, song);
+                if (song) showSongInfo(song);
               },
               hotkey: 'Alt+I',
             },
             {
-              id: 'debug',
+              id: 'menu-debug',
               text: 'Debug…',
               cb: () => {
                 const song = this.currentSong_;
@@ -363,36 +364,34 @@ customElements.define(
         // TODO: Preload the next song if needed.
       });
       this.playlistTable_.addEventListener('menu', (e) => {
-        if (!this.overlayManager_) throw new Error('No overlay manager');
-
         const idx = e.detail.index;
         const orig = e.detail.orig;
         orig.preventDefault();
 
-        const menu = this.overlayManager_.createMenu(orig.pageX, orig.pageY, [
+        const menu = createMenu(orig.pageX, orig.pageY, [
           {
-            id: 'play',
+            id: 'menu-play',
             text: 'Play',
             cb: () => this.selectTrack_(idx),
           },
           {
-            id: 'remove',
+            id: 'menu-remove',
             text: 'Remove',
             cb: () => this.removeSongs_(idx, 1),
           },
           {
-            id: 'truncate',
+            id: 'menu-truncate',
             text: 'Truncate',
             cb: () => this.removeSongs_(idx, this.songs_.length - idx),
           },
           { text: '-' },
           {
-            id: 'info',
+            id: 'menu-info',
             text: 'Info…',
-            cb: () => showSongInfo(this.overlayManager_, this.songs_[idx]),
+            cb: () => showSongInfo(this.songs_[idx]),
           },
           {
-            id: 'debug',
+            id: 'menu-debug',
             text: 'Debug…',
             cb: () => window.open(getDumpSongUrl(e.detail.songId), '_blank'),
           },
@@ -445,10 +444,6 @@ customElements.define(
           this.updateGain_();
         }
       });
-    }
-
-    set overlayManager(manager) {
-      this.overlayManager_ = manager;
     }
 
     // Returns true if the update div is currently shown.
@@ -975,20 +970,10 @@ customElements.define(
     showOptions_() {
       if (this.optionsDialog_) return;
       if (!this.config_) throw new Error('No config');
-      if (!this.overlayManager_) throw new Error('No overlay manager');
 
-      this.optionsDialog_ = new OptionsDialog(
-        this.config_,
-        this.overlayManager_,
-        () => {
-          this.optionsDialog_ = null;
-        }
-      );
-    }
-
-    showStats_() {
-      if (!this.overlayManager_) throw new Error('No overlay manager');
-      showStats(this.overlayManager_);
+      this.optionsDialog_ = new OptionsDialog(this.config_, () => {
+        this.optionsDialog_ = null;
+      });
     }
 
     // Shows or hides the presentation layer.
@@ -1041,7 +1026,7 @@ customElements.define(
         return true;
       } else if (e.altKey && e.key == 'i') {
         const song = this.currentSong_;
-        if (song) showSongInfo(this.overlayManager_, song);
+        if (song) showSongInfo(song);
         this.setPresentationLayerVisible_(false);
         return true;
       } else if (e.altKey && e.key == 'n') {

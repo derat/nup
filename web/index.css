@@ -41,3 +41,75 @@ body.no-scroll {
    * expected in Firefox. */
   border-right: 1px solid var(--border-color);
 }
+
+dialog.dialog {
+  background-color: var(--bg-color);
+  border: solid 1px var(--frame-border-color);
+  box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
+  color: var(--text-color);
+  padding: var(--margin);
+}
+dialog.dialog::backdrop {
+  /* I'd like to set the opacity to 0.1 for the light theme and 0.5 for the dark
+   * theme, but for some reason I don't seem to be able to access CSS vars from
+   * within this pseudo-element -- Dev Tools claims that any vars that I
+   * reference aren't defined. This sounds similar to https://crbug.com/1174553,
+   * except the backdrop is also transparent, so I think it isn't just a Dev
+   * Tools problem. */
+  background-color: rgba(0, 0, 0, 0.3);
+}
+dialog.dialog > span {
+  display: inline-block; /* permit width to be set via :host */
+  text-align: left;
+
+  /* Prevent a flash of unstyled content (FOUC) before the dialog's contents
+   * have been styled. dialog.css overrides this. */
+  opacity: 0;
+  visibility: hidden;
+}
+
+dialog.menu {
+  background-color: var(--bg-color);
+  border: solid 1px var(--frame-border-color);
+  box-shadow: 0 1px 2px 1px rgba(0, 0, 0, 0.2);
+  color: var(--text-color);
+  left: auto;
+  margin: 0;
+  padding: 0;
+  pointer-events: auto;
+  position: absolute;
+  right: auto;
+  text-align: left;
+}
+dialog.menu::backdrop {
+  background-color: transparent;
+}
+
+/* TODO: Consider making menu.js use a shadow so these rules can be moved. */
+dialog.menu .item {
+  cursor: default;
+  padding: 6px 12px;
+}
+dialog.menu .item:hover {
+  background-color: var(--menu-hover-color);
+}
+dialog.menu .item:first-child {
+  padding-top: 8px;
+}
+dialog.menu .item:last-child {
+  padding-bottom: 8px;
+}
+dialog.menu .item .hotkey {
+  color: var(--text-label-color);
+  display: inline-block;
+  float: right;
+  margin-left: var(--margin);
+  text-align: right;
+  min-width: 50px;
+}
+dialog.menu hr {
+  background-color: var(--border-color);
+  border: 0;
+  height: 1px;
+  margin: 4px 0;
+}

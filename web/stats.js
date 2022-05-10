@@ -8,6 +8,7 @@ import {
   createTemplate,
   handleFetchError,
 } from './common.js';
+import { createDialog } from './dialog.js';
 
 const template = createTemplate(`
 <style>
@@ -107,15 +108,16 @@ const template = createTemplate(`
 
 <div id="updated-div"></div>
 
-<div class="button-container">
-  <button id="dismiss-button">Dismiss</button>
-</div>
+<form method="dialog">
+  <div class="button-container">
+    <button id="dismiss-button">Dismiss</button>
+  </div>
+</form>
 `);
 
-export function showStats(manager) {
-  const container = manager.createDialog();
-  container.classList.add('stats'); // for tests
-  const shadow = createShadow(container, template);
+export function showStats() {
+  const dialog = createDialog(template, 'stats');
+  const shadow = dialog.shadow;
 
   // TODO: Display loading message.
   fetch('stats', { method: 'GET' })
@@ -162,10 +164,6 @@ export function showStats(manager) {
           : 'just now';
       $('updated-div', shadow).innerText = `Updated ${age}`;
     });
-
-  const dismiss = $('dismiss-button', shadow);
-  dismiss.addEventListener('click', () => manager.closeChild(container));
-  dismiss.focus();
 }
 
 const formatDuration = (sec) => `${parseFloat(sec / 86400).toFixed(1)} days`;

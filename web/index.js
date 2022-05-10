@@ -7,12 +7,9 @@ import Config from './config.js';
 const config = new Config();
 const musicPlayer = document.querySelector('music-player');
 const musicSearcher = document.querySelector('music-searcher');
-const overlayManager = document.querySelector('overlay-manager');
 
 // Wire up dependencies between components.
 musicPlayer.config = config;
-musicPlayer.overlayManager = overlayManager;
-musicSearcher.overlayManager = overlayManager;
 musicSearcher.musicPlayer = musicPlayer;
 
 // Watch for theme changes.
@@ -62,7 +59,8 @@ document.test = {
   reset: () => {
     musicPlayer.resetForTesting();
     musicSearcher.resetForTesting();
-    overlayManager.resetForTesting();
+    // Make a hacky attempt to close any modal dialogs.
+    [...document.querySelectorAll('dialog')].forEach((d) => d.close());
   },
   setPlayDelayMs: (delayMs) => (musicPlayer.playDelayMs_ = delayMs),
   updateTags: async () => await musicPlayer.updateTagsFromServer_(),

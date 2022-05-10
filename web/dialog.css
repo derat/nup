@@ -3,12 +3,12 @@
 
 @import 'common.css';
 
-:host(.dialog) {
-  /* Override style set by overlay-manager to prevent a flash of unstyled
-   * content (FOUC) due to the dialog being displayed before its contents'
-   * stylesheets have been loaded. I tried to find a way to do this without
-   * !important, but for some reason the .dialog rule in overlay-manager seems
-   * to be more specific than e.g. :host(.dialog.ready) here. */
+:host {
+  /* Override style set on "dialog.dialog > span" in index.css to prevent a
+   * flash of unstyled content (FOUC) due to the dialog being displayed before
+   * its contents' stylesheets have been loaded. I tried to find a way to do
+   * this without !important, but for some reason the rule in index.css seems
+   * to be more specific than the one here. */
   opacity: 1 !important;
   visibility: visible !important;
 }

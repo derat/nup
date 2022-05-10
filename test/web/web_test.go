@@ -468,15 +468,6 @@ func TestPlayTimeQuery(t *testing.T) {
 		page.setStage(fmt.Sprintf("%s / %s", tc.first, tc.last))
 		page.clickOption(firstPlayedSelect, tc.first)
 		page.clickOption(lastPlayedSelect, tc.last)
-		// TODO: Saw a weird failure here once:
-		//
-		//  Failed clicking [{tag name music-searcher} {id search-button}] at web_test.go:471 (one
-		//  year / ...): unknown error - 64: element click intercepted: Element <button
-		//  id="search-button" type="button">...</button> is not clickable at point (573, 343).
-		//  Other element would receive the click: <overlay-manager></overlay-manager>
-		//
-		// I have no idea how overlay-manager could be be blocking the search button (especially
-		// after a few earlier test cases succeeded).
 		page.click(searchButton)
 		page.checkSearchResults(tc.want)
 	}

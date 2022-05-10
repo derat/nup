@@ -50,14 +50,12 @@ var (
 	// Use selenium.ByCSSSelector instead for referencing deeply-nested elements.
 	body = joinLocs(loc{selenium.ByTagName, "body"})
 
-	overlayManager = joinLocs(loc{selenium.ByTagName, "overlay-manager"})
-
-	optionsDialog   = joinLocs(overlayManager, loc{selenium.ByCSSSelector, ".dialog.options"})
+	optionsDialog   = joinLocs(body, loc{selenium.ByCSSSelector, ".dialog .options"})
 	optionsOKButton = joinLocs(optionsDialog, loc{selenium.ByID, "ok-button"})
 	gainTypeSelect  = joinLocs(optionsDialog, loc{selenium.ByID, "gain-type-select"})
 	preAmpRange     = joinLocs(optionsDialog, loc{selenium.ByID, "pre-amp-range"})
 
-	infoDialog        = joinLocs(overlayManager, loc{selenium.ByCSSSelector, ".dialog.info"})
+	infoDialog        = joinLocs(body, loc{selenium.ByCSSSelector, ".dialog .info"})
 	infoArtist        = joinLocs(infoDialog, loc{selenium.ByID, "artist"})
 	infoTitle         = joinLocs(infoDialog, loc{selenium.ByID, "title"})
 	infoAlbum         = joinLocs(infoDialog, loc{selenium.ByID, "album"})
@@ -67,15 +65,15 @@ var (
 	infoTags          = joinLocs(infoDialog, loc{selenium.ByID, "tags"})
 	infoDismissButton = joinLocs(infoDialog, loc{selenium.ByID, "dismiss-button"})
 
-	statsDialog = joinLocs(overlayManager, loc{selenium.ByCSSSelector, ".dialog.stats"})
+	statsDialog = joinLocs(body, loc{selenium.ByCSSSelector, ".dialog .stats"})
 
-	menuPresent  = joinLocs(overlayManager, loc{selenium.ByID, "present"})
-	menuOptions  = joinLocs(overlayManager, loc{selenium.ByID, "options"})
-	menuStats    = joinLocs(overlayManager, loc{selenium.ByID, "stats"})
-	menuInfo     = joinLocs(overlayManager, loc{selenium.ByID, "info"})
-	menuPlay     = joinLocs(overlayManager, loc{selenium.ByID, "play"})
-	menuRemove   = joinLocs(overlayManager, loc{selenium.ByID, "remove"})
-	menuTruncate = joinLocs(overlayManager, loc{selenium.ByID, "truncate"})
+	menuPresent  = joinLocs(loc{selenium.ByID, "menu-present"})
+	menuOptions  = joinLocs(loc{selenium.ByID, "menu-options"})
+	menuStats    = joinLocs(loc{selenium.ByID, "menu-stats"})
+	menuInfo     = joinLocs(loc{selenium.ByID, "menu-info"})
+	menuPlay     = joinLocs(loc{selenium.ByID, "menu-play"})
+	menuRemove   = joinLocs(loc{selenium.ByID, "menu-remove"})
+	menuTruncate = joinLocs(loc{selenium.ByID, "menu-truncate"})
 
 	musicPlayer       = joinLocs(loc{selenium.ByTagName, "music-player"})
 	menuButton        = joinLocs(musicPlayer, loc{selenium.ByID, "menu-button"})

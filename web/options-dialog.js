@@ -3,6 +3,7 @@
 
 import { $, createShadow, createTemplate } from './common.js';
 import Config from './config.js';
+import { createDialog } from './dialog.js';
 
 const template = createTemplate(`
 <style>
@@ -69,35 +70,34 @@ const template = createTemplate(`
   </label>
 </div>
 
-<div class="button-container">
-  <button id="ok-button">OK</button>
-</div>
+<form method="dialog">
+  <div class="button-container">
+    <button id="ok-button">OK</button>
+  </div>
+</form>
 `);
 
+// TODO: Make this a function instead of a class?
 export default class OptionsDialog {
-  constructor(config, manager, closeCallback) {
+  constructor(config, closeCallback) {
     this.config_ = config;
-    this.manager_ = manager;
     this.closeCallback_ = closeCallback;
+    this.dialog_ = createDialog(template, 'options');
 
-    this.container_ = this.manager_.createDialog();
-    this.container_.classList.add('options'); // for tests
-    this.shadow_ = createShadow(this.container_, template);
-
-    this.themeSelect_ = $('theme-select', this.shadow_);
+    this.themeSelect_ = $('theme-select', this.dialog_.shadow);
     this.themeSelect_.value = this.config_.get(Config.THEME);
     this.themeSelect_.addEventListener('change', () =>
       this.config_.set(Config.THEME, this.themeSelect_.value)
     );
 
-    this.gainTypeSelect_ = $('gain-type-select', this.shadow_);
+    this.gainTypeSelect_ = $('gain-type-select', this.dialog_.shadow);
     this.gainTypeSelect_.value = this.config_.get(Config.GAIN_TYPE);
     this.gainTypeSelect_.addEventListener('change', () =>
       this.config_.set(Config.GAIN_TYPE, this.gainTypeSelect_.value)
     );
 
     const preAmp = this.config_.get(Config.PRE_AMP);
-    this.preAmpRange_ = $('pre-amp-range', this.shadow_);
+    this.preAmpRange_ = $('pre-amp-range', this.dialog_.shadow);
     this.preAmpRange_.value = preAmp;
     this.preAmpRange_.addEventListener('input', () =>
       this.updatePreAmpSpan_(this.preAmpRange_.value)
@@ -106,14 +106,10 @@ export default class OptionsDialog {
       this.config_.set(Config.PRE_AMP, this.preAmpRange_.value)
     );
 
-    this.preAmpSpan_ = $('pre-amp-span', this.shadow_);
+    this.preAmpSpan_ = $('pre-amp-span', this.dialog_.shadow);
     this.updatePreAmpSpan_(preAmp);
 
-    $('ok-button', this.shadow_).addEventListener('click', () =>
-      this.manager_.closeChild(this.container_)
-    );
-
-    this.container_.addEventListener('close', () => {
+    this.dialog_.addEventListener('close', () => {
       this.config_.save();
       if (this.closeCallback_) this.closeCallback_();
     });

@@ -10,6 +10,7 @@ import {
   getRatingString,
   getScaledCoverUrl,
 } from './common.js';
+import { createDialog } from './dialog.js';
 
 const template = createTemplate(`
 <style>
@@ -67,15 +68,16 @@ const template = createTemplate(`
   <tr><td>Tags</td><td id="tags"></td></tr>
 </table>
 
-<div class="button-container">
-  <button id="dismiss-button">Dismiss</button>
-</div>
+<form method="dialog">
+  <div class="button-container">
+    <button id="dismiss-button">Dismiss</button>
+  </div>
+</form>
 `);
 
-export function showSongInfo(manager, song) {
-  const container = manager.createDialog();
-  container.classList.add('info'); // for tests
-  const shadow = createShadow(container, template);
+export function showSongInfo(song) {
+  const dialog = createDialog(template, 'info');
+  const shadow = dialog.shadow;
 
   const cover = $('cover-img', shadow);
   if (song.coverFilename) {
@@ -95,8 +97,4 @@ export function showSongInfo(manager, song) {
   $('length', shadow).innerText = formatTime(parseFloat(song.length));
   $('rating', shadow).innerText = getRatingString(song.rating);
   $('tags', shadow).innerText = song.tags ? song.tags.join(' ') : '';
-
-  const dismiss = $('dismiss-button', shadow);
-  dismiss.addEventListener('click', () => manager.closeChild(container));
-  dismiss.focus();
 }
