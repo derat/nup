@@ -110,11 +110,12 @@ const template = createTemplate(`
 
 <form method="dialog">
   <div class="button-container">
-    <button id="dismiss-button">Dismiss</button>
+    <button id="dismiss-button" autofocus>Dismiss</button>
   </div>
 </form>
 `);
 
+// Shows a modal dialog containing stats fetched from the server.
 export function showStats() {
   const dialog = createDialog(template, 'stats');
   const shadow = dialog.firstChild.shadowRoot;
@@ -132,38 +133,38 @@ export function showStats() {
         td.innerText = songs ? parseInt(songs).toLocaleString() : '0';
       }
       $('albums', shadow).innerText = parseInt(stats.albums).toLocaleString();
-      $('duration', shadow).innerText =
-        parseFloat(stats.totalSec / 86400).toFixed(1) + ' days';
+      $('duration', shadow).innerText = formatDays(stats.totalSec);
 
       const tbody = shadow.querySelector('#years-table tbody');
       for (const [year, ystats] of Object.entries(stats.years).sort()) {
         const row = createElement('tr', null, tbody);
         createElement('td', null, row, year);
         createElement('td', null, row, parseInt(ystats.plays).toLocaleString());
-        const days = parseFloat(ystats.totalSec / 86400).toFixed(1);
-        createElement('td', null, row, days);
+        createElement('td', null, row, formatDays(ystats.totalSec));
       }
 
-      const sec = (Date.now() - Date.parse(stats.updateTime)) / 1000;
-      const days = sec / 86400;
-      const hours = sec / 3600;
-      const min = sec / 60;
-      const age =
-        days >= 1.5
-          ? `${Math.round(days)} days ago`
-          : days >= 1
-          ? '1 day ago'
-          : hours >= 1.5
-          ? `${Math.round(hours)} hours ago`
-          : hours >= 1
-          ? '1 hour ago'
-          : min >= 1.5
-          ? `${Math.round(min)} minutes ago`
-          : min >= 1
-          ? '1 minute ago'
-          : 'just now';
-      $('updated-div', shadow).innerText = `Updated ${age}`;
+      const updateSec = (Date.now() - Date.parse(stats.updateTime)) / 1000;
+      $('updated-div', shadow).innerText = `Updated ${formatAgo(updateSec)}`;
     });
 }
 
-const formatDuration = (sec) => `${parseFloat(sec / 86400).toFixed(1)} days`;
+const formatDays = (sec) => `${(sec / 86400).toFixed(1)} days`;
+
+function formatAgo(sec) {
+  const days = sec / 86400;
+  const hours = sec / 3600;
+  const min = sec / 60;
+  return days >= 1.5
+    ? `${Math.round(days)} days ago`
+    : days >= 1
+    ? '1 day ago'
+    : hours >= 1.5
+    ? `${Math.round(hours)} hours ago`
+    : hours >= 1
+    ? '1 hour ago'
+    : min >= 1.5
+    ? `${Math.round(min)} minutes ago`
+    : min >= 1
+    ? '1 minute ago'
+    : 'just now';
+}

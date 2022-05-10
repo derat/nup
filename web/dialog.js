@@ -19,7 +19,7 @@ const msgTemplate = createTemplate(`
 <div id="message"></div>
 <form method="dialog">
   <div class="button-container">
-    <button class="ok-button">OK</button>
+    <button class="ok-button" autofocus>OK</button>
   </div>
 </form>
 `);

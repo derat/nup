@@ -20,6 +20,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// When tethering over a cellular connection, I saw dev_appserver.py block for 4+ minutes at startup
+// after logging "devappserver2.py:316] Skipping SDK update check." lsof suggested that it was
+// blocked on an HTTP connection in SYN_SENT to some random IPv6 address owned by Akamai (?).
+// When I increased this timeout to 10 minutes, it eventually proceeded (without logging anything).
 const appserverTimeout = 15 * time.Second
 
 // DevAppserver wraps a dev_appserver.py process.

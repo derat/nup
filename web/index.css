@@ -63,9 +63,10 @@ dialog.dialog > span {
   text-align: left;
 
   /* Prevent a flash of unstyled content (FOUC) before the dialog's contents
-   * have been styled. dialog.css overrides this. */
+   * have been styled. dialog.css overrides this. This was initially also
+   * setting "visibility: hidden", but that seems to prevent dialogs' controls
+   * from being autofocused. */
   opacity: 0;
-  visibility: hidden;
 }
 
 dialog.menu {

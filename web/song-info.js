@@ -70,7 +70,7 @@ const template = createTemplate(`
 
 <form method="dialog">
   <div class="button-container">
-    <button id="dismiss-button">Dismiss</button>
+    <button id="dismiss-button" autofocus>Dismiss</button>
   </div>
 </form>
 `);
