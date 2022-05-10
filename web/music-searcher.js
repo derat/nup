@@ -10,8 +10,8 @@ import {
   getDumpSongUrl,
   handleFetchError,
 } from './common.js';
-import { showMessageDialog } from './dialog.js';
-import { createMenu } from './menu.js';
+import { isDialogShown, showMessageDialog } from './dialog.js';
+import { createMenu, isMenuShown } from './menu.js';
 import { showSongInfo } from './song-info.js';
 
 const template = createTemplate(`
@@ -620,6 +620,7 @@ customElements.define(
     }
 
     handleBodyKeyDown_(e) {
+      if (isDialogShown() || isMenuShown()) return;
       if (this.musicPlayer_ && this.musicPlayer_.updateDivShown) return;
 
       if (e.key === '/') {

@@ -19,8 +19,9 @@ import {
   updateTitleAttributeForTruncation,
 } from './common.js';
 import Config from './config.js';
-import { createMenu } from './menu.js';
-import OptionsDialog from './options-dialog.js';
+import { isDialogShown } from './dialog.js';
+import { createMenu, isMenuShown } from './menu.js';
+import { showOptionsDialog } from './options-dialog.js';
 import { showSongInfo } from './song-info.js';
 import { showStats } from './stats.js';
 import Updater from './updater.js';
@@ -229,7 +230,6 @@ customElements.define(
       super();
 
       this.updater_ = new Updater();
-      this.optionsDialog_ = null;
 
       this.songs_ = []; // songs in the order in which they should be played
       this.tags_ = []; // available tags loaded from server
@@ -273,7 +273,7 @@ customElements.define(
             {
               id: 'menu-options',
               text: 'Options…',
-              cb: () => this.showOptions_(),
+              cb: () => showOptionsDialog(this.config_),
               hotkey: 'Alt+O',
             },
             {
@@ -967,15 +967,6 @@ customElements.define(
       }
     }
 
-    showOptions_() {
-      if (this.optionsDialog_) return;
-      if (!this.config_) throw new Error('No config');
-
-      this.optionsDialog_ = new OptionsDialog(this.config_, () => {
-        this.optionsDialog_ = null;
-      });
-    }
-
     // Shows or hides the presentation layer.
     setPresentationLayerVisible_(visible) {
       if (this.presentationLayer_.visible == visible) return;
@@ -1015,9 +1006,7 @@ customElements.define(
     }
 
     processAccelerator_(e) {
-      if (this.overlayManager_ && this.overlayManager_.numChildren) {
-        return false;
-      }
+      if (isDialogShown() || isMenuShown()) return false;
 
       if (e.altKey && e.key == 'd') {
         const song = this.currentSong_;
@@ -1033,7 +1022,7 @@ customElements.define(
         this.cycleTrack_(1, true /* delay */);
         return true;
       } else if (e.altKey && e.key == 'o') {
-        this.showOptions_();
+        showOptionsDialog(this.config_);
         this.setPresentationLayerVisible_(false);
         return true;
       } else if (e.altKey && e.key == 'p') {

@@ -75,9 +75,10 @@ const template = createTemplate(`
 </form>
 `);
 
+// Displays a modal dialog containing information about |song|.
 export function showSongInfo(song) {
   const dialog = createDialog(template, 'info');
-  const shadow = dialog.shadow;
+  const shadow = dialog.firstChild.shadowRoot;
 
   const cover = $('cover-img', shadow);
   if (song.coverFilename) {

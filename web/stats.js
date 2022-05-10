@@ -117,7 +117,7 @@ const template = createTemplate(`
 
 export function showStats() {
   const dialog = createDialog(template, 'stats');
-  const shadow = dialog.shadow;
+  const shadow = dialog.firstChild.shadowRoot;
 
   // TODO: Display loading message.
   fetch('stats', { method: 'GET' })

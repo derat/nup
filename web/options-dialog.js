@@ -77,46 +77,37 @@ const template = createTemplate(`
 </form>
 `);
 
-// TODO: Make this a function instead of a class?
-export default class OptionsDialog {
-  constructor(config, closeCallback) {
-    this.config_ = config;
-    this.closeCallback_ = closeCallback;
-    this.dialog_ = createDialog(template, 'options');
+// Displays a modal dialog for setting options via |config|.
+export function showOptionsDialog(config) {
+  const dialog = createDialog(template, 'options');
+  const shadow = dialog.firstChild.shadowRoot;
+  dialog.addEventListener('close', () => config.save());
 
-    this.themeSelect_ = $('theme-select', this.dialog_.shadow);
-    this.themeSelect_.value = this.config_.get(Config.THEME);
-    this.themeSelect_.addEventListener('change', () =>
-      this.config_.set(Config.THEME, this.themeSelect_.value)
-    );
+  const themeSelect = $('theme-select', shadow);
+  themeSelect.value = config.get(Config.THEME);
+  themeSelect.addEventListener('change', () =>
+    config.set(Config.THEME, themeSelect.value)
+  );
 
-    this.gainTypeSelect_ = $('gain-type-select', this.dialog_.shadow);
-    this.gainTypeSelect_.value = this.config_.get(Config.GAIN_TYPE);
-    this.gainTypeSelect_.addEventListener('change', () =>
-      this.config_.set(Config.GAIN_TYPE, this.gainTypeSelect_.value)
-    );
+  const gainTypeSelect = $('gain-type-select', shadow);
+  gainTypeSelect.value = config.get(Config.GAIN_TYPE);
+  gainTypeSelect.addEventListener('change', () =>
+    config.set(Config.GAIN_TYPE, gainTypeSelect.value)
+  );
 
-    const preAmp = this.config_.get(Config.PRE_AMP);
-    this.preAmpRange_ = $('pre-amp-range', this.dialog_.shadow);
-    this.preAmpRange_.value = preAmp;
-    this.preAmpRange_.addEventListener('input', () =>
-      this.updatePreAmpSpan_(this.preAmpRange_.value)
-    );
-    this.preAmpRange_.addEventListener('change', () =>
-      this.config_.set(Config.PRE_AMP, this.preAmpRange_.value)
-    );
+  const preAmpSpan = $('pre-amp-span', shadow);
+  const updatePreAmpSpan = (v) =>
+    (preAmpSpan.innerText = `${v > 0 ? '+' : ''}${v} dB`);
 
-    this.preAmpSpan_ = $('pre-amp-span', this.dialog_.shadow);
-    this.updatePreAmpSpan_(preAmp);
+  const preAmpValue = config.get(Config.PRE_AMP);
+  updatePreAmpSpan(preAmpValue);
 
-    this.dialog_.addEventListener('close', () => {
-      this.config_.save();
-      if (this.closeCallback_) this.closeCallback_();
-    });
-  }
-
-  updatePreAmpSpan_(preAmp) {
-    const prefix = preAmp > 0 ? '+' : '';
-    this.preAmpSpan_.innerText = `${prefix}${preAmp} dB`;
-  }
+  const preAmpRange = $('pre-amp-range', shadow);
+  preAmpRange.value = preAmpValue;
+  preAmpRange.addEventListener('input', () =>
+    updatePreAmpSpan(preAmpRange.value)
+  );
+  preAmpRange.addEventListener('change', () =>
+    config.set(Config.PRE_AMP, preAmpRange.value)
+  );
 }

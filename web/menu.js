@@ -3,6 +3,9 @@
 
 import { createElement } from './common.js';
 
+// Number of open menus.
+let numMenus = 0;
+
 // Creates and displays a simple context menu at the specified location.
 // Returns a <dialog> element.
 //
@@ -13,7 +16,10 @@ import { createElement } from './common.js';
 // - hotkey - optional text describing menu's accelerator
 export function createMenu(x, y, items, alignRight) {
   const menu = createElement('dialog', 'menu', document.body);
-  menu.addEventListener('close', () => document.body.removeChild(menu));
+  menu.addEventListener('close', () => {
+    document.body.removeChild(menu);
+    numMenus--;
+  });
   menu.addEventListener('click', (e) => {
     const rect = menu.getBoundingClientRect();
     if (
@@ -56,6 +62,10 @@ export function createMenu(x, y, items, alignRight) {
       ? `${y}px`
       : `${y - menu.clientHeight}px`;
 
+  numMenus++;
   menu.showModal();
   return menu;
 }
+
+// Returns true if a menu is currently shown.
+export const isMenuShown = () => numMenus > 0;
