@@ -98,6 +98,9 @@ const template = createTemplate(`
   #search-buttons > *:not(:first-child) {
     margin-left: var(--button-spacing);
   }
+  #search-buttons > button {
+    min-width: 80px; /* avoid width jump when font is loaded */
+  }
   #results-controls {
     border-top: 1px solid var(--border-color);
     padding: var(--margin) 0 var(--margin) var(--margin);
@@ -108,6 +111,9 @@ const template = createTemplate(`
   }
   #results-controls > *:not(:first-child) {
     margin-left: var(--button-spacing);
+  }
+  #results-controls > button {
+    min-width: 80px; /* avoid width jump when font is loaded */
   }
   #waiting {
     background-color: #a00;
