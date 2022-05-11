@@ -97,6 +97,8 @@ type songInfo struct {
 	srvRating *float64       // server rating in [0.0, 1.0] or -1.0 for unrated
 	srvTags   []string       // server tags in ascending order
 	srvPlays  [][2]time.Time // server play time lower/upper bounds in ascending order
+
+	timeout *time.Duration // hack for using longer timeouts in checks
 }
 
 // makeSongInfo constructs a basic songInfo using data from s.
@@ -182,6 +184,14 @@ func (s *songInfo) String() string {
 	return "[" + str + "]"
 }
 
+// getTimeout retuns s.timeout if non-nil or def otherwise.
+func (s *songInfo) getTimeout(def time.Duration) time.Duration {
+	if s.timeout != nil {
+		return *s.timeout
+	}
+	return def
+}
+
 // songCheck specifies a check to perform on a song.
 type songCheck func(*songInfo)
 
@@ -204,6 +214,9 @@ func hasSrvPlay(lower, upper time.Time) songCheck {
 
 // hasNoSrvPlays asserts that there are no recorded plays.
 func hasNoSrvPlays() songCheck { return func(i *songInfo) { i.srvPlays = [][2]time.Time{} } }
+
+// useTimeout sets a custom timeout to use when waiting for the condition.
+func useTimeout(t time.Duration) songCheck { return func(i *songInfo) { i.timeout = &t } }
 
 // songInfosEqual returns true if want and got have the same artist, title, and album
 // and any additional optional fields specified in want also match.
@@ -325,7 +338,7 @@ func checkServerSong(t *testing.T, song db.Song, checks ...songCheck) {
 	}
 
 	var got *songInfo
-	if err := wait(func() error {
+	if err := waitFull(func() error {
 		got = nil
 		songs := tester.DumpSongs(test.KeepIDs)
 		for i := range songs {
@@ -347,7 +360,7 @@ func checkServerSong(t *testing.T, song db.Song, checks ...songCheck) {
 			return errors.New("songs don't match")
 		}
 		return nil
-	}); err != nil {
+	}, want.getTimeout(waitTimeout), waitSleep); err != nil {
 		msg := fmt.Sprintf("Bad server %q data at %v:\n", song.SHA1, test.Caller())
 		msg += "  Want: " + want.String() + "\n"
 		msg += "  Got:  " + got.String() + "\n"

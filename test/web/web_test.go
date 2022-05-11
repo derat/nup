@@ -586,8 +586,8 @@ func TestAddToPlaylist(t *testing.T) {
 func TestPlaybackButtons(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
-	// Using a 10-second song here makes this test slow, but I've seen flakiness
-	// when using the 5-second song.
+	// Using a 10-second song here makes this test slow, but I've seen flakiness when using the
+	// 5-second song.
 	song1 := newSong("artist", "track1", "album", withTrack(1), withFilename(file10s))
 	song2 := newSong("artist", "track2", "album", withTrack(2), withFilename(file1s))
 	importSongs(song1, song2)
@@ -626,7 +626,9 @@ func TestPlaybackButtons(t *testing.T) {
 	page.checkPlaylist(joinSongs(song1, song2), hasActive(0))
 
 	// We should eventually play through to the second song.
-	page.checkSong(song2, isPaused(false))
+	// Use a long timeout since I saw a failure on GCP where we were somehow still only at position
+	// 0:09 in the 10-second song after waiting for 15 seconds.
+	page.checkSong(song2, isPaused(false), useTimeout(20*time.Second))
 	page.checkPlaylist(joinSongs(song1, song2), hasActive(1))
 }
 

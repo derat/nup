@@ -8,11 +8,14 @@ import (
 	"time"
 )
 
+const (
+	waitTimeout = 10 * time.Second
+	waitSleep   = 10 * time.Millisecond
+)
+
 // wait calls waitFull with reasonable defaults.
 func wait(f func() error) error {
-	// Some tests use a 10-second song, so wait longer than that
-	// to avoid races when tests are waiting for playback to compete.
-	return waitFull(f, 15*time.Second, 10*time.Millisecond)
+	return waitFull(f, waitTimeout, waitSleep)
 }
 
 // waitFull waits up to timeout for f to return nil, sleeping sleep between attempts.

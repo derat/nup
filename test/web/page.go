@@ -763,7 +763,7 @@ func (p *page) checkSong(s db.Song, checks ...songCheck) {
 	}
 
 	var got songInfo
-	if err := wait(func() error {
+	if err := waitFull(func() error {
 		imgTitle := p.getAttrOrFail(p.getOrFail(coverImage), "title", false)
 		rating := p.getTextOrFail(p.getOrFail(ratingOverlayDiv), false)
 		time := p.getTextOrFail(p.getOrFail(timeDiv), false)
@@ -792,7 +792,7 @@ func (p *page) checkSong(s db.Song, checks ...songCheck) {
 			return errors.New("songs don't match")
 		}
 		return nil
-	}); err != nil {
+	}, want.getTimeout(waitTimeout), waitSleep); err != nil {
 		msg := fmt.Sprintf("Bad song at %v: %v\n", p.desc(), err)
 		msg += "Want: " + want.String() + "\n"
 		msg += "Got:  " + got.String()

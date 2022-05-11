@@ -43,12 +43,8 @@ export function createDialog(template, className) {
   const wrapper = createElement('span', className, dialog);
   createShadow(wrapper, template);
 
-  // TODO: Figure out how to get form buttons to be consistently focused
-  // automatically. Is the FOUC hack breaking autofocus?
   dialog.showModal();
-
   numDialogs++;
-
   return dialog;
 }
 
