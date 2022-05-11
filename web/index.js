@@ -33,13 +33,6 @@ config.addCallback((k, v) => k === Config.THEME && updateTheme(v));
 window.matchMedia(darkMediaQuery).addListener((e) => updateTheme());
 updateTheme(config.get(Config.THEME));
 
-// Hide the scrollbar while the presentation layer is shown.
-musicPlayer.addEventListener('present', (e) => {
-  e.detail.visible
-    ? document.body.classList.add('no-scroll')
-    : document.body.classList.remove('no-scroll');
-});
-
 // Use the cover art as the favicon.
 musicPlayer.addEventListener('cover', (e) => {
   const favicon = $('favicon');

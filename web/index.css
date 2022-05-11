@@ -13,8 +13,6 @@ body {
   font-size: var(--font-size);
   height: 100%;
   margin: 0;
-}
-body.no-scroll {
   overflow: hidden;
 }
 
@@ -76,6 +74,7 @@ dialog.menu {
   color: var(--text-color);
   left: auto;
   margin: 0;
+  opacity: 0; /* overridden by menu.js after positioning */
   padding: 0;
   pointer-events: auto;
   position: absolute;

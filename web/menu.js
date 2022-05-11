@@ -48,19 +48,27 @@ export function createMenu(x, y, items, alignRight) {
     }
   }
 
-  if (alignRight) {
-    menu.style.right = `${x}px`;
-  } else {
-    // Keep the menu onscreen.
-    menu.style.left =
-      x + menu.clientWidth <= window.innerWidth
-        ? `${x}px`
-        : `${x - menu.clientWidth}px`;
-  }
-  menu.style.top =
-    y + menu.clientHeight <= window.innerHeight
-      ? `${y}px`
-      : `${y - menu.clientHeight}px`;
+  // TODO: For some reason, the menu's clientWidth and clientHeight seem to
+  // initially be 0 after switching to <dialog>. Deferring the calculation of
+  // the menu's position seems to work around this, but we also need to hide the
+  // menu initially to avoid having it flash in the top-left corner first.
+  window.setTimeout(() => {
+    if (alignRight) {
+      menu.style.right = `${x}px`;
+    } else {
+      // Keep the menu onscreen.
+      menu.style.left =
+        x + menu.clientWidth <= window.innerWidth
+          ? `${x}px`
+          : `${x - menu.clientWidth}px`;
+    }
+    menu.style.top =
+      y + menu.clientHeight <= window.innerHeight
+        ? `${y}px`
+        : `${y - menu.clientHeight}px`;
+
+    menu.style.opacity = 1;
+  });
 
   numMenus++;
   menu.showModal();
