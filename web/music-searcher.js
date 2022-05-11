@@ -86,6 +86,11 @@ const template = createTemplate(`
     padding-right: 2px;
     width: 2em;
   }
+  #preset-select {
+    /* Prevent a big jump in width when the presets are loaded. This is 90px
+     * plus 30px of padding that common.css sets on select elements. */
+    min-width: 110px;
+  }
   #search-buttons {
     padding-top: 5px;
     user-select: none;
