@@ -1,13 +1,45 @@
 // Copyright 2022 Daniel Erat.
 // All rights reserved.
 
-import { createElement } from './common.js';
+import { createElement, createShadow, createTemplate } from './common.js';
+
+const menuStyle = createTemplate(`
+<style>
+  .item {
+    cursor: default;
+    padding: 6px 12px;
+  }
+  .item:hover {
+    background-color: var(--menu-hover-color);
+  }
+  .item:first-child {
+    padding-top: 8px;
+  }
+  .item:last-child {
+    padding-bottom: 8px;
+  }
+  .item .hotkey {
+    color: var(--text-label-color);
+    display: inline-block;
+    float: right;
+    margin-left: var(--margin);
+    text-align: right;
+    min-width: 50px;
+  }
+  hr {
+    background-color: var(--border-color);
+    border: 0;
+    height: 1px;
+    margin: 4px 0;
+  }
+</style>
+`);
 
 // Number of open menus.
 let numMenus = 0;
 
 // Creates and displays a simple context menu at the specified location.
-// Returns a <dialog> element.
+// Returns a <dialog> element containing a <span> acting as a shadow root.
 //
 // |items| is an array of objects with the following properties:
 // - text   - menu item text, or '-' to insert separator instead
@@ -32,12 +64,23 @@ export function createMenu(x, y, items, alignRight) {
     }
   });
 
+  // It seems like it isn't possible to attach a shadow root directly to
+  // <dialog>, so add a wrapper element first.
+  const wrapper = createElement('span', null, menu);
+  const shadow = createShadow(wrapper, menuStyle);
+
+  // Only show the menu after common.css is loaded to avoid FOUC.
+  const link = createElement('link', null, shadow);
+  link.setAttribute('rel', 'stylesheet');
+  link.setAttribute('href', 'common.css');
+  link.addEventListener('load', () => menu.classList.add('ready'));
+
   const hotkeys = items.some((it) => it.hotkey);
   for (const item of items) {
     if (item.text === '-') {
-      createElement('hr', null, menu, null);
+      createElement('hr', null, shadow);
     } else {
-      const el = createElement('div', 'item', menu, item.text);
+      const el = createElement('div', 'item', shadow, item.text);
       if (item.id) el.id = item.id;
       if (hotkeys) createElement('span', 'hotkey', el, item.hotkey || '');
       el.addEventListener('click', (e) => {
@@ -48,10 +91,9 @@ export function createMenu(x, y, items, alignRight) {
     }
   }
 
-  // TODO: For some reason, the menu's clientWidth and clientHeight seem to
-  // initially be 0 after switching to <dialog>. Deferring the calculation of
-  // the menu's position seems to work around this, but we also need to hide the
-  // menu initially to avoid having it flash in the top-left corner first.
+  // For some reason, the menu's clientWidth and clientHeight seem to initially
+  // be 0 after switching to <dialog>. Deferring the calculation of the menu's
+  // position seems to work around this.
   window.setTimeout(() => {
     if (alignRight) {
       menu.style.right = `${x}px`;
@@ -66,8 +108,6 @@ export function createMenu(x, y, items, alignRight) {
       y + menu.clientHeight <= window.innerHeight
         ? `${y}px`
         : `${y - menu.clientHeight}px`;
-
-    menu.style.opacity = 1;
   });
 
   numMenus++;

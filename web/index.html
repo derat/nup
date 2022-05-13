@@ -6,7 +6,7 @@
 
     <link id="favicon" rel="shortcut icon" href="favicon.ico" sizes="48x48" />
     <link rel="manifest" href="manifest.json" />
-    <link href="index.css" rel="stylesheet" type="text/css" />
+    <link href="common.css" rel="stylesheet" type="text/css" />
 
     <script src="audio-wrapper.js" type="module"></script>
     <script src="music-player.js" type="module"></script>
@@ -16,6 +16,93 @@
     <script src="tag-suggester.js" type="module"></script>
 
     <script src="index.js" type="module" defer></script>
+    <style>
+      html {
+        height: 100%;
+      }
+      body {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-family: var(--font-family);
+        font-size: var(--font-size);
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      #container {
+        box-sizing: border-box;
+        display: grid;
+        grid-auto-rows: 100%;
+        grid-template-columns: 50% 50%;
+        height: 100vh;
+        overflow: hidden;
+        padding-bottom: 2px;
+      }
+      #container > :not(:last-child) {
+        /* With Chrome on a high-DPI display, there's a 1-2 pixel white gap
+         * between the music-player component and its right border that I'm
+         * utterly unable to get rid of. I've tried:
+         *
+         * - setting a left border on music-searcher instead
+         * - setting negative margins
+         * - using grid-gap and background-color on #container
+         * - making #container a flexbox and adding a dedicated div for the border
+         * - probably other stuff that I'm forgetting
+         *
+         * I suspect that this is a rounding bug in Chrome's subpixel-rendering
+         * code. Things work as expected in Firefox. */
+        border-right: 1px solid var(--border-color);
+      }
+
+      dialog.dialog {
+        background-color: var(--bg-color);
+        border: solid 1px var(--frame-border-color);
+        box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
+        color: var(--text-color);
+        padding: var(--margin);
+
+        /* Prevent a flash of unstyled content (FOUC) before the dialog's
+         * contents have been styled. dialog.js adds the 'ready' class once
+         * common.css is loaded to override this. This was initially also
+         * setting 'visibility: hidden', but that seems to prevent dialogs'
+         * controls from being autofocused. */
+        opacity: 0;
+      }
+      dialog.dialog.ready {
+        opacity: 1;
+      }
+      dialog.dialog::backdrop {
+        /* I'd like to set the opacity to 0.1 for the light theme and 0.5 for
+         * the dark theme, but for some reason I don't seem to be able to access
+         * CSS vars from within this pseudo-element -- Dev Tools claims that any
+         * vars that I reference aren't defined. This sounds similar to
+         * https://crbug.com/1174553, except the backdrop is also transparent,
+         * so I think it isn't just a Dev Tools problem. */
+        background-color: rgba(0, 0, 0, 0.3);
+      }
+
+      dialog.menu {
+        background-color: var(--bg-color);
+        border: solid 1px var(--frame-border-color);
+        box-shadow: 0 1px 2px 1px rgba(0, 0, 0, 0.2);
+        color: var(--text-color);
+        left: auto;
+        margin: 0;
+        opacity: 0; /* overridden by menu.js after positioning */
+        padding: 0;
+        pointer-events: auto;
+        position: absolute;
+        right: auto;
+        text-align: left;
+      }
+      dialog.menu.ready {
+        opacity: 1;
+      }
+      dialog.menu::backdrop {
+        background-color: transparent;
+      }
+    </style>
   </head>
 
   <body>

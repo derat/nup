@@ -265,24 +265,24 @@ customElements.define(
           rect.bottom,
           [
             {
-              id: 'menu-present',
+              id: 'present',
               text: 'Presentation',
               cb: () => this.setPresentationLayerVisible_(true),
               hotkey: 'Alt+V',
             },
             {
-              id: 'menu-options',
+              id: 'options',
               text: 'Options…',
               cb: () => showOptionsDialog(this.config_),
               hotkey: 'Alt+O',
             },
             {
-              id: 'menu-stats',
+              id: 'stats',
               text: 'Stats…',
               cb: () => showStats(),
             },
             {
-              id: 'menu-info',
+              id: 'info',
               text: 'Song info…',
               cb: () => {
                 const song = this.currentSong_;
@@ -291,7 +291,7 @@ customElements.define(
               hotkey: 'Alt+I',
             },
             {
-              id: 'menu-debug',
+              id: 'debug',
               text: 'Debug…',
               cb: () => {
                 const song = this.currentSong_;
@@ -370,28 +370,28 @@ customElements.define(
 
         const menu = createMenu(orig.pageX, orig.pageY, [
           {
-            id: 'menu-play',
+            id: 'play',
             text: 'Play',
             cb: () => this.selectTrack_(idx),
           },
           {
-            id: 'menu-remove',
+            id: 'remove',
             text: 'Remove',
             cb: () => this.removeSongs_(idx, 1),
           },
           {
-            id: 'menu-truncate',
+            id: 'truncate',
             text: 'Truncate',
             cb: () => this.removeSongs_(idx, this.songs_.length - idx),
           },
           { text: '-' },
           {
-            id: 'menu-info',
+            id: 'info',
             text: 'Info…',
             cb: () => showSongInfo(this.songs_[idx]),
           },
           {
-            id: 'menu-debug',
+            id: 'debug',
             text: 'Debug…',
             cb: () => window.open(getDumpSongUrl(e.detail.songId), '_blank'),
           },

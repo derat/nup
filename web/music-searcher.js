@@ -380,12 +380,12 @@ customElements.define(
         orig.preventDefault();
         const menu = createMenu(orig.pageX, orig.pageY, [
           {
-            id: 'menu-info',
+            id: 'info',
             text: 'Info…',
             cb: () => showSongInfo(this.resultsTable_.getSong(idx)),
           },
           {
-            id: 'menu-debug',
+            id: 'debug',
             text: 'Debug…',
             cb: () => window.open(getDumpSongUrl(e.detail.songId), '_blank'),
           },

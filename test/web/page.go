@@ -67,13 +67,14 @@ var (
 
 	statsDialog = joinLocs(body, loc{selenium.ByCSSSelector, ".dialog .stats"})
 
-	menuPresent  = joinLocs(loc{selenium.ByID, "menu-present"})
-	menuOptions  = joinLocs(loc{selenium.ByID, "menu-options"})
-	menuStats    = joinLocs(loc{selenium.ByID, "menu-stats"})
-	menuInfo     = joinLocs(loc{selenium.ByID, "menu-info"})
-	menuPlay     = joinLocs(loc{selenium.ByID, "menu-play"})
-	menuRemove   = joinLocs(loc{selenium.ByID, "menu-remove"})
-	menuTruncate = joinLocs(loc{selenium.ByID, "menu-truncate"})
+	menu         = joinLocs(body, loc{selenium.ByCSSSelector, ".menu span"})
+	menuPresent  = joinLocs(menu, loc{selenium.ByID, "present"})
+	menuOptions  = joinLocs(menu, loc{selenium.ByID, "options"})
+	menuStats    = joinLocs(menu, loc{selenium.ByID, "stats"})
+	menuInfo     = joinLocs(menu, loc{selenium.ByID, "info"})
+	menuPlay     = joinLocs(menu, loc{selenium.ByID, "play"})
+	menuRemove   = joinLocs(menu, loc{selenium.ByID, "remove"})
+	menuTruncate = joinLocs(menu, loc{selenium.ByID, "truncate"})
 
 	musicPlayer       = joinLocs(loc{selenium.ByTagName, "music-player"})
 	menuButton        = joinLocs(musicPlayer, loc{selenium.ByID, "menu-button"})
