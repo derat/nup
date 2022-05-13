@@ -12,8 +12,6 @@ import { createDialog } from './dialog.js';
 
 const template = createTemplate(`
 <style>
-  @import 'common.css';
-  @import 'dialog.css';
   :host {
     width: 25em;
   }

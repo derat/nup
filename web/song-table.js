@@ -5,7 +5,6 @@ import {
   $,
   createElement,
   createShadow,
-  createStyle,
   createTemplate,
   formatTime,
   updateTitleAttributeForTruncation,

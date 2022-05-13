@@ -46,6 +46,16 @@ dialog.dialog {
   box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.1);
   color: var(--text-color);
   padding: var(--margin);
+
+  /* Prevent a flash of unstyled content (FOUC) before the dialog's contents
+   * have been styled. dialog.js adds the 'ready' class once common.css is
+   * loaded to override this. This was initially also setting 'visibility:
+   * hidden', but that seems to prevent dialogs' controls from being
+   * autofocused. */
+  opacity: 0;
+}
+dialog.dialog.ready {
+  opacity: 1;
 }
 dialog.dialog::backdrop {
   /* I'd like to set the opacity to 0.1 for the light theme and 0.5 for the dark
@@ -55,16 +65,6 @@ dialog.dialog::backdrop {
    * except the backdrop is also transparent, so I think it isn't just a Dev
    * Tools problem. */
   background-color: rgba(0, 0, 0, 0.3);
-}
-dialog.dialog > span {
-  display: inline-block; /* permit width to be set via :host */
-  text-align: left;
-
-  /* Prevent a flash of unstyled content (FOUC) before the dialog's contents
-   * have been styled. dialog.css overrides this. This was initially also
-   * setting "visibility: hidden", but that seems to prevent dialogs' controls
-   * from being autofocused. */
-  opacity: 0;
 }
 
 dialog.menu {

@@ -88,14 +88,6 @@ export function createTemplate(html) {
   return template;
 }
 
-// Creates and returns a <style> element containing the supplied CSS.
-export function createStyle(text) {
-  const style = document.createElement('style');
-  style.type = 'text/css';
-  style.innerText = text;
-  return style;
-}
-
 // Returns an absolute URL for the song specified by |filename| (corresponding
 // to a song's |filename| property).
 export function getSongUrl(filename) {

@@ -3,9 +3,36 @@
 
 import { $, createElement, createShadow, createTemplate } from './common.js';
 
+const dialogStyle = createTemplate(`
+<style>
+  :host {
+    display: inline-block; /* let width be set */
+    text-align: left;
+  }
+  div.title {
+    color: var(--dialog-title-color);
+    font-size: 18px;
+    font-weight: bold;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: none;
+    white-space: nowrap;
+  }
+  hr.title {
+    background-color: var(--border-color);
+    border: 0;
+    height: 1px;
+    margin: 4px 0;
+  }
+  div.button-container {
+    margin-top: 4px;
+    text-align: right;
+  }
+</style>
+`);
+
 const msgTemplate = createTemplate(`
 <style>
-  @import 'dialog.css';
   :host {
     width: 400px;
   }
@@ -41,7 +68,16 @@ export function createDialog(template, className) {
   // It seems like it isn't possible to attach a shadow root directly to
   // <dialog>, so add a wrapper element first.
   const wrapper = createElement('span', className, dialog);
-  createShadow(wrapper, template);
+  const shadow = createShadow(wrapper, dialogStyle);
+
+  // Wait until common.css has been loaded to show the dialog so it isn't
+  // initially visible with e.g. unstyled buttons.
+  const link = createElement('link', null, shadow);
+  link.setAttribute('rel', 'stylesheet');
+  link.setAttribute('href', 'common.css');
+  link.addEventListener('load', () => dialog.classList.add('ready'));
+
+  shadow.appendChild(template.content.cloneNode(true));
 
   dialog.showModal();
   numDialogs++;
