@@ -142,7 +142,7 @@ const (
 	fiveStars  = "★★★★★"
 
 	// Text for firstPlayedSelect and lastPlayedSelect options.
-	unsetTime   = "..."
+	unsetTime   = ""
 	oneDay      = "one day"
 	oneWeek     = "one week"
 	oneMonth    = "one month"

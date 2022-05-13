@@ -131,7 +131,7 @@ const template = createTemplate(`
   }
 </style>
 
-<form id="search-form">
+<form id="search-form" autocomplete="off">
   <div class="heading">Search</div>
   <div class="row">
     <input id="keywords-input" type="text" placeholder="Keywords" />
@@ -194,7 +194,7 @@ const template = createTemplate(`
       <span class="label-col">First played</span>
       <div class="select-wrapper">
         <select id="first-played-select">
-          <option value="0">...</option>
+          <option value="0"></option>
           <option value="86400">one day</option>
           <option value="604800">one week</option>
           <option value="2592000">one month</option>
@@ -214,7 +214,7 @@ const template = createTemplate(`
       <span class="label-col">Last played</span>
       <div class="select-wrapper">
         <select id="last-played-select">
-          <option value="0">...</option>
+          <option value="0"></option>
           <option value="86400">one day</option>
           <option value="604800">one week</option>
           <option value="2592000">one month</option>
@@ -234,7 +234,7 @@ const template = createTemplate(`
       <span class="label-col">Preset</span>
       <div class="select-wrapper">
         <select id="preset-select">
-          <option value="">...</option>
+          <option value=""></option>
         </select>
       </div>
     </label>
