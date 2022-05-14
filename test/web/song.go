@@ -92,7 +92,7 @@ type songInfo struct {
 	filename  *string // filename from audio element src attribute
 	ratingStr *string // rating string from cover image, e.g. "★★★"
 	imgTitle  *string // cover image title attr, e.g. "Rating: ★★★☆☆\nTags: guitar rock"
-	timeStr   *string // displayed time, e.g. "[ 0:00 / 0:05 ]"
+	timeStr   *string // displayed time, e.g. "0:00 / 0:05"
 
 	srvRating *float64       // server rating in [0.0, 1.0] or -1.0 for unrated
 	srvTags   []string       // server tags in ascending order

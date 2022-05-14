@@ -20,6 +20,7 @@ const template = createTemplate(`
   :host {
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
   .heading {
     font-size: 15px;
@@ -105,6 +106,7 @@ const template = createTemplate(`
     border-top: 1px solid var(--border-color);
     padding: var(--margin) 0 var(--margin) var(--margin);
     user-select: none;
+    white-space: nowrap;
   }
   #results-controls .heading {
     margin-right: 4px;

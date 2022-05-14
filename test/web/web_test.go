@@ -685,12 +685,12 @@ func TestDisplayTimeWhilePlaying(t *testing.T) {
 	page.click(luckyButton)
 
 	// TODO: This can be flaky when the checks happen to run slowly.
-	page.checkSong(song, isPaused(false), hasTimeStr("[ 0:00 / 0:05 ]"))
-	page.checkSong(song, isPaused(false), hasTimeStr("[ 0:01 / 0:05 ]"))
-	page.checkSong(song, isPaused(false), hasTimeStr("[ 0:02 / 0:05 ]"))
-	page.checkSong(song, isPaused(false), hasTimeStr("[ 0:03 / 0:05 ]"))
-	page.checkSong(song, isPaused(false), hasTimeStr("[ 0:04 / 0:05 ]"))
-	page.checkSong(song, isEnded(true), isPaused(true), hasTimeStr("[ 0:05 / 0:05 ]"))
+	page.checkSong(song, isPaused(false), hasTimeStr("0:00 / 0:05"))
+	page.checkSong(song, isPaused(false), hasTimeStr("0:01 / 0:05"))
+	page.checkSong(song, isPaused(false), hasTimeStr("0:02 / 0:05"))
+	page.checkSong(song, isPaused(false), hasTimeStr("0:03 / 0:05"))
+	page.checkSong(song, isPaused(false), hasTimeStr("0:04 / 0:05"))
+	page.checkSong(song, isEnded(true), isPaused(true), hasTimeStr("0:05 / 0:05"))
 }
 
 func TestReportPlayed(t *testing.T) {

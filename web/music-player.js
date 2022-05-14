@@ -32,6 +32,7 @@ const template = createTemplate(`
   :host {
     display: flex;
     flex-direction: column;
+    overflow: hidden;
     position: relative; /* needed for menu-button */
   }
 
@@ -97,10 +98,14 @@ const template = createTemplate(`
   #title {
     font-style: italic;
   }
+  #time {
+    opacity: 0.7;
+  }
   #controls {
     margin: var(--margin);
     margin-top: 0;
     user-select: none;
+    white-space: nowrap;
   }
   #controls button {
     font-family: var(--icon-font-family);
@@ -851,7 +856,7 @@ customElements.define(
       }
 
       this.timeDiv_.innerText = dur
-        ? `[ ${formatTime(pos)} / ${formatTime(dur)} ]`
+        ? `${formatTime(pos)} / ${formatTime(dur)}`
         : '';
       this.presentationLayer_.updatePosition(pos);
 
