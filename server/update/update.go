@@ -264,13 +264,6 @@ func ReindexSongs(ctx context.Context, cursor string) (nextCursor string, scanne
 		var update bool
 		if err := updateExistingSong(ctx, id, func(ctx context.Context, s *db.Song) error {
 			scanned++
-
-			// Write the song back if we converted from a floating-point rating.
-			if s.RatingWasFloat {
-				update = true
-				return nil
-			}
-
 			var up db.Song
 			if err := up.Update(s, true /* copyUserData */); err != nil {
 				return err
