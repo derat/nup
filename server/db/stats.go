@@ -21,7 +21,7 @@ type Stats struct {
 	Albums int `json:"albums"`
 	// TotalSec is the total duration in seconds of all songs.
 	TotalSec float64 `json:"totalSec"`
-	// Ratings maps from "%.2f" rating in [0.0, 1.0] (or -1.0 for unrated) to number of songs with that rating.
+	// Ratings maps from a rating in [1, 5] (or 0 for unrated) to number of songs with that rating.
 	Ratings map[string]int `json:"ratings"`
 	// Tags maps from tag to number of songs with that tag.
 	Tags map[string]int `json:"tags"`

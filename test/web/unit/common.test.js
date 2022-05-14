@@ -7,8 +7,6 @@ import {
   formatTime,
   getRatingString,
   moveItem,
-  numStarsToRating,
-  ratingToNumStars,
 } from './common.js';
 
 suite('common', () => {
@@ -47,51 +45,18 @@ suite('common', () => {
     expectEq(br.parentElement, p, 'parentElement');
   });
 
-  test('numStarsToRating', () => {
-    for (const [stars, want] of [
-      [-1, -1],
-      [0, -1],
-      [1, 0],
-      [2, 0.25],
-      [3, 0.5],
-      [4, 0.75],
-      [5, 1.0],
-    ]) {
-      const got = numStarsToRating(stars);
-      if (got !== want) {
-        error(`numStarsToRating(${stars}) = ${got}; want ${want}`);
-      }
-    }
-  });
-
-  test('ratingToNumStars', () => {
-    for (const [rating, want] of [
-      [-1, 0],
-      [0, 1],
-      [0.25, 2],
-      [0.5, 3],
-      [0.75, 4],
-      [1, 5],
-    ]) {
-      const got = ratingToNumStars(rating);
-      if (got !== want) {
-        error(`ratingToNumStars(${rating}) = ${got}; want ${want}`);
-      }
-    }
-  });
-
   test('getRatingString', () => {
     for (const [args, want] of [
-      [[-1], 'Unrated'],
-      [[0], '★☆☆☆☆'],
-      [[0.25], '★★☆☆☆'],
-      [[0.5], '★★★☆☆'],
-      [[0.75], '★★★★☆'],
-      [[1], '★★★★★'],
-      [[0.5, '*', ''], '***'],
-      [[-1, '★', '☆', ''], ''],
-      [[0.25, '*', '', 'Unrated', 'Rated: '], 'Rated: **'],
-      [[-1, '*', '', 'Unrated', 'Rated: '], 'Unrated'],
+      [[0], 'Unrated'],
+      [[1], '★☆☆☆☆'],
+      [[2], '★★☆☆☆'],
+      [[3], '★★★☆☆'],
+      [[4], '★★★★☆'],
+      [[5], '★★★★★'],
+      [[3, '*', ''], '***'],
+      [[0, '★', '☆', ''], ''],
+      [[2, '*', '', 'Unrated', 'Rated: '], 'Rated: **'],
+      [[0, '*', '', 'Unrated', 'Rated: '], 'Unrated'],
     ]) {
       const got = getRatingString.apply(null, args);
       if (got !== want) {

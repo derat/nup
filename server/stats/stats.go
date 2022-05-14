@@ -6,6 +6,7 @@ package stats
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/derat/nup/server/cache"
@@ -77,7 +78,7 @@ func Update(ctx context.Context) error {
 			stats.Albums++
 		}},
 		{"Rating", false, func(id int64, s *db.Song) {
-			stats.Ratings[fmt.Sprintf("%.2f", s.Rating)]++
+			stats.Ratings[strconv.Itoa(s.Rating)]++
 		}},
 		{"Tags", false, func(id int64, s *db.Song) {
 			for _, t := range s.Tags {

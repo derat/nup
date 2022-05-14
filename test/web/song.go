@@ -25,7 +25,6 @@ func newSong(artist, title, album string, fields ...songField) db.Song {
 		SHA1:     fmt.Sprintf("%s-%s-%s", artist, title, album),
 		AlbumID:  artist + "-" + album,
 		Filename: test.Song10s.Filename,
-		Rating:   -1.0,
 	}
 	for _, f := range fields {
 		f(&s)
@@ -47,7 +46,7 @@ type songField func(*db.Song)
 func withDisc(d int) songField        { return func(s *db.Song) { s.Disc = d } }
 func withFilename(f string) songField { return func(s *db.Song) { s.Filename = f } }
 func withLength(l float64) songField  { return func(s *db.Song) { s.Length = l } }
-func withRating(r float64) songField  { return func(s *db.Song) { s.Rating = r } }
+func withRating(r int) songField      { return func(s *db.Song) { s.Rating = r } }
 func withTags(t ...string) songField  { return func(s *db.Song) { s.Tags = t } }
 func withTrack(t int) songField       { return func(s *db.Song) { s.Track = t } }
 func withPlays(ts ...time.Time) songField {
@@ -94,7 +93,7 @@ type songInfo struct {
 	imgTitle  *string // cover image title attr, e.g. "Rating: ★★★☆☆\nTags: guitar rock"
 	timeStr   *string // displayed time, e.g. "0:00 / 0:05"
 
-	srvRating *float64       // server rating in [0.0, 1.0] or -1.0 for unrated
+	srvRating *int           // server rating in [1, 5] or 0 for unrated
 	srvTags   []string       // server tags in ascending order
 	srvPlays  [][2]time.Time // server play time lower/upper bounds in ascending order
 
@@ -152,15 +151,15 @@ func (s *songInfo) String() string {
 		}
 	}
 
-	// Describe optional floats.
+	// Describe optional ints.
 	for _, f := range []struct {
 		name string
-		val  *float64
+		val  *int
 	}{
 		{"rating", s.srvRating},
 	} {
 		if f.val != nil {
-			str += fmt.Sprintf(" %s=%.2f", f.name, *f.val)
+			str += fmt.Sprintf(" %s=%d", f.name, *f.val)
 		}
 	}
 
@@ -202,7 +201,7 @@ func hasFilename(f string) songCheck   { return func(i *songInfo) { i.filename =
 func hasRatingStr(r string) songCheck  { return func(i *songInfo) { i.ratingStr = &r } }
 func hasImgTitle(t string) songCheck   { return func(i *songInfo) { i.imgTitle = &t } }
 func hasTimeStr(s string) songCheck    { return func(i *songInfo) { i.timeStr = &s } }
-func hasSrvRating(r float64) songCheck { return func(i *songInfo) { i.srvRating = &r } }
+func hasSrvRating(r int) songCheck     { return func(i *songInfo) { i.srvRating = &r } }
 func hasSrvTags(t ...string) songCheck { return func(i *songInfo) { i.srvTags = t } }
 
 // hasSrvPlay should be called once for each play (in ascending order).
@@ -253,9 +252,9 @@ func songInfosEqual(want, got songInfo) bool {
 		}
 	}
 
-	// Compare floats.
+	// Compare ints.
 	for _, t := range []struct {
-		want, got *float64
+		want, got *int
 	}{
 		{want.srvRating, got.srvRating},
 	} {

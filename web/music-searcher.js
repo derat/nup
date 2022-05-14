@@ -168,11 +168,11 @@ const template = createTemplate(`
       <div class="select-wrapper">
         <select id="min-rating-select">
           <option value=""></option>
-          <option value="0">★</option>
-          <option value="0.25">★★</option>
-          <option value="0.5">★★★</option>
-          <option value="0.75">★★★★</option>
-          <option value="1">★★★★★</option>
+          <option value="1">★</option>
+          <option value="2">★★</option>
+          <option value="3">★★★</option>
+          <option value="4">★★★★</option>
+          <option value="5">★★★★★</option>
         </select>
       </div>
     </label>

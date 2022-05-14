@@ -84,12 +84,12 @@ const template = createTemplate(`
 <div id="top-div">
   <table id="main-table">
     <tr><td>Songs</td><td id="songs"></td></tr>
-    <tr><td>★★★★★</td><td id="rating-1.00"></td></tr>
-    <tr><td>★★★★</td><td id="rating-0.75"></td></tr>
-    <tr><td>★★★</td><td id="rating-0.50"></td></tr>
-    <tr><td>★★</td><td id="rating-0.25"></td></tr>
-    <tr><td>★</td><td id="rating-0.00"></td></tr>
-    <tr><td>Unrated</td><td id="rating--1.00"></td></tr>
+    <tr><td>★★★★★</td><td id="rating-5"></td></tr>
+    <tr><td>★★★★</td><td id="rating-4"></td></tr>
+    <tr><td>★★★</td><td id="rating-3"></td></tr>
+    <tr><td>★★</td><td id="rating-2"></td></tr>
+    <tr><td>★</td><td id="rating-1"></td></tr>
+    <tr><td>Unrated</td><td id="rating-0"></td></tr>
     <tr><td>Albums</td><td id="albums"></td></tr>
     <tr><td>Duration</td><td id="duration"></td></tr>
   </table>
@@ -128,7 +128,7 @@ export function showStats() {
     .then((stats) => {
       // This corresponds to the Stats struct in server/db/stats.go.
       $('songs', shadow).innerText = parseInt(stats.songs).toLocaleString();
-      for (const rating of ['-1.00', '0.00', '0.25', '0.50', '0.75', '1.00']) {
+      for (const rating of ['0', '1', '2', '3', '4', '5']) {
         const td = $(`rating-${rating}`, shadow);
         const songs = stats.ratings[rating];
         td.innerText = songs ? parseInt(songs).toLocaleString() : '0';

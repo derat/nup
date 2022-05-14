@@ -3,6 +3,7 @@
 
 import {
   $,
+  clamp,
   createShadow,
   createTemplate,
   emptyImg,
@@ -14,8 +15,6 @@ import {
   getSongUrl,
   handleFetchError,
   moveItem,
-  numStarsToRating,
-  ratingToNumStars,
   updateTitleAttributeForTruncation,
 } from './common.js';
 import Config from './config.js';
@@ -243,7 +242,7 @@ customElements.define(
       this.reportedCurrentTrack_ = false; // already reported current as played?
       this.reachedEndOfSongs_ = false; // did we hit end of last song?
       this.updateSong_ = null; // song playing when update div was opened
-      this.updatedRating_ = -1.0; // rating set in update div
+      this.updatedRating_ = 0; // rating set in update div
       this.notification_ = null; // song notification currently shown
       this.closeNotificationTimeoutId_ = null; // for closeNotification_()
       this.playDelayMs_ = this.constructor.PLAY_DELAY_MS_;
@@ -952,9 +951,9 @@ customElements.define(
 
       // Initialize the stars the first time we show them.
       if (!this.ratingSpan_.hasChildNodes()) {
-        for (let i = 1; i <= 5; ++i) {
+        for (let i = 1; i <= 5; i++) {
           const anchor = document.createElement('a');
-          const rating = numStarsToRating(i);
+          const rating = i;
           anchor.addEventListener(
             'click',
             () => this.setRating_(rating),
@@ -965,10 +964,8 @@ customElements.define(
         }
       }
 
-      const numStars = ratingToNumStars(rating);
-      for (let i = 1; i <= 5; ++i) {
-        this.ratingSpan_.childNodes[i - 1].innerText =
-          i <= numStars ? '★' : '☆';
+      for (let i = 1; i <= 5; i++) {
+        this.ratingSpan_.childNodes[i - 1].innerText = i <= rating ? '★' : '☆';
       }
     }
 
@@ -1070,13 +1067,12 @@ customElements.define(
 
     handleRatingSpanKeyDown_(e) {
       if (['0', '1', '2', '3', '4', '5'].indexOf(e.key) != -1) {
-        this.setRating_(numStarsToRating(parseInt(e.key)));
+        this.setRating_(parseInt(e.key));
         e.preventDefault();
         e.stopPropagation();
       } else if (e.key == 'ArrowLeft' || e.key == 'ArrowRight') {
-        const oldStars = ratingToNumStars(this.updatedRating_);
-        const newStars = oldStars + (e.key == 'ArrowLeft' ? -1 : 1);
-        this.setRating_(numStarsToRating(newStars));
+        const rating = this.updatedRating_ + (e.key == 'ArrowLeft' ? -1 : 1);
+        this.setRating_(clamp(rating, 0, 5));
         e.preventDefault();
         e.stopPropagation();
       }

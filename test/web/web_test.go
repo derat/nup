@@ -269,17 +269,15 @@ var presets = []config.SearchPreset{
 	},
 	{
 		Name:        "new albums",
-		MinRating:   -1,
 		FirstPlayed: 3,
 		MaxPlays:    -1,
 		FirstTrack:  true,
 	},
 	{
-		Name:      "unrated",
-		MinRating: -1,
-		Unrated:   true,
-		MaxPlays:  -1,
-		Play:      true,
+		Name:     "unrated",
+		Unrated:  true,
+		MaxPlays: -1,
+		Play:     true,
 	},
 }
 
@@ -351,12 +349,12 @@ func TestTagQuery(t *testing.T) {
 func TestRatingQuery(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
-	song1 := newSong("a", "t", "al1", withRating(0.0))
-	song2 := newSong("a", "t", "al2", withRating(0.25))
-	song3 := newSong("a", "t", "al3", withRating(0.5))
-	song4 := newSong("a", "t", "al4", withRating(0.75))
-	song5 := newSong("a", "t", "al5", withRating(1.0))
-	song6 := newSong("a", "t", "al6", withRating(-1.0))
+	song1 := newSong("a", "t", "al1", withRating(1))
+	song2 := newSong("a", "t", "al2", withRating(2))
+	song3 := newSong("a", "t", "al3", withRating(3))
+	song4 := newSong("a", "t", "al4", withRating(4))
+	song5 := newSong("a", "t", "al5", withRating(5))
+	song6 := newSong("a", "t", "al6")
 	allSongs := joinSongs(song1, song2, song3, song4, song5, song6)
 	importSongs(allSongs)
 
@@ -753,7 +751,7 @@ func TestReportReplay(t *testing.T) {
 func TestRateAndTag(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
-	song := newSong("ar", "t1", "al", withRating(0.5), withTags("rock", "guitar"))
+	song := newSong("ar", "t1", "al", withRating(3), withTags("rock", "guitar"))
 	importSongs(song)
 
 	page.setText(keywordsInput, song.Artist)
@@ -768,21 +766,21 @@ func TestRateAndTag(t *testing.T) {
 	page.click(updateCloseImage)
 	page.checkSong(song, hasRatingStr(fourStars),
 		hasImgTitle("Rating: ★★★★☆\nTags: guitar rock"))
-	checkServerSong(t, song, hasSrvRating(0.75), hasSrvTags("guitar", "rock"))
+	checkServerSong(t, song, hasSrvRating(4), hasSrvTags("guitar", "rock"))
 
 	page.click(coverImage)
 	page.sendKeys(editTagsTextarea, " +metal", false)
 	page.click(updateCloseImage)
 	page.checkSong(song, hasRatingStr(fourStars),
 		hasImgTitle("Rating: ★★★★☆\nTags: guitar metal rock"))
-	checkServerSong(t, song, hasSrvRating(0.75), hasSrvTags("guitar", "metal", "rock"))
+	checkServerSong(t, song, hasSrvRating(4), hasSrvTags("guitar", "metal", "rock"))
 }
 
 func TestRetryUpdates(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
 	song := newSong("ar", "t1", "al", withFilename(file1s),
-		withRating(0.5), withTags("rock", "guitar"))
+		withRating(3), withTags("rock", "guitar"))
 	importSongs(song)
 
 	// Configure the server to reject updates and play the song.
@@ -802,7 +800,7 @@ func TestRetryUpdates(t *testing.T) {
 	// Wait a bit to let the updates fail and then let them succeed.
 	time.Sleep(time.Second)
 	tester.ForceUpdateFailures(false)
-	checkServerSong(t, song, hasSrvRating(0.75), hasSrvTags("jazz", "mellow"),
+	checkServerSong(t, song, hasSrvRating(4), hasSrvTags("jazz", "mellow"),
 		hasSrvPlay(firstLower, firstUpper))
 
 	// Queue some more failed updates.
@@ -821,7 +819,7 @@ func TestRetryUpdates(t *testing.T) {
 	// The queued updates should be sent if the page is reloaded.
 	page.reload()
 	tester.ForceUpdateFailures(false)
-	checkServerSong(t, song, hasSrvRating(0.25), hasSrvTags("lively", "soul"),
+	checkServerSong(t, song, hasSrvRating(2), hasSrvTags("lively", "soul"),
 		hasSrvPlay(firstLower, firstUpper), hasSrvPlay(secondLower, secondUpper))
 
 	// In the case of multiple queued updates, the last one should take precedence.
@@ -837,7 +835,7 @@ func TestRetryUpdates(t *testing.T) {
 		page.checkDisplayed(updateCloseImage, false)
 	}
 	tester.ForceUpdateFailures(false)
-	checkServerSong(t, song, hasSrvRating(1.0))
+	checkServerSong(t, song, hasSrvRating(5))
 }
 
 func TestEditTagsAutocomplete(t *testing.T) {
@@ -970,7 +968,7 @@ func TestSongInfo(t *testing.T) {
 	defer done()
 
 	song1 := newSong("a", "t1", "al1", withTrack(1), withLength(123),
-		withRating(1.0), withTags("guitar", "instrumental"))
+		withRating(5), withTags("guitar", "instrumental"))
 	song2 := newSong("a", "t2", "al2", withTrack(5), withLength(52))
 	importSongs(song1, song2)
 
@@ -1012,11 +1010,11 @@ func TestPresets(t *testing.T) {
 	old := now.Add(-2 * 365 * 24 * time.Hour)
 	old2 := old.Add(-5 * time.Minute)
 	song1 := newSong("a", "t1", "unrated")
-	song2 := newSong("a", "t1", "new", withRating(0.25), withTrack(1), withDisc(1), withPlays(now, now2))
-	song3 := newSong("a", "t2", "new", withRating(1.0), withTrack(2), withDisc(1), withPlays(now, now2))
-	song4 := newSong("a", "t1", "old", withRating(0.75), withPlays(old, old2))
-	song5 := newSong("a", "t2", "old", withRating(0.75), withTags("instrumental"), withPlays(old, old2))
-	song6 := newSong("a", "t1", "mellow", withRating(0.75), withTags("mellow"))
+	song2 := newSong("a", "t1", "new", withRating(2), withTrack(1), withDisc(1), withPlays(now, now2))
+	song3 := newSong("a", "t2", "new", withRating(5), withTrack(2), withDisc(1), withPlays(now, now2))
+	song4 := newSong("a", "t1", "old", withRating(4), withPlays(old, old2))
+	song5 := newSong("a", "t2", "old", withRating(4), withTags("instrumental"), withPlays(old, old2))
+	song6 := newSong("a", "t1", "mellow", withRating(4), withTags("mellow"))
 	importSongs(song1, song2, song3, song4, song5, song6)
 
 	page.clickOption(presetSelect, presetInstrumentalOld)
@@ -1090,9 +1088,9 @@ func TestStats(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
 
-	song1 := newSong("artist", "track1", "album1", withRating(0.5), withLength(7200),
+	song1 := newSong("artist", "track1", "album1", withRating(3), withLength(7200),
 		withPlays(time.Unix(86400, 0)))
-	song2 := newSong("artist", "track2", "album1", withRating(1.0), withLength(201))
+	song2 := newSong("artist", "track2", "album1", withRating(5), withLength(201))
 	importSongs(song1, song2)
 	tester.UpdateStats()
 

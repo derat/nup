@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math"
 	"os"
 	"path/filepath"
 	"time"
@@ -310,7 +309,9 @@ func (cmd *Command) doMergeSongs() subcommands.ExitStatus {
 		fmt.Fprintf(os.Stderr, "Failed dumping song %v: %v\n", dstID, err)
 		return subcommands.ExitFailure
 	}
-	dst.Rating = math.Max(src.Rating, dst.Rating)
+	if src.Rating > dst.Rating {
+		dst.Rating = src.Rating
+	}
 	dst.Tags = append(dst.Tags, src.Tags...)
 	dst.Plays = append(dst.Plays, src.Plays...)
 	dst.Clean() // sort and dedupe Tags and Plays

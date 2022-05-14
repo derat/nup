@@ -30,7 +30,7 @@ func TestSong_Update(t *testing.T) {
 		TrackGain:      -5.6,
 		AlbumGain:      -7.2,
 		PeakAmp:        1.1,
-		Rating:         0.5,
+		Rating:         3,
 		FirstStartTime: t1,
 		LastStartTime:  t2,
 		NumPlays:       2,
@@ -38,7 +38,7 @@ func TestSong_Update(t *testing.T) {
 	}
 
 	dst := Song{
-		Rating:         0.25,
+		Rating:         2,
 		FirstStartTime: t3,
 		LastStartTime:  t4,
 		NumPlays:       4,
@@ -70,9 +70,9 @@ func TestSong_Update(t *testing.T) {
 	dst = Song{}
 
 	want.Rating = src.Rating
-	want.RatingAtLeast50 = true
-	want.RatingAtLeast25 = true
-	want.RatingAtLeast0 = true
+	want.RatingAtLeast3 = true
+	want.RatingAtLeast2 = true
+	want.RatingAtLeast1 = true
 	want.FirstStartTime = src.FirstStartTime
 	want.LastStartTime = src.LastStartTime
 	want.NumPlays = src.NumPlays

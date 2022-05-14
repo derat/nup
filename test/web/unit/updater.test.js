@@ -171,12 +171,12 @@ suite('updater', () => {
 
   test('rateAndTag (success)', async () => {
     const updater = new Updater();
-    w.expectFetch(rateAndTagUrl('123', 0.75, null), 'POST', 'ok');
-    await updater.rateAndTag('123', 0.75, null);
+    w.expectFetch(rateAndTagUrl('123', 4, null), 'POST', 'ok');
+    await updater.rateAndTag('123', 4, null);
     w.expectFetch(rateAndTagUrl('123', null, ['abc', 'def']), 'POST', 'ok');
     await updater.rateAndTag('123', null, ['abc', 'def']);
-    w.expectFetch(rateAndTagUrl('123', 1.0, ['ijk']), 'POST', 'ok');
-    await updater.rateAndTag('123', 1.0, ['ijk']);
+    w.expectFetch(rateAndTagUrl('123', 5, ['ijk']), 'POST', 'ok');
+    await updater.rateAndTag('123', 5, ['ijk']);
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
 
@@ -184,20 +184,20 @@ suite('updater', () => {
     const updater = new Updater();
 
     // Rate and tag a song and have the server report failure.
-    w.expectFetch(rateAndTagUrl('123', 0.25, ['old']), 'POST', 'bad', 500);
-    await updater.rateAndTag('123', 0.25, ['old']);
+    w.expectFetch(rateAndTagUrl('123', 2, ['old']), 'POST', 'bad', 500);
+    await updater.rateAndTag('123', 2, ['old']);
 
     // Try to send an updated rating and tag for the same song.
-    w.expectFetch(rateAndTagUrl('123', 0.75, ['new']), 'POST', 'bad', 500);
-    await updater.rateAndTag('123', 0.75, ['new']);
+    w.expectFetch(rateAndTagUrl('123', 4, ['new']), 'POST', 'bad', 500);
+    await updater.rateAndTag('123', 4, ['new']);
 
     // Send a rating and tag for another song.
-    w.expectFetch(rateAndTagUrl('456', 1.0, ['other']), 'POST', 'bad', 500);
-    await updater.rateAndTag('456', 1.0, ['other']);
+    w.expectFetch(rateAndTagUrl('456', 5, ['other']), 'POST', 'bad', 500);
+    await updater.rateAndTag('456', 5, ['other']);
 
     // After a 500 ms delay, the latest data for each song should be sent.
-    w.expectFetch(rateAndTagUrl('123', 0.75, ['new']), 'POST', 'ok');
-    w.expectFetch(rateAndTagUrl('456', 1.0, ['other']), 'POST', 'ok');
+    w.expectFetch(rateAndTagUrl('123', 4, ['new']), 'POST', 'ok');
+    w.expectFetch(rateAndTagUrl('456', 5, ['other']), 'POST', 'ok');
     await w.runTimeouts(500);
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
@@ -205,24 +205,24 @@ suite('updater', () => {
   test('rateAndTag (retry at startup)', async () => {
     // Make the initial attempt fail.
     let updater = new Updater();
-    w.expectFetch(rateAndTagUrl('123', 1.0, ['tag']), 'POST', 'bad', 500);
-    await updater.rateAndTag('123', 1.0, ['tag']);
+    w.expectFetch(rateAndTagUrl('123', 5, ['tag']), 'POST', 'bad', 500);
+    await updater.rateAndTag('123', 5, ['tag']);
 
     // Send a second request, but leave the fetch() hanging. This should leave
     // the update in the "in-progress" list in localStorage.
-    w.expectFetchDeferred(rateAndTagUrl('456', 0, ['a']), 'POST', 'fail', 500);
-    updater.rateAndTag('456', 0, ['a']);
+    w.expectFetchDeferred(rateAndTagUrl('456', 1, ['a']), 'POST', 'fail', 500);
+    updater.rateAndTag('456', 1, ['a']);
 
     // Fail again with a new updater.
     w.clearTimeouts();
-    w.expectFetch(rateAndTagUrl('123', 1.0, ['tag']), 'POST', 'bad', 500);
+    w.expectFetch(rateAndTagUrl('123', 5, ['tag']), 'POST', 'bad', 500);
     updater = new Updater();
     await updater.initialRetryDoneForTest;
 
     // Create another updater and let both updates get sent successfully.
     w.clearTimeouts();
-    w.expectFetch(rateAndTagUrl('123', 1.0, ['tag']), 'POST', 'ok');
-    w.expectFetch(rateAndTagUrl('456', 0, ['a']), 'POST', 'ok');
+    w.expectFetch(rateAndTagUrl('123', 5, ['tag']), 'POST', 'ok');
+    w.expectFetch(rateAndTagUrl('456', 1, ['a']), 'POST', 'ok');
     updater = new Updater();
     await updater.initialRetryDoneForTest;
     await w.runTimeouts(0);

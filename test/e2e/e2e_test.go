@@ -207,7 +207,7 @@ func TestUserData(tt *testing.T) {
 
 	log.Print("Rating and tagging")
 	s := Song0s
-	s.Rating = 0.75
+	s.Rating = 4
 	s.Tags = []string{"electronic", "instrumental"}
 	t.RateAndTag(id, s.Rating, s.Tags)
 	if err := test.CompareSongs([]db.Song{s}, t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
@@ -311,7 +311,7 @@ func TestUpdateUseFilenames(tt *testing.T) {
 	const (
 		oldFn  = "old.mp3"
 		newFn  = "new.mp3"
-		rating = 0.75
+		rating = 4
 	)
 
 	log.Print("Importing song from music dir")
@@ -363,7 +363,7 @@ func TestUpdateCompare(tt *testing.T) {
 
 	// Dump 0s (with changed user data) and 1s (with changed metadata) to a file.
 	s0 := Song0s
-	s0.Rating = 0.5
+	s0.Rating = 3
 	s0.Tags = []string{"instrumental"}
 	s1 := Song1s
 	s1.Artist = s1.Artist + " (old)"
@@ -412,17 +412,17 @@ func TestQueries(tt *testing.T) {
 		{"keywords=arovane+foo", 0, []db.Song{}},
 		{"keywords=second+artist", 0, []db.Song{Song1s}}, // track artist
 		{"keywords=remixer", 0, []db.Song{Song1s}},       // album artist
-		{"minRating=1.0", 0, []db.Song{}},
-		{"minRating=0.75", 0, []db.Song{LegacySong1}},
-		{"minRating=0.5", 0, []db.Song{LegacySong2, LegacySong1}},
-		{"minRating=0.0", 0, []db.Song{LegacySong2, LegacySong1}},
+		{"minRating=5", 0, []db.Song{}},
+		{"minRating=4", 0, []db.Song{LegacySong1}},
+		{"minRating=3", 0, []db.Song{LegacySong2, LegacySong1}},
+		{"minRating=1", 0, []db.Song{LegacySong2, LegacySong1}},
 		{"unrated=1", 0, []db.Song{Song5s, Song0s, Song1s, s10s}},
 		{"tags=instrumental", 0, []db.Song{LegacySong2, LegacySong1}},
 		{"tags=electronic+instrumental", 0, []db.Song{LegacySong1}},
 		{"tags=-electronic+instrumental", 0, []db.Song{LegacySong2}},
-		{"tags=instrumental&minRating=0.75", 0, []db.Song{LegacySong1}},
-		{"tags=instrumental&minRating=0.75&maxPlays=1", noIndex, []db.Song{}},
-		{"tags=instrumental&minRating=0.75&maxPlays=2", noIndex, []db.Song{LegacySong1}},
+		{"tags=instrumental&minRating=4", 0, []db.Song{LegacySong1}},
+		{"tags=instrumental&minRating=4&maxPlays=1", noIndex, []db.Song{}},
+		{"tags=instrumental&minRating=4&maxPlays=2", noIndex, []db.Song{LegacySong1}},
 		{"firstTrack=1", 0, []db.Song{LegacySong1, Song0s}},
 		{"artist=" + url.QueryEscape("µ-Ziq"), 0, []db.Song{s10s}}, // U+00B5 (MICRO SIGN)
 		{"artist=" + url.QueryEscape("μ-Ziq"), 0, []db.Song{s10s}}, // U+03BC (GREEK SMALL LETTER MU)
@@ -431,24 +431,24 @@ func TestQueries(tt *testing.T) {
 		{"album=two2", 0, []db.Song{s10s}},
 		// Ensure that Datastore indexes exist to satisfy various queries (or if not, that the
 		// server's fallback mode is still able to handle them).
-		{"tags=-bogus&minRating=1.0&shuffle=1&orderByLastPlayed=1", 0, []db.Song{}},
-		{"tags=instrumental&minRating=0.75&shuffle=1&orderByLastPlayed=1", 0, []db.Song{LegacySong1}},
-		{"tags=instrumental+-bogus&minRating=0.75&shuffle=1&orderByLastPlayed=1", 0, []db.Song{LegacySong1}},
-		{"minRating=0.75&shuffle=1&orderByLastPlayed=1", 0, []db.Song{LegacySong1}}, // old songs
-		{"minRating=0.75&maxPlays=1&shuffle=1", 0, []db.Song{}},
-		{"minRating=0.25&orderByLastPlayed=1", noIndex, []db.Song{LegacySong1, LegacySong2}},
-		{"tags=instrumental&minRating=0.75&shuffle=1&maxLastPlayed=1649256074", 0, []db.Song{LegacySong1}},
-		{"tags=instrumental&minRating=0.75&shuffle=1&maxPlays=1", noIndex, []db.Song{}},
+		{"tags=-bogus&minRating=5&shuffle=1&orderByLastPlayed=1", 0, []db.Song{}},
+		{"tags=instrumental&minRating=4&shuffle=1&orderByLastPlayed=1", 0, []db.Song{LegacySong1}},
+		{"tags=instrumental+-bogus&minRating=4&shuffle=1&orderByLastPlayed=1", 0, []db.Song{LegacySong1}},
+		{"minRating=4&shuffle=1&orderByLastPlayed=1", 0, []db.Song{LegacySong1}}, // old songs
+		{"minRating=4&maxPlays=1&shuffle=1", 0, []db.Song{}},
+		{"minRating=2&orderByLastPlayed=1", noIndex, []db.Song{LegacySong1, LegacySong2}},
+		{"tags=instrumental&minRating=4&shuffle=1&maxLastPlayed=1649256074", 0, []db.Song{LegacySong1}},
+		{"tags=instrumental&minRating=4&shuffle=1&maxPlays=1", noIndex, []db.Song{}},
 		{"tags=instrumental&maxLastPlayed=1649256074", noIndex, []db.Song{LegacySong2, LegacySong1}},
 		{"firstTrack=1&minFirstPlayed=1276057170", 0, []db.Song{LegacySong1}}, // new albums
 		{"firstTrack=1&minFirstPlayed=1276057170&maxPlays=1", noIndex, []db.Song{}},
-		{"keywords=arovane&minRating=0.75", 0, []db.Song{LegacySong1}},
-		{"keywords=arovane&minRating=0.75&maxPlays=1", noIndex, []db.Song{}},
+		{"keywords=arovane&minRating=4", 0, []db.Song{LegacySong1}},
+		{"keywords=arovane&minRating=4&maxPlays=1", noIndex, []db.Song{}},
 		{"keywords=arovane&firstTrack=1", 0, []db.Song{LegacySong1}},
-		{"keywords=arovane&tags=instrumental&minRating=0.75&shuffle=1", 0, []db.Song{LegacySong1}},
+		{"keywords=arovane&tags=instrumental&minRating=4&shuffle=1", 0, []db.Song{LegacySong1}},
 		{"artist=arovane&firstTrack=1", 0, []db.Song{LegacySong1}},
-		{"artist=arovane&minRating=0.75", 0, []db.Song{LegacySong1}},
-		{"artist=arovane&minRating=0.75&maxPlays=1", noIndex, []db.Song{}},
+		{"artist=arovane&minRating=4", 0, []db.Song{LegacySong1}},
+		{"artist=arovane&minRating=4&maxPlays=1", noIndex, []db.Song{}},
 		{"orderByLastPlayed=1&minFirstPlayed=1276057160&maxLastPlayed=1649256074", noIndex, []db.Song{LegacySong1, LegacySong2}},
 		{"orderByLastPlayed=1&maxPlays=1&minFirstPlayed=1276057160&maxLastPlayed=1649256074", noIndex, []db.Song{LegacySong2}},
 	} {
@@ -483,7 +483,7 @@ func TestCaching(tt *testing.T) {
 	// After rating the song, the query results should still be served from the cache.
 	log.Print("Rating and re-querying")
 	id1 := t.SongID(s1.SHA1)
-	s1.Rating = 1.0
+	s1.Rating = 5
 	t.RateAndTag(id1, s1.Rating, nil)
 	if err := compareQueryResults([]db.Song{s1}, t.QuerySongs(cacheParam), test.IgnoreOrder); err != nil {
 		tt.Error("Bad results after rating: ", err)
@@ -568,7 +568,7 @@ func TestAndroid(tt *testing.T) {
 	log.Print("Rating a song")
 	id := t.SongID(LegacySong1.SHA1)
 	updatedLegacySong1 := LegacySong1
-	updatedLegacySong1.Rating = 1.0
+	updatedLegacySong1.Rating = 5
 	now = t.GetNowFromServer()
 	t.RateAndTag(id, updatedLegacySong1.Rating, nil)
 	if err := compareQueryResults([]db.Song{updatedLegacySong1},
@@ -704,7 +704,7 @@ func TestJSONImport(tt *testing.T) {
 	us.Track += 1
 	us.Disc += 1
 	us.Length *= 2
-	us.Rating /= 2.0
+	us.Rating = 2
 	us.Plays = us.Plays[0:1]
 	us.Tags = []string{"bogus"}
 	t.ImportSongsFromJSONFile([]db.Song{us, LegacySong2})
@@ -891,13 +891,13 @@ func TestMergeSongs(tt *testing.T) {
 
 	log.Print("Posting songs")
 	s1 := Song0s
-	s1.Rating = 0.75
+	s1.Rating = 4
 	s1.Tags = []string{"guitar", "instrumental"}
 	s1.Plays = []db.Play{
 		db.NewPlay(time.Unix(1410746718, 0), "127.0.0.1"),
 	}
 	s2 := Song1s
-	s2.Rating = 0.25
+	s2.Rating = 2
 	s2.Tags = []string{"drums", "guitar", "rock"}
 	s2.Plays = []db.Play{
 		db.NewPlay(time.Unix(1410746923, 0), "127.0.0.1"),
@@ -932,7 +932,7 @@ func TestReindexSongs(tt *testing.T) {
 
 	log.Print("Posting song")
 	s := Song0s
-	s.Rating = 0.75
+	s.Rating = 4
 	s.Tags = []string{"guitar", "instrumental"}
 	s.Plays = []db.Play{
 		db.NewPlay(time.Unix(1410746718, 0), "127.0.0.1"),
@@ -945,7 +945,7 @@ func TestReindexSongs(tt *testing.T) {
 	// This doesn't actually check that we reindex, but it at least verifies that the server isn't
 	// dropping user data.
 	log.Print("Querying after reindex")
-	if err := compareQueryResults([]db.Song{s}, t.QuerySongs("minRating=0"), test.IgnoreOrder); err != nil {
+	if err := compareQueryResults([]db.Song{s}, t.QuerySongs("minRating=1"), test.IgnoreOrder); err != nil {
 		tt.Error("Bad results for query: ", err)
 	}
 }
@@ -956,11 +956,11 @@ func TestStats(tt *testing.T) {
 
 	log.Print("Posting songs")
 	s1 := Song1s
-	s1.Rating = 0.75
+	s1.Rating = 4
 	s1.Tags = []string{"guitar", "instrumental"}
 	s1.Plays = []db.Play{db.NewPlay(time.Unix(1410746718, 0), "127.0.0.1")}
 	s2 := Song5s
-	s2.Rating = 1.0
+	s2.Rating = 5
 	s2.Tags = []string{"guitar", "vocals"}
 	s2.Plays = []db.Play{
 		db.NewPlay(time.Unix(1379210718, 0), "127.0.0.1"),
@@ -980,7 +980,7 @@ func TestStats(tt *testing.T) {
 		Songs:    2,
 		Albums:   2,
 		TotalSec: s1.Length + s2.Length,
-		Ratings:  map[string]int{"0.75": 1, "1.00": 1},
+		Ratings:  map[string]int{"4": 1, "5": 1},
 		Tags:     map[string]int{"guitar": 2, "instrumental": 1, "vocals": 1},
 		Years: map[int]db.PlayStats{
 			2013: {Plays: 1, TotalSec: s2.Length},

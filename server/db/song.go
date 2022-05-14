@@ -6,6 +6,7 @@ package db
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -14,6 +15,8 @@ import (
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
+
+	"google.golang.org/appengine/v2/datastore"
 )
 
 const (
@@ -99,17 +102,21 @@ type Song struct {
 	// amplitude that can be played without clipping.
 	PeakAmp float64 `datastore:",noindex" json:"peakAmp"`
 
-	// Rating is the song's rating in the range [0.0, 1.0], or -1 if unrated.
+	// Rating is the song's rating in the range [1, 5], or 0 if unrated.
 	// The server should call SetRating to additionally update the RatingAtLeast* fields.
-	Rating float64 `json:"rating"`
+	Rating int `json:"rating"`
 
-	// RatingAtLeast* are true if Rating is at least 0.75, 0.5, 0.25, or 0.
+	// Set to true if datastore contained a float property for Rating.
+	// TODO: Delete this after updating existing data.
+	RatingWasFloat bool `datastore:"-" json:"-"`
+
+	// RatingAtLeast* are true if Rating is at least the specified value.
 	// These are maintained to sidestep Datastore's restriction against using multiple
 	// inequality filters in a query.
-	RatingAtLeast75 bool `json:"-"`
-	RatingAtLeast50 bool `json:"-"`
-	RatingAtLeast25 bool `json:"-"`
-	RatingAtLeast0  bool `json:"-"`
+	RatingAtLeast1 bool `json:"-"`
+	RatingAtLeast2 bool `json:"-"`
+	RatingAtLeast3 bool `json:"-"`
+	RatingAtLeast4 bool `json:"-"`
 
 	// FirstStartTime is the first time the song was played.
 	FirstStartTime time.Time `json:"-"`
@@ -128,6 +135,43 @@ type Song struct {
 
 	// LastModifiedTime is the time that the song was modified.
 	LastModifiedTime time.Time `json:"-"`
+}
+
+// TODO: Delete this after updating existing data.
+func (s *Song) Load(props []datastore.Property) error {
+	// Rewrite float rating-related properties.
+	for i, p := range props {
+		switch p.Name {
+		case "Rating":
+			if v, ok := p.Value.(float64); ok {
+				// datastore.Property seems to use int64 internally for all int types:
+				// https://github.com/golang/appengine/blob/v2.0.1/v2/datastore/load.go
+				var stars int64
+				if v >= 0 {
+					stars = int64(math.Round(4*v)) + 1
+				}
+				props[i].Value = stars
+				s.RatingWasFloat = true
+			} else if _, ok := p.Value.(int64); !ok {
+				return fmt.Errorf("Rating property has type %T", p.Value)
+			}
+		case "RatingAtLeast0":
+			props[i].Name = "RatingAtLeast1"
+		case "RatingAtLeast25":
+			props[i].Name = "RatingAtLeast2"
+		case "RatingAtLeast50":
+			props[i].Name = "RatingAtLeast3"
+		case "RatingAtLeast75":
+			props[i].Name = "RatingAtLeast4"
+		}
+	}
+
+	return datastore.LoadStruct(s, props)
+}
+
+// TODO: Delete this after updating existing data.
+func (s *Song) Save() ([]datastore.Property, error) {
+	return datastore.SaveStruct(s)
 }
 
 // MetadataEquals returns true if s and o have identical metadata.
@@ -212,12 +256,12 @@ func (dst *Song) Update(src *Song, copyUserData bool) error {
 }
 
 // SetRating sets Rating to r and updates RatingAtLeast*.
-func (s *Song) SetRating(r float64) {
+func (s *Song) SetRating(r int) {
 	s.Rating = r
-	s.RatingAtLeast75 = r >= 0.75
-	s.RatingAtLeast50 = r >= 0.5
-	s.RatingAtLeast25 = r >= 0.25
-	s.RatingAtLeast0 = r >= 0
+	s.RatingAtLeast1 = r >= 1
+	s.RatingAtLeast2 = r >= 2
+	s.RatingAtLeast3 = r >= 3
+	s.RatingAtLeast4 = r >= 4
 }
 
 // UpdatePlayStats updates NumPlays, FirstStartTime, and LastStartTime to

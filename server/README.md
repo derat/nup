@@ -117,8 +117,7 @@ Queries Datastore and returns a JSON-marshaled array of [Song]s.
 *   `minFirstPlayed` (optional) - Float seconds since the Unix epoch specifying
     the minimum time at which songs were first played (used to select
     recently-added music).
-*   `minRating` (optional) - Float minimum song rating in the range `(0.0,
-    1.0]`.
+*   `minRating` (optional) - Integer minimum song rating in the range `[1, 5]`.
 *   `maxLastPlayed` (optional) - Float seconds since the Unix epoch specifying
     the maximmum time at which songs were last played (used to select music that
     hasn't been played recently).
@@ -135,8 +134,8 @@ Queries Datastore and returns a JSON-marshaled array of [Song]s.
 
 Updates a song's rating and/or tags in Datastore.
 
-*   `rating` (optional) - Float rating for the song in the range `[0.0, 1.0]`,
-    or `-1` to clear the song's rating. See [Song]'s `Rating` field.
+*   `rating` (optional) - Integer rating for the song in the range `[1, 5]`,
+    or `0` to clear the song's rating. See [Song]'s `Rating` field.
 *   `songId` - Integer ID from [Song]'s `SongID` field.
 *   `tags` (optional) - Space-separated tags for the song. See [Song]'s `Tags`
     field.

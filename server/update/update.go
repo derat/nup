@@ -56,7 +56,7 @@ func AddPlay(ctx context.Context, id int64, startTime time.Time, ip string) erro
 // SetRatingAndTags updates the rating and tags of the song identified by id in datastore.
 // The rating is only updated if hasRating is true, and tags are not updated if tags is nil.
 // If delay is nonzero, the server will wait before writing to datastore.
-func SetRatingAndTags(ctx context.Context, id int64, hasRating bool, rating float64,
+func SetRatingAndTags(ctx context.Context, id int64, hasRating bool, rating int,
 	tags []string, delay time.Duration) error {
 	var ut query.UpdateTypes
 	err := updateExistingSong(ctx, id, func(ctx context.Context, s *db.Song) error {
@@ -158,7 +158,6 @@ func UpdateOrInsertSong(ctx context.Context, updated *db.Song,
 			log.Debugf(ctx, "Inserting song with SHA1 %v and filename %q",
 				updated.SHA1, updated.Filename)
 			key = datastore.NewIncompleteKey(ctx, db.SongKind, nil)
-			song.Rating = -1.0 // unrated
 		}
 
 		if err := song.Update(updated, replace); err != nil {
@@ -265,6 +264,13 @@ func ReindexSongs(ctx context.Context, cursor string) (nextCursor string, scanne
 		var update bool
 		if err := updateExistingSong(ctx, id, func(ctx context.Context, s *db.Song) error {
 			scanned++
+
+			// Write the song back if we converted from a floating-point rating.
+			if s.RatingWasFloat {
+				update = true
+				return nil
+			}
+
 			var up db.Song
 			if err := up.Update(s, true /* copyUserData */); err != nil {
 				return err
@@ -272,9 +278,13 @@ func ReindexSongs(ctx context.Context, cursor string) (nextCursor string, scanne
 
 			// The Keywords field is derived from ArtistLower, TitleLower, and AlbumLower,
 			// so it will only change if one or more of those fields changed.
-			if up.ArtistLower == s.ArtistLower && up.TitleLower == s.TitleLower && up.AlbumLower == s.AlbumLower &&
-				up.RatingAtLeast75 == s.RatingAtLeast75 && up.RatingAtLeast50 == s.RatingAtLeast50 &&
-				up.RatingAtLeast25 == s.RatingAtLeast25 && up.RatingAtLeast0 == s.RatingAtLeast0 &&
+			if up.ArtistLower == s.ArtistLower &&
+				up.TitleLower == s.TitleLower &&
+				up.AlbumLower == s.AlbumLower &&
+				up.RatingAtLeast1 == s.RatingAtLeast1 &&
+				up.RatingAtLeast2 == s.RatingAtLeast2 &&
+				up.RatingAtLeast3 == s.RatingAtLeast3 &&
+				up.RatingAtLeast4 == s.RatingAtLeast4 &&
 				reflect.DeepEqual(up.Tags, s.Tags) {
 				return errUnmodified
 			}
@@ -284,16 +294,16 @@ func ReindexSongs(ctx context.Context, cursor string) (nextCursor string, scanne
 			s.TitleLower = up.TitleLower
 			s.AlbumLower = up.AlbumLower
 			s.Keywords = up.Keywords
-			s.RatingAtLeast75 = up.RatingAtLeast75
-			s.RatingAtLeast50 = up.RatingAtLeast50
-			s.RatingAtLeast25 = up.RatingAtLeast25
-			s.RatingAtLeast0 = up.RatingAtLeast0
+			s.RatingAtLeast1 = up.RatingAtLeast1
+			s.RatingAtLeast2 = up.RatingAtLeast2
+			s.RatingAtLeast3 = up.RatingAtLeast3
+			s.RatingAtLeast4 = up.RatingAtLeast4
 			s.Tags = up.Tags
 
 			update = true
 			return nil
 		}, 0, false); err != nil {
-			return "", scanned, updated, err
+			return "", scanned, updated, fmt.Errorf("song %d: %v", id, err)
 		}
 		if update {
 			updated++

@@ -39,8 +39,8 @@ type SongQuery struct {
 
 	Keywords []string // Song.Keywords
 
-	MinRating float64 // Song.Rating (-1 if unspecified)
-	Unrated   bool    // Song.Rating is -1
+	MinRating int  // Song.Rating (0 if unspecified)
+	Unrated   bool // Song.Rating is 0
 
 	MaxPlays int64 // Song.NumPlays (-1 if unspecified)
 
@@ -57,7 +57,7 @@ type SongQuery struct {
 	OrderByLastStartTime bool // order by Song.LastStartTime
 }
 
-func (q *SongQuery) hasMinRating() bool { return q.MinRating >= 0 }
+func (q *SongQuery) hasMinRating() bool { return q.MinRating > 0 }
 func (q *SongQuery) hasMaxPlays() bool  { return q.MaxPlays >= 0 }
 
 // hash returns a string uniquely identifying q.
@@ -360,21 +360,21 @@ func runQuery(ctx context.Context, query *SongQuery, fallback bool) ([]int64, er
 	}
 	if query.hasMinRating() {
 		switch query.MinRating {
-		case 1.0:
-			eq = eq.Filter("Rating =", 1.0)
-		case 0.75:
-			eq = eq.Filter("RatingAtLeast75 =", true)
-		case 0.5:
-			eq = eq.Filter("RatingAtLeast50 =", true)
-		case 0.25:
-			eq = eq.Filter("RatingAtLeast25 =", true)
-		case 0.0:
-			eq = eq.Filter("RatingAtLeast0 =", true)
+		case 1:
+			eq = eq.Filter("RatingAtLeast1 =", true)
+		case 2:
+			eq = eq.Filter("RatingAtLeast2 =", true)
+		case 3:
+			eq = eq.Filter("RatingAtLeast3 =", true)
+		case 4:
+			eq = eq.Filter("RatingAtLeast4 =", true)
+		case 5:
+			eq = eq.Filter("Rating =", 5)
 		default:
-			return nil, fmt.Errorf("rating %v not in [1, 0.75, 0.5, 0.25, 0]", query.MinRating)
+			return nil, fmt.Errorf("rating %v not in [1, 5]", query.MinRating)
 		}
 	} else if query.Unrated {
-		eq = eq.Filter("Rating =", -1.0)
+		eq = eq.Filter("Rating =", 0)
 	}
 	if query.MaxPlays == 0 {
 		eq = eq.Filter("NumPlays =", 0)

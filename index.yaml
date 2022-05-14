@@ -6,7 +6,7 @@ indexes:
       - name: LastStartTime
   - kind: Song
     properties:
-      - name: RatingAtLeast75
+      - name: RatingAtLeast4
       - name: LastStartTime
 
   # 4+ or 5 stars with tags, ordered by last played.
@@ -17,14 +17,14 @@ indexes:
       - name: LastStartTime
   - kind: Song
     properties:
-      - name: RatingAtLeast75
+      - name: RatingAtLeast4
       - name: Tags
       - name: LastStartTime
 
   # 4+ stars, with 1+ max plays.
   - kind: Song
     properties:
-      - name: RatingAtLeast75
+      - name: RatingAtLeast4
       - name: NumPlays
 
   # First tracks played in the last month.

@@ -32,7 +32,6 @@ var Song0s = db.Song{
 	TrackGain:   TrackGain,
 	AlbumGain:   AlbumGain,
 	PeakAmp:     PeakAmp,
-	Rating:      -1,
 }
 
 var Song0sUpdated = db.Song{
@@ -49,7 +48,6 @@ var Song0sUpdated = db.Song{
 	TrackGain:   TrackGain,
 	AlbumGain:   AlbumGain,
 	PeakAmp:     PeakAmp,
-	Rating:      -1,
 }
 
 var Song1s = db.Song{
@@ -67,7 +65,6 @@ var Song1s = db.Song{
 	TrackGain:   TrackGain,
 	AlbumGain:   AlbumGain,
 	PeakAmp:     PeakAmp,
-	Rating:      -1,
 }
 
 var Song5s = db.Song{
@@ -84,7 +81,6 @@ var Song5s = db.Song{
 	TrackGain:   TrackGain,
 	AlbumGain:   AlbumGain,
 	PeakAmp:     PeakAmp,
-	Rating:      -1,
 }
 
 var Song10s = db.Song{
@@ -97,7 +93,6 @@ var Song10s = db.Song{
 	TrackGain: TrackGain,
 	AlbumGain: AlbumGain,
 	PeakAmp:   PeakAmp,
-	Rating:    -1,
 }
 
 var ID3V1Song = db.Song{
@@ -112,7 +107,6 @@ var ID3V1Song = db.Song{
 	TrackGain: TrackGain,
 	AlbumGain: AlbumGain,
 	PeakAmp:   PeakAmp,
-	Rating:    -1,
 }
 
 var LegacySong1 = db.Song{
@@ -127,7 +121,7 @@ var LegacySong1 = db.Song{
 	TrackGain: TrackGain,
 	AlbumGain: AlbumGain,
 	PeakAmp:   PeakAmp,
-	Rating:    0.75,
+	Rating:    4,
 	Plays: []db.Play{
 		db.NewPlay(time.Unix(1276057170, 0).UTC(), "127.0.0.1"),
 		db.NewPlay(time.Unix(1297316913, 0).UTC(), "1.2.3.4"),
@@ -147,7 +141,7 @@ var LegacySong2 = db.Song{
 	TrackGain: TrackGain,
 	AlbumGain: AlbumGain,
 	PeakAmp:   PeakAmp,
-	Rating:    0.5,
+	Rating:    3,
 	Plays:     []db.Play{db.NewPlay(time.Unix(1394773930, 0).UTC(), "8.8.8.8")},
 	Tags:      []string{"instrumental", "rock"},
 }

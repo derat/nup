@@ -29,9 +29,9 @@ export default class Updater {
     // keyed by song ID.
     //
     // {
-    //   '4926489086656512': {'rating': 1.0,  'tags': ['metal']},
+    //   '4926489086656512': {'rating': 5,  'tags': ['metal']},
     //   '5459812892540928': {'rating': null, 'tags': ['instrumental', 'mellow']},
-    //   '5656003198582784': {'rating': 0.25, 'tags': null},
+    //   '5656003198582784': {'rating': 2, 'tags': null},
     //   ...
     // }
     this.queuedRatingsAndTags_ = readObject(
@@ -99,9 +99,9 @@ export default class Updater {
   }
 
   // Asynchronously notifies the server that song |songId| was given |rating|
-  // (float) and |tags| (string array). Either |rating| or |tags| can be null to
-  // leave them unchanged. Returns a promise that is resolved once the update
-  // attempt is completed (possibly unsuccessfully).
+  // (int in [1, 5] or 0 for unrated) and |tags| (string array). Either |rating|
+  // or |tags| can be null to leave them unchanged. Returns a promise that is
+  // resolved once the update attempt is completed (possibly unsuccessfully).
   rateAndTag(songId, rating, tags) {
     if (rating === null && tags === null) return Promise.resolve();
 
@@ -123,7 +123,7 @@ export default class Updater {
     this.writeState_();
 
     let url = `rate_and_tag?songId=${encodeURIComponent(songId)}`;
-    if (rating !== null) url += `&rating=${encodeURIComponent(rating)}`;
+    if (rating !== null) url += `&rating=${rating}`;
     if (tags !== null) url += `&tags=${encodeURIComponent(tags.join(' '))}`;
     console.log(`Rating/tagging song: ${url}`);
 

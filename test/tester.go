@@ -404,10 +404,10 @@ func (t *Tester) GetTags(requireCache bool) string {
 
 // RateAndTag sends a rating and/or tags update to the server.
 // The rating is not sent if negative, and tags are not sent if nil.
-func (t *Tester) RateAndTag(songID string, rating float64, tags []string) {
+func (t *Tester) RateAndTag(songID string, rating int, tags []string) {
 	var args string
 	if rating >= 0 {
-		args += fmt.Sprintf("&rating=%0.2f", rating)
+		args += fmt.Sprintf("&rating=%d", rating)
 	}
 	if tags != nil {
 		args += "&tags=" + url.QueryEscape(strings.Join(tags, " "))

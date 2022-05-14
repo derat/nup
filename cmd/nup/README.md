@@ -151,8 +151,8 @@ storage [flags]:
     	Storage class for infrequently-accessed files (default "COLDLINE")
   -max-updates int
     	Maximum number of files to update (default -1)
-  -rating-cutoff float
-    	Minimum song rating for standard storage class (default 0.75)
+  -rating-cutoff int
+    	Minimum song rating for standard storage class (default 4)
   -workers int
     	Maximum concurrent Google Cloud Storage updates (default 10)
 ```

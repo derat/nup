@@ -53,7 +53,7 @@ func TestUpdate(t *testing.T) {
 		Track:    3,
 		Disc:     1,
 		Length:   449,
-		Rating:   0.75,
+		Rating:   4,
 		Plays: []db.Play{
 			db.NewPlay(time.Unix(1276057170, 0), "127.0.0.1"),
 			db.NewPlay(time.Unix(1297316913, 0), "1.2.3.4"),
@@ -69,7 +69,7 @@ func TestUpdate(t *testing.T) {
 		Track:    7,
 		Disc:     1,
 		Length:   182,
-		Rating:   0.5,
+		Rating:   3,
 		Plays:    []db.Play{db.NewPlay(time.Unix(1394773930, 0), "8.8.8.8")},
 		Tags:     []string{"instrumental", "rock"},
 	}

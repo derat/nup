@@ -136,17 +136,15 @@ var presets = []config.SearchPreset{
 	},
 	{
 		Name:        "new albums",
-		MinRating:   -1,
 		FirstPlayed: 3,
 		MaxPlays:    -1,
 		FirstTrack:  true,
 	},
 	{
-		Name:      "unrated",
-		MinRating: -1,
-		Unrated:   true,
-		MaxPlays:  -1,
-		Play:      true,
+		Name:     "unrated",
+		Unrated:  true,
+		MaxPlays: -1,
+		Play:     true,
 	},
 }
 
@@ -162,7 +160,7 @@ var songs = []db.Song{
 		Track:    1,
 		Disc:     1,
 		Length:   1,
-		Rating:   1,
+		Rating:   5,
 		Tags:     []string{"electronic", "instrumental", "drum-and-bass"},
 	},
 	{
@@ -176,7 +174,7 @@ var songs = []db.Song{
 		Track:    1,
 		Disc:     1,
 		Length:   1,
-		Rating:   0.75,
+		Rating:   4,
 		Tags:     []string{"drums", "guitar", "rock", "vocals"},
 	},
 	{
@@ -190,7 +188,7 @@ var songs = []db.Song{
 		Track:    1,
 		Disc:     1,
 		Length:   1,
-		Rating:   0.5,
+		Rating:   3,
 		Tags:     []string{"electronic", "vocals"},
 	},
 	{
@@ -204,7 +202,7 @@ var songs = []db.Song{
 		Track:    1,
 		Disc:     1,
 		Length:   1,
-		Rating:   0.25,
+		Rating:   2,
 		Tags:     []string{"annoying", "pop", "vocals"},
 	},
 	{
@@ -218,6 +216,6 @@ var songs = []db.Song{
 		Track:    1,
 		Disc:     1,
 		Length:   1,
-		Rating:   -1,
+		Rating:   0,
 	},
 }

@@ -433,7 +433,6 @@ func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 		Album:                r.FormValue("album"),
 		AlbumID:              r.FormValue("albumId"),
 		Keywords:             strings.Fields(r.FormValue("keywords")),
-		MinRating:            -1,
 		MaxPlays:             -1,
 		Shuffle:              r.FormValue("shuffle") == "1",
 		OrderByLastStartTime: r.FormValue("orderByLastPlayed") == "1",
@@ -445,9 +444,10 @@ func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 	}
 
 	if len(r.FormValue("minRating")) > 0 {
-		var ok bool
-		if q.MinRating, ok = parseFloatParam(ctx, w, r, "minRating"); !ok {
+		if v, ok := parseIntParam(ctx, w, r, "minRating"); !ok {
 			return
+		} else {
+			q.MinRating = int(v)
 		}
 	} else if r.FormValue("unrated") == "1" {
 		q.Unrated = true
@@ -507,18 +507,20 @@ func handleRateAndTag(ctx context.Context, cfg *config.Config, w http.ResponseWr
 		}
 	}
 
-	hasRating := false
-	var rating float64
+	var hasRating bool
+	var rating int
 	var tags []string
 	if _, ok := r.Form["rating"]; ok {
-		if rating, ok = parseFloatParam(ctx, w, r, "rating"); !ok {
+		if v, ok := parseIntParam(ctx, w, r, "rating"); !ok {
 			return
+		} else {
+			rating = int(v)
 		}
 		hasRating = true
-		if rating < 0.0 {
-			rating = -1.0
-		} else if rating > 1.0 {
-			rating = 1.0
+		if rating < 0 {
+			rating = 0
+		} else if rating > 5 {
+			rating = 5
 		}
 	}
 	if _, ok := r.Form["tags"]; ok {

@@ -36,11 +36,11 @@ const (
 type Command struct {
 	Cfg *client.Config
 
-	bucketName   string  // GCS bucket name
-	class        string  // storage class for low-rated files
-	maxUpdates   int     // files to update
-	numWorkers   int     // concurrent GCS updates
-	ratingCutoff float64 // min rating for standard storage class
+	bucketName   string // GCS bucket name
+	class        string // storage class for low-rated files
+	maxUpdates   int    // files to update
+	numWorkers   int    // concurrent GCS updates
+	ratingCutoff int    // min rating for standard storage class
 }
 
 func (*Command) Name() string     { return "storage" }
@@ -58,7 +58,7 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&cmd.class, "class", string(coldline), "Storage class for infrequently-accessed files")
 	f.IntVar(&cmd.maxUpdates, "max-updates", -1, "Maximum number of files to update")
 	f.IntVar(&cmd.numWorkers, "workers", 10, "Maximum concurrent Google Cloud Storage updates")
-	f.Float64Var(&cmd.ratingCutoff, "rating-cutoff", 0.75, "Minimum song rating for standard storage class")
+	f.IntVar(&cmd.ratingCutoff, "rating-cutoff", 4, "Minimum song rating for standard storage class")
 }
 
 func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
@@ -98,7 +98,7 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interf
 			return subcommands.ExitFailure
 		}
 		cls := standard
-		if s.Rating >= 0 && s.Rating < cmd.ratingCutoff {
+		if s.Rating > 0 && s.Rating < cmd.ratingCutoff {
 			cls = class
 		}
 		songClasses[s.Filename] = cls
