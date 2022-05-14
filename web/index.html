@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>Player</title>
+    <title>nup</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
     <link id="favicon" rel="shortcut icon" href="favicon.ico" sizes="48x48" />
     <link rel="manifest" href="manifest.json" />
-    <link href="common.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="common.css" type="text/css" />
 
+    <!-- These scripts define custom elements. -->
     <script src="audio-wrapper.js" type="module"></script>
     <script src="music-player.js" type="module"></script>
     <script src="music-searcher.js" type="module"></script>
@@ -15,7 +16,25 @@
     <script src="song-table.js" type="module"></script>
     <script src="tag-suggester.js" type="module"></script>
 
-    <script src="index.js" type="module" defer></script>
+    <script src="index.js" type="module"></script>
+
+    <!-- These scripts are imported by other scripts but listed here so
+         they'll be fetched earlier. -->
+    <script src="common.js" type="module"></script>
+    <script src="config.js" type="module"></script>
+    <script src="dialog.js" type="module"></script>
+    <script src="menu.js" type="module"></script>
+    <script src="options-dialog.js" type="module"></script>
+    <script src="presentation-layer.js" type="module"></script>
+    <script src="song-info.js" type="module"></script>
+    <script src="stats.js" type="module"></script>
+    <script src="tag-suggester.js" type="module"></script>
+    <script src="updater.js" type="module"></script>
+
+    <link rel="preload" href="fontello/css/fontello.css" as="style" />
+    <link rel="preconnect" href="https://fonts.googleapis.com/" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin />
+
     <style>
       html {
         height: 100%;
