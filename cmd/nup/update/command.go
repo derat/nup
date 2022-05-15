@@ -194,7 +194,7 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 					fn = soe.song.Filename
 				}
 				errChan <- fmt.Errorf("%v: %v", fn, soe.err)
-				return
+				break
 			}
 			s := *soe.song
 			s.CoverFilename = getCoverFilename(cmd.Cfg.CoverDir, &s)
@@ -202,7 +202,7 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 				(len(s.AlbumID) > 0 || len(s.CoverID) > 0 || len(s.RecordingID) > 0) {
 				errChan <- fmt.Errorf("missing cover for %v (album=%v, cover=%v, recording=%v)",
 					s.Filename, s.AlbumID, s.CoverID, s.RecordingID)
-				return
+				break
 			}
 			s.RecordingID = ""
 

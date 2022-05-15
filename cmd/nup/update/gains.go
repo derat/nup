@@ -111,18 +111,20 @@ func (gc *gainsCache) get(p, album, albumID string) (mp3gain.Info, error) {
 				// original readSong call. In practice, computing gains is so incredibly slow (at
 				// least on my computer) that reading tags twice probably doesn't matter in the big
 				// scheme of things.
+				// I'm ignoring errors here since it's weird if we fail to add a new song because
+				// some other song in the same directory is broken.
 				s, err := readSong(p, "", fi, true /* onlyTags */, nil, nil)
-				if err != nil {
-					return nil, err
-				}
-				if s.Album == album && s.AlbumID == albumID {
+				if err == nil && s.Album == album && s.AlbumID == albumID {
 					paths = append(paths, p)
 				}
 			}
-			log.Printf("Computing gain adjustments for %d songs in %v", len(paths), dir)
 		} else {
 			paths = []string{p}
-			log.Printf("Computing gain adjustments for %v", p)
+		}
+		if len(paths) == 1 {
+			log.Printf("Computing gain adjustments for %v", paths[0])
+		} else {
+			log.Printf("Computing gain adjustments for %d songs in %v", len(paths), dir)
 		}
 
 		infos, err := mp3gain.ComputeAlbum(paths)

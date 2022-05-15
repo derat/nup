@@ -252,6 +252,9 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDi
 			workers <- struct{}{}
 			s, err := readSong(path, relPath, fi, false, opts, gains)
 			<-workers
+			if err != nil && s == nil {
+				s = &db.Song{Filename: relPath} // return the filename for error reporting
+			}
 			ch <- songOrErr{s, err}
 		}()
 
