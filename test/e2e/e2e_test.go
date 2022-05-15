@@ -7,6 +7,7 @@ package e2e
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/url"
 	"os"
@@ -990,5 +991,37 @@ func TestStats(tt *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		tt.Errorf("Got %+v, want %+v", got, want)
+	}
+}
+
+func TestUpdateError(tt *testing.T) {
+	t, done := initTest(tt)
+	defer done()
+
+	// Write a file with a header with a bogus ID3v2 version number (which should cause an error in
+	// taglib-go) and no trailing ID3v1 tag (so we can't fall back to it).
+	f, err := os.Create(filepath.Join(t.MusicDir, "song.mp3"))
+	if err != nil {
+		tt.Fatal("Failed creating file: ", err)
+	}
+	if _, err := io.WriteString(f, "ID301"+strings.Repeat("\x00", 1024)); err != nil {
+		tt.Fatal("Failed writing file: ", err)
+	}
+	if err := f.Close(); err != nil {
+		tt.Fatal("Failed closing file: ", err)
+	}
+	want := filepath.Base(f.Name()) + ": taglib: format not supported"
+
+	log.Print("Importing malformed song")
+	if _, stderr, err := t.UpdateSongsRaw(); err == nil {
+		tt.Error("Update unexpectedly succeeded with bad file\nstderr:\n" + stderr)
+	} else if !strings.Contains(stderr, want) {
+		tt.Errorf("Output doesn't include %q\nstderr:\n%s", want, stderr)
+	}
+
+	// We shouldn't have written the last update time, so a second attempt should also fail.
+	log.Print("Importing malformed song again")
+	if _, stderr, err := t.UpdateSongsRaw(); err == nil {
+		tt.Error("Repeated update attempt unexpectedly succeeded\nstderr:\n" + stderr)
 	}
 }

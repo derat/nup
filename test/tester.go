@@ -147,28 +147,23 @@ func runCommand(p string, args ...string) (stdout, stderr string, err error) {
 	cmd := exec.CommandContext(ctx, p, args...)
 	outPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		return
+		return "", "", err
 	}
 	errPipe, err := cmd.StderrPipe()
 	if err != nil {
-		return
+		return "", "", err
 	}
 	if err = cmd.Start(); err != nil {
-		return
+		return "", "", err
 	}
 
-	outBytes, err := ioutil.ReadAll(outPipe)
-	if err != nil {
-		return
+	if outBytes, err := ioutil.ReadAll(outPipe); err != nil {
+		return "", "", err
+	} else if errBytes, err := ioutil.ReadAll(errPipe); err != nil {
+		return string(outBytes), "", err
+	} else {
+		return string(outBytes), string(errBytes), cmd.Wait()
 	}
-	errBytes, err := ioutil.ReadAll(errPipe)
-	if err != nil {
-		return
-	}
-	stdout = string(outBytes)
-	stderr = string(errBytes)
-	err = cmd.Wait()
-	return
 }
 
 type StripPolicy int // controls whether DumpSongs removes data from songs
@@ -233,14 +228,18 @@ func ForceGlobFlag(glob string) string    { return "-force-glob=" + glob }
 
 // UpdateSongs runs 'nup update' with the supplied flags.
 func (t *Tester) UpdateSongs(flags ...string) {
-	args := append([]string{
+	if _, stderr, err := t.UpdateSongsRaw(flags...); err != nil {
+		t.fatalf("Failed updating songs: %v\nstderr: %v", err, stderr)
+	}
+}
+
+// UpdateSongsRaw is similar to UpdateSongs but allows the caller to handle errors.
+func (t *Tester) UpdateSongsRaw(flags ...string) (stdout, stderr string, err error) {
+	return runCommand("nup", append([]string{
 		"-config=" + t.configFile,
 		"update",
 		"-test-gain-info=" + fmt.Sprintf("%f:%f:%f", TrackGain, AlbumGain, PeakAmp),
-	}, flags...)
-	if _, stderr, err := runCommand("nup", args...); err != nil {
-		t.fatalf("Failed updating songs: %v\nstderr: %v", err, stderr)
-	}
+	}, flags...)...)
 }
 
 // UpdateSongsFromList runs 'nup update' to import the songs listed in path.
