@@ -231,24 +231,23 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 				return subcommands.ExitFailure
 			}
 		}
-	} else {
-		if err := updateSongs(cmd.Cfg, updateChan, replaceUserData, cmd.useFilenames); err != nil {
-			fmt.Fprintln(os.Stderr, "Failed updating songs:", err)
-		}
-		if didFullScan {
-			if err := writeLastUpdateInfo(cmd.Cfg.LastUpdateInfoFile, lastUpdateInfo{
-				Time: startTime,
-				Dirs: scannedDirs,
-			}); err != nil {
-				fmt.Fprintln(os.Stderr, "Failed saving update info:", err)
-				return subcommands.ExitFailure
-			}
-		}
+	} else if err := updateSongs(cmd.Cfg, updateChan, replaceUserData, cmd.useFilenames); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed updating songs:", err)
 	}
 
 	if err := <-errChan; err != nil {
 		fmt.Fprintln(os.Stderr, "Failed scanning song files:", err)
 		return subcommands.ExitFailure
+	}
+
+	if !cmd.dryRun && didFullScan {
+		if err := writeLastUpdateInfo(cmd.Cfg.LastUpdateInfoFile, lastUpdateInfo{
+			Time: startTime,
+			Dirs: scannedDirs,
+		}); err != nil {
+			fmt.Fprintln(os.Stderr, "Failed saving update info:", err)
+			return subcommands.ExitFailure
+		}
 	}
 	return subcommands.ExitSuccess
 }
