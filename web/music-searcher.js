@@ -15,8 +15,8 @@ import { createMenu, isMenuShown } from './menu.js';
 import { showSongInfo } from './song-info.js';
 
 const template = createTemplate(`
+<link rel="stylesheet" href="common.css" />
 <style>
-  @import 'common.css';
   :host {
     display: flex;
     flex-direction: column;

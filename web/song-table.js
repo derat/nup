@@ -11,8 +11,8 @@ import {
 } from './common.js';
 
 const template = createTemplate(`
+<link rel="stylesheet" href="common.css" />
 <style>
-  @import 'common.css';
   :host {
     display: block;
     overflow-y: auto;

@@ -26,8 +26,8 @@ import { showStats } from './stats.js';
 import Updater from './updater.js';
 
 const template = createTemplate(`
+<link rel="stylesheet" href="common.css" />
 <style>
-  @import 'common.css';
   :host {
     display: flex;
     flex-direction: column;
