@@ -9,14 +9,14 @@
 .gcloudignore
 .git
 .gitignore
-
-# Stuff not needed by the App Engine server.
-*.md
-*.sh
-
 .prettierrc
 LICENSE
-web/fontello/LICENSE.txt
+
+# Stuff not needed by the App Engine server.
+*.json
+*.md
+*.sh
+*.txt
 
 build/
 cmd/
