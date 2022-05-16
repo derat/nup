@@ -6,9 +6,7 @@ main: server
 # Support using App Engine bundled services (e.g. memcache).
 app_engine_apis: true
 
-# Make the app handle index.html so we can check auth. Note that it won't
-# actually serve it; this just prevents the static file from being accessed
-# directly.
+# Make the app handle index.html so we can check auth.
 handlers:
   - url: /index\.html
     script: auto

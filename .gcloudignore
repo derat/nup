@@ -13,12 +13,12 @@
 LICENSE
 
 # Stuff not needed by the App Engine server.
-*.json
 *.md
 *.sh
-*.txt
 
 build/
 cmd/
 example/
 test/
+web/fonts/*.json
+web/fonts/*.txt
