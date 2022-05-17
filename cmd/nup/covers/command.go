@@ -8,14 +8,20 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"image"
+	_ "image/jpeg"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/derat/nup/cmd/nup/client"
+	srvcover "github.com/derat/nup/server/cover"
 	"github.com/derat/nup/server/db"
 	"github.com/derat/taglib-go/taglib"
 	"github.com/google/subcommands"
@@ -24,33 +30,38 @@ import (
 const (
 	logInterval = 100
 	albumIDTag  = "MusicBrainz Album Id"
+	coverExt    = ".jpg"
 )
 
 type Command struct {
 	Cfg *client.Config
 
-	coverDir    string // directory to write covers to
-	maxSongs    int    // songs to inspect
-	maxRequests int    // parallel HTTP requests
-	size        int    // image size to download (250, 500, 1200)
+	coverDir     string // directory containing cover images
+	download     bool   // download image covers to coverDir
+	generateWebP bool   // generate WebP versions of covers in coverDir
+	maxSongs     int    // songs to inspect
+	maxRequests  int    // parallel HTTP requests
+	size         int    // image size to download (250, 500, 1200)
 }
 
 func (*Command) Name() string     { return "covers" }
-func (*Command) Synopsis() string { return "download album art" }
+func (*Command) Synopsis() string { return "manages album art" }
 func (*Command) Usage() string {
 	return `covers [flags]:
-	Download album art from coverartarchive.org for dumped songs from
-	stdin. Image files are written to the directory specified via
-	-cover-dir.
+	Works with album art images in a directory.
+	With -download, downloads album art from coverartarchive.org.
+	With -generate-webp, generates WebP versions of existing JPEG images.
 
 `
 }
 
 func (cmd *Command) SetFlags(f *flag.FlagSet) {
-	f.StringVar(&cmd.coverDir, "cover-dir", "", "Directory to write covers to")
-	f.IntVar(&cmd.maxSongs, "max-songs", -1, "Maximum number of songs to inspect")
-	f.IntVar(&cmd.maxRequests, "max-requests", 2, "Maximum number of parallel HTTP requests")
-	f.IntVar(&cmd.size, "size", 1200, "Image size to download (250, 500, or 1200)")
+	f.StringVar(&cmd.coverDir, "cover-dir", "", "Directory containing cover images")
+	f.BoolVar(&cmd.download, "download", false, "Download covers for dumped songs read from stdin to -cover-dir")
+	f.IntVar(&cmd.size, "download-size", 1200, "Image size to download (250, 500, or 1200)")
+	f.BoolVar(&cmd.generateWebP, "generate-webp", false, "Generate WebP versions of covers in -cover-dir")
+	f.IntVar(&cmd.maxSongs, "max-downloads", -1, "Maximum number of songs to inspect for -download")
+	f.IntVar(&cmd.maxRequests, "max-requests", 2, "Maximum number of parallel HTTP requests for -download")
 }
 
 func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
@@ -59,13 +70,34 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interf
 		return subcommands.ExitUsageError
 	}
 
+	switch {
+	case cmd.download:
+		if err := cmd.doDownload(args); err != nil {
+			fmt.Fprintln(os.Stderr, "Failed downloading covers:", err)
+			return subcommands.ExitFailure
+		}
+		return subcommands.ExitSuccess
+	case cmd.generateWebP:
+		if err := cmd.doGenerateWebP(); err != nil {
+			fmt.Fprintln(os.Stderr, "Failed generating WebP images:", err)
+			return subcommands.ExitFailure
+		}
+		return subcommands.ExitSuccess
+	default:
+		fmt.Fprintln(os.Stderr, "Must supply one of -download and -generate-webp")
+		return subcommands.ExitUsageError
+	}
+}
+
+// TODO: Document that -download also accepts song filenames via positional arguments,
+// or just delete this behavior.
+func (cmd *Command) doDownload(args []interface{}) error {
 	albumIDs := make([]string, 0)
 	if len(args) > 0 {
 		ids := make(map[string]bool)
 		for _, p := range args {
 			if id, err := readSong(p.(string)); err != nil {
-				fmt.Fprintf(os.Stderr, "Failed reading %v: %v", p, err)
-				return subcommands.ExitFailure
+				return err
 			} else if len(id) > 0 {
 				log.Printf("%v has album ID %v", p, id)
 				ids[id] = true
@@ -78,20 +110,92 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interf
 		log.Print("Reading songs from stdin")
 		var err error
 		if albumIDs, err = readDumpedSongs(os.Stdin, cmd.coverDir, cmd.maxSongs); err != nil {
-			fmt.Fprintln(os.Stderr, "Failed reading dumped songs:", err)
-			return subcommands.ExitFailure
+			return err
 		}
 	}
 
 	log.Printf("Downloading cover(s) for %v album(s)", len(albumIDs))
 	downloadCovers(albumIDs, cmd.coverDir, cmd.size, cmd.maxRequests)
-	return subcommands.ExitSuccess
+	return nil
 }
 
-func getCoverFilename(albumID string) string {
-	return albumID + ".jpg"
+func (cmd *Command) doGenerateWebP() error {
+	return filepath.Walk(cmd.coverDir, func(p string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !fi.Mode().IsRegular() || !strings.HasSuffix(p, coverExt) {
+			return nil
+		}
+
+		var width, height int
+		for _, size := range srvcover.WebPSizes {
+			// Skip this size if we already have it and it's up-to-date.
+			gp := srvcover.WebPFilename(p, size)
+			if gfi, err := os.Stat(gp); err == nil && !fi.ModTime().After(gfi.ModTime()) {
+				continue
+			}
+			// Read the source image's dimensions if we haven't already.
+			if width == 0 && height == 0 {
+				if width, height, err = getDimensions(p); err != nil {
+					return fmt.Errorf("failed getting %q dimensions: %v", p, err)
+				}
+			}
+			if err := writeWebP(p, gp, width, height, size); err != nil {
+				return fmt.Errorf("failed converting %q to %q: %v", p, gp, err)
+			}
+		}
+		return nil
+	})
 }
 
+// getDimensions returns the dimensions of the JPEG image at p.
+func getDimensions(p string) (width, height int, err error) {
+	f, err := os.Open(p)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer f.Close()
+
+	cfg, _, err := image.DecodeConfig(f)
+	return cfg.Width, cfg.Height, err
+}
+
+// writeWebP writes the JPEG image at srcPath of the supplied dimensions
+// to destPath in WebP format and with the supplied (square) size.
+// The image is cropped and scaled as per the Scale function in server/cover/cover.go.
+func writeWebP(srcPath string, destPath string, srcWidth, srcHeight int, destSize int) error {
+	args := []string{
+		"-mt", // multithreaded
+		"-resize", strconv.Itoa(destSize), strconv.Itoa(destSize),
+	}
+
+	// Crop the source image rect if it isn't square.
+	if srcWidth > srcHeight {
+		args = append(args, "-crop", strconv.Itoa((srcWidth-srcHeight)/2), "0",
+			strconv.Itoa(srcHeight), strconv.Itoa(srcHeight))
+	} else if srcHeight > srcWidth {
+		args = append(args, "-crop", "0", strconv.Itoa((srcHeight-srcWidth)/2),
+			strconv.Itoa(srcWidth), strconv.Itoa(srcWidth))
+	}
+
+	// TODO: cwebp dies with "Unsupported color conversion request" when given
+	// a JPEG with a CMYK (rather than RGB) color space:
+	// https://groups.google.com/a/webmproject.org/g/webp-discuss/c/MH8q_d6M1vM
+	// This can be fixed with e.g. "convert -colorspace RGB old.jpg new.jpg", but
+	// CMYK images seem to be rare enough that I haven't bothered automating this.
+	args = append(args, "-o", destPath, srcPath)
+	err := exec.Command("cwebp", args...).Run()
+	// TODO: It'd probably be safer to write to a temp file and then rename, since it'd
+	// still be possible for us to die before we can unlink the dest file. If a partial
+	// file is written, it probably won't be replaced in future runs due to its timestamp.
+	if err != nil {
+		os.Remove(destPath)
+	}
+	return err
+}
+
+// TODO: This code... isn't great. Make it share more with the update subcommand?
 func readSong(path string) (albumID string, err error) {
 	fi, err := os.Stat(path)
 	if err != nil {
@@ -137,7 +241,7 @@ func readDumpedSongs(r io.Reader, coverDir string, maxSongs int) (albumIDs []str
 		}
 
 		// Check if we already have the cover.
-		if _, err := os.Stat(filepath.Join(coverDir, getCoverFilename(s.AlbumID))); err == nil {
+		if _, err := os.Stat(filepath.Join(coverDir, s.AlbumID+coverExt)); err == nil {
 			continue
 		}
 
@@ -173,7 +277,7 @@ func downloadCover(albumID, dir string, size int) (path string, err error) {
 	}
 	defer resp.Body.Close()
 
-	path = filepath.Join(dir, getCoverFilename(albumID))
+	path = filepath.Join(dir, albumID+coverExt)
 	f, err := os.Create(path)
 	if err != nil {
 		return "", err

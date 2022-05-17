@@ -152,10 +152,12 @@ func handleCover(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 			return
 		}
 	}
+	webp := r.FormValue("webp") == "1"
 
+	// cover.Scale will set the Content-Type header.
 	addLongCacheHeaders(w)
-	w.Header().Set("Content-Type", "image/jpeg")
-	if err := cover.Scale(ctx, cfg.CoverBucket, cfg.CoverBaseURL, fn, int(size), coverJPEGQuality, w); err != nil {
+	if err := cover.Scale(ctx, cfg.CoverBucket, cfg.CoverBaseURL, fn, int(size),
+		coverJPEGQuality, webp, w); err != nil {
 		log.Errorf(ctx, "Scaling cover %q failed: %v", fn, err)
 		if os.IsNotExist(err) {
 			http.Error(w, "Not found", http.StatusNotFound)
@@ -489,6 +491,10 @@ func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// TODO: It'd be cool if we could somehow preload the first couple songs' covers (and audio?)
+	// into the cache here, but I don't know if it's possible in App Engine without delaying the
+	// search results (since I don't think the cache-filling can extend beyond this request handler).
 	writeJSONResponse(w, songs)
 }
 

@@ -15,6 +15,7 @@ import {
   getSongUrl,
   handleFetchError,
   moveItem,
+  smallCoverSize,
   updateTitleAttributeForTruncation,
 } from './common.js';
 import Config from './config.js';
@@ -219,8 +220,8 @@ const template = createTemplate(`
 //
 // When the current cover art changes due to a song change, a 'cover'
 // CustomEvent is emitted with a 'detail.url' string property corresponding to a
-// URL to the scaled JPEG image. This property is null if no cover art is
-// available.
+// URL to a |smallCoverSize| WebP image. This property is null if no cover art
+// is available.
 customElements.define(
   'music-player',
   class extends HTMLElement {
@@ -623,7 +624,7 @@ customElements.define(
       updateTitleAttributeForTruncation(this.albumDiv_, song ? song.album : '');
 
       if (song && song.coverFilename) {
-        const url = getScaledCoverUrl(song.coverFilename);
+        const url = getScaledCoverUrl(song.coverFilename, smallCoverSize);
         this.coverImage_.src = url;
         this.coverDiv_.classList.remove('empty');
         this.dispatchEvent(new CustomEvent('cover', { detail: { url } }));
@@ -639,7 +640,7 @@ customElements.define(
       // App Engine "feature": https://github.com/derat/nup/issues/1
       const precacheCover = (s) => {
         if (!s || !s.coverFilename) return;
-        new Image().src = getScaledCoverUrl(s.coverFilename);
+        new Image().src = getScaledCoverUrl(s.coverFilename, smallCoverSize);
       };
       precacheCover(this.songs_[this.currentIndex_ + 1]);
       precacheCover(this.songs_[this.currentIndex_ + 2]);
@@ -692,7 +693,7 @@ customElements.define(
           {
             src: img.src,
             sizes: `${img.naturalWidth}x${img.naturalHeight}`,
-            type: 'image/jpeg',
+            type: 'image/webp',
           },
         ];
       }
@@ -729,7 +730,7 @@ customElements.define(
         body: `${song.title}\n${song.album}\n${formatTime(song.length)}`,
       };
       if (song.coverFilename) {
-        options.icon = getScaledCoverUrl(song.coverFilename);
+        options.icon = getScaledCoverUrl(song.coverFilename, smallCoverSize);
       }
       this.notification_ = new Notification(`${song.artist}`, options);
       this.closeNotificationTimeoutId_ = window.setTimeout(() => {

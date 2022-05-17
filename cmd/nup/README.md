@@ -13,7 +13,7 @@ Subcommands:
 	check            check for issues in songs and cover images
 	commands         list all command names
 	config           manage server configuration
-	covers           download album art
+	covers           manages album art
 	dump             dump songs from the server
 	flags            describe all known top-level flags
 	help             describe subcommands and their syntax
@@ -68,8 +68,10 @@ config [flags]:
 
 ## `covers` command
 
-The `covers` command reads JSON-marshaled [Song] objects written by the `dump`
-command and downloads the corresponding album artwork from the [Cover Art
+The `covers` command manipulates local cover images.
+
+With the `-download` flag, it reads JSON-marshaled [Song] objects written by the
+`dump` command and downloads the corresponding album artwork from the [Cover Art
 Archive].
 
 Google Images is also convenient for finding album artwork. A custom search for
@@ -83,20 +85,32 @@ following information:
 
 [Cover Art Archive]: https://coverartarchive.org/
 
+With the `-generate-webp` flag, it generates smaller [WebP] versions at various
+sizes of all of the JPEG images in `-cover-dir`. The server's `/cover` endpoint
+returns a WebP image if available when passed the `webp=1` parameter. WebP
+images should be generated before syncing the local cover directory to Cloud
+Storage.
+
+[WebP]: https://developers.google.com/speed/webp
+
 ```
 covers [flags]:
-	Download album art from coverartarchive.org for dumped songs from
-	stdin. Image files are written to the directory specified via
-	-cover-dir.
+	Works with album art images in a directory.
+	With -download, downloads album art from coverartarchive.org.
+	With -generate-webp, generates WebP versions of existing JPEG images.
 
   -cover-dir string
-    	Directory to write covers to
-  -max-requests int
-    	Maximum number of parallel HTTP requests (default 2)
-  -max-songs int
-    	Maximum number of songs to inspect (default -1)
-  -size int
+    	Directory containing cover images
+  -download
+    	Download covers for dumped songs read from stdin to -cover-dir
+  -download-size int
     	Image size to download (250, 500, or 1200) (default 1200)
+  -generate-webp
+    	Generate WebP versions of covers in -cover-dir
+  -max-downloads int
+    	Maximum number of songs to inspect for -download (default -1)
+  -max-requests int
+    	Maximum number of parallel HTTP requests for -download (default 2)
 ```
 
 ## `dump` command

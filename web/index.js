@@ -1,7 +1,7 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-import { $, scaledCoverSize } from './common.js';
+import { $, smallCoverSize } from './common.js';
 import Config from './config.js';
 
 const config = new Config();
@@ -38,8 +38,11 @@ musicPlayer.addEventListener('cover', (e) => {
   const favicon = $('favicon');
   if (e.detail.url) {
     favicon.href = e.detail.url;
-    favicon.type = 'image/jpeg';
-    favicon.sizes = `${scaledCoverSize}x${scaledCoverSize}`;
+    // The server can fall back to JPEG here if it doesn't have a WebP image
+    // at the requested size, but I'm guessing that the browser will sniff the
+    // type anyway.
+    favicon.type = 'image/webp';
+    favicon.sizes = `${smallCoverSize}x${smallCoverSize}`;
   } else {
     favicon.href = 'favicon.ico';
     favicon.type = 'image/png';

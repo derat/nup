@@ -9,6 +9,7 @@ import {
   formatTime,
   getFullCoverUrl,
   getScaledCoverUrl,
+  smallCoverSize,
 } from './common.js';
 
 const template = createTemplate(`
@@ -256,6 +257,8 @@ customElements.define(
       this.oldCover_ = el;
 
       // Use the full-resolution cover image.
+      // TODO: Avoid downloading these bulky full-resolution images until the
+      // presentation layer has been shown at least once, maybe?
       updateImg(
         this.currentCover_,
         currentSong ? getFullCoverUrl(currentSong.coverFilename) : ''
@@ -271,7 +274,9 @@ customElements.define(
       }
       updateImg(
         this.nextCover_,
-        nextSong ? getScaledCoverUrl(nextSong.coverFilename) : ''
+        nextSong
+          ? getScaledCoverUrl(nextSong.coverFilename, smallCoverSize)
+          : ''
       );
 
       // Preload the next track's full-resolution cover.

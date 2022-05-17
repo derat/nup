@@ -9,6 +9,7 @@ import {
   getFullCoverUrl,
   getRatingString,
   getScaledCoverUrl,
+  largeCoverSize,
 } from './common.js';
 import { createDialog } from './dialog.js';
 
@@ -80,7 +81,7 @@ export function showSongInfo(song) {
 
   const cover = $('cover-img', shadow);
   if (song.coverFilename) {
-    cover.src = getScaledCoverUrl(song.coverFilename);
+    cover.src = getScaledCoverUrl(song.coverFilename, largeCoverSize);
     const link = $('cover-link', shadow);
     link.href = getFullCoverUrl(song.coverFilename);
     link.target = '_blank';

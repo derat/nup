@@ -27,6 +27,8 @@ Returns an album cover art image in JPEG format.
 *   `filename` - Image path from [Song]'s `CoverFilename` field.
 *   `size` (optional) - Integer cover dimensions, e.g. `400` to request that the
     image be scaled (and possibly cropped) to 400x400.
+*   `webp` (optional) - If `1`, return a prescaled WebP version of the image if
+    available. If unavailable, return JPEG.
 
 ### /delete\_song (POST)
 
