@@ -8,7 +8,9 @@ import {
   createTemplate,
   getCurrentTimeSec,
   getDumpSongUrl,
+  getScaledCoverUrl,
   handleFetchError,
+  smallCoverSize,
 } from './common.js';
 import { isDialogShown, showMessageDialog } from './dialog.js';
 import { createMenu, isMenuShown } from './menu.js';
@@ -513,7 +515,16 @@ customElements.define(
           this.resultsTable_.setSongs(songs);
           this.resultsTable_.setAllCheckboxes(true);
           this.resultsShuffled_ = shuffled;
-          if (appendToQueue) this.enqueueSearchResults_(true, true);
+          if (appendToQueue) {
+            this.enqueueSearchResults_(true, true);
+          } else if (songs.length > 0 && songs[0].coverFilename) {
+            // If we aren't automatically enqueuing the results, prefetch the
+            // cover image for the first song so it'll be ready to go.
+            new Image().src = getScaledCoverUrl(
+              songs[0].coverFilename,
+              smallCoverSize
+            );
+          }
         })
         .catch((err) => {
           showMessageDialog('Search Failed', err.toString());

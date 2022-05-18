@@ -491,10 +491,6 @@ func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	// TODO: It'd be cool if we could somehow preload the first couple songs' covers (and audio?)
-	// into the cache here, but I don't know if it's possible in App Engine without delaying the
-	// search results (since I don't think the cache-filling can extend beyond this request handler).
 	writeJSONResponse(w, songs)
 }
 
