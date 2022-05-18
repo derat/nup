@@ -190,6 +190,7 @@ customElements.define(
 
       this.shadow_ = createShadow(this, template);
       this.table_ = this.shadow_.querySelector('table');
+      this.rowSongs_ = new WeakMap(); // row element to song object
 
       this.dragImage_ = createElement('img');
       this.dragTarget_ = $('drag-target', this.shadow_);
@@ -282,13 +283,13 @@ customElements.define(
     }
 
     get songs() {
-      return this.songRowsArray_.map((r) => r.song); // shallow copy
+      return this.songRowsArray_.map((r) => this.rowSongs_.get(r)); // shallow copy
     }
     get numSongs() {
       return this.songRows_.length;
     }
     getSong(index) {
-      return this.songRows_[index].song;
+      return this.rowSongs_.get(this.songRows_[index]);
     }
 
     get checkedSongs() {
@@ -296,7 +297,7 @@ customElements.define(
         ? []
         : this.songRowsArray_
             .filter((r) => r.cells[0].children[0].checked)
-            .map((r) => r.song);
+            .map((r) => this.rowSongs_.get(r));
     }
 
     // Marks the row at |index| as being active (or not).
@@ -417,17 +418,15 @@ customElements.define(
           this.onCheckboxClick_(e.target, e.shiftKey)
         );
       row.querySelector('.artist a').addEventListener('click', () => {
-        this.emitEvent_('field', { artist: row.song.artist });
+        this.emitEvent_('field', { artist: this.rowSongs_.get(row).artist });
       });
       row.querySelector('.album a').addEventListener('click', () => {
-        this.emitEvent_('field', {
-          albumId: row.song.albumId,
-          album: row.song.album,
-        });
+        const song = this.rowSongs_.get(row);
+        this.emitEvent_('field', { albumId: song.albumId, album: song.album });
       });
       row.addEventListener('contextmenu', (e) => {
         this.emitEvent_('menu', {
-          songId: row.song.songId,
+          songId: this.rowSongs_.get(row).songId,
           index: this.songRowsArray_.indexOf(row), // don't use orig (stale) index
           orig: e, // PointerEvent
         });
@@ -458,10 +457,7 @@ customElements.define(
       const row = this.songRows_[index];
       row.classList.remove('active');
 
-      // HTML5 dataset properties can only hold strings, so we attach the song
-      // directly to the element instead. (Serializing it to JSON would also be
-      // an option but seems like it may have performance concerns.)
-      row.song = song;
+      this.rowSongs_.set(row, song);
 
       const update = (cell, text, textInChild) =>
         ((textInChild ? cell.firstChild : cell).innerText = text);
