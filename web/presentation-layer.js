@@ -191,7 +191,8 @@ customElements.define(
 
       this.duration_ = 0; // duration of current song in seconds
       this.visible_ = false;
-      this.playNextTrackFunction_ = null;
+      this.currentFilename_ = null;
+      this.nextFilename_ = null;
 
       this.shadow_ = createShadow(this, template);
       this.currentCover_ = $('current-cover', this.shadow_);
@@ -213,10 +214,8 @@ customElements.define(
         this.dispatchEvent(new Event('hide'));
         e.stopPropagation();
       });
-
       this.nextDiv_.addEventListener('click', (e) => {
         this.dispatchEvent(new Event('next'));
-        this.playNextTrackFunction_ && this.playNextTrackFunction_();
         e.stopPropagation();
       });
 
@@ -236,6 +235,7 @@ customElements.define(
 
       if (!currentSong) {
         this.currentDetails_.classList.add('hidden');
+        this.currentFilename_ = null;
       } else {
         this.currentDetails_.classList.remove('hidden');
         this.currentArtist_.innerText = currentSong.artist;
@@ -246,6 +246,7 @@ customElements.define(
         this.timeDiv_.innerText = '';
         this.durationDiv_.innerText = formatTime(currentSong.length);
         this.duration_ = currentSong.length;
+        this.currentFilename_ = currentSong.coverFilename;
       }
 
       // Make the "old" cover image display the image that we were just
@@ -257,31 +258,39 @@ customElements.define(
       this.oldCover_ = el;
 
       // Use the full-resolution cover image.
-      // TODO: Avoid downloading these bulky full-resolution images until the
-      // presentation layer has been shown at least once, maybe?
-      updateImg(
+      this.updateImg_(
         this.currentCover_,
-        currentSong ? getFullCoverUrl(currentSong.coverFilename) : ''
+        this.visible ? getFullCoverUrl(this.currentFilename_) : ''
       );
 
       if (!nextSong) {
         this.nextDiv_.classList.add('hidden');
+        this.nextFilename_ = null;
       } else {
         this.nextDiv_.classList.remove('hidden');
         this.nextArtist_.innerText = nextSong.artist;
         this.nextTitle_.innerText = nextSong.title;
         this.nextAlbum_.innerText = nextSong.album;
+        this.nextFilename_ = nextSong.coverFilename;
       }
-      updateImg(
+      this.updateImg_(
         this.nextCover_,
-        nextSong
-          ? getScaledCoverUrl(nextSong.coverFilename, smallCoverSize)
-          : ''
+        getScaledCoverUrl(this.nextFilename_, smallCoverSize)
       );
 
       // Preload the next track's full-resolution cover.
-      if (this.visible && nextSong && nextSong.coverFilename) {
-        new Image().src = getFullCoverUrl(nextSong.coverFilename);
+      if (this.visible && this.nextFilename_) {
+        new Image().src = getFullCoverUrl(this.nextFilename_);
+      }
+    }
+
+    updateImg_(img, url) {
+      if (url) {
+        img.src = url;
+        img.classList.remove('hidden');
+      } else {
+        img.src = emptyImg;
+        img.classList.add('hidden');
       }
     }
 
@@ -298,20 +307,29 @@ customElements.define(
       return this.visible_;
     }
     set visible(visible) {
-      if (this.visible_ == visible) return;
+      if (this.visible_ === visible) return;
 
-      // Prevent the old cover from crossfading out again.
-      // Its animation seems to be repeated whenever it becomes visible.
-      if (visible) this.oldCover_.classList.add('hidden');
+      if (visible) {
+        // If we weren't visible when updateSongs() was last called, we haven't
+        // loaded the current cover image yet or preloaded the next one, so do
+        // it now.
+        this.updateImg_(
+          this.currentCover_,
+          getFullCoverUrl(this.currentFilename_)
+        );
+        if (this.nextFilename_) {
+          new Image().src = getFullCoverUrl(this.nextFilename_);
+        }
+
+        // Prevent the old cover from crossfading out again.
+        // Its animation seems to be repeated whenever it becomes visible.
+        this.oldCover_.classList.add('hidden');
+      }
 
       visible
         ? this.classList.add('visible')
         : this.classList.remove('visible');
       this.visible_ = visible;
-    }
-
-    setPlayNextTrackFunction(f) {
-      this.playNextTrackFunction_ = f;
     }
   }
 );
