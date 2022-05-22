@@ -89,7 +89,6 @@ const template = createTemplate(`
 
   #details {
     line-height: 1.3;
-    overflow: hidden;
     white-space: nowrap;
   }
   #artist {
