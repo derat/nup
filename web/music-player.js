@@ -464,8 +464,9 @@ customElements.define(
     }
 
     set config(config) {
+      // We're leaking this callback, but it doesn't matter in practice since
+      // music-player never gets removed from the DOM.
       this.config_ = config;
-      // TODO: Remove callback in disconnectedCallback().
       this.config_.addCallback((name, value) => {
         if (name === Config.GAIN_TYPE || name === Config.PRE_AMP) {
           this.updateGain_();
@@ -1015,6 +1016,7 @@ customElements.define(
     // This implements the approach described at
     // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification.
     updateGain_() {
+      if (!this.config_) throw new Error('Config unset');
       let adj = this.config_.get(Config.PRE_AMP); // decibels
 
       const song = this.currentSong_;

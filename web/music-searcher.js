@@ -12,8 +12,8 @@ import {
   handleFetchError,
   smallCoverSize,
 } from './common.js';
-import { isDialogShown, showMessageDialog } from './dialog.js';
-import { createMenu, isMenuShown } from './menu.js';
+import { showMessageDialog } from './dialog.js';
+import { createMenu } from './menu.js';
 import { showSongInfo } from './song-info.js';
 
 const template = createTemplate(`
@@ -268,8 +268,16 @@ const template = createTemplate(`
 <div id="waiting">Waiting for server...</div>
 `);
 
-// <music-searcher> sends queries to the server and supports enqueuing the
-// resulting songs in a <music-player>.
+// <music-searcher> displays a form for sending queries to the server and
+// displays the results in a <song-table>. It provides controls for enqueuing
+// some or all of the results.
+//
+// When songs should be enqueued, an 'enqueue' CustomEvent is emitted with the
+// following properties in its |detail| property:
+// - |songs|: array of song objects
+// - |clearFirst|: true if playlist should be cleared first
+// - |afterCurrent|: true to insert songs after current song (rather than at end)
+// - |shuffled|: true if search results were shuffled
 customElements.define(
   'music-searcher',
   class extends HTMLElement {
@@ -393,44 +401,25 @@ customElements.define(
       this.resultsShuffled_ = false;
     }
 
-    set musicPlayer(player) {
-      this.musicPlayer_ = player;
-      player.addEventListener('field', this.onPlayerField_);
-      player.addEventListener('tags', this.onTagsLoaded_);
+    // Uses |tags| as autocomplete suggestions in the tags search field.
+    set tags(tags) {
+      // Also suggest negative tags.
+      this.tagSuggester_.words = tags.concat(tags.map((t) => '-' + t));
     }
 
-    connectedCallback() {
-      document.body.addEventListener('keydown', this.onBodyKeyDown_);
+    // Resets the search fields using the supplied (optional) values.
+    resetFields(artist, album, albumId) {
+      this.reset_(artist, album, albumId, false);
     }
 
-    disconnectedCallback() {
-      document.body.removeEventListener('keydown', this.onBodyKeyDown_);
-      if (this.musicPlayer_) {
-        this.musicPlayer_.removeEventListener('field', this.onPlayerField_);
-        this.musicPlayer_.removeEventListener('tags', this.onTagsLoaded_);
-        this.musicPlayer_ = null;
-      }
+    // Focuses the keywords input.
+    focusKeywords() {
+      this.keywordsInput_.focus();
     }
 
     resetForTesting() {
       this.reset_(null, null, null, true /* clearResults */);
     }
-
-    onPlayerField_ = (e) => {
-      this.reset_(
-        e.detail.artist,
-        e.detail.album,
-        e.detail.albumId,
-        false /* clearResults */
-      );
-    };
-
-    onTagsLoaded_ = (e) => {
-      // Also suggest negative tags.
-      this.tagSuggester_.words = e.detail.tags.concat(
-        e.detail.tags.map((t) => '-' + t)
-      );
-    };
 
     getPresetsFromServer_() {
       fetch('presets', { method: 'GET' })
@@ -531,16 +520,17 @@ customElements.define(
     }
 
     enqueueSearchResults_(clearFirst, afterCurrent) {
-      if (!this.musicPlayer_) throw new Error('No <music-player>');
-      if (!this.resultsTable_.numSongs) return;
-
       const songs = this.resultsTable_.checkedSongs;
-      this.musicPlayer_.enqueueSongs(
+      if (!songs.length) return;
+
+      const detail = {
         songs,
         clearFirst,
         afterCurrent,
-        this.resultsShuffled_
-      );
+        shuffled: this.resultsShuffled_,
+      };
+      this.dispatchEvent(new CustomEvent('enqueue', { detail }));
+
       if (songs.length === this.resultsTable_.numSongs) {
         this.resultsTable_.setSongs([]);
       }
@@ -637,17 +627,6 @@ customElements.define(
       this.presetSelect_.blur();
 
       this.submitQuery_(preset.play);
-    };
-
-    onBodyKeyDown_ = (e) => {
-      if (isDialogShown() || isMenuShown()) return;
-      if (this.musicPlayer_?.updateDivShown) return;
-
-      if (e.key === '/') {
-        this.keywordsInput_.focus();
-        e.preventDefault();
-        e.stopPropagation();
-      }
     };
   }
 );

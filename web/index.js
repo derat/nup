@@ -2,15 +2,15 @@
 // All rights reserved.
 
 import { $, smallCoverSize } from './common.js';
+import { isDialogShown } from './dialog.js';
+import { isMenuShown } from './menu.js';
 import Config from './config.js';
 
 const config = new Config();
-const musicPlayer = document.querySelector('music-player');
-const musicSearcher = document.querySelector('music-searcher');
+const player = document.querySelector('music-player');
+const searcher = document.querySelector('music-searcher');
 
-// Wire up dependencies between components.
-musicPlayer.config = config;
-musicSearcher.musicPlayer = musicPlayer;
+player.config = config;
 
 // Watch for theme changes.
 const darkMediaQuery = '(prefers-color-scheme: dark)';
@@ -34,7 +34,7 @@ window.matchMedia(darkMediaQuery).addListener((e) => updateTheme());
 updateTheme(config.get(Config.THEME));
 
 // Use the cover art as the favicon.
-musicPlayer.addEventListener('cover', (e) => {
+player.addEventListener('cover', (e) => {
   const favicon = $('favicon');
   if (e.detail.url) {
     favicon.href = e.detail.url;
@@ -50,16 +50,47 @@ musicPlayer.addEventListener('cover', (e) => {
   }
 });
 
-// Used by browser tests.
+// Wire up components.
+player.addEventListener('field', (e) => {
+  searcher.resetFields(e.detail.artist, e.detail.album, e.detail.albumId);
+});
+player.addEventListener('tags', (e) => {
+  searcher.tags = e.detail.tags;
+});
+searcher.addEventListener('enqueue', (e) => {
+  player.enqueueSongs(
+    e.detail.songs,
+    e.detail.clearFirst,
+    e.detail.afterCurrent,
+    e.detail.shuffled
+  );
+});
+
+// Listening for this here feels gross, but less gross than injecting
+// music-player into music-searcher.
+document.body.addEventListener('keydown', (e) => {
+  if (
+    e.key === '/' &&
+    !isDialogShown() &&
+    !isMenuShown() &&
+    !player.updateDivShown
+  ) {
+    searcher.focusKeywords();
+    e.preventDefault();
+    e.stopPropagation();
+  }
+});
+
+// Used by web tests.
 document.test = {
   reset: () => {
-    musicPlayer.resetForTesting();
-    musicSearcher.resetForTesting();
+    player.resetForTesting();
+    searcher.resetForTesting();
     // Make a hacky attempt to close any modal dialogs.
     [...document.querySelectorAll('dialog')].forEach((d) => d.close());
   },
-  setPlayDelayMs: (delayMs) => (musicPlayer.playDelayMs_ = delayMs),
-  updateTags: async () => await musicPlayer.updateTagsFromServer_(),
+  setPlayDelayMs: (delayMs) => (player.playDelayMs_ = delayMs),
+  updateTags: async () => await player.updateTagsFromServer_(),
   dragElement: (src, dest, offsetX, offsetY) => {
     const dataTransfer = { setDragImage: () => {} };
     let dropEffect = 'none';
