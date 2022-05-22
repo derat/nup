@@ -278,17 +278,11 @@ customElements.define(
 
       this.fetchController_ = null;
 
-      document.body.addEventListener('keydown', (e) =>
-        this.handleBodyKeyDown_(e)
-      );
-
       this.shadow_ = createShadow(this, template);
       const get = (id) => $(id, this.shadow_);
 
       this.keywordsInput_ = get('keywords-input');
-      this.keywordsInput_.addEventListener('keydown', (e) =>
-        this.handleFormKeyDown_(e)
-      );
+      this.keywordsInput_.addEventListener('keydown', this.onFormKeyDown_);
       get('keywords-clear').addEventListener(
         'click',
         () => (this.keywordsInput_.value = '')
@@ -296,44 +290,33 @@ customElements.define(
 
       this.tagSuggester_ = get('tags-suggester');
       this.tagsInput_ = get('tags-input');
-      this.tagsInput_.addEventListener('keydown', (e) =>
-        this.handleFormKeyDown_(e)
-      );
+      this.tagsInput_.addEventListener('keydown', this.onFormKeyDown_);
       get('tags-clear').addEventListener(
         'click',
         () => (this.tagsInput_.value = '')
       );
 
       this.shuffleCheckbox_ = get('shuffle-checkbox');
-      this.shuffleCheckbox_.addEventListener('keydown', (e) =>
-        this.handleFormKeyDown_(e)
-      );
+      this.shuffleCheckbox_.addEventListener('keydown', this.onFormKeyDown_);
       this.firstTrackCheckbox_ = get('first-track-checkbox');
-      this.firstTrackCheckbox_.addEventListener('keydown', (e) =>
-        this.handleFormKeyDown_(e)
-      );
+      this.firstTrackCheckbox_.addEventListener('keydown', this.onFormKeyDown_);
       this.unratedCheckbox_ = get('unrated-checkbox');
-      this.unratedCheckbox_.addEventListener('keydown', (e) =>
-        this.handleFormKeyDown_(e)
-      );
+      this.unratedCheckbox_.addEventListener('keydown', this.onFormKeyDown_);
       this.unratedCheckbox_.addEventListener('change', () =>
         this.updateFormDisabledState_()
       );
       this.minRatingSelect_ = get('min-rating-select');
       this.orderByLastPlayedCheckbox_ = get('order-by-last-played-checkbox');
-      this.orderByLastPlayedCheckbox_.addEventListener('keydown', (e) =>
-        this.handleFormKeyDown_(e)
+      this.orderByLastPlayedCheckbox_.addEventListener(
+        'keydown',
+        this.onFormKeyDown_
       );
       this.maxPlaysInput_ = get('max-plays-input');
-      this.maxPlaysInput_.addEventListener('keydown', (e) =>
-        this.handleFormKeyDown_(e)
-      );
+      this.maxPlaysInput_.addEventListener('keydown', this.onFormKeyDown_);
       this.firstPlayedSelect_ = get('first-played-select');
       this.lastPlayedSelect_ = get('last-played-select');
       this.presetSelect_ = get('preset-select');
-      this.presetSelect_.addEventListener('change', (e) =>
-        this.handlePresetSelectChanged_(e)
-      );
+      this.presetSelect_.addEventListener('change', this.onPresetSelectChange_);
 
       this.searchButton_ = get('search-button');
       this.searchButton_.addEventListener('click', () =>
@@ -412,25 +395,42 @@ customElements.define(
 
     set musicPlayer(player) {
       this.musicPlayer_ = player;
-      player.addEventListener('field', (e) => {
-        this.reset_(
-          e.detail.artist,
-          e.detail.album,
-          e.detail.albumId,
-          false /* clearResults */
-        );
-      });
-      player.addEventListener('tags', (e) => {
-        // Also suggest negative tags.
-        this.tagSuggester_.words = e.detail.tags.concat(
-          e.detail.tags.map((t) => '-' + t)
-        );
-      });
+      player.addEventListener('field', this.onPlayerField_);
+      player.addEventListener('tags', this.onTagsLoaded_);
+    }
+
+    connectedCallback() {
+      document.body.addEventListener('keydown', this.onBodyKeyDown_);
+    }
+
+    disconnectedCallback() {
+      document.body.removeEventListener('keydown', this.onBodyKeyDown_);
+      if (this.musicPlayer_) {
+        this.musicPlayer_.removeEventListener('field', this.onPlayerField_);
+        this.musicPlayer_.removeEventListener('tags', this.onTagsLoaded_);
+        this.musicPlayer_ = null;
+      }
     }
 
     resetForTesting() {
       this.reset_(null, null, null, true /* clearResults */);
     }
+
+    onPlayerField_ = (e) => {
+      this.reset_(
+        e.detail.artist,
+        e.detail.album,
+        e.detail.albumId,
+        false /* clearResults */
+      );
+    };
+
+    onTagsLoaded_ = (e) => {
+      // Also suggest negative tags.
+      this.tagSuggester_.words = e.detail.tags.concat(
+        e.detail.tags.map((t) => '-' + t)
+      );
+    };
 
     getPresetsFromServer_() {
       fetch('presets', { method: 'GET' })
@@ -474,20 +474,16 @@ customElements.define(
       if (parseInt(this.maxPlaysInput_.value) >= 0) {
         terms.push('maxPlays=' + parseInt(this.maxPlaysInput_.value));
       }
-      if (this.firstPlayedSelect_.value != 0) {
+      const firstPlayed = parseInt(this.firstPlayedSelect_.value);
+      if (firstPlayed !== 0) {
         terms.push(
-          'minFirstPlayed=' +
-            parseInt(
-              getCurrentTimeSec() - parseInt(this.firstPlayedSelect_.value)
-            )
+          `minFirstPlayed=${parseInt(getCurrentTimeSec() - firstPlayed)}`
         );
       }
-      if (this.lastPlayedSelect_.value != 0) {
+      const lastPlayed = parseInt(this.lastPlayedSelect_.value);
+      if (lastPlayed !== 0) {
         terms.push(
-          'maxLastPlayed=' +
-            parseInt(
-              getCurrentTimeSec() - parseInt(this.lastPlayedSelect_.value)
-            )
+          `maxLastPlayed=${parseInt(getCurrentTimeSec() - lastPlayed)}`
         );
       }
 
@@ -557,7 +553,7 @@ customElements.define(
       const keywords = [];
       const clean = (s) => {
         s = s.replace(/"/g, '\\"');
-        if (s.indexOf(' ') != -1) s = '"' + s + '"';
+        if (s.includes(' ')) s = '"' + s + '"';
         return s;
       };
       if (newArtist) keywords.push('artist:' + clean(newArtist));
@@ -590,7 +586,7 @@ customElements.define(
         !this.shuffleCheckbox_.checked &&
         !this.firstTrackCheckbox_.checked &&
         !this.unratedCheckbox_.checked &&
-        this.minRatingSelect_.selectedIndex == 0 &&
+        this.minRatingSelect_.selectedIndex === 0 &&
         !this.orderByLastPlayedCheckbox_.checked &&
         !(parseInt(this.maxPlaysInput_.value) >= 0) &&
         this.firstPlayedSelect_.selectedIndex === 0 &&
@@ -604,19 +600,19 @@ customElements.define(
     }
 
     // Handle a key being pressed in the search form.
-    handleFormKeyDown_(e) {
-      if (e.key == 'Enter') {
+    onFormKeyDown_ = (e) => {
+      if (e.key === 'Enter') {
         this.submitQuery_(false);
-      } else if ([' ', 'ArrowLeft', 'ArrowRight', '/'].indexOf(e.key) != -1) {
+      } else if ([' ', 'ArrowLeft', 'ArrowRight', '/'].includes(e.key)) {
         e.stopPropagation();
       }
-    }
+    };
 
     updateFormDisabledState_() {
       this.minRatingSelect_.disabled = this.unratedCheckbox_.checked;
     }
 
-    handlePresetSelectChanged_(event) {
+    onPresetSelectChange_ = () => {
       const index = this.presetSelect_.selectedIndex;
       if (index === 0) return; // ignore '...' item
 
@@ -641,18 +637,18 @@ customElements.define(
       this.presetSelect_.blur();
 
       this.submitQuery_(preset.play);
-    }
+    };
 
-    handleBodyKeyDown_(e) {
+    onBodyKeyDown_ = (e) => {
       if (isDialogShown() || isMenuShown()) return;
-      if (this.musicPlayer_ && this.musicPlayer_.updateDivShown) return;
+      if (this.musicPlayer_?.updateDivShown) return;
 
       if (e.key === '/') {
         this.keywordsInput_.focus();
         e.preventDefault();
         e.stopPropagation();
       }
-    }
+    };
   }
 );
 
@@ -663,27 +659,27 @@ function parseQueryString(text) {
   text = text.trim();
   while (text.length > 0) {
     if (
-      text.indexOf('artist:') == 0 ||
-      text.indexOf('title:') == 0 ||
-      text.indexOf('albumId:') == 0 ||
-      text.indexOf('album:') == 0
+      text.startsWith('artist:') ||
+      text.startsWith('title:') ||
+      text.startsWith('albumId:') ||
+      text.startsWith('album:')
     ) {
       const key = text.substring(0, text.indexOf(':'));
 
       // Skip over key and leading whitespace.
       let index = key.length + 1;
-      for (; index < text.length && text[index] == ' '; index++);
+      for (; index < text.length && text[index] === ' '; index++);
 
       let value = '';
       let inEscape = false;
       let inQuote = false;
       for (; index < text.length; index++) {
         const ch = text[index];
-        if (ch == '\\' && !inEscape) {
+        if (ch === '\\' && !inEscape) {
           inEscape = true;
-        } else if (ch == '"' && !inEscape) {
+        } else if (ch === '"' && !inEscape) {
           inQuote = !inQuote;
-        } else if (ch == ' ' && !inQuote) {
+        } else if (ch === ' ' && !inQuote) {
           break;
         } else {
           value += ch;

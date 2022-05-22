@@ -51,24 +51,30 @@ customElements.define(
 
       this.shadow_ = createShadow(this, template);
       this.suggestionsDiv_ = $('suggestions', this.shadow_);
+      this.target_ = null;
+    }
 
+    connectedCallback() {
       const slotElements = this.shadow_
         .querySelector('slot')
         .assignedElements();
-      if (slotElements.length != 1) {
+      if (slotElements.length !== 1) {
         throw new Error('Editable element must be provided via slot');
       }
       this.target_ = slotElements[0];
-      this.target_.addEventListener('keydown', (e) => this.handleKeyDown_(e));
-      this.target_.addEventListener('focus', () => {
-        // Preserve the caret position but remove the selection. Otherwise,
-        // tabbing to the field selects its contents, which makes it too easy to
-        // accidentally clear it.
-        this.target_.selectionStart = this.target_.selectionEnd;
-      });
+      this.target_.addEventListener('keydown', this.onKeyDown_);
+      this.target_.addEventListener('focus', this.onFocus_);
       this.target_.spellcheck = false;
 
-      document.addEventListener('click', (e) => this.hideSuggestions_(), false);
+      document.addEventListener('click', this.onDocumentClick_);
+    }
+
+    disconnectedCallback() {
+      this.target_.removeEventListener('keydown', this.onKeyDown_);
+      this.target_.removeEventListener('focus', this.onFocus_);
+      this.target_ = null;
+
+      document.removeEventListener('click', this.onDocumentClick_);
     }
 
     set words(words) {
@@ -102,7 +108,18 @@ customElements.define(
       };
     }
 
-    handleKeyDown_(e) {
+    onDocumentClick_ = () => {
+      this.hideSuggestions_();
+    };
+
+    onFocus_ = () => {
+      // Preserve the caret position but remove the selection. Otherwise,
+      // tabbing to the field selects its contents, which makes it too easy to
+      // accidentally clear it.
+      this.target_.selectionStart = this.target_.selectionEnd;
+    };
+
+    onKeyDown_ = (e) => {
       this.hideSuggestions_();
 
       if (e.key !== 'Tab' || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
@@ -146,7 +163,7 @@ customElements.define(
 
       e.preventDefault();
       e.stopPropagation();
-    }
+    };
 
     showSuggestions_(words) {
       const cont = this.suggestionsDiv_;

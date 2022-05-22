@@ -58,8 +58,15 @@ export default class Updater {
     // Start sending queued updates.
     this.initialRetryDone_ = this.doRetry_();
 
-    // Automatically try to send queued updates when we come back online.
-    window.addEventListener('online', (e) => this.scheduleRetry_(true));
+    window.addEventListener('online', this.onOnline_);
+  }
+
+  // Releases resources. Should be called if destroying the object.
+  destroy() {
+    window.clearTimeout(this.retryTimeoutId_);
+    this.retryTimeoutId_ = null;
+
+    window.removeEventListener('online', this.onOnline_);
   }
 
   // Returns a promise that is resolved once the initial retry attempt in the
@@ -151,6 +158,11 @@ export default class Updater {
         this.scheduleRetry_(false /* immediate */);
       });
   }
+
+  onOnline_ = () => {
+    // Automatically try to send queued updates when we come back online.
+    this.scheduleRetry_(true);
+  };
 
   // Persists the current state to local storage.
   writeState_() {

@@ -7,7 +7,7 @@ export const emptyImg =
 
 // Returns the element under |root| with ID |id|.
 export function $(id, root) {
-  return (root || document).getElementById(id);
+  return (root ?? document).getElementById(id);
 }
 
 // Clamps number |val| between |min| and |max|.

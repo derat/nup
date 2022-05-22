@@ -62,6 +62,7 @@ customElements.define(
       this.gainNode_ = this.audioCtx_.createGain();
       this.gainNode_.connect(this.audioCtx_.destination);
       this.gain_ = 1;
+      this.audioSrc_ = null;
 
       this.shadow_ = createShadow(this, template);
       this.audio_ = this.shadow_.querySelector('audio');
@@ -75,20 +76,47 @@ customElements.define(
       this.pauseTimeoutId_ = null; // calls audio_.pause() after dropping gain
       this.pausedForOfflineTime_ = null; // seconds since epoch when auto-paused
       this.numErrors_ = 0; // consecutive playback errors
-
-      window.addEventListener('online', (e) => this.onOnline_(e));
     }
 
-    // Adds event handlers to |audio_| and routes it through |gainNode_|.
-    configureAudio_() {
-      this.audio_.addEventListener('ended', (e) => this.resendAudioEvent_(e));
-      this.audio_.addEventListener('error', (e) => this.onError_(e));
-      this.audio_.addEventListener('pause', (e) => this.onPause_(e));
-      this.audio_.addEventListener('play', (e) => this.onPlay_(e));
-      this.audio_.addEventListener('timeupdate', (e) => this.onTimeUpdate_(e));
+    connectedCallback() {
+      window.addEventListener('online', this.onOnline_);
+    }
 
+    disconnectedCallback() {
+      window.removeEventListener('online', this.onOnline_);
+
+      if (this.pauseTimeoutId_) {
+        window.clearTimeout(this.pauseTimeoutId_);
+        this.pauseTimeoutId_ = null;
+      }
+    }
+
+    // Adds event handlers to |audio_| and recreates |audioSrc_| to route
+    // playback through |gainNode_|.
+    configureAudio_() {
+      this.audio_.addEventListener('ended', this.onEnded_);
+      this.audio_.addEventListener('error', this.onError_);
+      this.audio_.addEventListener('pause', this.onPause_);
+      this.audio_.addEventListener('play', this.onPlay_);
+      this.audio_.addEventListener('timeupdate', this.onTimeUpdate_);
+
+      this.audioSrc_?.disconnect(this.gainNode_);
       this.audioSrc_ = this.audioCtx_.createMediaElementSource(this.audio_);
       this.audioSrc_.connect(this.gainNode_);
+    }
+
+    // Deconfigures |audio_| and replaces it with |audio|.
+    replaceAudio_(audio) {
+      this.audio_.removeAttribute('src');
+      this.audio_.removeEventListener('ended', this.onEnded_);
+      this.audio_.removeEventListener('error', this.onError_);
+      this.audio_.removeEventListener('pause', this.onPause_);
+      this.audio_.removeEventListener('play', this.onPlay_);
+      this.audio_.removeEventListener('timeupdate', this.onTimeUpdate_);
+
+      this.audio_.parentNode.replaceChild(audio, this.audio_);
+      this.audio_ = audio;
+      this.configureAudio_();
     }
 
     onOnline_(e) {
@@ -104,7 +132,11 @@ customElements.define(
       }
     }
 
-    onError_(e) {
+    onEnded_ = (e) => {
+      this.resendAudioEvent_(e);
+    };
+
+    onError_ = (e) => {
       if (e.target !== this.audio_) return;
 
       this.numErrors_++;
@@ -131,19 +163,19 @@ customElements.define(
           }
           break;
       }
-    }
+    };
 
-    onPause_(e) {
+    onPause_ = (e) => {
       this.lastUpdateTime_ = null;
       this.resendAudioEvent_(e);
-    }
+    };
 
-    onPlay_(e) {
+    onPlay_ = (e) => {
       this.lastUpdateTime_ = getCurrentTimeSec();
       this.resendAudioEvent_(e);
-    }
+    };
 
-    onTimeUpdate_(e) {
+    onTimeUpdate_ = (e) => {
       if (e.target !== this.audio_) return;
 
       const pos = this.audio_.currentTime;
@@ -164,7 +196,7 @@ customElements.define(
       this.numErrors_ = 0;
 
       this.resendAudioEvent_(e);
-    }
+    };
 
     // Dispatches a new event based on |e|.
     resendAudioEvent_(e) {
@@ -222,12 +254,8 @@ customElements.define(
         this.audio_.pause();
         this.audio_.removeAttribute('src');
       } else if (this.preloadSrc === src && !this.preloadAudio_.error) {
-        this.audioSrc_.disconnect(this.gainNode_);
-        this.audio_.removeAttribute('src');
-        this.audio_.parentNode.replaceChild(this.preloadAudio_, this.audio_);
-        this.audio_ = this.preloadAudio_;
+        this.replaceAudio_(this.preloadAudio_);
         this.preloadAudio_ = null;
-        this.configureAudio_(); // resets |audioSrc_|
       } else {
         this.audio_.src = src;
       }

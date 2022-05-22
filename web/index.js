@@ -85,8 +85,8 @@ document.test = {
     const srcX = srcRect.x + srcRect.width / 2;
     const srcY = srcRect.y + srcRect.height / 2;
     const destRect = dest.getBoundingClientRect();
-    const destX = destRect.x + destRect.width / 2 + (offsetX || 0);
-    const destY = destRect.y + destRect.height / 2 + (offsetY || 0);
+    const destX = destRect.x + destRect.width / 2 + (offsetX ?? 0);
+    const destY = destRect.y + destRect.height / 2 + (offsetY ?? 0);
 
     src.dispatchEvent(makeEvent('dragstart', srcX, srcY));
     dest.dispatchEvent(makeEvent('dragenter', destX, destY));

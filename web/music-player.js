@@ -233,8 +233,7 @@ customElements.define(
     constructor() {
       super();
 
-      this.updater_ = new Updater();
-
+      this.updater_ = null; // initialized in connectedCallback()
       this.songs_ = []; // songs in the order in which they should be played
       this.tags_ = []; // available tags loaded from server
       this.currentIndex_ = -1; // index into |songs| of current track
@@ -246,7 +245,7 @@ customElements.define(
       this.notification_ = null; // song notification currently shown
       this.closeNotificationTimeoutId_ = null; // for closeNotification_()
       this.playDelayMs_ = this.constructor.PLAY_DELAY_MS_;
-      this.playTimeoutId_ = 0; // for playInternal_()
+      this.playTimeoutId_ = null; // for playInternal_()
       this.shuffled_ = false; // playlist contains shuffled songs
 
       this.shadow_ = createShadow(this, template);
@@ -408,6 +407,13 @@ customElements.define(
         });
       });
 
+      this.updateTagsFromServer_();
+      this.updateSongDisplay_();
+    }
+
+    connectedCallback() {
+      this.updater_ = new Updater();
+
       if ('mediaSession' in navigator) {
         const ms = navigator.mediaSession;
         ms.setActionHandler('play', () => this.play_(false /* delay */));
@@ -426,23 +432,40 @@ customElements.define(
         );
       }
 
-      document.body.addEventListener('keydown', (e) => {
-        if (this.processAccelerator_(e)) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-      });
-      window.addEventListener('beforeunload', () => {
-        this.closeNotification_();
-        return null;
-      });
+      document.body.addEventListener('keydown', this.onKeyDown_);
+      window.addEventListener('beforeunload', this.onBeforeUnload_);
+    }
 
-      this.updateTagsFromServer_();
-      this.updateSongDisplay_();
+    disconnectedCallback() {
+      this.updater_.destroy();
+      this.updater_ = null;
+
+      if (this.closeNotificationTimeoutId_) {
+        window.clearTimeout(this.closeNotificationTimeoutId_);
+        this.closeNotificationTimeoutId_ = null;
+      }
+      if (this.playTimeoutId_) {
+        window.clearTimeout(this.playTimeoutId_);
+        this.playTimeoutId_ = null;
+      }
+
+      if ('mediaSession' in navigator) {
+        const ms = navigator.mediaSession;
+        ms.setActionHandler('play', null);
+        ms.setActionHandler('pause', null);
+        ms.setActionHandler('seekbackward', null);
+        ms.setActionHandler('seekforward', null);
+        ms.setActionHandler('previoustrack', null);
+        ms.setActionHandler('nexttrack', null);
+      }
+
+      document.body.removeEventListener('keydown', this.onKeyDown_);
+      window.removeEventListener('beforeunload', this.onBeforeUnload_);
     }
 
     set config(config) {
       this.config_ = config;
+      // TODO: Remove callback in disconnectedCallback().
       this.config_.addCallback((name, value) => {
         if (name === Config.GAIN_TYPE || name === Config.PRE_AMP) {
           this.updateGain_();
@@ -454,6 +477,18 @@ customElements.define(
     get updateDivShown() {
       return !!this.updateSong_;
     }
+
+    onKeyDown_ = (e) => {
+      if (this.processAccelerator_(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    onBeforeUnload_ = () => {
+      this.closeNotification_();
+      return null;
+    };
 
     // Requests known tags from the server and updates the internal list.
     // Returns a promise for completion of the task.
@@ -471,10 +506,10 @@ customElements.define(
     }
 
     get currentSong_() {
-      return this.songs_[this.currentIndex_] || null;
+      return this.songs_[this.currentIndex_] ?? null;
     }
     get nextSong_() {
-      return this.songs_[this.currentIndex_ + 1] || null;
+      return this.songs_[this.currentIndex_ + 1] ?? null;
     }
 
     resetForTesting() {
@@ -638,7 +673,7 @@ customElements.define(
       // Note that this will probably only work for non-admin users due to an
       // App Engine "feature": https://github.com/derat/nup/issues/1
       const precacheCover = (s) => {
-        if (!s || !s.coverFilename) return;
+        if (!s?.coverFilename) return;
         new Image().src = getScaledCoverUrl(s.coverFilename, smallCoverSize);
       };
       precacheCover(this.songs_[this.currentIndex_ + 1]);
@@ -702,7 +737,7 @@ customElements.define(
     updatePresentationLayerSongs_() {
       this.presentationLayer_.updateSongs(
         this.currentSong_,
-        this.songs_[this.currentIndex_ + 1] || null
+        this.songs_[this.currentIndex_ + 1] ?? null
       );
     }
 
@@ -739,7 +774,7 @@ customElements.define(
     }
 
     closeNotification_() {
-      if (this.notification_) this.notification_.close();
+      this.notification_?.close();
       this.notification_ = null;
     }
 
@@ -776,7 +811,7 @@ customElements.define(
       // Get an absolute URL since that's what we'll get from the <audio>
       // element: https://stackoverflow.com/a/44547904
       const url = getSongUrl(song.filename);
-      if (this.audio_.src != url || this.reachedEndOfSongs_) {
+      if (this.audio_.src !== url || this.reachedEndOfSongs_) {
         console.log(`Starting ${song.songId} (${url})`);
         this.audio_.src = url;
         this.audio_.currentTime = 0;
@@ -796,7 +831,7 @@ customElements.define(
         // errors.
         // https://developers.google.com/web/updates/2017/06/play-request-was-interrupted
         if (
-          e.name == 'AbortError' &&
+          e.name === 'AbortError' &&
           (e.message.match(/interrupted by a new load request/) ||
             e.message.match(/interrupted by a call to pause/))
         ) {
@@ -903,7 +938,7 @@ customElements.define(
 
       if (!song || !saveChanges) return;
 
-      const ratingChanged = this.updatedRating_ != song.rating;
+      const ratingChanged = this.updatedRating_ !== song.rating;
 
       const newRawTags = this.tagsTextarea_.value.trim().split(/\s+/);
       let newTags = [];
@@ -911,12 +946,12 @@ customElements.define(
       for (let i = 0; i < newRawTags.length; ++i) {
         let tag = newRawTags[i].toLowerCase();
         if (tag === '') continue;
-        if (this.tags_.indexOf(tag) != -1 || song.tags.indexOf(tag) != -1) {
+        if (this.tags_.includes(tag) || song.tags.includes(tag)) {
           newTags.push(tag);
-        } else if (tag[0] == '+' && tag.length > 1) {
+        } else if (tag[0] === '+' && tag.length > 1) {
           tag = tag.substring(1);
           newTags.push(tag);
-          if (this.tags_.indexOf(tag) == -1) createdTags.push(tag);
+          if (!this.tags_.includes(tag)) createdTags.push(tag);
         } else {
           console.log(`Skipping unknown tag "${tag}"`);
         }
@@ -924,8 +959,8 @@ customElements.define(
       // Remove duplicates.
       newTags = newTags
         .sort()
-        .filter((item, pos, self) => self.indexOf(item) == pos);
-      const tagsChanged = newTags.join(' ') != song.tags.sort().join(' ');
+        .filter((item, pos, self) => self.indexOf(item) === pos);
+      const tagsChanged = newTags.join(' ') !== song.tags.sort().join(' ');
 
       if (createdTags.length > 0) {
         this.updateTags_(this.tags_.concat(createdTags));
@@ -971,7 +1006,7 @@ customElements.define(
 
     // Shows or hides the presentation layer.
     setPresentationLayerVisible_(visible) {
-      if (this.presentationLayer_.visible == visible) return;
+      if (this.presentationLayer_.visible === visible) return;
       this.presentationLayer_.visible = visible;
       this.dispatchEvent(new CustomEvent('present', { detail: { visible } }));
     }
@@ -990,9 +1025,9 @@ customElements.define(
         }
 
         if (gainType === Config.GAIN_ALBUM) {
-          adj += song.albumGain || 0;
+          adj += song.albumGain ?? 0;
         } else if (gainType === Config.GAIN_TRACK) {
-          adj += song.trackGain || 0;
+          adj += song.trackGain ?? 0;
         }
       }
 
@@ -1010,54 +1045,54 @@ customElements.define(
     processAccelerator_(e) {
       if (isDialogShown() || isMenuShown()) return false;
 
-      if (e.altKey && e.key == 'd') {
+      if (e.altKey && e.key === 'd') {
         const song = this.currentSong_;
         if (song) window.open(getDumpSongUrl(song.songId), '_blank');
         this.setPresentationLayerVisible_(false);
         return true;
-      } else if (e.altKey && e.key == 'i') {
+      } else if (e.altKey && e.key === 'i') {
         const song = this.currentSong_;
         if (song) showSongInfo(song);
         this.setPresentationLayerVisible_(false);
         return true;
-      } else if (e.altKey && e.key == 'n') {
+      } else if (e.altKey && e.key === 'n') {
         this.cycleTrack_(1, true /* delay */);
         return true;
-      } else if (e.altKey && e.key == 'o') {
+      } else if (e.altKey && e.key === 'o') {
         showOptionsDialog(this.config_);
         this.setPresentationLayerVisible_(false);
         return true;
-      } else if (e.altKey && e.key == 'p') {
+      } else if (e.altKey && e.key === 'p') {
         this.cycleTrack_(-1, true /* delay */);
         return true;
-      } else if (e.altKey && e.key == 'r') {
+      } else if (e.altKey && e.key === 'r') {
         if (this.showUpdateDiv_()) this.ratingSpan_.focus();
         this.setPresentationLayerVisible_(false);
         return true;
-      } else if (e.altKey && e.key == 't') {
+      } else if (e.altKey && e.key === 't') {
         if (this.showUpdateDiv_()) this.tagsTextarea_.focus();
         this.setPresentationLayerVisible_(false);
         return true;
-      } else if (e.altKey && e.key == 'v') {
+      } else if (e.altKey && e.key === 'v') {
         this.setPresentationLayerVisible_(!this.presentationLayer_.visible);
         if (this.updateSong_) this.hideUpdateDiv_(false);
         return true;
-      } else if (e.key == ' ' && !this.updateSong_) {
+      } else if (e.key === ' ' && !this.updateSong_) {
         this.togglePause_();
         return true;
-      } else if (e.key == 'Enter' && this.updateSong_) {
+      } else if (e.key === 'Enter' && this.updateSong_) {
         this.hideUpdateDiv_(true);
         return true;
-      } else if (e.key == 'Escape' && this.presentationLayer_.visible) {
+      } else if (e.key === 'Escape' && this.presentationLayer_.visible) {
         this.setPresentationLayerVisible_(false);
         return true;
-      } else if (e.key == 'Escape' && this.updateSong_) {
+      } else if (e.key === 'Escape' && this.updateSong_) {
         this.hideUpdateDiv_(false);
         return true;
-      } else if (e.key == 'ArrowLeft' && !this.updateSong_) {
+      } else if (e.key === 'ArrowLeft' && !this.updateSong_) {
         this.seek_(-this.constructor.SEEK_SEC_);
         return true;
-      } else if (e.key == 'ArrowRight' && !this.updateSong_) {
+      } else if (e.key === 'ArrowRight' && !this.updateSong_) {
         this.seek_(this.constructor.SEEK_SEC_);
         return true;
       }
@@ -1066,12 +1101,12 @@ customElements.define(
     }
 
     handleRatingSpanKeyDown_(e) {
-      if (['0', '1', '2', '3', '4', '5'].indexOf(e.key) != -1) {
+      if (['0', '1', '2', '3', '4', '5'].includes(e.key)) {
         this.setRating_(parseInt(e.key));
         e.preventDefault();
         e.stopPropagation();
-      } else if (e.key == 'ArrowLeft' || e.key == 'ArrowRight') {
-        const rating = this.updatedRating_ + (e.key == 'ArrowLeft' ? -1 : 1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        const rating = this.updatedRating_ + (e.key === 'ArrowLeft' ? -1 : 1);
         this.setRating_(clamp(rating, 0, 5));
         e.preventDefault();
         e.stopPropagation();

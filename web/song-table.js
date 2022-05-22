@@ -205,64 +205,33 @@ customElements.define(
         this.onCheckboxClick_(this.headingCheckbox_, e.shiftKey);
       });
 
-      // Listen for drag-and-drop events on document.body instead of |table_| so
-      // we can still reorder songs if the user releases the button outside of
-      // the table. Only the song table that initiated the drag will process the
-      // events.
-      document.body.addEventListener('dragenter', (e) => {
-        if (!this.inDrag_) return;
-        e.preventDefault(); // needed to allow dropping
-        e.stopPropagation();
-        e.dataTransfer.dropEffect = 'move';
-      });
-      document.body.addEventListener('dragover', (e) => {
-        if (!this.inDrag_) return;
-        e.preventDefault(); // needed to allow dropping
-        e.stopPropagation();
-        const idx = this.getDragEventIndex_(e);
-        if (idx != this.dragToIndex_) {
-          this.dragToIndex_ = idx;
-          this.moveDragTarget_();
-        }
-      });
-      // Listen for 'dragend' since 'drop' doesn't fire when the drag was
-      // canceled. Chrome 98 also seems to always misreport the drop effect as
-      // 'none' in the 'drop' event, making it impossible to tell if the drag
-      // was canceled: https://stackoverflow.com/a/43892407
-      // Firefox 95 sets the drop effect properly.
-      document.body.addEventListener('dragend', (e) => {
-        if (!this.inDrag_) return;
-        e.preventDefault();
-        e.stopPropagation();
-
-        const from = this.dragFromIndex_;
-        const to = this.dragToIndex_;
-        this.songRows_[from].classList.remove('dragged');
-        this.hideDragTarget_();
-        this.dragFromIndex_ = this.dragToIndex_ = -1;
-        this.dragListRect_ = null;
-
-        // The browser sets the drop effect to 'none' if the drag was aborted
-        // e.g. with the Escape key or by dropping outside the window.
-        if (e.dataTransfer.dropEffect === 'none' || to === from) return;
-
-        const row = this.songRows_[from];
-        const tbody = row.parentNode;
-        if (to < from) {
-          tbody.insertBefore(row, this.songRows_[to]);
-        } else if (to < this.numSongs - 1) {
-          tbody.insertBefore(row, this.songRows_[to + 1]);
-        } else {
-          tbody.appendChild(row);
-        }
-        this.emitEvent_('reorder', { fromIndex: from, toIndex: to });
-      });
-
       // Show/hide the header shadow when scrolling.
       this.addEventListener('scroll', (e) => {
         if (this.scrollTop) this.table_.classList.add('scrolled');
         else this.table_.classList.remove('scrolled');
       });
+    }
+
+    connectedCallback() {
+      // Listen for drag-and-drop events on document.body instead of |table_| so
+      // we can still reorder songs if the user releases the button outside of
+      // the table. Only the song table that initiated the drag will process the
+      // events.
+      document.body.addEventListener('dragenter', this.onDragEnter_);
+      document.body.addEventListener('dragover', this.onDragOver_);
+
+      // Listen for 'dragend' since 'drop' doesn't fire when the drag was
+      // canceled. Chrome 98 also seems to always misreport the drop effect as
+      // 'none' in the 'drop' event, making it impossible to tell if the drag
+      // was canceled: https://stackoverflow.com/a/43892407
+      // Firefox 95 sets the drop effect properly.
+      document.body.addEventListener('dragend', this.onDragEnd_);
+    }
+
+    disconnectedCallback() {
+      document.body.removeEventListener('dragenter', this.onDragEnter_);
+      document.body.removeEventListener('dragover', this.onDragOver_);
+      document.body.removeEventListener('dragend', this.onDragEnd_);
     }
 
     get inDrag_() {
@@ -490,14 +459,14 @@ customElements.define(
 
       let index = -1;
       for (let i = 0; i < this.table_.rows.length; i++) {
-        if (checkbox == getCheckbox(i)) {
+        if (checkbox === getCheckbox(i)) {
           index = i;
           break;
         }
       }
       const checked = checkbox.checked;
 
-      if (index == 0) {
+      if (index === 0) {
         for (let i = 1; i < this.table_.rows.length; i++) {
           getCheckbox(i).checked = checked ? 'checked' : null;
         }
@@ -509,7 +478,7 @@ customElements.define(
           if (
             this.lastClickedCheckboxIndex_ > 0 &&
             this.lastClickedCheckboxIndex_ < this.table_.rows.length &&
-            this.lastClickedCheckboxIndex_ != index
+            this.lastClickedCheckboxIndex_ !== index
           ) {
             const start = Math.min(index, this.lastClickedCheckboxIndex_);
             const end = Math.max(index, this.lastClickedCheckboxIndex_);
@@ -537,12 +506,58 @@ customElements.define(
     // checked songs.
     updateHeadingCheckbox_() {
       this.headingCheckbox_.checked = this.numCheckedSongs_ ? 'checked' : null;
-      if (this.numCheckedSongs_ && this.numCheckedSongs_ != this.numSongs) {
+      if (this.numCheckedSongs_ && this.numCheckedSongs_ !== this.numSongs) {
         this.headingCheckbox_.classList.add('transparent');
       } else {
         this.headingCheckbox_.classList.remove('transparent');
       }
     }
+
+    onDragEnter_ = (e) => {
+      if (!this.inDrag_) return;
+      e.preventDefault(); // needed to allow dropping
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+    };
+
+    onDragOver_ = (e) => {
+      if (!this.inDrag_) return;
+      e.preventDefault(); // needed to allow dropping
+      e.stopPropagation();
+      const idx = this.getDragEventIndex_(e);
+      if (idx !== this.dragToIndex_) {
+        this.dragToIndex_ = idx;
+        this.moveDragTarget_();
+      }
+    };
+
+    onDragEnd_ = (e) => {
+      if (!this.inDrag_) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const from = this.dragFromIndex_;
+      const to = this.dragToIndex_;
+      this.songRows_[from].classList.remove('dragged');
+      this.hideDragTarget_();
+      this.dragFromIndex_ = this.dragToIndex_ = -1;
+      this.dragListRect_ = null;
+
+      // The browser sets the drop effect to 'none' if the drag was aborted
+      // e.g. with the Escape key or by dropping outside the window.
+      if (e.dataTransfer.dropEffect === 'none' || to === from) return;
+
+      const row = this.songRows_[from];
+      const tbody = row.parentNode;
+      if (to < from) {
+        tbody.insertBefore(row, this.songRows_[to]);
+      } else if (to < this.numSongs - 1) {
+        tbody.insertBefore(row, this.songRows_[to + 1]);
+      } else {
+        tbody.appendChild(row);
+      }
+      this.emitEvent_('reorder', { fromIndex: from, toIndex: to });
+    };
 
     getDragEventIndex_(e) {
       const ey = e.clientY;

@@ -82,7 +82,7 @@ export function createMenu(x, y, items, alignRight) {
     } else {
       const el = createElement('div', 'item', shadow, item.text);
       if (item.id) el.id = item.id;
-      if (hotkeys) createElement('span', 'hotkey', el, item.hotkey || '');
+      if (hotkeys) createElement('span', 'hotkey', el, item.hotkey ?? '');
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         menu.close();
