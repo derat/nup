@@ -110,8 +110,11 @@ type Config struct {
 	// Presets describes search presets for the web interface.
 	Presets []SearchPreset `json:"presets"`
 
-	// Minify describes whether the server should minify the web interface.
+	// Bundle describes whether the server should bundle JavaScript files into a single file.
 	// Defaults to true if unset.
+	Bundle *bool `json:"bundle"`
+	// Minify describes whether the server should minify JavaScript, HTML, and CSS files.
+	// Defaults to true if unset. JavaScript will not be minified unless bundling is also enabled.
 	Minify *bool `json:"minify"`
 }
 

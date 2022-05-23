@@ -6,6 +6,15 @@ import { isDialogShown } from './dialog.js';
 import { isMenuShown } from './menu.js';
 import Config from './config.js';
 
+// Import web components so they'll be included in the bundle.
+// If we weren't bundling, it'd be faster to load these from index.html.
+import './audio-wrapper.js';
+import './music-player.js';
+import './music-searcher.js';
+import './presentation-layer.js';
+import './song-table.js';
+import './tag-suggester.js';
+
 const config = new Config();
 const player = document.querySelector('music-player');
 const searcher = document.querySelector('music-searcher');

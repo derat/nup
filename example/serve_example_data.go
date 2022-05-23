@@ -32,9 +32,10 @@ func main() {
 }
 
 func run() (int, error) {
+	bundle := flag.Bool("bundle", false, "Bundle JavaScript into a single file")
 	email := flag.String("email", "test@example.com", "Email address for login")
 	logToStderr := flag.Bool("log-to-stderr", true, "Write noisy dev_appserver output to stderr")
-	minify := flag.Bool("minify", false, "Serve minified version of web app")
+	minify := flag.Bool("minify", false, "Minify HTML, JavaScript, and CSS")
 	port := flag.Int("port", 8080, "HTTP port for app")
 	flag.Parse()
 
@@ -76,6 +77,7 @@ func run() (int, error) {
 		SongBaseURL:    fileSrv.URL + "/music/",
 		CoverBaseURL:   fileSrv.URL + "/covers/",
 		Presets:        presets,
+		Bundle:         bundle,
 		Minify:         minify,
 	}
 	appSrv, err := test.NewDevAppserver(cfg, filepath.Join(tmpDir, "app_storage"), appOut,

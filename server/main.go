@@ -18,7 +18,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/derat/nup/server/cache"
@@ -48,10 +47,6 @@ const (
 // test/dev_server.go passes --max_module_instances=1 to ensure that there's a single instance.
 var forceUpdateFailures = false
 
-// staticFiles maps from request path (e.g. "/common.css") to *staticFile structs
-// corresponding to previously-loaded and -processed static files.
-var staticFiles sync.Map
-
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
@@ -80,6 +75,10 @@ func main() {
 		addHandler("/config", http.MethodPost, rejectUnauth, handleConfig)
 		addHandler("/flush_cache", http.MethodPost, rejectUnauth, handleFlushCache)
 	}
+
+	// TODO: It'd be nice to call getStaticFile(bundleFile, ...) here so that we're
+	// immediately ready to serve the bundle, but we don't have a context to use to
+	// get the config so we can figure out whether minification was requested.
 
 	// The google.golang.org/appengine packages are (were?) deprecated, and the official way forward
 	// is (was?) to use the non-App-Engine-specific cloud.google.com/go packages and call
@@ -628,26 +627,21 @@ func handleStatic(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 	p := filepath.Clean(req.URL.Path)
 	if p == "/" {
 		p = "index.html"
+	} else if strings.HasPrefix(p, "/") {
+		p = p[1:]
 	}
 
-	var sf *staticFile
-	if fi, ok := staticFiles.Load(p); ok {
-		sf = fi.(*staticFile)
+	bundle := cfg.Bundle == nil || *cfg.Bundle
+	minify := cfg.Minify == nil || *cfg.Minify
+
+	if sf, err := getStaticFile(p, bundle, minify); os.IsNotExist(err) {
+		http.Error(w, "Not found", http.StatusNotFound)
+	} else if err != nil {
+		log.Errorf(ctx, "Reading %q failed: %v", p, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	} else {
-		minify := cfg.Minify == nil || *cfg.Minify
-		var err error
-		if sf, err = readStaticFile(p, minify); os.IsNotExist(err) {
-			http.Error(w, "Not found", http.StatusNotFound)
-			return
-		} else if err != nil {
-			log.Errorf(ctx, "Reading %v failed: %v", p, err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		staticFiles.Store(p, sf)
+		http.ServeContent(w, req, filepath.Base(p), sf.mtime, bytes.NewReader(sf.data))
 	}
-
-	http.ServeContent(w, req, filepath.Base(p), sf.mtime, bytes.NewReader(sf.data))
 }
 
 func handleTags(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {

@@ -7,29 +7,7 @@
     <link id="favicon" rel="shortcut icon" href="favicon.ico" sizes="48x48" />
     <link rel="manifest" href="manifest.json" />
     <link rel="stylesheet" href="common.css" type="text/css" />
-
-    <!-- These scripts define custom elements. -->
-    <script src="audio-wrapper.js" type="module"></script>
-    <script src="music-player.js" type="module"></script>
-    <script src="music-searcher.js" type="module"></script>
-    <script src="presentation-layer.js" type="module"></script>
-    <script src="song-table.js" type="module"></script>
-    <script src="tag-suggester.js" type="module"></script>
-
-    <script src="index.js" type="module"></script>
-
-    <!-- These scripts are imported by other scripts but listed here so
-         they'll be fetched earlier. -->
-    <script src="common.js" type="module"></script>
-    <script src="config.js" type="module"></script>
-    <script src="dialog.js" type="module"></script>
-    <script src="menu.js" type="module"></script>
-    <script src="options-dialog.js" type="module"></script>
-    <script src="presentation-layer.js" type="module"></script>
-    <script src="song-info.js" type="module"></script>
-    <script src="stats.js" type="module"></script>
-    <script src="tag-suggester.js" type="module"></script>
-    <script src="updater.js" type="module"></script>
+    <script src="{{ENTRY_POINT}}" type="module"></script>
 
     <link rel="preload" href="fonts/fontello.woff2" as="font" type="font/woff2" crossorigin />
     <link

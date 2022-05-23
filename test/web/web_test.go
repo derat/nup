@@ -57,9 +57,11 @@ func TestMain(m *testing.M) {
 
 func runTests(m *testing.M) (res int, err error) {
 	browserStderr := flag.Bool("browser-stderr", false, "Write browser log to stderr (default is -out-dir)")
+	bundle := flag.Bool("bundle", true, "Bundle JavaScript into a single file")
 	chromedriverPath := flag.String("chromedriver", "chromedriver", "Chromedriver executable ($PATH searched by default)")
 	debugSelenium := flag.Bool("debug-selenium", false, "Write Selenium debug logs to stderr")
 	headless := flag.Bool("headless", true, "Run Chrome headlessly using Xvfb")
+	minify := flag.Bool("minify", true, "Minify HTML, JavaScript, and CSS")
 	flag.StringVar(&unitTestRegexp, "unit-test-regexp", "", "Regexp matching unit tests to run (all other tests skipped)")
 	flag.Parse()
 
@@ -111,6 +113,8 @@ func runTests(m *testing.M) (res int, err error) {
 			SongBaseURL:    musicSrv.URL + "/",
 			CoverBaseURL:   musicSrv.URL + "/.covers/", // bogus but required
 			Presets:        presets,
+			Bundle:         bundle,
+			Minify:         minify,
 		}
 		storageDir := filepath.Join(outDir, "app_storage")
 		appSrv, err := test.NewDevAppserver(cfg, storageDir, appLog)
