@@ -60,6 +60,7 @@ func TestAddHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed marshaling config: ", err)
 	}
+
 	// The aetest package makes no sense. It looks like I need to call NewRequest
 	// just to get a context.
 	req, err := inst.NewRequest("GET", "/", nil)
@@ -86,6 +87,7 @@ func TestAddHandler(t *testing.T) {
 	addHandler("/get", http.MethodGet, rejectUnauth, handleReq)
 	addHandler("/post", http.MethodPost, rejectUnauth, handleReq)
 	addHandler("/cron", http.MethodGet, rejectUnauthCron, handleReq)
+	addHandler("/allow", http.MethodGet, allowUnauth, handleReq)
 
 	for _, tc := range []struct {
 		method, path string
@@ -125,6 +127,11 @@ func TestAddHandler(t *testing.T) {
 		{"GET", "/cron", "", "", "", false, 401},       // no auth
 		{"GET", "/cron", badEmail, "", "", false, 401}, // bad google user
 		{"POST", "/cron", "", "", "", true, 405},       // wrong method
+
+		{"GET", "/allow", "", "", "", false, 200},       // no auth
+		{"GET", "/allow", email1, "", "", false, 200},   // valid user
+		{"GET", "/allow", "", user1, pass1, false, 200}, // valid auth
+		{"POST", "/allow", "", "", "", false, 405},      // wrong method
 	} {
 		desc := tc.method + " " + tc.path
 		req, err := inst.NewRequest(tc.method, tc.path, nil)

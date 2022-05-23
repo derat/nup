@@ -94,21 +94,25 @@ type Config struct {
 	BasicAuthUsers []BasicAuthInfo `json:"basicAuthUsers"`
 
 	// SongBucket contains the name of the Google Cloud Storage bucket holding song files.
-	SongBucket string `json:"songBucket"`
+	SongBucket string `json:"songBucket,omitempty"`
 	// CoverBucket contains the name of the Google Cloud Storage bucket holding album cover images.
-	CoverBucket string `json:"coverBucket"`
+	CoverBucket string `json:"coverBucket,omitempty"`
 
 	// SongBaseURL contains the slash-terminated URL under which song files are stored.
 	// This is used for testing.
 	// Exactly one of SongBucket and SongBaseURL must be set.
-	SongBaseURL string `json:"songBaseUrl"`
+	SongBaseURL string `json:"songBaseUrl,omitempty"`
 	// CoverBaseURL contains the slash-terminated URL under which album cover images are stored.
 	// This is used for testing.
 	// Exactly one of CoverBucket and CoverBaseURL must be set.
-	CoverBaseURL string `json:"coverBaseUrl"`
+	CoverBaseURL string `json:"coverBaseUrl,omitempty"`
 
 	// Presets describes search presets for the web interface.
 	Presets []SearchPreset `json:"presets"`
+
+	// Minify describes whether the server should minify the web interface.
+	// Defaults to true if unset.
+	Minify *bool `json:"minify"`
 }
 
 // Parse unmarshals jsonData, validates it, and returns the resulting config.

@@ -14,9 +14,11 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/derat/nup/server/cache"
@@ -33,8 +35,6 @@ import (
 )
 
 const (
-	indexPath = "web/index.html" // path to index relative to base dir
-
 	defaultDumpBatchSize = 100  // default size of batch of dumped entities
 	maxDumpBatchSize     = 5000 // max size of batch of dumped entities
 
@@ -48,12 +48,18 @@ const (
 // test/dev_server.go passes --max_module_instances=1 to ensure that there's a single instance.
 var forceUpdateFailures = false
 
+// staticFiles maps from request path (e.g. "/common.css") to *staticFile structs
+// corresponding to previously-loaded and -processed static files.
+var staticFiles sync.Map
+
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	// Use a wrapper instead of calling http.HandleFunc directly to reduce the risk
 	// that a handler neglects checking that requests are authorized.
-	addHandler("/", http.MethodGet, redirectUnauth, handleIndex)
+	addHandler("/", http.MethodGet, redirectUnauth, handleStatic)
+	addHandler("/manifest.json", http.MethodGet, allowUnauth, handleStatic)
+
 	addHandler("/cover", http.MethodGet, rejectUnauth, handleCover)
 	addHandler("/delete_song", http.MethodPost, rejectUnauth, handleDeleteSong)
 	addHandler("/dump_song", http.MethodGet, rejectUnauth, handleDumpSong)
@@ -358,26 +364,6 @@ func handleImport(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 	writeTextResponse(w, "ok")
 }
 
-func handleIndex(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-
-	f, err := os.Open(indexPath)
-	if err != nil {
-		log.Errorf(ctx, "Opening %v failed: %v", indexPath, err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer f.Close()
-
-	w.Header().Set("Content-Type", "text/html")
-	if _, err = io.Copy(w, f); err != nil {
-		log.Errorf(ctx, "Copying %v to response failed: %v", indexPath, err)
-	}
-}
-
 func handleNow(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
 	writeTextResponse(w, strconv.FormatInt(time.Now().UnixNano(), 10))
 }
@@ -636,6 +622,32 @@ func handleSong(ctx context.Context, cfg *config.Config, w http.ResponseWriter, 
 			log.Errorf(ctx, "Sending song %q failed: %v", fn, err)
 		}
 	}
+}
+
+func handleStatic(ctx context.Context, cfg *config.Config, w http.ResponseWriter, req *http.Request) {
+	p := filepath.Clean(req.URL.Path)
+	if p == "/" {
+		p = "index.html"
+	}
+
+	var sf *staticFile
+	if fi, ok := staticFiles.Load(p); ok {
+		sf = fi.(*staticFile)
+	} else {
+		minify := cfg.Minify == nil || *cfg.Minify
+		var err error
+		if sf, err = readStaticFile(p, minify); os.IsNotExist(err) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Errorf(ctx, "Reading %v failed: %v", p, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		staticFiles.Store(p, sf)
+	}
+
+	http.ServeContent(w, req, filepath.Base(p), sf.mtime, bytes.NewReader(sf.data))
 }
 
 func handleTags(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {

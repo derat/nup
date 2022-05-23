@@ -182,7 +182,11 @@ const template = createTemplate(`
 
   <div class="row">
     <label for="order-by-last-played-checkbox" class="checkbox-col">
-      <input id="order-by-last-played-checkbox" type="checkbox" value="orderByLastPlayed" />
+      <input
+        id="order-by-last-played-checkbox"
+        type="checkbox"
+        value="orderByLastPlayed"
+      />
       Order by last played
     </label>
   </div>

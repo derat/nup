@@ -58,6 +58,7 @@ const (
 	rejectUnauth     handlerAuth = iota // 401 if unauthorized
 	rejectUnauthCron                    // 401 if unauthorized and not from cron
 	redirectUnauth                      // 302 to login page if unauthorized
+	allowUnauth
 )
 
 // handlerFunc handles HTTP requests to a single endpoint.
@@ -76,27 +77,29 @@ func addHandler(path, method string, auth handlerAuth, fn handlerFunc) {
 			return
 		}
 
-		allowCron := auth == rejectUnauthCron
-		if ok, username := cfg.Auth(r, allowCron); !ok {
-			switch auth {
-			case rejectUnauth, rejectUnauthCron:
-				log.Debugf(ctx, "Unauthorized request for %v from %v (user %q)",
-					r.URL.String(), r.RemoteAddr, username)
-				http.Error(w, "Request requires authorization", http.StatusUnauthorized)
-			case redirectUnauth:
-				if u, err := getLoginURL(ctx); err != nil {
-					log.Errorf(ctx, "Failed generating login URL: %v", err)
-					http.Error(w, "Failed redirecting to login", http.StatusInternalServerError)
-				} else {
-					log.Debugf(ctx, "Unauthorized request for %v from %v (user %q); redirecting to %v",
-						r.URL.String(), r.RemoteAddr, username, u)
-					http.Redirect(w, r, u, http.StatusFound)
+		if auth != allowUnauth {
+			allowCron := auth == rejectUnauthCron
+			if ok, username := cfg.Auth(r, allowCron); !ok {
+				switch auth {
+				case rejectUnauth, rejectUnauthCron:
+					log.Debugf(ctx, "Unauthorized request for %v from %v (user %q)",
+						r.URL.String(), r.RemoteAddr, username)
+					http.Error(w, "Request requires authorization", http.StatusUnauthorized)
+				case redirectUnauth:
+					if u, err := getLoginURL(ctx); err != nil {
+						log.Errorf(ctx, "Failed generating login URL: %v", err)
+						http.Error(w, "Failed redirecting to login", http.StatusInternalServerError)
+					} else {
+						log.Debugf(ctx, "Unauthorized request for %v from %v (user %q); redirecting to %v",
+							r.URL.String(), r.RemoteAddr, username, u)
+						http.Redirect(w, r, u, http.StatusFound)
+					}
+				default:
+					log.Errorf(ctx, "Unhandled auth type %v", auth)
+					http.Error(w, "Unhandled auth type", http.StatusInternalServerError)
 				}
-			default:
-				log.Errorf(ctx, "Unhandled auth type %v", auth)
-				http.Error(w, "Unhandled auth type", http.StatusInternalServerError)
+				return
 			}
-			return
 		}
 
 		if r.Method != method {

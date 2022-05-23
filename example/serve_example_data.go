@@ -34,6 +34,7 @@ func main() {
 func run() (int, error) {
 	email := flag.String("email", "test@example.com", "Email address for login")
 	logToStderr := flag.Bool("log-to-stderr", true, "Write noisy dev_appserver output to stderr")
+	minify := flag.Bool("minify", false, "Serve minified version of web app")
 	port := flag.Int("port", 8080, "HTTP port for app")
 	flag.Parse()
 
@@ -75,6 +76,7 @@ func run() (int, error) {
 		SongBaseURL:    fileSrv.URL + "/music/",
 		CoverBaseURL:   fileSrv.URL + "/covers/",
 		Presets:        presets,
+		Minify:         minify,
 	}
 	appSrv, err := test.NewDevAppserver(cfg, filepath.Join(tmpDir, "app_storage"), appOut,
 		test.DevAppserverPort(*port), test.DevAppserverWatchForChanges(true))

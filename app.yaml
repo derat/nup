@@ -6,12 +6,10 @@ main: server
 # Support using App Engine bundled services (e.g. memcache).
 app_engine_apis: true
 
-# Make the app handle index.html so we can check auth.
+# The app handles everything except binary files so it can do e.g. auth and
+# minification.
 handlers:
-  - url: /index\.html
-    script: auto
-    secure: always
-  - url: /(.*\.(css|eot|html|gif|ico|jpe?g|js|json|png|svg|ttf|txt|woff|woff2))
+  - url: /(.*\.(gif|ico|jpe?g|png|ttf|woff|woff2))
     static_files: web/\1
     secure: always
     upload: web/.*
