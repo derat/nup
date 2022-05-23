@@ -85,7 +85,7 @@ const template = createTemplate(`
     font-size: 12px;
   }
   #max-plays-input {
-    margin: 0 6px;
+    margin: 0 4px;
     padding-right: 2px;
     width: 2em;
   }
@@ -167,7 +167,7 @@ const template = createTemplate(`
     </label>
     <label for="min-rating-select">
       Min rating
-      <div class="select-wrapper">
+      <span class="select-wrapper">
         <select id="min-rating-select">
           <option value=""></option>
           <option value="1">★</option>
@@ -175,8 +175,8 @@ const template = createTemplate(`
           <option value="3">★★★</option>
           <option value="4">★★★★</option>
           <option value="5">★★★★★</option>
-        </select>
-      </div>
+        </select></span
+      >
     </label>
   </div>
 
@@ -200,7 +200,7 @@ const template = createTemplate(`
   <div class="row">
     <label for="first-played-select">
       <span class="label-col">First played</span>
-      <div class="select-wrapper">
+      <span class="select-wrapper">
         <select id="first-played-select">
           <option value="0"></option>
           <option value="86400">one day</option>
@@ -211,16 +211,15 @@ const template = createTemplate(`
           <option value="31536000">one year</option>
           <option value="94608000">three years</option>
           <option value="157680000">five years</option>
-        </select>
-      </div>
-      or less ago
+        </select></span
+      >or less ago
     </label>
   </div>
 
   <div class="row">
     <label for="last-played-select">
       <span class="label-col">Last played</span>
-      <div class="select-wrapper">
+      <span class="select-wrapper">
         <select id="last-played-select">
           <option value="0"></option>
           <option value="86400">one day</option>
@@ -231,20 +230,18 @@ const template = createTemplate(`
           <option value="31536000">one year</option>
           <option value="94608000">three years</option>
           <option value="157680000">five years</option>
-        </select>
-      </div>
-      or longer ago
+        </select></span
+      >or longer ago
     </label>
   </div>
 
   <div class="row">
     <label for="preset-select">
       <span class="label-col">Preset</span>
-      <div class="select-wrapper">
+      <span class="select-wrapper">
         <select id="preset-select">
-          <option value=""></option>
-        </select>
-      </div>
+          <option value=""></option></select
+      ></span>
     </label>
   </div>
 

@@ -194,10 +194,13 @@ input:disabled {
   opacity: 0.5;
 }
 
+/* To avoid spacing differences between minified and non-minified code, omit
+ * whitespace between </select> and the closing .select-wrapper </span> tag.
+ * I think that https://github.com/tdewolff/minify/issues/240 is related. */
 .select-wrapper {
   display: inline-block;
   margin-left: 4px;
-  margin-right: -8px;
+  margin-right: -2px;
 }
 .select-wrapper:after {
   color: var(--icon-color);
@@ -205,7 +208,7 @@ input:disabled {
   font-size: 10px;
   position: relative;
   top: 0;
-  right: 21px;
+  right: 18px;
   content: '\2304'; /* ⌄ */
   pointer-events: none;
 }

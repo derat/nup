@@ -35,27 +35,27 @@ const template = createTemplate(`
 <div class="row">
   <label for="theme-select">
     <span class="label-col">Theme</span>
-    <div class="select-wrapper">
+    <span class="select-wrapper">
       <select id="theme-select">
         <option value="0">Auto</option>
         <option value="1">Light</option>
         <option value="2">Dark</option>
-      </select>
-    </div>
+      </select></span
+    >
   </label>
 </div>
 
 <div class="row">
   <label for="gain-type-select">
     <span class="label-col">Gain</span>
-    <div class="select-wrapper">
+    <span class="select-wrapper">
       <select id="gain-type-select">
         <option value="3">Auto</option>
         <option value="0">Album</option>
         <option value="1">Track</option>
         <option value="2">None</option>
-      </select>
-    </div>
+      </select></span
+    >
   </label>
 </div>
 
