@@ -39,8 +39,12 @@ const template = createTemplate(`
   }
 
   @keyframes fade-out {
-    0% { opacity: 1 }
-    100% { opacity: 0 }
+    0% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
   }
   #old-cover {
     animation: fade-out 0.5s ease-in-out;
@@ -74,7 +78,9 @@ const template = createTemplate(`
   #current-details.hidden {
     visibility: hidden;
   }
-  #current-artist, #current-title, #current-album {
+  #current-artist,
+  #current-title,
+  #current-album {
     font-size: 24px;
     overflow: hidden;
     padding: 4px 8px;
@@ -130,7 +136,9 @@ const template = createTemplate(`
   #next-details {
     overflow: hidden; /* needed to elide artist/title/album */
   }
-  #next-artist, #next-title, #next-album {
+  #next-artist,
+  #next-title,
+  #next-album {
     overflow: hidden;
     padding: 3px 6px;
     text-overflow: ellipsis;

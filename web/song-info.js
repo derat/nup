@@ -57,6 +57,7 @@ const template = createTemplate(`
 
 <a id="cover-link"><img id="cover-img" /></a>
 
+<!-- prettier-ignore -->
 <table class="info-table">
   <tr><td>Artist</td><td id="artist"></td></tr>
   <tr><td>Title</td><td id="title"></td></tr>

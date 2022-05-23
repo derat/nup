@@ -39,7 +39,8 @@ const template = createTemplate(`
 
   /* Gross hack from https://stackoverflow.com/a/57170489/6882947 to keep
    * borders from scrolling along with table contents. */
-  th:after, th:before {
+  th:after,
+  th:before {
     content: '';
     left: 0;
     position: absolute;
@@ -67,10 +68,12 @@ const template = createTemplate(`
     background-color: var(--accent-color);
     color: var(--accent-text-color);
   }
-  tr.menu, tr.dragged {
+  tr.menu,
+  tr.dragged {
     background-color: var(--bg-active-color);
   }
-  tr.active.menu, tr.active.dragged {
+  tr.active.menu,
+  tr.active.dragged {
     background-color: var(--accent-active-color);
   }
 
@@ -110,7 +113,6 @@ const template = createTemplate(`
   input[type='checkbox'][class~='transparent'] {
     opacity: 0.3;
   }
-
 
   td.time {
     padding-left: 6px;

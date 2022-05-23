@@ -68,7 +68,8 @@ const template = createTemplate(`
     left: 0;
     width: 100%;
   }
-  #years-table th:not(:first-child), #years-div td:not(:first-child) {
+  #years-table th:not(:first-child),
+  #years-div td:not(:first-child) {
     text-align: right;
   }
 
@@ -82,6 +83,7 @@ const template = createTemplate(`
 <hr class="title" />
 
 <div id="top-div">
+  <!-- prettier-ignore -->
   <table id="main-table">
     <tr><td>Songs</td><td id="songs"></td></tr>
     <tr><td>★★★★★</td><td id="rating-5"></td></tr>
