@@ -92,7 +92,7 @@ customElements.define(
     }
 
     // Adds event handlers to |audio_| and recreates |audioSrc_| to route
-    // playback through |gainNode_|.
+    // |audio_|'s output through |gainNode_|.
     configureAudio_() {
       this.audio_.addEventListener('ended', this.onEnded_);
       this.audio_.addEventListener('error', this.onError_);
@@ -100,7 +100,6 @@ customElements.define(
       this.audio_.addEventListener('play', this.onPlay_);
       this.audio_.addEventListener('timeupdate', this.onTimeUpdate_);
 
-      this.audioSrc_?.disconnect(this.gainNode_);
       this.audioSrc_ = this.audioCtx_.createMediaElementSource(this.audio_);
       this.audioSrc_.connect(this.gainNode_);
     }
@@ -113,6 +112,9 @@ customElements.define(
       this.audio_.removeEventListener('pause', this.onPause_);
       this.audio_.removeEventListener('play', this.onPlay_);
       this.audio_.removeEventListener('timeupdate', this.onTimeUpdate_);
+
+      this.audioSrc_.disconnect();
+      this.audioSrc_ = null;
 
       this.audio_.parentNode.replaceChild(audio, this.audio_);
       this.audio_ = audio;
@@ -316,7 +318,9 @@ customElements.define(
     }
     set preloadSrc(src) {
       if (this.preloadAudio_ && this.preloadAudio_.src === src) return;
-      this.preloadAudio_ = this.audio_.cloneNode(true);
+      this.preloadAudio_ = template.content
+        .cloneNode(true)
+        .querySelector('audio');
       this.preloadAudio_.src = src;
     }
   }
