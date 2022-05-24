@@ -119,7 +119,7 @@ customElements.define(
       this.configureAudio_();
     }
 
-    onOnline_(e) {
+    onOnline_ = (e) => {
       // Automatically resume playing if we previously paused due to going
       // offline: https://github.com/derat/nup/issues/17
       if (this.pausedForOfflineTime_ !== null) {
@@ -130,7 +130,7 @@ customElements.define(
         this.reloadAudio_();
         if (resume) this.audio_.play();
       }
-    }
+    };
 
     onEnded_ = (e) => {
       this.resendAudioEvent_(e);
