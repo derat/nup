@@ -1,7 +1,12 @@
 // Copyright 2022 Daniel Erat.
 // All rights reserved.
 
-import { createElement, createShadow, createTemplate } from './common.js';
+import {
+  commonStyles,
+  createElement,
+  createShadow,
+  createTemplate,
+} from './common.js';
 
 const menuStyle = createTemplate(`
 <style>
@@ -68,12 +73,7 @@ export function createMenu(x, y, items, alignRight) {
   // <dialog>, so add a wrapper element first.
   const wrapper = createElement('span', null, menu);
   const shadow = createShadow(wrapper, menuStyle);
-
-  // Only show the menu after common.css is loaded to avoid FOUC.
-  const link = createElement('link', null, shadow);
-  link.setAttribute('rel', 'stylesheet');
-  link.setAttribute('href', 'common.css');
-  link.addEventListener('load', () => menu.classList.add('ready'));
+  shadow.adoptedStyleSheets = [commonStyles];
 
   const hotkeys = items.some((it) => it.hotkey);
   for (const item of items) {
@@ -108,6 +108,9 @@ export function createMenu(x, y, items, alignRight) {
       y + menu.clientHeight <= window.innerHeight
         ? `${y}px`
         : `${y - menu.clientHeight}px`;
+
+    // Only show the menu after it's been positioned.
+    menu.classList.add('ready');
   });
 
   numMenus++;

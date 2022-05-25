@@ -3,6 +3,7 @@
 
 import {
   $,
+  commonStyles,
   createElement,
   createShadow,
   createTemplate,
@@ -11,7 +12,6 @@ import {
 } from './common.js';
 
 const template = createTemplate(`
-<link rel="stylesheet" href="common.css" />
 <style>
   :host {
     display: block;
@@ -191,6 +191,8 @@ customElements.define(
       this.numCheckedSongs_ = 0;
 
       this.shadow_ = createShadow(this, template);
+      this.shadow_.adoptedStyleSheets = [commonStyles];
+
       this.table_ = this.shadow_.querySelector('table');
       this.rowSongs_ = new WeakMap(); // row element to song object
 

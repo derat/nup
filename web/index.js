@@ -1,10 +1,15 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-import { $, smallCoverSize } from './common.js';
+// Needed by common.js for Firefox and Safari.
+import './construct-style-sheets-polyfill.js';
+
+import { $, commonStyles, smallCoverSize } from './common.js';
 import { isDialogShown } from './dialog.js';
 import { isMenuShown } from './menu.js';
 import Config from './config.js';
+
+document.adoptedStyleSheets = [commonStyles];
 
 // Import web components so they'll be included in the bundle.
 // If we weren't bundling, it'd be faster to load these from index.html.

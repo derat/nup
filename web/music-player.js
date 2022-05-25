@@ -4,6 +4,7 @@
 import {
   $,
   clamp,
+  commonStyles,
   createShadow,
   createTemplate,
   emptyImg,
@@ -27,7 +28,6 @@ import { showStats } from './stats.js';
 import Updater from './updater.js';
 
 const template = createTemplate(`
-<link rel="stylesheet" href="common.css" />
 <style>
   :host {
     display: flex;
@@ -249,6 +249,8 @@ customElements.define(
       this.shuffled_ = false; // playlist contains shuffled songs
 
       this.shadow_ = createShadow(this, template);
+      this.shadow_.adoptedStyleSheets = [commonStyles];
+
       const get = (id) => $(id, this.shadow_);
 
       this.presentationLayer_ =

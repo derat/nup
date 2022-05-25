@@ -1,7 +1,13 @@
 // Copyright 2022 Daniel Erat.
 // All rights reserved.
 
-import { $, createElement, createShadow, createTemplate } from './common.js';
+import {
+  $,
+  commonStyles,
+  createElement,
+  createShadow,
+  createTemplate,
+} from './common.js';
 
 const dialogStyle = createTemplate(`
 <style>
@@ -69,14 +75,7 @@ export function createDialog(template, className) {
   // <dialog>, so add a wrapper element first.
   const wrapper = createElement('span', className, dialog);
   const shadow = createShadow(wrapper, dialogStyle);
-
-  // Wait until common.css has been loaded to show the dialog so it isn't
-  // initially visible with e.g. unstyled buttons.
-  const link = createElement('link', null, shadow);
-  link.setAttribute('rel', 'stylesheet');
-  link.setAttribute('href', 'common.css');
-  link.addEventListener('load', () => dialog.classList.add('ready'));
-
+  shadow.adoptedStyleSheets = [commonStyles];
   shadow.appendChild(template.content.cloneNode(true));
 
   dialog.showModal();

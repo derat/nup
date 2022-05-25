@@ -4,6 +4,7 @@
 import {
   $,
   clamp,
+  commonStyles,
   createShadow,
   createTemplate,
   getCurrentTimeSec,
@@ -17,7 +18,6 @@ import { createMenu } from './menu.js';
 import { showSongInfo } from './song-info.js';
 
 const template = createTemplate(`
-<link rel="stylesheet" href="common.css" />
 <style>
   :host {
     display: flex;
@@ -91,7 +91,7 @@ const template = createTemplate(`
   }
   #preset-select {
     /* Prevent a big jump in width when the presets are loaded. This is 90px
-     * plus 30px of padding that common.css sets on select elements. */
+     * plus 30px of padding that |commonStyles| sets on select elements. */
     min-width: 110px;
   }
   #search-buttons {
@@ -288,6 +288,8 @@ customElements.define(
       this.fetchController_ = null;
 
       this.shadow_ = createShadow(this, template);
+      this.shadow_.adoptedStyleSheets = [commonStyles];
+
       const get = (id) => $(id, this.shadow_);
 
       this.keywordsInput_ = get('keywords-input');

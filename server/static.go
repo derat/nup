@@ -62,8 +62,8 @@ func init() {
 	// JS is minified by esbuild when creating the bundle.
 }
 
-// staticFiles maps from request path (e.g. "/common.css") to *staticFile structs
-// corresponding to previously-loaded and -processed static files.
+// staticFiles maps from relative request paths (e.g. "index.html") to *staticFile
+// structs corresponding to previously-loaded and -processed static files.
 var staticFiles sync.Map
 
 // staticFile contains data about a static file to be served over HTTP.
@@ -131,32 +131,41 @@ func getStaticFile(p string, bundle, minify bool) (*staticFile, error) {
 // minifyData reads from r and returns a minified version of its data.
 // ctype should be a value from minifyExts, e.g. cssType or htmlType.
 func minifyData(r io.Reader, ctype string) ([]byte, error) {
-	// Super gross: look for createTemplate() calls and minify the contents as HTML.
-	// The opening "createTemplate(`" must appear at the end of a line and the
-	// closing "`);" must appear on a line by itself.
+	// Super gross: look for createTemplate() and replaceSync() calls and minify the contents as
+	// HTML and CSS, respectively. The opening "createTemplate(`" or ".replaceSync(`" must appear at
+	// the end of a line and the closing "`);" must appear on a line by itself.
 	if ctype == jsType {
 		var b bytes.Buffer
-		var inTemplate bool
-		var template string
+		var inHTML, inCSS bool
+		var quoted string
 		sc := bufio.NewScanner(r)
 		for sc.Scan() {
 			ln := sc.Text()
+			inQuoted := inHTML || inCSS
 			switch {
-			case !inTemplate && strings.HasSuffix(ln, "createTemplate(`"):
+			case !inQuoted && strings.HasSuffix(ln, "createTemplate(`"):
 				io.WriteString(&b, ln) // omit trailing newline
-				inTemplate = true
-			case !inTemplate:
+				inHTML = true
+			case !inQuoted && strings.HasSuffix(ln, ".replaceSync(`"):
+				io.WriteString(&b, ln) // omit trailing newline
+				inCSS = true
+			case !inQuoted:
 				io.WriteString(&b, ln+"\n")
-			case inTemplate && ln == "`);":
-				min, err := minifier.String(htmlType, template)
+			case inQuoted && ln == "`);":
+				t := htmlType
+				if inCSS {
+					t = cssType
+				}
+				min, err := minifier.String(t, quoted)
 				if err != nil {
 					return nil, err
 				}
 				io.WriteString(&b, min+ln+"\n")
-				inTemplate = false
-				template = ""
-			case inTemplate:
-				template += ln + "\n"
+				inHTML = false
+				inCSS = false
+				quoted = ""
+			case inQuoted:
+				quoted += ln + "\n"
 			}
 		}
 		if err := sc.Err(); err != nil {
