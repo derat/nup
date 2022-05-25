@@ -6,14 +6,10 @@ export const emptyImg =
   'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
 // Returns the element under |root| with ID |id|.
-export function $(id, root) {
-  return (root ?? document).getElementById(id);
-}
+export const $ = (id, root) => (root ?? document).getElementById(id);
 
 // Clamps number |val| between |min| and |max|.
-export function clamp(val, min, max) {
-  return Math.min(Math.max(val, min), max);
-}
+export const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
 
 function pad(num, width) {
   let str = num + '';
@@ -22,14 +18,11 @@ function pad(num, width) {
 }
 
 // Formats |sec| as "m:ss".
-export function formatTime(sec) {
-  return parseInt(sec / 60) + ':' + pad(parseInt(sec % 60), 2);
-}
+export const formatTime = (sec) =>
+  parseInt(sec / 60) + ':' + pad(parseInt(sec % 60), 2);
 
-// Returns the number of milliseconds since the Unix epoch.
-export function getCurrentTimeSec() {
-  return new Date().getTime() / 1000.0;
-}
+// Returns the number of fractional milliseconds since the Unix epoch.
+export const getCurrentTimeSec = () => Date.now() / 1000;
 
 // Sets |element|'s 'title' attribute to |text| if the row's content overflows
 // its area or removes it otherwise.
@@ -67,9 +60,8 @@ export function createTemplate(html) {
 
 // Returns an absolute URL for the song specified by |filename| (corresponding
 // to a song's |filename| property).
-export function getSongUrl(filename) {
-  return getAbsUrl(`/song?filename=${encodeURIComponent(filename)}`);
-}
+export const getSongUrl = (filename) =>
+  getAbsUrl(`/song?filename=${encodeURIComponent(filename)}`);
 
 // Image sizes that can be passed to getScaledCoverUrl().
 export const smallCoverSize = 256;
@@ -94,15 +86,11 @@ export function getFullCoverUrl(filename) {
 }
 
 // Returns a URL for dumping information about the song identified by |songId|.
-export function getDumpSongUrl(songId) {
-  return `/dump_song?songId=${songId}`;
-}
+export const getDumpSongUrl = (songId) => `/dump_song?songId=${songId}`;
 
 // Returns an absolute version of |url| if it's relative.
 // If it's already absolute, it is returned unchanged.
-export function getAbsUrl(url) {
-  return new URL(url, document.baseURI).href;
-}
+const getAbsUrl = (url) => new URL(url, document.baseURI).href;
 
 // Throws if |response| failed due to the server returning an error status.
 export function handleFetchError(response) {

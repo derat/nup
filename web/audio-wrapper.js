@@ -203,7 +203,7 @@ customElements.define(
     // Dispatches a new event based on |e|.
     resendAudioEvent_(e) {
       const ne = new Event(e.type);
-      Object.defineProperty(ne, 'target', { get: () => e.target });
+      Object.defineProperty(ne, 'target', { value: e.target });
       this.dispatchEvent(ne);
     }
 

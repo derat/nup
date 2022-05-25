@@ -99,6 +99,12 @@ const template = createTemplate(`
   }
   #time {
     opacity: 0.7;
+    /* Add a layout boundary since we update this frequently:
+     * http://blog.wilsonpage.co.uk/introducing-layout-boundaries/
+     * Oddly, doing this on #details doesn't seem to have the same effect. */
+    height: 17px;
+    overflow: hidden;
+    width: 100px;
   }
   #controls {
     margin: var(--margin);
@@ -310,11 +316,11 @@ customElements.define(
       });
 
       this.audio_ = this.shadow_.querySelector('audio-wrapper');
-      this.audio_.addEventListener('ended', () => this.onEnded_());
-      this.audio_.addEventListener('pause', () => this.onPause_());
-      this.audio_.addEventListener('play', () => this.onPlay_());
-      this.audio_.addEventListener('timeupdate', () => this.onTimeUpdate_());
-      this.audio_.addEventListener('error', (e) => this.onError_(e));
+      this.audio_.addEventListener('ended', this.onEnded_);
+      this.audio_.addEventListener('pause', this.onPause_);
+      this.audio_.addEventListener('play', this.onPlay_);
+      this.audio_.addEventListener('timeupdate', this.onTimeUpdate_);
+      this.audio_.addEventListener('error', this.onError_);
 
       this.coverDiv_ = get('cover-div');
       this.coverImage_ = get('cover-img');
@@ -347,9 +353,7 @@ customElements.define(
         this.hideUpdateDiv_(true)
       );
       this.ratingSpan_ = get('rating');
-      this.ratingSpan_.addEventListener('keydown', (e) =>
-        this.handleRatingSpanKeyDown_(e)
-      );
+      this.ratingSpan_.addEventListener('keydown', this.onRatingSpanKeyDown_);
       this.tagsTextarea_ = get('edit-tags');
       this.tagSuggester_ = get('edit-tags-suggester');
 
@@ -861,25 +865,25 @@ customElements.define(
       if (newTime < this.audio_.duration) this.audio_.currentTime = newTime;
     }
 
-    onEnded_() {
+    onEnded_ = () => {
       if (this.currentIndex_ >= this.songs_.length - 1) {
         this.reachedEndOfSongs_ = true;
       } else {
         this.cycleTrack_(1, false /* delay */);
       }
-    }
+    };
 
-    onPause_() {
+    onPause_ = () => {
       this.playPauseButton_.innerText = '▶';
       this.playPauseButton_.title = 'Play (Space)';
-    }
+    };
 
-    onPlay_() {
+    onPlay_ = () => {
       this.playPauseButton_.innerText = '⏸';
       this.playPauseButton_.title = 'Pause (Space)';
-    }
+    };
 
-    onTimeUpdate_() {
+    onTimeUpdate_ = () => {
       const song = this.currentSong_;
       if (song === null) return;
 
@@ -907,11 +911,11 @@ customElements.define(
         console.log(`Preloading ${this.nextSong_.songId} (${url})`);
         this.audio_.preloadSrc = url;
       }
-    }
+    };
 
-    onError_(e) {
+    onError_ = () => {
       this.cycleTrack_(1, false /* delay */);
-    }
+    };
 
     showUpdateDiv_() {
       const song = this.currentSong_;
@@ -1104,7 +1108,7 @@ customElements.define(
       return false;
     }
 
-    handleRatingSpanKeyDown_(e) {
+    onRatingSpanKeyDown_ = (e) => {
       if (['0', '1', '2', '3', '4', '5'].includes(e.key)) {
         this.setRating_(parseInt(e.key));
         e.preventDefault();
@@ -1115,6 +1119,6 @@ customElements.define(
         e.preventDefault();
         e.stopPropagation();
       }
-    }
+    };
   }
 );
