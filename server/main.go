@@ -7,6 +7,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,6 +20,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/derat/nup/server/cache"
@@ -46,6 +49,11 @@ const (
 // TODO: This will only affect the instance that receives the /config request. For now,
 // test/dev_server.go passes --max_module_instances=1 to ensure that there's a single instance.
 var forceUpdateFailures = false
+
+// staticFileETags maps from a relative request path (e.g. "index.html") to a string containing
+// a quoted ETag header value for the file. We do this here instead of in getStaticFile() since
+// we don't need to hash the files that go into the bundle, just the bundle itself.
+var staticFileETags sync.Map
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
@@ -634,13 +642,27 @@ func handleStatic(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 	bundle := cfg.Bundle == nil || *cfg.Bundle
 	minify := cfg.Minify == nil || *cfg.Minify
 
-	if sf, err := getStaticFile(p, bundle, minify); os.IsNotExist(err) {
+	if b, err := getStaticFile(p, bundle, minify); os.IsNotExist(err) {
 		http.Error(w, "Not found", http.StatusNotFound)
 	} else if err != nil {
 		log.Errorf(ctx, "Reading %q failed: %v", p, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	} else {
-		http.ServeContent(w, req, filepath.Base(p), sf.mtime, bytes.NewReader(sf.data))
+		var etag string
+		if v, ok := staticFileETags.Load(p); ok {
+			etag = v.(string)
+		} else {
+			sum := sha1.Sum(b)
+			etag = fmt.Sprintf(`"%s"`, hex.EncodeToString(sum[:]))
+			staticFileETags.Store(p, etag)
+		}
+		w.Header().Set("ETag", etag)
+
+		// App Engine seems to always report static file mtimes as 1980:
+		//  https://issuetracker.google.com/issues/168399701
+		//  https://stackoverflow.com/questions/63813692
+		//  https://github.com/GoogleChrome/web.dev/issues/3913
+		http.ServeContent(w, req, filepath.Base(p), time.Time{}, bytes.NewReader(b))
 	}
 }
 

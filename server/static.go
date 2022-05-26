@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/evanw/esbuild/pkg/api"
 
@@ -62,30 +61,24 @@ func init() {
 	// JS is minified by esbuild when creating the bundle.
 }
 
-// staticFiles maps from relative request paths (e.g. "index.html") to *staticFile
-// structs corresponding to previously-loaded and -processed static files.
+// staticFiles maps from a relative request path (e.g. "index.html") to a []byte
+// containing the content of the previously-loaded and -processed static file.
 var staticFiles sync.Map
-
-// staticFile contains data about a static file to be served over HTTP.
-type staticFile struct {
-	data  []byte
-	mtime time.Time
-}
 
 // getStaticFile returns the contents of the file at the specified path
 // (without a leading slash) within staticDir.
-func getStaticFile(p string, bundle, minify bool) (*staticFile, error) {
-	if fi, ok := staticFiles.Load(p); ok {
-		return fi.(*staticFile), nil
+func getStaticFile(p string, bundle, minify bool) ([]byte, error) {
+	if b, ok := staticFiles.Load(p); ok {
+		return b.([]byte), nil
 	}
 
 	if p == bundleFile && bundle {
-		sf, err := buildBundle(minify)
+		b, err := buildBundle(minify)
 		if err != nil {
 			return nil, err
 		}
-		staticFiles.Store(p, sf)
-		return sf, nil
+		staticFiles.Store(p, b)
+		return b, nil
 	}
 
 	fp := filepath.Join(staticDir, p)
@@ -93,23 +86,17 @@ func getStaticFile(p string, bundle, minify bool) (*staticFile, error) {
 		return nil, os.ErrNotExist
 	}
 
-	var sf staticFile
-	fi, err := os.Stat(fp)
-	if err != nil {
-		return nil, err
-	}
-	sf.mtime = fi.ModTime()
-
 	f, err := os.Open(fp)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
+	var b []byte
 	if ctype, ok := minifyExts[filepath.Ext(fp)]; ok && minify {
-		sf.data, err = minifyData(f, ctype)
+		b, err = minifyData(f, ctype)
 	} else {
-		sf.data, err = ioutil.ReadAll(f)
+		b, err = ioutil.ReadAll(f)
 	}
 	if err != nil {
 		return nil, err
@@ -121,11 +108,11 @@ func getStaticFile(p string, bundle, minify bool) (*staticFile, error) {
 		if bundle {
 			ep = bundleFile
 		}
-		sf.data = bytes.ReplaceAll(sf.data, []byte(entryPointPlaceholder), []byte(ep))
+		b = bytes.ReplaceAll(b, []byte(entryPointPlaceholder), []byte(ep))
 	}
 
-	staticFiles.Store(p, &sf)
-	return &sf, nil
+	staticFiles.Store(p, b)
+	return b, nil
 }
 
 // minifyData reads from r and returns a minified version of its data.
@@ -179,9 +166,8 @@ func minifyData(r io.Reader, ctype string) ([]byte, error) {
 	return b.Bytes(), err
 }
 
-// buildBundle builds a single bundle file consisting of
-// bundleEntryPoint and all of its imports.
-func buildBundle(minify bool) (*staticFile, error) {
+// buildBundle builds a single bundle file consisting of bundleEntryPoint and all of its imports.
+func buildBundle(minify bool) ([]byte, error) {
 	// Write all the (possibly minified) .js files to a temp dir for esbuild.
 	// I think it'd be possible to write an esbuild plugin that returns these
 	// files from memory, but the plugin API is still experimental and we only
@@ -196,18 +182,14 @@ func buildBundle(minify bool) (*staticFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	var mtime time.Time
 	for _, p := range paths {
 		base := filepath.Base(p)
-		sf, err := getStaticFile(base, true /* bundle */, minify)
+		b, err := getStaticFile(base, true /* bundle */, minify)
 		if err != nil {
 			return nil, err
 		}
-		if err := ioutil.WriteFile(filepath.Join(td, base), sf.data, 0644); err != nil {
+		if err := ioutil.WriteFile(filepath.Join(td, base), b, 0644); err != nil {
 			return nil, err
-		}
-		if sf.mtime.After(mtime) {
-			mtime = sf.mtime
 		}
 	}
 
@@ -229,8 +211,5 @@ func buildBundle(minify bool) (*staticFile, error) {
 	if n := len(res.OutputFiles); n != 1 {
 		return nil, fmt.Errorf("got %d output files", n)
 	}
-	return &staticFile{
-		data:  res.OutputFiles[0].Contents,
-		mtime: mtime,
-	}, nil
+	return res.OutputFiles[0].Contents, nil
 }
