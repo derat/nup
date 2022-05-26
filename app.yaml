@@ -9,10 +9,21 @@ app_engine_apis: true
 # The app handles everything except binary files so it can do e.g. auth and
 # minification.
 handlers:
-  - url: /(.*\.(gif|ico|jpe?g|png|ttf|woff|woff2))
+  - url: /(.*\.(gif|ico|jpe?g|png|ttf|woff2?))
     static_files: web/\1
     secure: always
-    upload: web/.*
+    upload: web/.*\.(gif|ico|jpe?g|png|ttf|woff2?)
+    # https://cloud.google.com/appengine/docs/standard/python/how-requests-are-handled#static_cache_expiration:
+    #
+    #  After a file is transmitted with a given expiration time, there is
+    #  generally no way to clear it out of web-proxy caches, even if the user
+    #  clears their own browser cache. Re-deploying a new version of the app
+    #  will not reset any caches. Therefore, if you ever plan to modify a static
+    #  file, it should have a short (less than one hour) expiration time. In
+    #  most cases, the default 10-minute expiration time is appropriate.
+    #
+    # So, static files should have versioned names.
+    expiration: 14d
   - url: /.*
     script: auto
     secure: always

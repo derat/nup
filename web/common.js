@@ -159,8 +159,8 @@ commonStyles.replaceSync(`
  * handy custom font generated using fontello.com. */
 @font-face {
   font-family: 'fontello';
-  src: url('fonts/fontello.woff2') format('woff2'),
-    url('fonts/fontello.woff') format('woff');
+  src: url('fonts/fontello-v1.woff2') format('woff2'),
+    url('fonts/fontello-v1.woff') format('woff');
   font-display: block; /* avoid showing fallback fonts */
   font-style: normal;
   font-weight: normal;
