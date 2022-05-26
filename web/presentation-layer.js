@@ -303,10 +303,10 @@ customElements.define(
     }
 
     updatePosition(sec) {
-      if (isNaN(sec)) return;
+      if (this.duration_ <= 0) return;
 
       // Make this overlap with the border to avoid hairline gaps.
-      const fraction = Math.min(sec / this.duration_, 1.0);
+      const fraction = Math.min(sec / this.duration_, 1);
       this.progressBar_.style.width = `calc(${fraction} * (100% + 2px))`;
       this.timeDiv_.innerText = formatTime(sec);
     }

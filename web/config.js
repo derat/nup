@@ -28,7 +28,7 @@ export default class Config {
     this.values_ = {
       [Config.THEME]: Config.THEME_AUTO,
       [Config.GAIN_TYPE]: Config.GAIN_AUTO,
-      [Config.PRE_AMP]: 0.0,
+      [Config.PRE_AMP]: 0,
     };
     this.load_();
   }

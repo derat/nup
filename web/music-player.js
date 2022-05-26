@@ -230,11 +230,12 @@ const template = createTemplate(`
 customElements.define(
   'music-player',
   class extends HTMLElement {
-    static SEEK_SEC_ = 10; // seconds skipped by seeking forward or back
-    static MAX_RETRIES_ = 2; // number of consecutive playback errors to reply
-    static NOTIFICATION_SEC_ = 3; // duration for song-change notification
+    static SEEK_SEC_ = 10; // seconds to skip when seeking forward or back
+    static MAX_RETRIES_ = 2; // number of consecutive playback errors to retry
+    static NOTIFICATION_SEC_ = 3; // duration to show song-change notification
     static PLAY_DELAY_MS_ = 500; // delay before playing when cycling track
-    static PRELOAD_SEC_ = 20; // seconds from end of song when next song should be loaded
+    static PRELOAD_SEC_ = 20; // seconds before end of song to load next song
+    static TIME_UPDATE_SLOP_MS_ = 10; // time to wait past second boundary
 
     constructor() {
       super();
@@ -252,6 +253,8 @@ customElements.define(
       this.closeNotificationTimeoutId_ = null; // for closeNotification_()
       this.playDelayMs_ = this.constructor.PLAY_DELAY_MS_;
       this.playTimeoutId_ = null; // for playInternal_()
+      this.lastTimeUpdatePos_ = 0; // audio position in last onTimeUpdate_()
+      this.timeUpdateTimeoutId_ = null; // for synthetic onTimeUpdate_() call
       this.shuffled_ = false; // playlist contains shuffled songs
 
       this.shadow_ = createShadow(this, template);
@@ -446,14 +449,9 @@ customElements.define(
       this.updater_.destroy();
       this.updater_ = null;
 
-      if (this.closeNotificationTimeoutId_) {
-        window.clearTimeout(this.closeNotificationTimeoutId_);
-        this.closeNotificationTimeoutId_ = null;
-      }
-      if (this.playTimeoutId_) {
-        window.clearTimeout(this.playTimeoutId_);
-        this.playTimeoutId_ = null;
-      }
+      this.cancelCloseNotificationTimeout_();
+      this.cancelPlayTimeout_();
+      this.cancelTimeUpdateTimeout_();
 
       if ('mediaSession' in navigator) {
         const ms = navigator.mediaSession;
@@ -759,10 +757,7 @@ customElements.define(
       }
 
       this.closeNotification_();
-      if (this.closeNotificationTimeoutId_ !== null) {
-        window.clearTimeout(this.closeNotificationTimeoutId_);
-        this.closeNotificationTimeoutId_ = null;
-      }
+      this.cancelCloseNotificationTimeout_();
 
       const song = this.currentSong_;
       if (!song) return;
@@ -785,6 +780,12 @@ customElements.define(
       this.notification_ = null;
     }
 
+    cancelCloseNotificationTimeout_() {
+      if (this.closeNotificationTimeoutId_ === null) return;
+      window.clearTimeout(this.closeNotificationTimeoutId_);
+      this.closeNotificationTimeoutId_ = null;
+    }
+
     // Starts playback. If |currentSong_| isn't being played, switches to it
     // even if we were already playing. Also restarts playback if we were
     // stopped at the end of the last song in the playlist.
@@ -794,10 +795,7 @@ customElements.define(
     play_(delay) {
       if (!this.currentSong_) return;
 
-      if (this.playTimeoutId_ !== undefined) {
-        window.clearTimeout(this.playTimeoutId_);
-        this.playTimeoutId_ = undefined;
-      }
+      this.cancelPlayTimeout_();
 
       if (delay) {
         console.log(`Playing in ${this.playDelayMs_} ms`);
@@ -808,6 +806,12 @@ customElements.define(
       } else {
         this.playInternal_();
       }
+    }
+
+    cancelPlayTimeout_() {
+      if (this.playTimeoutId_ === null) return;
+      window.clearTimeout(this.playTimeoutId_);
+      this.playTimeoutId_ = null;
     }
 
     // Internal method called by play_().
@@ -826,7 +830,7 @@ customElements.define(
         this.startTime_ = getCurrentTimeSec();
         this.reportedCurrentTrack_ = false;
         this.reachedEndOfSongs_ = false;
-        this.pausedForOfflineTime_ = -1;
+        this.lastTimeUpdatePos_ = 0;
         this.updateGain_();
       }
 
@@ -866,6 +870,7 @@ customElements.define(
     }
 
     onEnded_ = () => {
+      this.cancelTimeUpdateTimeout_();
       if (this.currentIndex_ >= this.songs_.length - 1) {
         this.reachedEndOfSongs_ = true;
       } else {
@@ -874,6 +879,7 @@ customElements.define(
     };
 
     onPause_ = () => {
+      this.cancelTimeUpdateTimeout_();
       this.playPauseButton_.innerText = '▶';
       this.playPauseButton_.title = 'Play (Space)';
     };
@@ -896,9 +902,9 @@ customElements.define(
         this.reportedCurrentTrack_ = true;
       }
 
-      this.timeDiv_.innerText = dur
-        ? `${formatTime(pos)} / ${formatTime(dur)}`
-        : '';
+      const str = dur ? `${formatTime(pos)} / ${formatTime(dur)}` : '';
+      if (this.timeDiv_.innerText !== str) this.timeDiv_.innerText = str;
+
       this.presentationLayer_.updatePosition(pos);
 
       // Preload the next song once we're nearing the end of this one.
@@ -911,11 +917,34 @@ customElements.define(
         console.log(`Preloading ${this.nextSong_.songId} (${url})`);
         this.audio_.preloadSrc = url;
       }
+
+      // Schedule a fake update for just after when we expect the playback
+      // position to cross the next second boundary. Only do this when we're
+      // actually making progress, though.
+      if (
+        !this.audio_.paused &&
+        pos > this.lastTimeUpdatePos_ &&
+        this.timeUpdateTimeoutId_ === null
+      ) {
+        const nextMs = 1000 * (Math.floor(pos + 1) - pos);
+        this.timeUpdateTimeoutId_ = window.setTimeout(() => {
+          this.timeUpdateTimeoutId_ = null;
+          this.onTimeUpdate_();
+        }, nextMs + this.constructor.TIME_UPDATE_SLOP_MS_);
+      }
+
+      this.lastTimeUpdatePos_ = pos;
     };
 
     onError_ = () => {
       this.cycleTrack_(1, false /* delay */);
     };
+
+    cancelTimeUpdateTimeout_() {
+      if (this.timeUpdateTimeoutId_ === null) return;
+      window.clearTimeout(this.timeUpdateTimeoutId_);
+      this.timeUpdateTimeoutId_ = null;
+    }
 
     showUpdateDiv_() {
       const song = this.currentSong_;
