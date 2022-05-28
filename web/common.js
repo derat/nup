@@ -63,27 +63,24 @@ export function createTemplate(html) {
 export const getSongUrl = (filename) =>
   getAbsUrl(`/song?filename=${encodeURIComponent(filename)}`);
 
-// Image sizes that can be passed to getScaledCoverUrl().
+// Image sizes that can be passed to getCoverUrl().
 export const smallCoverSize = 256;
 export const largeCoverSize = 512;
 
-// Returns a URL for a scaled, square version of the cover image identified by
-// |filename| (corresponding to a song's |coverFilename| property). If
-// |filename| is empty, an empty string is returned. |size| should be either
-// |smallCoverSize| or |largeCoverSize|.
-export function getScaledCoverUrl(filename, size) {
+// Returns a URL for the cover image identified by |filename|.
+// If |filename| is empty, an empty string is returned.
+// If |size| isn't supplied, returns the full-size, possibly-non-square image.
+// Otherwise (i.e. |smallCoverSize| or |largeCoverSize|), returns a scaled,
+// square version.
+export function getCoverUrl(filename, size = 0) {
   if (!filename) return '';
-  return getAbsUrl(
-    `/cover?filename=${encodeURIComponent(filename)}&size=${size}&webp=1`
-  );
+  let path = `/cover?filename=${encodeURIComponent(filename)}`;
+  if (size) path += `&size=${size}&webp=1`;
+  return getAbsUrl(path);
 }
 
-// Returns a URL for the full-size, possibly non-square cover image identified
-// by |filename|.
-export function getFullCoverUrl(filename) {
-  if (!filename) return '';
-  return getAbsUrl(`/cover?filename=${encodeURIComponent(filename)}`);
-}
+// Fetches an image at |src| so it can be loaded from the cache later.
+export const preloadImage = (src) => (new Image().src = src);
 
 // Returns a URL for dumping information about the song identified by |songId|.
 export const getDumpSongUrl = (songId) => `/dump_song?songId=${songId}`;

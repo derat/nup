@@ -7,8 +7,8 @@ import {
   createTemplate,
   emptyImg,
   formatTime,
-  getFullCoverUrl,
-  getScaledCoverUrl,
+  getCoverUrl,
+  preloadImage,
   smallCoverSize,
 } from './common.js';
 
@@ -16,6 +16,8 @@ const template = createTemplate(`
 <style>
   :host {
     background-color: black;
+    background-position: center;
+    background-size: cover;
     display: none;
     height: 100%;
     left: 0;
@@ -244,6 +246,7 @@ customElements.define(
       if (!currentSong) {
         this.currentDetails_.classList.add('hidden');
         this.currentFilename_ = null;
+        this.style.backgroundImage = '';
       } else {
         this.currentDetails_.classList.remove('hidden');
         this.currentArtist_.innerText = currentSong.artist;
@@ -255,6 +258,17 @@ customElements.define(
         this.durationDiv_.innerText = formatTime(currentSong.length);
         this.duration_ = currentSong.length;
         this.currentFilename_ = currentSong.coverFilename;
+
+        // Set the host element's background to the low-resolution cover image
+        // (which we've probably already loaded). If the presentation layer
+        // isn't currently visible but gets shown later, this image will act as
+        // a placeholder while we're loading the full-res version. We use the
+        // host element instead of |currentCover_| since Chrome appears to clear
+        // <img> elements when a new image is being loaded in response to a
+        // change to the src attribute.
+        const url = getCoverUrl(this.currentFilename_, smallCoverSize);
+        // Escape characters: https://stackoverflow.com/a/33541245
+        this.style.backgroundImage = `url("${encodeURI(url)}")`;
       }
 
       // Make the "old" cover image display the image that we were just
@@ -265,10 +279,10 @@ customElements.define(
       this.oldCover_.parentNode.replaceChild(el, this.oldCover_);
       this.oldCover_ = el;
 
-      // Use the full-resolution cover image.
+      // Load the full-resolution cover image if we're visible.
       this.updateImg_(
         this.currentCover_,
-        this.visible ? getFullCoverUrl(this.currentFilename_) : ''
+        this.visible ? getCoverUrl(this.currentFilename_) : null
       );
 
       if (!nextSong) {
@@ -283,12 +297,12 @@ customElements.define(
       }
       this.updateImg_(
         this.nextCover_,
-        getScaledCoverUrl(this.nextFilename_, smallCoverSize)
+        getCoverUrl(this.nextFilename_, smallCoverSize)
       );
 
       // Preload the next track's full-resolution cover.
       if (this.visible && this.nextFilename_) {
-        new Image().src = getFullCoverUrl(this.nextFilename_);
+        preloadImage(getCoverUrl(this.nextFilename_));
       }
     }
 
@@ -321,13 +335,8 @@ customElements.define(
         // If we weren't visible when updateSongs() was last called, we haven't
         // loaded the current cover image yet or preloaded the next one, so do
         // it now.
-        this.updateImg_(
-          this.currentCover_,
-          getFullCoverUrl(this.currentFilename_)
-        );
-        if (this.nextFilename_) {
-          new Image().src = getFullCoverUrl(this.nextFilename_);
-        }
+        this.updateImg_(this.currentCover_, getCoverUrl(this.currentFilename_));
+        if (this.nextFilename_) preloadImage(getCoverUrl(this.nextFilename_));
 
         // Prevent the old cover from crossfading out again.
         // Its animation seems to be repeated whenever it becomes visible.

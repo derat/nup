@@ -7,9 +7,9 @@ import {
   commonStyles,
   createShadow,
   createTemplate,
+  getCoverUrl,
   getCurrentTimeSec,
   getDumpSongUrl,
-  getScaledCoverUrl,
   handleFetchError,
   smallCoverSize,
 } from './common.js';
@@ -508,7 +508,7 @@ customElements.define(
           } else if (songs.length > 0 && songs[0].coverFilename) {
             // If we aren't automatically enqueuing the results, prefetch the
             // cover image for the first song so it'll be ready to go.
-            new Image().src = getScaledCoverUrl(
+            new Image().src = getCoverUrl(
               songs[0].coverFilename,
               smallCoverSize
             );

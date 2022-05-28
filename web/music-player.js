@@ -9,13 +9,14 @@ import {
   createTemplate,
   emptyImg,
   formatTime,
+  getCoverUrl,
   getCurrentTimeSec,
   getDumpSongUrl,
   getRatingString,
-  getScaledCoverUrl,
   getSongUrl,
   handleFetchError,
   moveItem,
+  preloadImage,
   smallCoverSize,
   updateTitleAttributeForTruncation,
 } from './common.js';
@@ -663,7 +664,7 @@ customElements.define(
       updateTitleAttributeForTruncation(this.albumDiv_, song ? song.album : '');
 
       if (song && song.coverFilename) {
-        const url = getScaledCoverUrl(song.coverFilename, smallCoverSize);
+        const url = getCoverUrl(song.coverFilename, smallCoverSize);
         this.coverImage_.src = url;
         this.coverDiv_.classList.remove('empty');
         this.dispatchEvent(new CustomEvent('cover', { detail: { url } }));
@@ -679,7 +680,7 @@ customElements.define(
       // App Engine "feature": https://github.com/derat/nup/issues/1
       const precacheCover = (s) => {
         if (!s?.coverFilename) return;
-        new Image().src = getScaledCoverUrl(s.coverFilename, smallCoverSize);
+        preloadImage(getCoverUrl(s.coverFilename, smallCoverSize));
       };
       precacheCover(this.songs_[this.currentIndex_ + 1]);
       precacheCover(this.songs_[this.currentIndex_ + 2]);
@@ -766,7 +767,7 @@ customElements.define(
         body: `${song.title}\n${song.album}\n${formatTime(song.length)}`,
       };
       if (song.coverFilename) {
-        options.icon = getScaledCoverUrl(song.coverFilename, smallCoverSize);
+        options.icon = getCoverUrl(song.coverFilename, smallCoverSize);
       }
       this.notification_ = new Notification(`${song.artist}`, options);
       this.closeNotificationTimeoutId_ = window.setTimeout(() => {

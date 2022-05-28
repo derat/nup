@@ -6,9 +6,8 @@ import {
   createShadow,
   createTemplate,
   formatTime,
-  getFullCoverUrl,
+  getCoverUrl,
   getRatingString,
-  getScaledCoverUrl,
   largeCoverSize,
 } from './common.js';
 import { createDialog } from './dialog.js';
@@ -82,9 +81,9 @@ export function showSongInfo(song) {
 
   const cover = $('cover-img', shadow);
   if (song.coverFilename) {
-    cover.src = getScaledCoverUrl(song.coverFilename, largeCoverSize);
+    cover.src = getCoverUrl(song.coverFilename, largeCoverSize);
     const link = $('cover-link', shadow);
-    link.href = getFullCoverUrl(song.coverFilename);
+    link.href = getCoverUrl(song.coverFilename);
     link.target = '_blank';
   } else {
     cover.classList.add('hidden');
