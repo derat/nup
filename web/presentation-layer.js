@@ -6,7 +6,7 @@ import {
   createShadow,
   createTemplate,
   emptyImg,
-  formatTime,
+  formatDuration,
   getCoverUrl,
   preloadImage,
   smallCoverSize,
@@ -255,7 +255,7 @@ customElements.define(
 
         this.progressBar_.style.width = '0px';
         this.timeDiv_.innerText = '';
-        this.durationDiv_.innerText = formatTime(currentSong.length);
+        this.durationDiv_.innerText = formatDuration(currentSong.length);
         this.duration_ = currentSong.length;
         this.currentFilename_ = currentSong.coverFilename;
 
@@ -322,7 +322,7 @@ customElements.define(
       // Make this overlap with the border to avoid hairline gaps.
       const fraction = Math.min(sec / this.duration_, 1);
       this.progressBar_.style.width = `calc(${fraction} * (100% + 2px))`;
-      this.timeDiv_.innerText = formatTime(sec);
+      this.timeDiv_.innerText = formatDuration(sec);
     }
 
     get visible() {

@@ -6,6 +6,7 @@ import {
   createElement,
   createShadow,
   createTemplate,
+  formatRelativeTime,
   handleFetchError,
 } from './common.js';
 import { createDialog } from './dialog.js';
@@ -146,8 +147,10 @@ export function showStats() {
         createElement('td', null, row, formatDays(ystats.totalSec));
       }
 
-      const updateSec = (Date.now() - Date.parse(stats.updateTime)) / 1000;
-      $('updated-div', shadow).innerText = `Updated ${formatAgo(updateSec)}`;
+      const updateTime = formatRelativeTime(
+        (Date.parse(stats.updateTime) - Date.now()) / 1000
+      );
+      $('updated-div', shadow).innerText = `Updated ${updateTime}`;
 
       $('top-div', shadow).classList.add('ready');
     })
@@ -157,22 +160,3 @@ export function showStats() {
 }
 
 const formatDays = (sec) => `${(sec / 86400).toFixed(1)} days`;
-
-function formatAgo(sec) {
-  const days = sec / 86400;
-  const hours = sec / 3600;
-  const min = sec / 60;
-  return days >= 1.5
-    ? `${Math.round(days)} days ago`
-    : days >= 1
-    ? '1 day ago'
-    : hours >= 1.5
-    ? `${Math.round(hours)} hours ago`
-    : hours >= 1
-    ? '1 hour ago'
-    : min >= 1.5
-    ? `${Math.round(min)} minutes ago`
-    : min >= 1
-    ? '1 minute ago'
-    : 'just now';
-}

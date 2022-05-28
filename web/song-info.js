@@ -5,7 +5,7 @@ import {
   $,
   createShadow,
   createTemplate,
-  formatTime,
+  formatDuration,
   getCoverUrl,
   getRatingString,
   largeCoverSize,
@@ -94,7 +94,7 @@ export function showSongInfo(song) {
   $('album', shadow).innerText = song.album;
   $('track', shadow).innerText =
     song.track + (song.disc > 1 ? ` (Disc ${song.disc})` : '');
-  $('length', shadow).innerText = formatTime(parseFloat(song.length));
+  $('length', shadow).innerText = formatDuration(parseFloat(song.length));
   $('rating', shadow).innerText = getRatingString(song.rating);
   $('tags', shadow).innerText = song.tags ? song.tags.join(' ') : '';
 }

@@ -4,13 +4,14 @@
 import { expectEq, error, fatal, suite, test } from './test.js';
 import {
   createElement,
-  formatTime,
+  formatDuration,
+  formatRelativeTime,
   getRatingString,
   moveItem,
 } from './common.js';
 
 suite('common', () => {
-  test('formatTime', () => {
+  test('formatDuration', () => {
     for (const [sec, want] of [
       [0, '0:00'],
       [1, '0:01'],
@@ -24,9 +25,47 @@ suite('common', () => {
       [3600, '60:00'],
       [3601, '60:01'],
     ]) {
-      const got = formatTime(sec);
+      const got = formatDuration(sec);
       if (got !== want) {
-        error(`formatTime(${sec}) = "${got}"; want "${want}"`);
+        error(`formatDuration(${sec}) = "${got}"; want "${want}"`);
+      }
+    }
+  });
+
+  test('formatRelativeTime', () => {
+    for (const [sec, wantBase] of [
+      [0, '0 seconds'],
+      [1, '1 second'],
+      [1.49, '1 second'],
+      [1.51, '2 seconds'], // -1.5 rounds to -1, not -2
+      [59.49, '59 seconds'],
+      [59.51, '1 minute'],
+      [60, '1 minute'],
+      [89, '1 minute'],
+      [91, '2 minutes'],
+      [3569, '59 minutes'],
+      [3571, '1 hour'],
+      [3600, '1 hour'],
+      [5399, '1 hour'],
+      [5401, '2 hours'],
+      [23 * 3600 + 1799, '23 hours'],
+      [23 * 3600 + 1801, '1 day'],
+      [86400, '1 day'],
+      [86400 + 43199, '1 day'],
+      [86400 + 43201, '2 days'],
+    ]) {
+      const gotPos = formatRelativeTime(sec);
+      const wantPos = `in ${wantBase}`;
+      if (gotPos !== wantPos) {
+        error(`formatRelativeTime(${sec}) = "${gotPos}"; want "${wantPos}"`);
+      }
+
+      if (sec !== 0) {
+        const gotNeg = formatRelativeTime(-sec);
+        const wantNeg = `${wantBase} ago`;
+        if (gotNeg !== wantNeg) {
+          error(`formatRelativeTime(${-sec}) = "${gotNeg}"; want "${wantNeg}"`);
+        }
       }
     }
   });

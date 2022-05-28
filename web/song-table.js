@@ -7,7 +7,7 @@ import {
   createElement,
   createShadow,
   createTemplate,
-  formatTime,
+  formatDuration,
   updateTitleAttributeForTruncation,
 } from './common.js';
 
@@ -437,7 +437,7 @@ customElements.define(
       update(row.cells[1], song.artist, true);
       update(row.cells[2], song.title, false);
       update(row.cells[3], song.album, true);
-      update(row.cells[4], formatTime(parseFloat(song.length)), false);
+      update(row.cells[4], formatDuration(parseFloat(song.length)), false);
 
       if (!deferTitles) this.updateSongRowTitleAttributes_(index);
     }

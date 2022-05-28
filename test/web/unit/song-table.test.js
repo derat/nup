@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, expectEq, suite, test } from './test.js';
 import MockWindow from './mock-window.js';
 
-import { formatTime } from './common.js';
+import { formatDuration } from './common.js';
 import {} from './song-table.js';
 
 suite('songTable', () => {
@@ -49,7 +49,7 @@ suite('songTable', () => {
     artist: s.artist,
     title: s.title,
     album: s.album,
-    time: formatTime(s.length),
+    time: formatDuration(s.length),
     checked,
   });
 

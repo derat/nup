@@ -17,9 +17,24 @@ function pad(num, width) {
   return str;
 }
 
-// Formats |sec| as "m:ss".
-export const formatTime = (sec) =>
+// Formats |sec| as 'm:ss'.
+export const formatDuration = (sec) =>
   parseInt(sec / 60) + ':' + pad(parseInt(sec % 60), 2);
+
+// Formats |sec| as a rounded relative time, e.g. '1 second ago' for -1
+// or 'in 2 hours' for 7200.
+export function formatRelativeTime(sec) {
+  const rtf = new Intl.RelativeTimeFormat('en', { style: 'long' });
+  const fmt = (n, u) => rtf.format(Math.round(n), u);
+  const days = sec / 86400;
+  const hours = sec / 3600;
+  const min = sec / 60;
+
+  if (Math.abs(Math.round(hours)) >= 24) return fmt(days, 'day');
+  if (Math.abs(Math.round(min)) >= 60) return fmt(hours, 'hour');
+  if (Math.abs(Math.round(sec)) >= 60) return fmt(min, 'minute');
+  return fmt(sec, 'second');
+}
 
 // Returns the number of fractional milliseconds since the Unix epoch.
 export const getCurrentTimeSec = () => Date.now() / 1000;

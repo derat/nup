@@ -8,7 +8,7 @@ import {
   createShadow,
   createTemplate,
   emptyImg,
-  formatTime,
+  formatDuration,
   getCoverUrl,
   getCurrentTimeSec,
   getDumpSongUrl,
@@ -764,7 +764,7 @@ customElements.define(
       if (!song) return;
 
       const options = {
-        body: `${song.title}\n${song.album}\n${formatTime(song.length)}`,
+        body: `${song.title}\n${song.album}\n${formatDuration(song.length)}`,
       };
       if (song.coverFilename) {
         options.icon = getCoverUrl(song.coverFilename, smallCoverSize);
@@ -903,7 +903,7 @@ customElements.define(
         this.reportedCurrentTrack_ = true;
       }
 
-      const str = dur ? `${formatTime(pos)} / ${formatTime(dur)}` : '';
+      const str = dur ? `${formatDuration(pos)} / ${formatDuration(dur)}` : '';
       if (this.timeDiv_.innerText !== str) this.timeDiv_.innerText = str;
 
       this.presentationLayer_.updatePosition(pos);

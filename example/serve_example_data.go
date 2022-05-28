@@ -94,6 +94,7 @@ func run() (int, error) {
 		CoverDir: filepath.Join(exampleDir, "covers"),
 	})
 	tester.ImportSongsFromJSONFile(songs)
+	tester.UpdateStats()
 
 	// Block until we get killed.
 	<-make(chan struct{})
