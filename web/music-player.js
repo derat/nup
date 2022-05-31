@@ -442,6 +442,10 @@ customElements.define(
         );
       }
 
+      document.addEventListener(
+        'visibilitychange',
+        this.onDocumentVisibilityChange_
+      );
       document.body.addEventListener('keydown', this.onKeyDown_);
       window.addEventListener('beforeunload', this.onBeforeUnload_);
     }
@@ -464,6 +468,10 @@ customElements.define(
         ms.setActionHandler('nexttrack', null);
       }
 
+      document.removeEventListener(
+        'visibilitychange',
+        this.onDocumentVisibilityChange_
+      );
       document.body.removeEventListener('keydown', this.onKeyDown_);
       window.removeEventListener('beforeunload', this.onBeforeUnload_);
     }
@@ -483,6 +491,12 @@ customElements.define(
     get updateDivShown() {
       return !!this.updateSong_;
     }
+
+    onDocumentVisibilityChange_ = () => {
+      // We hold off on updating the displayed time while the document is
+      // hidden, so update it as soon as the document is shown.
+      if (!document.hidden) this.onTimeUpdate_();
+    };
 
     onKeyDown_ = (e) => {
       if (this.processAccelerator_(e)) {
@@ -903,10 +917,15 @@ customElements.define(
         this.reportedCurrentTrack_ = true;
       }
 
-      const str = dur ? `${formatDuration(pos)} / ${formatDuration(dur)}` : '';
-      if (this.timeDiv_.innerText !== str) this.timeDiv_.innerText = str;
+      // Only update the displayed time while the document is visible.
+      if (!document.hidden) {
+        const str = dur
+          ? `${formatDuration(pos)} / ${formatDuration(dur)}`
+          : '';
+        if (this.timeDiv_.innerText !== str) this.timeDiv_.innerText = str;
 
-      this.presentationLayer_.updatePosition(pos);
+        this.presentationLayer_.updatePosition(pos);
+      }
 
       // Preload the next song once we're nearing the end of this one.
       if (

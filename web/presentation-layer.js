@@ -192,7 +192,7 @@ const template = createTemplate(`
 // about the current and next song.
 //
 // When the next track information is clicked, a 'next' event is emitted.
-// When click is received anywhere else, a 'hide' event is emitted.
+// When a click is received anywhere else, a 'hide' event is emitted.
 customElements.define(
   'presentation-layer',
   class extends HTMLElement {
@@ -200,20 +200,25 @@ customElements.define(
       super();
 
       this.duration_ = 0; // duration of current song in seconds
+      this.lastPos_ = 0; // last value in seconds passed to updatePosition()
       this.visible_ = false;
       this.currentFilename_ = null;
       this.nextFilename_ = null;
 
       this.shadow_ = createShadow(this, template);
+
       this.currentCover_ = $('current-cover', this.shadow_);
       this.oldCover_ = $('old-cover', this.shadow_);
+
       this.currentDetails_ = $('current-details', this.shadow_);
       this.currentArtist_ = $('current-artist', this.shadow_);
       this.currentTitle_ = $('current-title', this.shadow_);
       this.currentAlbum_ = $('current-album', this.shadow_);
+
       this.progressBar_ = $('progress-bar', this.shadow_);
       this.timeDiv_ = $('current-time', this.shadow_);
       this.durationDiv_ = $('current-duration', this.shadow_);
+
       this.nextDiv_ = $('next', this.shadow_);
       this.nextCover_ = $('next-cover', this.shadow_);
       this.nextArtist_ = $('next-artist', this.shadow_);
@@ -233,16 +238,6 @@ customElements.define(
     }
 
     updateSongs(currentSong, nextSong) {
-      const updateImg = (img, url) => {
-        if (url) {
-          img.src = url;
-          img.classList.remove('hidden');
-        } else {
-          img.src = emptyImg;
-          img.classList.add('hidden');
-        }
-      };
-
       if (!currentSong) {
         this.currentDetails_.classList.add('hidden');
         this.currentFilename_ = null;
@@ -280,7 +275,7 @@ customElements.define(
       this.oldCover_ = el;
 
       // Load the full-resolution cover image if we're visible.
-      this.updateImg_(
+      updateImg(
         this.currentCover_,
         this.visible ? getCoverUrl(this.currentFilename_) : null
       );
@@ -295,7 +290,7 @@ customElements.define(
         this.nextAlbum_.innerText = nextSong.album;
         this.nextFilename_ = nextSong.coverFilename;
       }
-      this.updateImg_(
+      updateImg(
         this.nextCover_,
         getCoverUrl(this.nextFilename_, smallCoverSize)
       );
@@ -306,23 +301,17 @@ customElements.define(
       }
     }
 
-    updateImg_(img, url) {
-      if (url) {
-        img.src = url;
-        img.classList.remove('hidden');
-      } else {
-        img.src = emptyImg;
-        img.classList.add('hidden');
-      }
-    }
-
     updatePosition(sec) {
-      if (this.duration_ <= 0) return;
+      this.lastPos_ = sec;
 
-      // Make this overlap with the border to avoid hairline gaps.
+      if (!this.visible || this.duration_ <= 0) return;
+
+      // Make the bar overlap with the border to avoid hairline gaps.
       const fraction = Math.min(sec / this.duration_, 1);
       this.progressBar_.style.width = `calc(${fraction} * (100% + 2px))`;
-      this.timeDiv_.innerText = formatDuration(sec);
+
+      const str = formatDuration(sec);
+      if (this.timeDiv_.innerText !== str) this.timeDiv_.innerText = str;
     }
 
     get visible() {
@@ -335,10 +324,13 @@ customElements.define(
         // If we weren't visible when updateSongs() was last called, we haven't
         // loaded the current cover image yet or preloaded the next one, so do
         // it now.
-        this.updateImg_(this.currentCover_, getCoverUrl(this.currentFilename_));
+        updateImg(this.currentCover_, getCoverUrl(this.currentFilename_));
         if (this.nextFilename_) preloadImage(getCoverUrl(this.nextFilename_));
 
-        // Prevent the old cover from crossfading out again.
+        // Make sure the progress bar and displayed time are correct.
+        this.updatePosition(this.lastPos_);
+
+        // Prevent the old cover from fading out again.
         // Its animation seems to be repeated whenever it becomes visible.
         this.oldCover_.classList.add('hidden');
       }
@@ -350,3 +342,13 @@ customElements.define(
     }
   }
 );
+
+function updateImg(img, url) {
+  if (url) {
+    img.src = url;
+    img.classList.remove('hidden');
+  } else {
+    img.src = emptyImg;
+    img.classList.add('hidden');
+  }
+}
