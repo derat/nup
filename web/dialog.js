@@ -52,7 +52,7 @@ const msgTemplate = createTemplate(`
 <div id="message"></div>
 <form method="dialog">
   <div class="button-container">
-    <button class="ok-button" autofocus>OK</button>
+    <button id="ok-button" autofocus>OK</button>
   </div>
 </form>
 `);
@@ -90,6 +90,7 @@ export function showMessageDialog(titleText, messageText) {
   const shadow = dialog.firstChild.shadowRoot;
   $('title', shadow).innerText = titleText;
   $('message', shadow).innerText = messageText;
+  $('ok-button', shadow).addEventListener('click', () => dialog.close());
 }
 
 // Returns true if a dialog is currently shown.

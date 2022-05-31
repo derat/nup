@@ -107,4 +107,6 @@ export function showOptionsDialog(config) {
   preAmpRange.addEventListener('change', () =>
     config.set(Config.PRE_AMP, preAmpRange.value)
   );
+
+  $('ok-button', shadow).addEventListener('click', () => dialog.close());
 }

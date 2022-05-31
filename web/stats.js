@@ -124,6 +124,7 @@ const template = createTemplate(`
 export function showStats() {
   const dialog = createDialog(template, 'stats');
   const shadow = dialog.firstChild.shadowRoot;
+  $('dismiss-button', shadow).addEventListener('click', () => dialog.close());
 
   fetch('stats', { method: 'GET' })
     .then((res) => handleFetchError(res))
