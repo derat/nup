@@ -26,6 +26,7 @@ import { createMenu, isMenuShown } from './menu.js';
 import { showOptionsDialog } from './options-dialog.js';
 import { showSongInfo } from './song-info.js';
 import { showStats } from './stats.js';
+import UpdateDialog from './update-dialog.js';
 import Updater from './updater.js';
 
 const template = createTemplate(`
@@ -121,56 +122,6 @@ const template = createTemplate(`
   #controls > *:not(:first-child) {
     margin-left: var(--button-spacing);
   }
-  #update-container {
-    background-color: var(--bg-color);
-    border: solid 1px var(--frame-border-color);
-    border-radius: 4px;
-    box-shadow: 0 1px 4px 1px rgba(0, 0, 0, 0.3);
-    display: none;
-    left: var(--margin);
-    padding: 8px;
-    position: absolute;
-    top: var(--margin);
-    z-index: 2;
-  }
-  #update-container.shown {
-    display: block;
-  }
-  #update-close {
-    cursor: pointer;
-    position: absolute;
-    right: 5px;
-    top: 5px;
-  }
-  #rating {
-    font-family: var(--icon-font-family);
-    font-size: 16px;
-  }
-  #rating a.star {
-    color: var(--text-color);
-    cursor: pointer;
-    display: inline-block;
-    min-width: 17px; /* black and white stars have different sizes :-/ */
-    opacity: 0.6;
-  }
-  #rating a.star:hover {
-    opacity: 0.9;
-  }
-  #edit-tags {
-    font-family: Arial, Helvetica, sans-serif;
-    height: 48px;
-    margin-bottom: -4px;
-    margin-top: 8px;
-    resize: none;
-    width: 220px;
-  }
-  #edit-tags-suggester {
-    bottom: 52px;
-    left: 4px;
-    max-height: 26px;
-    max-width: 210px;
-    position: absolute;
-  }
 </style>
 
 <presentation-layer></presentation-layer>
@@ -196,16 +147,6 @@ const template = createTemplate(`
   <button id="prev" disabled title="Previous song (Alt+P)">⏮</button>
   <button id="play-pause" disabled title="Pause (Space)">⏸</button>
   <button id="next" disabled title="Next song (Alt+N)">⏭</button>
-</div>
-
-<div id="update-container">
-  <span id="update-close" class="x-icon" title="Close"></span>
-  <div id="rating-container">
-    Rating: <span id="rating" tabindex="0"></span>
-  </div>
-  <tag-suggester id="edit-tags-suggester">
-    <textarea id="edit-tags" slot="text" placeholder="Tags"></textarea>
-  </tag-suggester>
 </div>
 
 <song-table id="playlist"></song-table>
@@ -248,9 +189,8 @@ customElements.define(
       this.startTime_ = null; // seconds since epoch when current track started
       this.reportedCurrentTrack_ = false; // already reported current as played?
       this.reachedEndOfSongs_ = false; // did we hit end of last song?
-      this.updateSong_ = null; // song playing when update div was opened
-      this.updatedRating_ = 0; // rating set in update div
-      this.notification_ = null; // song notification currently shown
+      this.updateDialog_ = null; // currently-shown UpdateDialog
+      this.notification_ = null; // currently-shown song-change notification
       this.closeNotificationTimeoutId_ = null; // for closeNotification_()
       this.playDelayMs_ = this.constructor.PLAY_DELAY_MS_;
       this.playTimeoutId_ = null; // for playInternal_()
@@ -328,7 +268,9 @@ customElements.define(
 
       this.coverDiv_ = get('cover-div');
       this.coverImage_ = get('cover-img');
-      this.coverImage_.addEventListener('click', () => this.showUpdateDiv_());
+      this.coverImage_.addEventListener('click', () =>
+        this.showUpdateDialog_()
+      );
       this.coverImage_.addEventListener('load', () =>
         this.updateMediaSessionMetadata_(true /* imageLoaded */)
       );
@@ -351,15 +293,6 @@ customElements.define(
       this.playPauseButton_.addEventListener('click', () =>
         this.togglePause_()
       );
-
-      this.updateDiv_ = get('update-container');
-      get('update-close').addEventListener('click', () =>
-        this.hideUpdateDiv_(true)
-      );
-      this.ratingSpan_ = get('rating');
-      this.ratingSpan_.addEventListener('keydown', this.onRatingSpanKeyDown_);
-      this.tagsTextarea_ = get('edit-tags');
-      this.tagSuggester_ = get('edit-tags-suggester');
 
       this.playlistTable_ = get('playlist');
       this.playlistTable_.addEventListener('field', (e) => {
@@ -487,11 +420,6 @@ customElements.define(
       });
     }
 
-    // Returns true if the update div is currently shown.
-    get updateDivShown() {
-      return !!this.updateSong_;
-    }
-
     onDocumentVisibilityChange_ = () => {
       // We hold off on updating the displayed time while the document is
       // hidden, so update it as soon as the document is shown.
@@ -499,7 +427,59 @@ customElements.define(
     };
 
     onKeyDown_ = (e) => {
-      if (this.processAccelerator_(e)) {
+      if (isDialogShown() || isMenuShown()) return;
+
+      if (
+        (() => {
+          if (e.altKey && e.key === 'd') {
+            const song = this.currentSong_;
+            if (song) window.open(getDumpSongUrl(song.songId), '_blank');
+            this.setPresentationLayerVisible_(false);
+            return true;
+          } else if (e.altKey && e.key === 'i') {
+            const song = this.currentSong_;
+            if (song) showSongInfo(song);
+            this.setPresentationLayerVisible_(false);
+            return true;
+          } else if (e.altKey && e.key === 'n') {
+            this.cycleTrack_(1, true /* delay */);
+            return true;
+          } else if (e.altKey && e.key === 'o') {
+            showOptionsDialog(this.config_);
+            this.setPresentationLayerVisible_(false);
+            return true;
+          } else if (e.altKey && e.key === 'p') {
+            this.cycleTrack_(-1, true /* delay */);
+            return true;
+          } else if (e.altKey && e.key === 'r') {
+            this.showUpdateDialog_();
+            this.updateDialog_?.focusRating();
+            this.setPresentationLayerVisible_(false);
+            return true;
+          } else if (e.altKey && e.key === 't') {
+            this.showUpdateDialog_();
+            this.updateDialog_?.focusTags();
+            this.setPresentationLayerVisible_(false);
+            return true;
+          } else if (e.altKey && e.key === 'v') {
+            this.setPresentationLayerVisible_(!this.presentationLayer_.visible);
+            return true;
+          } else if (e.key === ' ') {
+            this.togglePause_();
+            return true;
+          } else if (e.key === 'Escape' && this.presentationLayer_.visible) {
+            this.setPresentationLayerVisible_(false);
+            return true;
+          } else if (e.key === 'ArrowLeft') {
+            this.seek_(-this.constructor.SEEK_SEC_);
+            return true;
+          } else if (e.key === 'ArrowRight') {
+            this.seek_(this.constructor.SEEK_SEC_);
+            return true;
+          }
+          return false;
+        })()
+      ) {
         e.preventDefault();
         e.stopPropagation();
       }
@@ -512,6 +492,7 @@ customElements.define(
 
     // Requests known tags from the server and updates the internal list.
     // Returns a promise for completion of the task.
+    // TODO: Move this to index.js?
     updateTagsFromServer_() {
       return fetch('tags', { method: 'GET' })
         .then((res) => handleFetchError(res))
@@ -533,8 +514,8 @@ customElements.define(
     }
 
     resetForTesting() {
-      this.hideUpdateDiv_(false /* saveChanges */);
       if (this.songs_.length) this.removeSongs_(0, this.songs_.length);
+      this.updateDialog_?.close(false /* save */);
     }
 
     // Adds |songs| to the playlist.
@@ -650,7 +631,6 @@ customElements.define(
 
     updateTags_(tags) {
       this.tags_ = tags;
-      this.tagSuggester_.words = tags;
       this.dispatchEvent(new CustomEvent('tags', { detail: { tags } }));
     }
 
@@ -966,98 +946,33 @@ customElements.define(
       this.timeUpdateTimeoutId_ = null;
     }
 
-    showUpdateDiv_() {
+    showUpdateDialog_() {
       const song = this.currentSong_;
-      if (!song) return false;
+      if (this.updateDialog_ || !song) return;
+      this.updateDialog_ = new UpdateDialog(
+        song,
+        this.tags_,
+        (rating, tags) => {
+          this.updateDialog_ = null;
 
-      // Already shown.
-      if (this.updateSong_) return true;
+          if (rating === null && tags === null) return;
 
-      this.setRating_(song.rating);
-      this.tagsTextarea_.value = song.tags.length
-        ? song.tags.sort().join(' ') + ' ' // append space to ease editing
-        : '';
-      this.tagsTextarea_.selectionStart = this.tagsTextarea_.selectionEnd =
-        this.tagsTextarea_.value.length;
-      this.updateSong_ = song;
-      this.updateDiv_.classList.add('shown');
-      return true;
-    }
+          this.updater_.rateAndTag(song.songId, rating, tags);
 
-    hideUpdateDiv_(saveChanges) {
-      this.updateDiv_.classList.remove('shown');
-      this.ratingSpan_.blur();
-      this.tagsTextarea_.blur();
-
-      const song = this.updateSong_;
-      this.updateSong_ = null;
-
-      if (!song || !saveChanges) return;
-
-      const ratingChanged = this.updatedRating_ !== song.rating;
-
-      const newRawTags = this.tagsTextarea_.value.trim().split(/\s+/);
-      let newTags = [];
-      const createdTags = [];
-      for (let i = 0; i < newRawTags.length; ++i) {
-        let tag = newRawTags[i].toLowerCase();
-        if (tag === '') continue;
-        if (this.tags_.includes(tag) || song.tags.includes(tag)) {
-          newTags.push(tag);
-        } else if (tag[0] === '+' && tag.length > 1) {
-          tag = tag.substring(1);
-          newTags.push(tag);
-          if (!this.tags_.includes(tag)) createdTags.push(tag);
-        } else {
-          console.log(`Skipping unknown tag "${tag}"`);
+          if (rating !== null) {
+            song.rating = rating;
+            this.updateRatingOverlay_();
+          }
+          if (tags !== null) {
+            song.tags = tags;
+            const created = tags.filter((t) => !this.tags_.includes(t));
+            if (created.length > 0) {
+              this.updateTags_(this.tags_.concat(created));
+            }
+          }
+          this.updateCoverTitleAttribute_();
         }
-      }
-      // Remove duplicates.
-      newTags = newTags
-        .sort()
-        .filter((item, pos, self) => self.indexOf(item) === pos);
-      const tagsChanged = newTags.join(' ') !== song.tags.sort().join(' ');
-
-      if (createdTags.length > 0) {
-        this.updateTags_(this.tags_.concat(createdTags));
-      }
-
-      if (!ratingChanged && !tagsChanged) return;
-
-      this.updater_.rateAndTag(
-        song.songId,
-        ratingChanged ? this.updatedRating_ : null,
-        tagsChanged ? newTags : null
       );
-
-      song.rating = this.updatedRating_;
-      song.tags = newTags;
-
-      this.updateCoverTitleAttribute_();
-      if (ratingChanged) this.updateRatingOverlay_();
-    }
-
-    setRating_(rating) {
-      this.updatedRating_ = rating;
-
-      // Initialize the stars the first time we show them.
-      if (!this.ratingSpan_.hasChildNodes()) {
-        for (let i = 1; i <= 5; i++) {
-          const anchor = document.createElement('a');
-          const rating = i;
-          anchor.addEventListener(
-            'click',
-            () => this.setRating_(rating),
-            false
-          );
-          anchor.className = 'star';
-          this.ratingSpan_.appendChild(anchor);
-        }
-      }
-
-      for (let i = 1; i <= 5; i++) {
-        this.ratingSpan_.childNodes[i - 1].innerText = i <= rating ? '★' : '☆';
-      }
     }
 
     // Shows or hides the presentation layer.
@@ -1098,76 +1013,5 @@ customElements.define(
       console.log(`Scaling amplitude by ${scale.toFixed(3)}`);
       this.audio_.gain = scale;
     }
-
-    processAccelerator_(e) {
-      if (isDialogShown() || isMenuShown()) return false;
-
-      if (e.altKey && e.key === 'd') {
-        const song = this.currentSong_;
-        if (song) window.open(getDumpSongUrl(song.songId), '_blank');
-        this.setPresentationLayerVisible_(false);
-        return true;
-      } else if (e.altKey && e.key === 'i') {
-        const song = this.currentSong_;
-        if (song) showSongInfo(song);
-        this.setPresentationLayerVisible_(false);
-        return true;
-      } else if (e.altKey && e.key === 'n') {
-        this.cycleTrack_(1, true /* delay */);
-        return true;
-      } else if (e.altKey && e.key === 'o') {
-        showOptionsDialog(this.config_);
-        this.setPresentationLayerVisible_(false);
-        return true;
-      } else if (e.altKey && e.key === 'p') {
-        this.cycleTrack_(-1, true /* delay */);
-        return true;
-      } else if (e.altKey && e.key === 'r') {
-        if (this.showUpdateDiv_()) this.ratingSpan_.focus();
-        this.setPresentationLayerVisible_(false);
-        return true;
-      } else if (e.altKey && e.key === 't') {
-        if (this.showUpdateDiv_()) this.tagsTextarea_.focus();
-        this.setPresentationLayerVisible_(false);
-        return true;
-      } else if (e.altKey && e.key === 'v') {
-        this.setPresentationLayerVisible_(!this.presentationLayer_.visible);
-        if (this.updateSong_) this.hideUpdateDiv_(false);
-        return true;
-      } else if (e.key === ' ' && !this.updateSong_) {
-        this.togglePause_();
-        return true;
-      } else if (e.key === 'Enter' && this.updateSong_) {
-        this.hideUpdateDiv_(true);
-        return true;
-      } else if (e.key === 'Escape' && this.presentationLayer_.visible) {
-        this.setPresentationLayerVisible_(false);
-        return true;
-      } else if (e.key === 'Escape' && this.updateSong_) {
-        this.hideUpdateDiv_(false);
-        return true;
-      } else if (e.key === 'ArrowLeft' && !this.updateSong_) {
-        this.seek_(-this.constructor.SEEK_SEC_);
-        return true;
-      } else if (e.key === 'ArrowRight' && !this.updateSong_) {
-        this.seek_(this.constructor.SEEK_SEC_);
-        return true;
-      }
-
-      return false;
-    }
-
-    onRatingSpanKeyDown_ = (e) => {
-      if (['0', '1', '2', '3', '4', '5'].includes(e.key)) {
-        this.setRating_(parseInt(e.key));
-        e.preventDefault();
-        e.stopPropagation();
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        const rating = this.updatedRating_ + (e.key === 'ArrowLeft' ? -1 : 1);
-        this.setRating_(clamp(rating, 0, 5));
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
   }
 );

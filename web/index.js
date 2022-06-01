@@ -80,21 +80,6 @@ searcher.addEventListener('enqueue', (e) => {
   );
 });
 
-// Listening for this here feels gross, but less gross than injecting
-// music-player into music-searcher.
-document.body.addEventListener('keydown', (e) => {
-  if (
-    e.key === '/' &&
-    !isDialogShown() &&
-    !isMenuShown() &&
-    !player.updateDivShown
-  ) {
-    searcher.focusKeywords();
-    e.preventDefault();
-    e.stopPropagation();
-  }
-});
-
 // Used by web tests.
 document.test = {
   reset: () => {

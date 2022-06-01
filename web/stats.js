@@ -4,7 +4,6 @@
 import {
   $,
   createElement,
-  createShadow,
   createTemplate,
   formatRelativeTime,
   handleFetchError,

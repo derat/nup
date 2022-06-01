@@ -766,14 +766,14 @@ func TestRateAndTag(t *testing.T) {
 		hasImgTitle("Rating: ★★★☆☆\nTags: guitar rock"))
 
 	page.click(coverImage)
-	page.click(ratingFourStars)
+	page.click(updateFourStars)
 	page.click(updateCloseImage)
 	page.checkSong(song, hasRatingStr(fourStars),
 		hasImgTitle("Rating: ★★★★☆\nTags: guitar rock"))
 	checkServerSong(t, song, hasSrvRating(4), hasSrvTags("guitar", "rock"))
 
 	page.click(coverImage)
-	page.sendKeys(editTagsTextarea, " +metal", false)
+	page.sendKeys(updateTagsTextarea, " +metal", false)
 	page.click(updateCloseImage)
 	page.checkSong(song, hasRatingStr(fourStars),
 		hasImgTitle("Rating: ★★★★☆\nTags: guitar metal rock"))
@@ -797,8 +797,8 @@ func TestRetryUpdates(t *testing.T) {
 
 	// Change the song's rating and tags.
 	page.click(coverImage)
-	page.click(ratingFourStars)
-	page.setText(editTagsTextarea, "+jazz +mellow")
+	page.click(updateFourStars)
+	page.setText(updateTagsTextarea, "+jazz +mellow")
 	page.click(updateCloseImage)
 
 	// Wait a bit to let the updates fail and then let them succeed.
@@ -815,8 +815,8 @@ func TestRetryUpdates(t *testing.T) {
 	page.checkSong(song, isEnded(true))
 	secondUpper := time.Now()
 	page.click(coverImage)
-	page.click(ratingTwoStars)
-	page.setText(editTagsTextarea, "+lively +soul")
+	page.click(updateTwoStars)
+	page.setText(updateTagsTextarea, "+lively +soul")
 	page.click(updateCloseImage)
 	time.Sleep(time.Second)
 
@@ -831,18 +831,18 @@ func TestRetryUpdates(t *testing.T) {
 	page.setText(keywordsInput, song.Artist)
 	page.click(luckyButton)
 	page.checkSong(song)
-	for _, r := range [][]loc{ratingThreeStars, ratingFourStars, ratingFiveStars} {
+	for _, r := range [][]loc{updateThreeStars, updateFourStars, updateFiveStars} {
 		page.click(coverImage)
 		page.checkDisplayed(updateCloseImage, true)
 		page.click(r)
 		page.click(updateCloseImage)
-		page.checkDisplayed(updateCloseImage, false)
+		page.checkGone(updateCloseImage)
 	}
 	tester.ForceUpdateFailures(false)
 	checkServerSong(t, song, hasSrvRating(5))
 }
 
-func TestEditTagsAutocomplete(t *testing.T) {
+func TestUpdateTagsAutocomplete(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
 	song1 := newSong("ar", "t1", "al", withTags("a0", "a1", "b"))
@@ -855,23 +855,23 @@ func TestEditTagsAutocomplete(t *testing.T) {
 	page.checkSong(song1)
 
 	page.click(coverImage)
-	page.checkAttr(editTagsTextarea, "value", "a0 a1 b ")
+	page.checkAttr(updateTagsTextarea, "value", "a0 a1 b ")
 
-	page.sendKeys(editTagsTextarea, "d"+selenium.TabKey, false)
-	page.checkAttr(editTagsTextarea, "value", "a0 a1 b d ")
+	page.sendKeys(updateTagsTextarea, "d"+selenium.TabKey, false)
+	page.checkAttr(updateTagsTextarea, "value", "a0 a1 b d ")
 
-	page.sendKeys(editTagsTextarea, "c"+selenium.TabKey, false)
-	page.checkAttr(editTagsTextarea, "value", "a0 a1 b d c")
-	page.checkText(editTagsSuggester, `^\s*c0\s*c1\s*$`)
+	page.sendKeys(updateTagsTextarea, "c"+selenium.TabKey, false)
+	page.checkAttr(updateTagsTextarea, "value", "a0 a1 b d c")
+	page.checkText(updateTagSuggester, `^\s*c0\s*c1\s*$`)
 
-	page.sendKeys(editTagsTextarea, "1"+selenium.TabKey, false)
-	page.checkAttr(editTagsTextarea, "value", "a0 a1 b d c1 ")
+	page.sendKeys(updateTagsTextarea, "1"+selenium.TabKey, false)
+	page.checkAttr(updateTagsTextarea, "value", "a0 a1 b d c1 ")
 
 	// Position the caret at the beginning of the "c1" tag and complete "long".
 	// The caret strangely seems to get moved to the end of the textarea for each
 	// sendKeys call, so do this all in one go.
-	page.sendKeys(editTagsTextarea, strings.Repeat(selenium.LeftArrowKey, 3)+"l"+selenium.TabKey, false)
-	page.checkAttr(editTagsTextarea, "value", "a0 a1 b d long c1 ")
+	page.sendKeys(updateTagsTextarea, strings.Repeat(selenium.LeftArrowKey, 3)+"l"+selenium.TabKey, false)
+	page.checkAttr(updateTagsTextarea, "value", "a0 a1 b d long c1 ")
 }
 
 func TestDragSongs(t *testing.T) {
@@ -1078,6 +1078,7 @@ func TestPresentation(t *testing.T) {
 	page.checkPresentation(&song2, nil)
 	rate()
 	page.checkPresentation(nil, nil)
+	page.click(updateCloseImage)
 
 	// The presentation layer should be displayable via the menu too, and clicking on the layer
 	// should hide it.

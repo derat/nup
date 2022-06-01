@@ -13,8 +13,8 @@ import {
   handleFetchError,
   smallCoverSize,
 } from './common.js';
-import { showMessageDialog } from './dialog.js';
-import { createMenu } from './menu.js';
+import { isDialogShown, showMessageDialog } from './dialog.js';
+import { createMenu, isMenuShown } from './menu.js';
 import { showSongInfo } from './song-info.js';
 
 const template = createTemplate(`
@@ -404,6 +404,14 @@ customElements.define(
       this.resultsShuffled_ = false;
     }
 
+    connectedCallback() {
+      document.body.addEventListener('keydown', this.onBodyKeyDown_);
+    }
+
+    disconnectedCallback() {
+      document.body.removeEventListener('keydown', this.onBodyKeyDown_);
+    }
+
     // Uses |tags| as autocomplete suggestions in the tags search field.
     set tags(tags) {
       // Also suggest negative tags.
@@ -413,11 +421,6 @@ customElements.define(
     // Resets the search fields using the supplied (optional) values.
     resetFields(artist, album, albumId) {
       this.reset_(artist, album, albumId, false);
-    }
-
-    // Focuses the keywords input.
-    focusKeywords() {
-      this.keywordsInput_.focus();
     }
 
     resetForTesting() {
@@ -630,6 +633,16 @@ customElements.define(
       this.presetSelect_.blur();
 
       this.submitQuery_(preset.play);
+    };
+
+    onBodyKeyDown_ = (e) => {
+      if (isDialogShown() || isMenuShown()) return;
+
+      if (e.key === '/') {
+        this.keywordsInput_.focus();
+        e.preventDefault();
+        e.stopPropagation();
+      }
     };
   }
 );

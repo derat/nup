@@ -1,7 +1,7 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
-import { $, createShadow, createTemplate } from './common.js';
+import { $, createTemplate } from './common.js';
 import Config from './config.js';
 import { createDialog } from './dialog.js';
 
