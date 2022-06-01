@@ -155,8 +155,8 @@ const template = createTemplate(`
 // <music-player> plays and displays information about songs. It also maintains
 // and displays a playlist. Songs can be enqueued by calling enqueueSongs().
 //
-// When the list of available tags changes, a 'tags' CustomEvent with a
-// 'detail.tags' property containing a string array of the new tags is emitted.
+// When new tags are created, a 'newtags' CustomEvent with a 'detail.tags'
+// property containing a string array of the new tags is emitted.
 //
 // When an artist or album field in the playlist is clicked, a 'field'
 // CustomEvent is emitted. See <song-table> for more details.
@@ -350,7 +350,6 @@ customElements.define(
         });
       });
 
-      this.updateTagsFromServer_();
       this.updateSongDisplay_();
     }
 
@@ -418,6 +417,10 @@ customElements.define(
           this.updateGain_();
         }
       });
+    }
+
+    set tags(tags) {
+      this.tags_ = tags;
     }
 
     onDocumentVisibilityChange_ = () => {
@@ -489,22 +492,6 @@ customElements.define(
       this.closeNotification_();
       return null;
     };
-
-    // Requests known tags from the server and updates the internal list.
-    // Returns a promise for completion of the task.
-    // TODO: Move this to index.js?
-    updateTagsFromServer_() {
-      return fetch('tags', { method: 'GET' })
-        .then((res) => handleFetchError(res))
-        .then((res) => res.json())
-        .then((tags) => {
-          this.updateTags_(tags);
-          console.log(`Loaded ${tags.length} tag(s)`);
-        })
-        .catch((err) => {
-          console.error(`Failed loading tags: ${err}`);
-        });
-    }
 
     get currentSong_() {
       return this.songs_[this.currentIndex_] ?? null;
@@ -627,11 +614,6 @@ customElements.define(
       this.play_(delayPlay);
 
       if (!document.hasFocus()) this.showNotification_();
-    }
-
-    updateTags_(tags) {
-      this.tags_ = tags;
-      this.dispatchEvent(new CustomEvent('tags', { detail: { tags } }));
     }
 
     updateButtonState_() {
@@ -967,7 +949,9 @@ customElements.define(
             song.tags = tags;
             const created = tags.filter((t) => !this.tags_.includes(t));
             if (created.length > 0) {
-              this.updateTags_(this.tags_.concat(created));
+              this.dispatchEvent(
+                new CustomEvent('newtags', { detail: { tags: created } })
+              );
             }
           }
           this.updateCoverTitleAttribute_();

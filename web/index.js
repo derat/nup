@@ -4,7 +4,7 @@
 // Needed by common.js for Firefox and Safari.
 import './construct-style-sheets-polyfill.js';
 
-import { $, commonStyles, smallCoverSize } from './common.js';
+import { $, commonStyles, handleFetchError, smallCoverSize } from './common.js';
 import { isDialogShown } from './dialog.js';
 import { isMenuShown } from './menu.js';
 import Config from './config.js';
@@ -47,6 +47,23 @@ config.addCallback((k, v) => k === Config.THEME && updateTheme(v));
 window.matchMedia(darkMediaQuery).addListener((e) => updateTheme());
 updateTheme(config.get(Config.THEME));
 
+// Tags known by the server.
+let serverTags = [];
+
+// Returns a promise that will be resolved once tags are fetched.
+const fetchServerTags = () =>
+  fetch('tags', { method: 'GET' })
+    .then((res) => handleFetchError(res))
+    .then((res) => res.json())
+    .then((tags) => {
+      console.log(`Fetched ${tags.length} tag(s)`);
+      serverTags = player.tags = searcher.tags = tags;
+    })
+    .catch((err) => {
+      console.error(`Failed fetching tags: ${err}`);
+    });
+fetchServerTags();
+
 // Use the cover art as the favicon.
 player.addEventListener('cover', (e) => {
   const favicon = $('favicon');
@@ -68,8 +85,9 @@ player.addEventListener('cover', (e) => {
 player.addEventListener('field', (e) => {
   searcher.resetFields(e.detail.artist, e.detail.album, e.detail.albumId);
 });
-player.addEventListener('tags', (e) => {
-  searcher.tags = e.detail.tags;
+player.addEventListener('newtags', (e) => {
+  serverTags = serverTags.concat(e.detail.tags);
+  player.tags = searcher.tags = serverTags;
 });
 searcher.addEventListener('enqueue', (e) => {
   player.enqueueSongs(
@@ -89,7 +107,7 @@ document.test = {
     [...document.querySelectorAll('dialog')].forEach((d) => d.close());
   },
   setPlayDelayMs: (delayMs) => (player.playDelayMs_ = delayMs),
-  updateTags: async () => await player.updateTagsFromServer_(),
+  updateTags: async () => await fetchServerTags(),
   dragElement: (src, dest, offsetX, offsetY) => {
     const dataTransfer = { setDragImage: () => {} };
     let dropEffect = 'none';
