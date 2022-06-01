@@ -184,6 +184,8 @@ const rowTemplate = createTemplate(`
 customElements.define(
   'song-table',
   class extends HTMLElement {
+    static RESIZE_TIMEOUT_MS_ = 1000; // delay after resize to update titles
+
     constructor() {
       super();
 
@@ -195,6 +197,20 @@ customElements.define(
 
       this.table_ = this.shadow_.querySelector('table');
       this.rowSongs_ = new WeakMap(); // row element to song object
+
+      // When the table is resized, update all of the rows' title attributes
+      // after a short delay.
+      this.resizeTimeoutId_ = null;
+      this.resizeObserver_ = new ResizeObserver((entries) => {
+        if (this.resizeTimeoutId_) window.clearTimeout(this.resizeTimeoutId_);
+        this.resizeTimeoutId_ = window.setTimeout(() => {
+          this.resizeTimeoutId_ = null;
+          for (let i = 0; i < this.songRows_.length; i++) {
+            this.updateSongRowTitleAttributes_(i);
+          }
+        }, this.constructor.RESIZE_TIMEOUT_MS_);
+      });
+      this.resizeObserver_.observe(this.table_);
 
       this.dragImage_ = createElement('img');
       this.dragTarget_ = $('drag-target', this.shadow_);
@@ -236,6 +252,11 @@ customElements.define(
       document.body.removeEventListener('dragenter', this.onDragEnter_);
       document.body.removeEventListener('dragover', this.onDragOver_);
       document.body.removeEventListener('dragend', this.onDragEnd_);
+
+      if (this.resizeTimeoutId_ !== null) {
+        window.clearTimeout(this.resizeTimeoutId_);
+        this.resizeTimeoutId_ = null;
+      }
     }
 
     get inDrag_() {
@@ -357,9 +378,9 @@ customElements.define(
         const index = startMatchLength + i;
         this.updateSongRow_(index, newSongs[index], true /* deferTitles */);
       }
-      // Show or hide title attributes. Do this after updating all the rows so
-      // we trigger a single reflow instead of |numNewMiddleSongs|.
-      // TODO: Also update the attributes whenever the table is resized.
+      // Show or hide title attributes (which function as tooltips for elided
+      // strings). Do this after updating all the rows so we trigger a single
+      // reflow instead of |numNewMiddleSongs| reflows.
       for (let i = 0; i < numNewMiddleSongs; i++) {
         const index = startMatchLength + i;
         this.updateSongRowTitleAttributes_(index);
