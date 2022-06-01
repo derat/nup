@@ -45,6 +45,7 @@ var minifyExts = map[string]string{
 	".css":  cssType,
 	".html": htmlType,
 	".js":   jsType,
+	".json": jsonType,
 	".svg":  svgType,
 }
 
