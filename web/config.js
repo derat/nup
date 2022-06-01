@@ -94,3 +94,11 @@ export default class Config {
     localStorage.setItem(Config.CONFIG_KEY_, JSON.stringify(this.values_));
   }
 }
+
+let defaultConfig = null;
+
+// Returns a default singleton Config instance.
+export function getConfig() {
+  if (!defaultConfig) defaultConfig = new Config();
+  return defaultConfig;
+}

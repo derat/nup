@@ -2,7 +2,7 @@
 // All rights reserved.
 
 import { $, createTemplate } from './common.js';
-import Config from './config.js';
+import Config, { getConfig } from './config.js';
 import { createDialog } from './dialog.js';
 
 const template = createTemplate(`
@@ -74,8 +74,9 @@ const template = createTemplate(`
 </form>
 `);
 
-// Displays a modal dialog for setting options via |config|.
-export function showOptionsDialog(config) {
+// Displays a modal dialog for setting options.
+export function showOptionsDialog() {
+  const config = getConfig();
   const dialog = createDialog(template, 'options');
   const shadow = dialog.firstChild.shadowRoot;
   dialog.addEventListener('close', () => config.save());

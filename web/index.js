@@ -5,9 +5,9 @@
 import './construct-style-sheets-polyfill.js';
 
 import { $, commonStyles, handleFetchError, smallCoverSize } from './common.js';
+import Config, { getConfig } from './config.js';
 import { isDialogShown } from './dialog.js';
 import { isMenuShown } from './menu.js';
-import Config from './config.js';
 
 document.adoptedStyleSheets = [commonStyles];
 
@@ -20,11 +20,9 @@ import './presentation-layer.js';
 import './song-table.js';
 import './tag-suggester.js';
 
-const config = new Config();
+const config = getConfig();
 const player = document.querySelector('music-player');
 const searcher = document.querySelector('music-searcher');
-
-player.config = config;
 
 // Watch for theme changes.
 const darkMediaQuery = '(prefers-color-scheme: dark)';

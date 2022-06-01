@@ -20,7 +20,7 @@ import {
   smallCoverSize,
   updateTitleAttributeForTruncation,
 } from './common.js';
-import Config from './config.js';
+import Config, { getConfig } from './config.js';
 import { isDialogShown } from './dialog.js';
 import { createMenu, isMenuShown } from './menu.js';
 import { showOptionsDialog } from './options-dialog.js';
@@ -182,6 +182,7 @@ customElements.define(
     constructor() {
       super();
 
+      this.config_ = getConfig();
       this.updater_ = null; // initialized in connectedCallback()
       this.songs_ = []; // songs in the order in which they should be played
       this.tags_ = []; // available tags loaded from server
@@ -201,8 +202,6 @@ customElements.define(
       this.shadow_ = createShadow(this, template);
       this.shadow_.adoptedStyleSheets = [commonStyles];
 
-      const get = (id) => $(id, this.shadow_);
-
       this.presentationLayer_ =
         this.shadow_.querySelector('presentation-layer');
       this.presentationLayer_.addEventListener('next', () => {
@@ -211,6 +210,16 @@ customElements.define(
       this.presentationLayer_.addEventListener('hide', () => {
         this.setPresentationLayerVisible_(false);
       });
+
+      // We're leaking this callback, but it doesn't matter in practice since
+      // music-player never gets removed from the DOM.
+      this.config_.addCallback((name, value) => {
+        if (name === Config.GAIN_TYPE || name === Config.PRE_AMP) {
+          this.updateGain_();
+        }
+      });
+
+      const get = (id) => $(id, this.shadow_);
 
       this.menuButton_ = get('menu-button');
       this.menuButton_.addEventListener('click', (e) => {
@@ -228,13 +237,13 @@ customElements.define(
             {
               id: 'options',
               text: 'Options…',
-              cb: () => showOptionsDialog(this.config_),
+              cb: showOptionsDialog,
               hotkey: 'Alt+O',
             },
             {
               id: 'stats',
               text: 'Stats…',
-              cb: () => showStats(),
+              cb: showStats,
             },
             {
               id: 'info',
@@ -408,17 +417,6 @@ customElements.define(
       window.removeEventListener('beforeunload', this.onBeforeUnload_);
     }
 
-    set config(config) {
-      // We're leaking this callback, but it doesn't matter in practice since
-      // music-player never gets removed from the DOM.
-      this.config_ = config;
-      this.config_.addCallback((name, value) => {
-        if (name === Config.GAIN_TYPE || name === Config.PRE_AMP) {
-          this.updateGain_();
-        }
-      });
-    }
-
     set tags(tags) {
       this.tags_ = tags;
     }
@@ -448,7 +446,7 @@ customElements.define(
             this.cycleTrack_(1, true /* delay */);
             return true;
           } else if (e.altKey && e.key === 'o') {
-            showOptionsDialog(this.config_);
+            showOptionsDialog();
             this.setPresentationLayerVisible_(false);
             return true;
           } else if (e.altKey && e.key === 'p') {
@@ -970,7 +968,6 @@ customElements.define(
     // This implements the approach described at
     // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification.
     updateGain_() {
-      if (!this.config_) throw new Error('Config unset');
       let adj = this.config_.get(Config.PRE_AMP); // decibels
 
       const song = this.currentSong_;
