@@ -39,6 +39,7 @@ const (
 	jsType   = "application/javascript"
 	jsonType = "application/json"
 	svgType  = "image/svg+xml"
+	tsType   = "application/typescript"
 )
 
 var minifyExts = map[string]string{
@@ -47,6 +48,7 @@ var minifyExts = map[string]string{
 	".js":   jsType,
 	".json": jsonType,
 	".svg":  svgType,
+	".ts":   tsType,
 }
 
 var minifier *minify.M
@@ -59,7 +61,7 @@ func init() {
 	})
 	minifier.AddFunc(jsonType, json.Minify)
 	minifier.AddFunc(svgType, svg.Minify)
-	// JS is minified by esbuild when creating the bundle.
+	// JS and TS are minified by esbuild when creating the bundle.
 }
 
 // staticFiles maps from a relative request path (e.g. "index.html") to a []byte
@@ -146,7 +148,7 @@ func minifyData(r io.Reader, ctype string) ([]byte, error) {
 	// Super gross: look for createTemplate() and replaceSync() calls and minify the contents as
 	// HTML and CSS, respectively. The opening "createTemplate(`" or ".replaceSync(`" must appear at
 	// the end of a line and the closing "`);" must appear on a line by itself.
-	if ctype == jsType {
+	if ctype == jsType || ctype == tsType {
 		var b bytes.Buffer
 		var inHTML, inCSS bool
 		var quoted string
