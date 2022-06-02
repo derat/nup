@@ -113,12 +113,13 @@ func getStaticFile(p string, bundle, minify bool) ([]byte, error) {
 	// Use esbuild to transform TypeScript into JavaScript.
 	if ts {
 		res := api.Transform(string(b), api.TransformOptions{
-			Loader:            api.LoaderTS,
 			Charset:           api.CharsetUTF8,
 			Format:            api.FormatESModule,
-			MinifyWhitespace:  minify,
+			Loader:            api.LoaderTS,
 			MinifyIdentifiers: minify,
 			MinifySyntax:      minify,
+			MinifyWhitespace:  minify,
+			Target:            api.ES2020,
 		})
 		if len(res.Errors) > 0 {
 			return nil, fmt.Errorf("transform: %v", res.Errors[0].Text)
@@ -219,15 +220,16 @@ func buildBundle(minify bool) ([]byte, error) {
 
 	// TODO: Write source map?
 	res := api.Build(api.BuildOptions{
-		Bundle:            true,
-		EntryPoints:       []string{bundleEntryPoint},
-		Outfile:           bundleFile,
 		AbsWorkingDir:     td,
+		Bundle:            true,
 		Charset:           api.CharsetUTF8,
+		EntryPoints:       []string{bundleEntryPoint},
 		Format:            api.FormatESModule,
-		MinifyWhitespace:  minify,
 		MinifyIdentifiers: minify,
 		MinifySyntax:      minify,
+		MinifyWhitespace:  minify,
+		Outfile:           bundleFile,
+		Target:            api.ES2020,
 	})
 	if len(res.Errors) > 0 {
 		return nil, fmt.Errorf("bundle: %v", res.Errors[0].Text)

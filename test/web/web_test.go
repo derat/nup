@@ -1272,7 +1272,7 @@ func TestTypeScript(t *testing.T) {
 		"--noFallthroughCasesInSwitch",
 		"--noImplicitAny",
 		"--noUnusedLocals",
-		"--target", "esnext",
+		"--target", "es2020",
 		"../../web/index.js",
 		"../../web/global.d.ts",
 	)
