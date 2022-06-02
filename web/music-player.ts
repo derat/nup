@@ -361,7 +361,7 @@ export class MusicPlayer extends HTMLElement {
 
     if ('mediaSession' in navigator) {
       const ms = navigator.mediaSession;
-      ms.setActionHandler('play', () => this.play_(false /* delay */));
+      ms.setActionHandler('play', () => this.play_());
       ms.setActionHandler('pause', () => this.pause_());
       ms.setActionHandler('seekbackward', () =>
         this.seek_(-MusicPlayer.SEEK_SEC_)
@@ -761,7 +761,7 @@ export class MusicPlayer extends HTMLElement {
   //
   // If |delay| is true, waits a bit before loading media and playing;
   // otherwise starts playing immediately.
-  play_(delay: boolean) {
+  play_(delay = false) {
     if (!this.currentSong_) return;
 
     this.cancelPlayTimeout_();
@@ -828,7 +828,7 @@ export class MusicPlayer extends HTMLElement {
   }
 
   togglePause_() {
-    this.audio_.paused ? this.play_(false /* delay */) : this.pause_();
+    this.audio_.paused ? this.play_() : this.pause_();
   }
 
   seek_(seconds: number) {
