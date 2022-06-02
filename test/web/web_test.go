@@ -9,10 +9,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -24,11 +26,14 @@ import (
 	"github.com/derat/nup/server/config"
 	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/test"
-	"golang.org/x/sys/unix"
+
+	"github.com/evanw/esbuild/pkg/api"
 
 	"github.com/tebeka/selenium"
 	"github.com/tebeka/selenium/chrome"
 	slog "github.com/tebeka/selenium/log"
+
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -1123,8 +1128,36 @@ func TestUnit(t *testing.T) {
 	_, done := initWebTest(t)
 	defer done()
 
+	// Transform web/*.ts into JS and write it to a temp dir.
+	tsDir := filepath.Join(t.TempDir(), "ts")
+	if err := os.Mkdir(tsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	paths, err := filepath.Glob("../../web/*.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range paths {
+		b, err := ioutil.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res := api.Transform(string(b), api.TransformOptions{
+			Loader:  api.LoaderTS,
+			Charset: api.CharsetUTF8,
+			Format:  api.FormatESModule,
+		})
+		if len(res.Errors) > 0 {
+			t.Fatalf("Failed transforming %v: %v", p, res.Errors[0].Text)
+		}
+		fn := strings.TrimSuffix(filepath.Base(p), ".ts") + ".js"
+		if err := ioutil.WriteFile(filepath.Join(tsDir, fn), res.Code, 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	// Start an HTTP server that serves both the web interface and the unit test files.
-	fs := unionFS{[]http.Dir{http.Dir("unit"), http.Dir("../../web")}}
+	fs := unionFS{[]http.Dir{http.Dir("unit"), http.Dir("../../web"), http.Dir(tsDir)}}
 	srv := httptest.NewServer(http.FileServer(fs))
 	defer srv.Close()
 	if err := webDrv.Get(srv.URL); err != nil {
@@ -1230,4 +1263,20 @@ func (fs unionFS) Open(name string) (http.File, error) {
 		}
 	}
 	return nil, err
+}
+
+func TestTypeScript(t *testing.T) {
+	cmd := exec.Command("tsc",
+		"--allowJs",
+		"--noEmit",
+		"--noFallthroughCasesInSwitch",
+		"--noImplicitAny",
+		"--noUnusedLocals",
+		"--target", "esnext",
+		"../../web/index.js",
+		"../../web/global.d.ts",
+	)
+	if stdout, err := cmd.Output(); err != nil {
+		t.Errorf("tsc failed: %v\n%s", err, stdout)
+	}
 }

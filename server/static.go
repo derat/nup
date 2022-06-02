@@ -87,20 +87,43 @@ func getStaticFile(p string, bundle, minify bool) ([]byte, error) {
 		return nil, os.ErrNotExist
 	}
 
+	var ts bool
+	ext := filepath.Ext(fp)
 	f, err := os.Open(fp)
+	if os.IsNotExist(err) && ext == ".js" {
+		// If a .js file doesn't exist, try to read a .ts counterpart.
+		f, err = os.Open(strings.TrimSuffix(fp, ".js") + ".ts")
+		ts = true
+	}
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
 	var b []byte
-	if ctype, ok := minifyExts[filepath.Ext(fp)]; ok && minify {
+	if ctype, ok := minifyExts[ext]; ok && minify {
 		b, err = minifyData(f, ctype)
 	} else {
 		b, err = ioutil.ReadAll(f)
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	// Use esbuild to transform TypeScript into JavaScript.
+	if ts {
+		res := api.Transform(string(b), api.TransformOptions{
+			Loader:            api.LoaderTS,
+			Charset:           api.CharsetUTF8,
+			Format:            api.FormatESModule,
+			MinifyWhitespace:  minify,
+			MinifyIdentifiers: minify,
+			MinifySyntax:      minify,
+		})
+		if len(res.Errors) > 0 {
+			return nil, fmt.Errorf("transform: %v", res.Errors[0].Text)
+		}
+		b = res.Code
 	}
 
 	// Make index.html load the appropriate script depending on whether bundling is enabled.
@@ -169,7 +192,7 @@ func minifyData(r io.Reader, ctype string) ([]byte, error) {
 
 // buildBundle builds a single bundle file consisting of bundleEntryPoint and all of its imports.
 func buildBundle(minify bool) ([]byte, error) {
-	// Write all the (possibly minified) .js files to a temp dir for esbuild.
+	// Write all the (possibly minified) .js and .ts files to a temp dir for esbuild.
 	// I think it'd be possible to write an esbuild plugin that returns these
 	// files from memory, but the plugin API is still experimental and we only
 	// need to do this once at startup.
@@ -179,13 +202,13 @@ func buildBundle(minify bool) ([]byte, error) {
 	}
 	defer os.RemoveAll(td)
 
-	paths, err := filepath.Glob(filepath.Join(staticDir, "*.js"))
+	paths, err := filepath.Glob(filepath.Join(staticDir, "*.[jt]s"))
 	if err != nil {
 		return nil, err
 	}
 	for _, p := range paths {
 		base := filepath.Base(p)
-		b, err := getStaticFile(base, true /* bundle */, minify)
+		b, err := getStaticFile(base, false /* bundle */, minify)
 		if err != nil {
 			return nil, err
 		}

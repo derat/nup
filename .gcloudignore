@@ -20,5 +20,6 @@ build/
 cmd/
 example/
 test/
+web/*.d.ts
 web/fonts/*.json
 web/fonts/*.txt

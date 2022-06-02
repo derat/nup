@@ -29,6 +29,7 @@ RUN apt-get install -y \
     google-cloud-sdk-app-engine-go \
     google-cloud-sdk-app-engine-python \
     google-cloud-sdk-datastore-emulator \
+    node-typescript \
     python-is-python2 \
     unzip \
     xvfb

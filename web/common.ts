@@ -6,26 +6,29 @@ export const emptyImg =
   'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
 // Returns the element under |root| with ID |id|.
-export const $ = (id, root) => (root ?? document).getElementById(id);
+export const $ = (id: string, root: Document | ShadowRoot = document) =>
+  root.getElementById(id);
 
-// Clamps number |val| between |min| and |max|.
-export const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
+// Clamps |val| between |min| and |max|.
+export const clamp = (val: number, min: number, max: number) =>
+  Math.min(Math.max(val, min), max);
 
-function pad(num, width) {
-  let str = num + '';
+function pad(num: number, width: number) {
+  let str = num.toString();
   while (str.length < width) str = '0' + str;
   return str;
 }
 
 // Formats |sec| as 'm:ss'.
-export const formatDuration = (sec) =>
-  parseInt(sec / 60) + ':' + pad(parseInt(sec % 60), 2);
+export const formatDuration = (sec: number) =>
+  `${Math.floor(sec / 60)}:${pad(Math.floor(sec % 60), 2)}`;
 
 // Formats |sec| as a rounded relative time, e.g. '1 second ago' for -1
 // or 'in 2 hours' for 7200.
-export function formatRelativeTime(sec) {
+export function formatRelativeTime(sec: number) {
   const rtf = new Intl.RelativeTimeFormat('en', { style: 'long' });
-  const fmt = (n, u) => rtf.format(Math.round(n), u);
+  const fmt = (n: number, u: Intl.RelativeTimeFormatUnit) =>
+    rtf.format(Math.round(n), u);
   const days = sec / 86400;
   const hours = sec / 3600;
   const min = sec / 60;
@@ -44,13 +47,21 @@ export const getCurrentTimeSec = () => Date.now() / 1000;
 //
 // Note that this can be slow, as accessing |scrollWidth| and |offsetWidth| may
 // trigger a reflow: https://stackoverflow.com/a/70871905/6882947
-export function updateTitleAttributeForTruncation(element, text) {
+export function updateTitleAttributeForTruncation(
+  element: HTMLElement,
+  text: string
+) {
   if (element.scrollWidth > element.offsetWidth) element.title = text;
   else element.removeAttribute('title');
 }
 
 // Creates and returns a new |type| element. All other parameters are optional.
-export function createElement(type, className, parentElement, text) {
+export function createElement(
+  type: string,
+  className?: string,
+  parentElement?: HTMLElement,
+  text?: string
+) {
   const element = document.createElement(type);
   if (className) element.className = className;
   if (parentElement) parentElement.appendChild(element);
@@ -60,14 +71,14 @@ export function createElement(type, className, parentElement, text) {
 
 // Creates and returns a new shadow DOM attached to |el|. If |template| is
 // supplied, a copy of it is attached as a child of the root node.
-export function createShadow(el, template) {
+export function createShadow(el: HTMLElement, template?: HTMLTemplateElement) {
   const shadow = el.attachShadow({ mode: 'open' });
   if (template) shadow.appendChild(template.content.cloneNode(true));
   return shadow;
 }
 
 // Creates and returns a new <template> containing the supplied HTML.
-export function createTemplate(html) {
+export function createTemplate(html: string) {
   const template = document.createElement('template');
   template.innerHTML = html;
   return template;
@@ -75,7 +86,7 @@ export function createTemplate(html) {
 
 // Returns an absolute URL for the song specified by |filename| (corresponding
 // to a song's |filename| property).
-export const getSongUrl = (filename) =>
+export const getSongUrl = (filename: string) =>
   getAbsUrl(`/song?filename=${encodeURIComponent(filename)}`);
 
 // Image sizes that can be passed to getCoverUrl().
@@ -87,7 +98,7 @@ export const largeCoverSize = 512;
 // If |size| isn't supplied, returns the full-size, possibly-non-square image.
 // Otherwise (i.e. |smallCoverSize| or |largeCoverSize|), returns a scaled,
 // square version.
-export function getCoverUrl(filename, size = 0) {
+export function getCoverUrl(filename: string, size = 0) {
   if (!filename) return '';
   let path = `/cover?filename=${encodeURIComponent(filename)}`;
   if (size) path += `&size=${size}&webp=1`;
@@ -95,20 +106,20 @@ export function getCoverUrl(filename, size = 0) {
 }
 
 // Fetches an image at |src| so it can be loaded from the cache later.
-export const preloadImage = (src) => (new Image().src = src);
+export const preloadImage = (src: string) => (new Image().src = src);
 
 // Returns a URL for dumping information about the song identified by |songId|.
-export const getDumpSongUrl = (songId) => `/dump_song?songId=${songId}`;
+export const getDumpSongUrl = (songId: string) => `/dump_song?songId=${songId}`;
 
 // Returns an absolute version of |url| if it's relative.
 // If it's already absolute, it is returned unchanged.
-const getAbsUrl = (url) => new URL(url, document.baseURI).href;
+const getAbsUrl = (url: string) => new URL(url, document.baseURI).href;
 
 // Throws if |response| failed due to the server returning an error status.
-export function handleFetchError(response) {
+export function handleFetchError(response: Response) {
   if (!response.ok) {
     return response.text().then((text) => {
-      throw new Error(`${response.status}: ${text}`, response);
+      throw new Error(`${response.status}: ${text}`);
     });
   }
   return response;
@@ -116,13 +127,13 @@ export function handleFetchError(response) {
 
 // Converts a rating in the range [1, 5] (or 0 for unrated) to a string.
 export function getRatingString(
-  rating,
+  rating: number,
   filledStar = '★',
   emptyStar = '☆',
   unrated = 'Unrated',
   ratedPrefix = ''
 ) {
-  rating = clamp(parseInt(rating), 0, 5);
+  rating = clamp(Math.round(rating), 0, 5);
   if (rating === 0 || isNaN(rating)) return unrated;
 
   let str = ratedPrefix;
@@ -132,7 +143,12 @@ export function getRatingString(
 
 // Moves the item at index |from| in |array| to index |to|.
 // If |idx| is passed, it is adjusted if needed and returned.
-export function moveItem(array, from, to, idx) {
+export function moveItem<T>(
+  array: Array<T>,
+  from: number,
+  to: number,
+  idx?: number
+) {
   if (from === to) return idx;
 
   // https://stackoverflow.com/a/2440723
