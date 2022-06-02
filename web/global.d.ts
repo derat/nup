@@ -1,6 +1,7 @@
 // Copyright 2022 Daniel Erat.
 // All rights reserved.
 
+// Corresponds to Song in server/db/song.go.
 declare interface Song {
   sha1: string;
   songId: string;
@@ -19,6 +20,21 @@ declare interface Song {
   peakAmp: number;
   rating: number;
   tags: string[];
+}
+
+// Corresponds to SearchPreset in server/config/config.go.
+declare interface SearchPreset {
+  name: string;
+  tags: string;
+  minRating: number;
+  unrated: boolean;
+  firstPlayed: number;
+  lastPlayed: number;
+  orderByLastPlayed: boolean;
+  maxPlays: number;
+  firstTrack: boolean;
+  shuffle: boolean;
+  play: boolean;
 }
 
 declare interface CSSStyleSheet {

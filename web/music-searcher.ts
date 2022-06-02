@@ -16,6 +16,8 @@ import {
 import { isDialogShown, showMessageDialog } from './dialog.js';
 import { createMenu, isMenuShown } from './menu.js';
 import { showSongInfo } from './song-info.js';
+import type { SongTable } from './song-table.js';
+import type { TagSuggester } from './tag-suggester.js';
 
 const template = createTemplate(`
 <style>
@@ -282,82 +284,88 @@ const template = createTemplate(`
 customElements.define(
   'music-searcher',
   class extends HTMLElement {
+    fetchController_: AbortController | null = null;
+    shadow_ = createShadow(this, template);
+
+    // Convenience methods for initializing members.
+    getInput_ = (id: string) => $(id, this.shadow_) as HTMLInputElement;
+    getSelect_ = (id: string) => $(id, this.shadow_) as HTMLSelectElement;
+    getButton_ = (id: string) => $(id, this.shadow_) as HTMLButtonElement;
+
+    keywordsInput_ = this.getInput_('keywords-input');
+    tagSuggester_ = $('tags-suggester', this.shadow_) as TagSuggester;
+    tagsInput_ = this.getInput_('tags-input');
+    shuffleCheckbox_ = this.getInput_('shuffle-checkbox');
+    firstTrackCheckbox_ = this.getInput_('first-track-checkbox');
+    unratedCheckbox_ = this.getInput_('unrated-checkbox');
+    minRatingSelect_ = this.getSelect_('min-rating-select');
+    orderByLastPlayedCheckbox_ = this.getInput_(
+      'order-by-last-played-checkbox'
+    );
+    maxPlaysInput_ = this.getInput_('max-plays-input');
+    firstPlayedSelect_ = this.getSelect_('first-played-select');
+    lastPlayedSelect_ = this.getSelect_('last-played-select');
+    presetSelect_ = this.getSelect_('preset-select');
+
+    resultsTable_ = $('results-table', this.shadow_) as SongTable;
+    waitingDiv_ = $('waiting', this.shadow_);
+    presets_: SearchPreset[] = [];
+    resultsShuffled_ = false;
+
     constructor() {
       super();
 
-      this.fetchController_ = null;
-
-      this.shadow_ = createShadow(this, template);
       this.shadow_.adoptedStyleSheets = [commonStyles];
 
-      const get = (id) => $(id, this.shadow_);
-
-      this.keywordsInput_ = get('keywords-input');
       this.keywordsInput_.addEventListener('keydown', this.onFormKeyDown_);
-      get('keywords-clear').addEventListener(
+      $('keywords-clear', this.shadow_).addEventListener(
         'click',
         () => (this.keywordsInput_.value = '')
       );
 
-      this.tagSuggester_ = get('tags-suggester');
-      this.tagsInput_ = get('tags-input');
       this.tagsInput_.addEventListener('keydown', this.onFormKeyDown_);
-      get('tags-clear').addEventListener(
+      $('tags-clear', this.shadow_).addEventListener(
         'click',
         () => (this.tagsInput_.value = '')
       );
 
-      this.shuffleCheckbox_ = get('shuffle-checkbox');
       this.shuffleCheckbox_.addEventListener('keydown', this.onFormKeyDown_);
-      this.firstTrackCheckbox_ = get('first-track-checkbox');
       this.firstTrackCheckbox_.addEventListener('keydown', this.onFormKeyDown_);
-      this.unratedCheckbox_ = get('unrated-checkbox');
       this.unratedCheckbox_.addEventListener('keydown', this.onFormKeyDown_);
       this.unratedCheckbox_.addEventListener('change', () =>
         this.updateFormDisabledState_()
       );
-      this.minRatingSelect_ = get('min-rating-select');
-      this.orderByLastPlayedCheckbox_ = get('order-by-last-played-checkbox');
       this.orderByLastPlayedCheckbox_.addEventListener(
         'keydown',
         this.onFormKeyDown_
       );
-      this.maxPlaysInput_ = get('max-plays-input');
       this.maxPlaysInput_.addEventListener('keydown', this.onFormKeyDown_);
-      this.firstPlayedSelect_ = get('first-played-select');
-      this.lastPlayedSelect_ = get('last-played-select');
-      this.presetSelect_ = get('preset-select');
       this.presetSelect_.addEventListener('change', this.onPresetSelectChange_);
 
-      this.searchButton_ = get('search-button');
-      this.searchButton_.addEventListener('click', () =>
+      this.getButton_('search-button').addEventListener('click', () =>
         this.submitQuery_(false)
       );
-      this.resetButton_ = get('reset-button');
-      this.resetButton_.addEventListener('click', () =>
+      this.getButton_('reset-button').addEventListener('click', () =>
         this.reset_(null, null, null, true /* clearResults */)
       );
-      this.luckyButton_ = get('lucky-button');
-      this.luckyButton_.addEventListener('click', () => this.doLuckySearch_());
+      this.getButton_('lucky-button').addEventListener('click', () =>
+        this.doLuckySearch_()
+      );
 
-      this.appendButton_ = get('append-button');
-      this.appendButton_.addEventListener('click', () =>
+      this.getButton_('append-button').addEventListener('click', () =>
         this.enqueueSearchResults_(
           false /* clearFirst */,
           false /* afterCurrent */
         )
       );
-      this.insertButton_ = get('insert-button');
-      this.insertButton_.addEventListener('click', () =>
+      this.getButton_('insert-button').addEventListener('click', () =>
         this.enqueueSearchResults_(false, true)
       );
-      this.replaceButton_ = get('replace-button');
-      this.replaceButton_.addEventListener('click', () =>
+      this.getButton_('replace-button').addEventListener('click', () =>
         this.enqueueSearchResults_(true, false)
       );
 
-      this.resultsTable_ = get('results-table');
-      this.resultsTable_.addEventListener('field', (e) => {
+      this.resultsTable_.addEventListener('field', (e: CustomEvent) => {
         this.reset_(
           e.detail.artist,
           e.detail.album,
@@ -365,14 +373,14 @@ customElements.define(
           false /* clearResults */
         );
       });
-      this.resultsTable_.addEventListener('check', (e) => {
+      this.resultsTable_.addEventListener('check', (e: CustomEvent) => {
         const checked = !!e.detail.count;
-        this.appendButton_.disabled =
-          this.insertButton_.disabled =
-          this.replaceButton_.disabled =
+        this.getButton_('append-button').disabled =
+          this.getButton_('insert-button').disabled =
+          this.getButton_('replace-button').disabled =
             !checked;
       });
-      this.resultsTable_.addEventListener('menu', (e) => {
+      this.resultsTable_.addEventListener('menu', (e: CustomEvent) => {
         const idx = e.detail.index;
         const orig = e.detail.orig;
         orig.preventDefault();
@@ -396,12 +404,7 @@ customElements.define(
         });
       });
 
-      this.waitingDiv_ = get('waiting');
-
-      this.presets_ = [];
       this.getPresetsFromServer_();
-
-      this.resultsShuffled_ = false;
     }
 
     connectedCallback() {
@@ -413,13 +416,13 @@ customElements.define(
     }
 
     // Uses |tags| as autocomplete suggestions in the tags search field.
-    set tags(tags) {
+    set tags(tags: string[]) {
       // Also suggest negative tags.
       this.tagSuggester_.words = tags.concat(tags.map((t) => '-' + t));
     }
 
     // Resets the search fields using the supplied (optional) values.
-    resetFields(artist, album, albumId) {
+    resetFields(artist?: string, album?: string, albumId?: string) {
       this.reset_(artist, album, albumId, false);
     }
 
@@ -446,8 +449,8 @@ customElements.define(
         });
     }
 
-    submitQuery_(appendToQueue) {
-      let terms = [];
+    submitQuery_(appendToQueue: boolean) {
+      let terms: String[] = [];
       if (this.keywordsInput_.value.trim()) {
         terms = terms.concat(parseQueryString(this.keywordsInput_.value));
       }
@@ -472,13 +475,13 @@ customElements.define(
       const firstPlayed = parseInt(this.firstPlayedSelect_.value);
       if (firstPlayed !== 0) {
         terms.push(
-          `minFirstPlayed=${parseInt(getCurrentTimeSec() - firstPlayed)}`
+          `minFirstPlayed=${Math.round(getCurrentTimeSec()) - firstPlayed}`
         );
       }
       const lastPlayed = parseInt(this.lastPlayedSelect_.value);
       if (lastPlayed !== 0) {
         terms.push(
-          `maxLastPlayed=${parseInt(getCurrentTimeSec() - lastPlayed)}`
+          `maxLastPlayed=${Math.round(getCurrentTimeSec()) - lastPlayed}`
         );
       }
 
@@ -492,7 +495,7 @@ customElements.define(
 
       const shuffled = this.shuffleCheckbox_.checked;
 
-      if (this.fetchController_) this.fetchController_.abort();
+      this.fetchController_?.abort();
       this.fetchController_ = new AbortController();
       const signal = this.fetchController_.signal;
 
@@ -501,7 +504,7 @@ customElements.define(
       fetch(url, { method: 'GET', signal })
         .then((res) => handleFetchError(res))
         .then((res) => res.json())
-        .then((songs) => {
+        .then((songs: Song[]) => {
           console.log('Got response with ' + songs.length + ' song(s)');
           this.resultsTable_.setSongs(songs);
           this.resultsTable_.setAllCheckboxes(true);
@@ -525,7 +528,7 @@ customElements.define(
         });
     }
 
-    enqueueSearchResults_(clearFirst, afterCurrent) {
+    enqueueSearchResults_(clearFirst: boolean, afterCurrent: boolean) {
       const songs = this.resultsTable_.checkedSongs;
       if (!songs.length) return;
 
@@ -545,9 +548,14 @@ customElements.define(
     // Resets all of the fields in the search form. If |newArtist|, |newAlbum|,
     // or |newAlbumId| are non-null, the supplied values are used. Also jumps to
     // the top of the page so the form is visible.
-    reset_(newArtist, newAlbum, newAlbumId, clearResults) {
+    reset_(
+      newArtist: string | null,
+      newAlbum: string | null,
+      newAlbumId: string | null,
+      clearResults: boolean
+    ) {
       const keywords = [];
-      const clean = (s) => {
+      const clean = (s: string) => {
         s = s.replace(/"/g, '\\"');
         if (s.includes(' ')) s = '"' + s + '"';
         return s;
@@ -596,7 +604,7 @@ customElements.define(
     }
 
     // Handle a key being pressed in the search form.
-    onFormKeyDown_ = (e) => {
+    onFormKeyDown_ = (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
         this.submitQuery_(false);
       } else if ([' ', 'ArrowLeft', 'ArrowRight', '/'].includes(e.key)) {
@@ -622,7 +630,8 @@ customElements.define(
       this.orderByLastPlayedCheckbox_.checked = preset.orderByLastPlayed;
       this.firstPlayedSelect_.selectedIndex = preset.firstPlayed;
       this.lastPlayedSelect_.selectedIndex = preset.lastPlayed;
-      this.maxPlaysInput_.value = preset.maxPlays >= 0 ? preset.maxPlays : '';
+      this.maxPlaysInput_.value =
+        preset.maxPlays >= 0 ? preset.maxPlays.toString() : '';
       this.firstTrackCheckbox_.checked = preset.firstTrack;
       this.shuffleCheckbox_.checked = preset.shuffle;
 
@@ -635,7 +644,7 @@ customElements.define(
       this.submitQuery_(preset.play);
     };
 
-    onBodyKeyDown_ = (e) => {
+    onBodyKeyDown_ = (e: KeyboardEvent) => {
       if (isDialogShown() || isMenuShown()) return;
 
       if (e.key === '/') {
@@ -647,9 +656,9 @@ customElements.define(
   }
 );
 
-function parseQueryString(text) {
-  let terms = [];
-  let keywords = [];
+function parseQueryString(text: string) {
+  const terms: string[] = [];
+  let keywords: string[] = [];
 
   text = text.trim();
   while (text.length > 0) {
