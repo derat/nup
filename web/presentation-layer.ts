@@ -196,6 +196,27 @@ const template = createTemplate(`
 customElements.define(
   'presentation-layer',
   class extends HTMLElement {
+    duration_: number;
+    lastPos_: number;
+    visible_: boolean;
+    currentFilename_: string | null;
+    nextFilename_: string | null;
+    shadow_: ShadowRoot;
+    currentCover_: HTMLImageElement;
+    oldCover_: HTMLImageElement;
+    currentDetails_: HTMLElement;
+    currentArtist_: HTMLElement;
+    currentTitle_: HTMLElement;
+    currentAlbum_: HTMLElement;
+    progressBar_: HTMLElement;
+    timeDiv_: HTMLElement;
+    durationDiv_: HTMLElement;
+    nextDiv_: HTMLElement;
+    nextCover_: HTMLImageElement;
+    nextArtist_: HTMLElement;
+    nextTitle_: HTMLElement;
+    nextAlbum_: HTMLElement;
+
     constructor() {
       super();
 
@@ -207,8 +228,8 @@ customElements.define(
 
       this.shadow_ = createShadow(this, template);
 
-      this.currentCover_ = $('current-cover', this.shadow_);
-      this.oldCover_ = $('old-cover', this.shadow_);
+      this.currentCover_ = $('current-cover', this.shadow_) as HTMLImageElement;
+      this.oldCover_ = $('old-cover', this.shadow_) as HTMLImageElement;
 
       this.currentDetails_ = $('current-details', this.shadow_);
       this.currentArtist_ = $('current-artist', this.shadow_);
@@ -220,7 +241,7 @@ customElements.define(
       this.durationDiv_ = $('current-duration', this.shadow_);
 
       this.nextDiv_ = $('next', this.shadow_);
-      this.nextCover_ = $('next-cover', this.shadow_);
+      this.nextCover_ = $('next-cover', this.shadow_) as HTMLImageElement;
       this.nextArtist_ = $('next-artist', this.shadow_);
       this.nextTitle_ = $('next-title', this.shadow_);
       this.nextAlbum_ = $('next-album', this.shadow_);
@@ -237,7 +258,7 @@ customElements.define(
       this.updateSongs(null, null);
     }
 
-    updateSongs(currentSong, nextSong) {
+    updateSongs(currentSong: Song | null, nextSong: Song | null) {
       if (!currentSong) {
         this.currentDetails_.classList.add('hidden');
         this.currentFilename_ = null;
@@ -269,7 +290,7 @@ customElements.define(
       // Make the "old" cover image display the image that we were just
       // displaying, if any, and then fade out. We swap in a new image to
       // retrigger the fade-out animation.
-      const el = this.currentCover_.cloneNode(true);
+      const el = this.currentCover_.cloneNode(true) as HTMLImageElement;
       el.id = 'old-cover';
       this.oldCover_.parentNode.replaceChild(el, this.oldCover_);
       this.oldCover_ = el;
@@ -301,7 +322,7 @@ customElements.define(
       }
     }
 
-    updatePosition(sec) {
+    updatePosition(sec: number) {
       this.lastPos_ = sec;
 
       if (!this.visible || this.duration_ <= 0) return;
@@ -317,7 +338,7 @@ customElements.define(
     get visible() {
       return this.visible_;
     }
-    set visible(visible) {
+    set visible(visible: boolean) {
       if (this.visible_ === visible) return;
 
       if (visible) {
@@ -343,7 +364,7 @@ customElements.define(
   }
 );
 
-function updateImg(img, url) {
+function updateImg(img: HTMLImageElement, url: string | null) {
   if (url) {
     img.src = url;
     img.classList.remove('hidden');

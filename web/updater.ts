@@ -12,6 +12,14 @@ export default class Updater {
   static MIN_RETRY_DELAY_MS_ = 500; // Half a second.
   static MAX_RETRY_DELAY_MS_ = 300 * 1000; // Five minutes.
 
+  retryTimeoutId_: number | null;
+  lastRetryDelayMs_: number;
+  queuedPlayReports_: PlayReport[];
+  queuedRatingsAndTags_: SongUpdateMap;
+  inProgressPlayReports_: PlayReport[];
+  inProgressRatingsAndTags_: SongUpdateMap;
+  initialRetryDone_: Promise<void>;
+
   constructor() {
     this.retryTimeoutId_ = null; // for doRetry_()
     this.lastRetryDelayMs_ = 0; // used by scheduleRetry_()
@@ -19,11 +27,14 @@ export default class Updater {
     // Play reports that still need to be sent to the server.
     //
     // [
-    //   {'songId': 5459812892540928, 'startTime': 1638363333.676},
-    //   {'songId': 4926489086656512, 'startTime': 1638363383.521},
+    //   {'songId': '5459812892540928', 'startTime': 1638363333.676},
+    //   {'songId': '4926489086656512', 'startTime': 1638363383.521},
     //   ...
     // ]
-    this.queuedPlayReports_ = readObject(Updater.QUEUED_PLAY_REPORTS_KEY_, []);
+    this.queuedPlayReports_ = readObject(
+      Updater.QUEUED_PLAY_REPORTS_KEY_,
+      []
+    ) as PlayReport[];
 
     // Rating and/or tags updates that still need to be sent to the server,
     // keyed by song ID.
@@ -37,18 +48,21 @@ export default class Updater {
     this.queuedRatingsAndTags_ = readObject(
       Updater.QUEUED_RATINGS_AND_TAGS_KEY_,
       {}
-    );
+    ) as SongUpdateMap;
 
     // Play reports and rating/tags updates that are currently being sent.
     this.inProgressPlayReports_ = [];
     this.inProgressRatingsAndTags_ = {};
 
     // Move updates that were in-progress during the last run into the queue.
-    for (const play of readObject(Updater.IN_PROGRESS_PLAY_REPORTS_KEY_, [])) {
+    for (const play of readObject(
+      Updater.IN_PROGRESS_PLAY_REPORTS_KEY_,
+      []
+    ) as PlayReport[]) {
       this.queuedPlayReports_.push(play);
     }
     for (const [songId, data] of Object.entries(
-      readObject(Updater.IN_PROGRESS_RATINGS_AND_TAGS_KEY_, {})
+      readObject(Updater.IN_PROGRESS_RATINGS_AND_TAGS_KEY_, {}) as SongUpdateMap
     )) {
       this.queuedRatingsAndTags_[songId] = data;
     }
@@ -78,7 +92,7 @@ export default class Updater {
   // Asynchronously notifies the server that song |songId| was played starting
   // at |startTime| seconds since the Unix expoch. Returns a promise that is
   // resolved once the reporting attempt is completed (possibly unsuccessfully).
-  reportPlay(songId, startTime) {
+  reportPlay(songId: string, startTime: number): Promise<void> {
     // Move from queued (if present) to in-progress.
     removePlayReport(this.queuedPlayReports_, songId, startTime);
     addPlayReport(this.inProgressPlayReports_, songId, startTime);
@@ -109,7 +123,11 @@ export default class Updater {
   // (int in [1, 5] or 0 for unrated) and |tags| (string array). Either |rating|
   // or |tags| can be null to leave them unchanged. Returns a promise that is
   // resolved once the update attempt is completed (possibly unsuccessfully).
-  rateAndTag(songId, rating, tags) {
+  rateAndTag(
+    songId: string,
+    rating: number | null,
+    tags: string[] | null
+  ): Promise<void> {
     if (rating === null && tags === null) return Promise.resolve();
 
     // Handle the case where there's a queued rating and we're only updating
@@ -185,7 +203,7 @@ export default class Updater {
   }
 
   // Schedules a doRetry_() call if needed.
-  scheduleRetry_(immediate) {
+  scheduleRetry_(immediate: boolean) {
     // If we're not online, don't bother trying.
     // We'll be called again when the system comes back online.
     if (navigator.onLine === false) return;
@@ -247,20 +265,36 @@ export default class Updater {
   }
 }
 
+interface PlayReport {
+  songId: string;
+  startTime: number;
+}
+
+interface SongUpdate {
+  rating: number | null;
+  tags: string[] | null;
+}
+
+type SongUpdateMap = Record<string, SongUpdate>;
+
 // Reads |key| from local storage and parses it as JSON.
 // |defaultObject| is returned if the key is unset.
-function readObject(key, defaultObject) {
+function readObject(key: string, defaultObject: Object) {
   const value = localStorage.getItem(key);
   return value !== null ? JSON.parse(value) : defaultObject;
 }
 
 // Appends a play report to |list|.
-function addPlayReport(list, songId, startTime) {
-  list.push({ songId: songId, startTime: startTime });
+function addPlayReport(list: PlayReport[], songId: string, startTime: number) {
+  list.push({ songId, startTime });
 }
 
 // Removes the specified play report from |list|.
-function removePlayReport(list, songId, startTime) {
+function removePlayReport(
+  list: PlayReport[],
+  songId: string,
+  startTime: number
+) {
   for (let i = 0; i < list.length; i++) {
     if (list[i].songId === songId && list[i].startTime === startTime) {
       list.splice(i, 1);
@@ -269,7 +303,12 @@ function removePlayReport(list, songId, startTime) {
   }
 }
 
-// Sets |songId|'s rating and tags within |obj|.
-function addRatingAndTags(obj, songId, rating, tags) {
-  obj[songId] = { rating: rating, tags: tags };
+// Sets |songId|'s rating and tags within |map|.
+function addRatingAndTags(
+  map: SongUpdateMap,
+  songId: string,
+  rating: number | null,
+  tags: string[] | null
+) {
+  map[songId] = { rating: rating, tags: tags };
 }
