@@ -63,9 +63,16 @@ let numDialogs = 0;
 // Creates and shows a modal dialog filled with the supplied template.
 // If |className| is supplied, it is added to dialog's shadow root.
 // The <dialog> element is returned, and the shadow root can be accessed
-// via |dialog.firstChild.shadowRoot|.
-export function createDialog(template, className) {
-  const dialog = createElement('dialog', 'dialog', document.body);
+// via |dialog.firstElementChild.shadowRoot|.
+export function createDialog(
+  template: HTMLTemplateElement,
+  className?: string
+): HTMLDialogElement {
+  const dialog = createElement(
+    'dialog',
+    'dialog',
+    document.body
+  ) as HTMLDialogElement;
   dialog.addEventListener('close', () => {
     document.body.removeChild(dialog);
     numDialogs--;
@@ -85,11 +92,11 @@ export function createDialog(template, className) {
 
 // Creates and shows a modal dialog with the supplied title and text.
 // The dialog is not returned.
-export function showMessageDialog(titleText, messageText) {
+export function showMessageDialog(title: string, message: string) {
   const dialog = createDialog(msgTemplate, null);
-  const shadow = dialog.firstChild.shadowRoot;
-  $('title', shadow).innerText = titleText;
-  $('message', shadow).innerText = messageText;
+  const shadow = dialog.firstElementChild.shadowRoot;
+  $('title', shadow).innerText = title;
+  $('message', shadow).innerText = message;
   $('ok-button', shadow).addEventListener('click', () => dialog.close());
 }
 

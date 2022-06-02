@@ -57,42 +57,50 @@ const template = createTemplate(`
 
 // UpdateDialog displays a dialog to update a song's rating and tags.
 export default class UpdateDialog {
+  song_: Song;
+  tags_: string[]; // all tags known by server
+  callback_: UpdateCallback;
+  rating_: number; // rating set in dialog
+  dialog_: HTMLDialogElement;
+  ratingSpan_: HTMLElement;
+  tagsTextarea_: HTMLTextAreaElement;
+
   // |song| is the song to update, and |tags| is an array of available tags.
-  // When the dialog is closed, |closeCallback| is invoked with the updated
-  // rating (null if unchanged) and an array containing the updated tags (null
-  // if unchanged).
-  constructor(song, tags, closeCallback) {
+  // When the dialog is closed, |callback| is invoked with the updated rating
+  // (null if unchanged) and an array containing the updated tags (null if
+  // unchanged).
+  constructor(song: Song, tags: string[], callback: UpdateCallback) {
     this.song_ = song;
     this.tags_ = tags;
-    this.closeCallback_ = closeCallback;
-    this.rating_ = -1; // rating set in dialog
+    this.callback_ = callback;
+    this.rating_ = -1;
     this.dialog_ = createDialog(template, 'update');
 
     // This sucks, but I don't want to put this styling in index.html.
     this.dialog_.style.borderRadius = '4px';
-    this.dialog_.style.margin = 0; // needed to avoid centering
+    this.dialog_.style.margin = '0'; // needed to avoid centering
     this.dialog_.style.padding = '8px';
     this.dialog_.style.left = this.dialog_.style.top = getComputedStyle(
       this.dialog_
     ).getPropertyValue('--margin');
     this.dialog_.style.position = 'absolute';
 
-    const shadow = this.dialog_.firstChild.shadowRoot;
-    const get = (id) => $(id, shadow);
+    const shadow = this.dialog_.firstElementChild.shadowRoot;
+    const get = (id: string) => $(id, shadow);
 
     get('close-icon').addEventListener('click', () => this.close(true));
-    get('tag-suggester').words = tags;
+    (get('tag-suggester') as any).words = tags;
 
     this.ratingSpan_ = get('rating');
     this.ratingSpan_.addEventListener('keydown', this.onRatingSpanKeyDown_);
     for (let i = 1; i <= 5; i++) {
-      const anchor = this.ratingSpan_.childNodes[i - 1];
+      const anchor = this.ratingSpan_.children[i - 1];
       const rating = i;
       anchor.addEventListener('click', () => this.setRating_(rating));
     }
     this.setRating_(song.rating);
 
-    this.tagsTextarea_ = get('tags-textarea');
+    this.tagsTextarea_ = get('tags-textarea') as HTMLTextAreaElement;
     this.tagsTextarea_.value = song.tags.length
       ? song.tags.sort().join(' ') + ' ' // append space to ease editing
       : '';
@@ -109,7 +117,7 @@ export default class UpdateDialog {
     this.tagsTextarea_.focus();
   }
 
-  close(save) {
+  close(save: boolean) {
     document.body.removeEventListener('keydown', this.onBodyKeyDown_);
     this.dialog_.close();
 
@@ -139,17 +147,18 @@ export default class UpdateDialog {
       if (tags.join(' ') === this.song_.tags.sort().join(' ')) tags = null;
     }
 
-    this.closeCallback_(rating, tags);
+    this.callback_(rating, tags);
   }
 
-  setRating_(rating) {
+  setRating_(rating: number) {
     this.rating_ = rating;
     for (let i = 1; i <= 5; i++) {
-      this.ratingSpan_.childNodes[i - 1].innerText = i <= rating ? '★' : '☆';
+      const a = this.ratingSpan_.children[i - 1] as HTMLElement;
+      a.innerText = i <= rating ? '★' : '☆';
     }
   }
 
-  onBodyKeyDown_ = (e) => {
+  onBodyKeyDown_ = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
       this.close(true);
     } else if (e.key === 'Escape') {
@@ -161,7 +170,7 @@ export default class UpdateDialog {
     }
   };
 
-  onRatingSpanKeyDown_ = (e) => {
+  onRatingSpanKeyDown_ = (e: KeyboardEvent) => {
     if (['0', '1', '2', '3', '4', '5'].includes(e.key)) {
       this.setRating_(parseInt(e.key));
       e.preventDefault();
@@ -174,3 +183,5 @@ export default class UpdateDialog {
     }
   };
 }
+
+type UpdateCallback = (rating: number | null, tags: string[] | null) => void;

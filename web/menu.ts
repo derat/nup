@@ -45,14 +45,17 @@ let numMenus = 0;
 
 // Creates and displays a simple context menu at the specified location.
 // Returns a <dialog> element containing a <span> acting as a shadow root.
-//
-// |items| is an array of objects with the following properties:
-// - text   - menu item text, or '-' to insert separator instead
-// - cb     - callback to run when clicked
-// - id     - optional ID for element (used in tests)
-// - hotkey - optional text describing menu's accelerator
-export function createMenu(x, y, items, alignRight) {
-  const menu = createElement('dialog', 'menu', document.body);
+export function createMenu(
+  x: number,
+  y: number,
+  items: MenuItem[],
+  alignRight = false
+) {
+  const menu = createElement(
+    'dialog',
+    'menu',
+    document.body
+  ) as HTMLDialogElement;
   menu.addEventListener('close', () => {
     document.body.removeChild(menu);
     numMenus--;
@@ -116,6 +119,13 @@ export function createMenu(x, y, items, alignRight) {
   numMenus++;
   menu.showModal();
   return menu;
+}
+
+interface MenuItem {
+  text: string; // menu item text, or '-' to insert separator instead
+  cb: () => void; // callback to run when clicked
+  id?: string; // ID for element (used in tests)
+  hotkey?: string; // text describing menu's accelerator
 }
 
 // Returns true if a menu is currently shown.

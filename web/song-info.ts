@@ -3,7 +3,6 @@
 
 import {
   $,
-  createShadow,
   createTemplate,
   formatDuration,
   getCoverUrl,
@@ -75,14 +74,14 @@ const template = createTemplate(`
 `);
 
 // Displays a modal dialog containing information about |song|.
-export function showSongInfo(song) {
+export function showSongInfo(song: Song) {
   const dialog = createDialog(template, 'info');
-  const shadow = dialog.firstChild.shadowRoot;
+  const shadow = dialog.firstElementChild.shadowRoot;
 
-  const cover = $('cover-img', shadow);
+  const cover = $('cover-img', shadow) as HTMLImageElement;
   if (song.coverFilename) {
     cover.src = getCoverUrl(song.coverFilename, largeCoverSize);
-    const link = $('cover-link', shadow);
+    const link = $('cover-link', shadow) as HTMLAnchorElement;
     link.href = getCoverUrl(song.coverFilename);
     link.target = '_blank';
   } else {
@@ -94,7 +93,7 @@ export function showSongInfo(song) {
   $('album', shadow).innerText = song.album;
   $('track', shadow).innerText =
     song.track + (song.disc > 1 ? ` (Disc ${song.disc})` : '');
-  $('length', shadow).innerText = formatDuration(parseFloat(song.length));
+  $('length', shadow).innerText = formatDuration(song.length);
   $('rating', shadow).innerText = getRatingString(song.rating);
   $('tags', shadow).innerText = song.tags ? song.tags.join(' ') : '';
   $('dismiss-button', shadow).addEventListener('click', () => dialog.close());

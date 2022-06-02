@@ -122,28 +122,28 @@ const template = createTemplate(`
 // Shows a modal dialog containing stats fetched from the server.
 export function showStats() {
   const dialog = createDialog(template, 'stats');
-  const shadow = dialog.firstChild.shadowRoot;
+  const shadow = dialog.firstElementChild.shadowRoot;
   $('dismiss-button', shadow).addEventListener('click', () => dialog.close());
 
   fetch('stats', { method: 'GET' })
     .then((res) => handleFetchError(res))
     .then((res) => res.json())
-    .then((stats) => {
+    .then((stats: Stats) => {
       // This corresponds to the Stats struct in server/db/stats.go.
-      $('songs', shadow).innerText = parseInt(stats.songs).toLocaleString();
+      $('songs', shadow).innerText = stats.songs.toLocaleString();
       for (const rating of ['0', '1', '2', '3', '4', '5']) {
         const td = $(`rating-${rating}`, shadow);
         const songs = stats.ratings[rating];
-        td.innerText = songs ? parseInt(songs).toLocaleString() : '0';
+        td.innerText = songs ? songs.toLocaleString() : '0';
       }
-      $('albums', shadow).innerText = parseInt(stats.albums).toLocaleString();
+      $('albums', shadow).innerText = stats.albums.toLocaleString();
       $('duration', shadow).innerText = formatDays(stats.totalSec);
 
-      const tbody = shadow.querySelector('#years-table tbody');
+      const tbody = shadow.querySelector('#years-table tbody') as HTMLElement;
       for (const [year, ystats] of Object.entries(stats.years).sort()) {
         const row = createElement('tr', null, tbody);
         createElement('td', null, row, year);
-        createElement('td', null, row, parseInt(ystats.plays).toLocaleString());
+        createElement('td', null, row, ystats.plays.toLocaleString());
         createElement('td', null, row, formatDays(ystats.totalSec));
       }
 
@@ -159,4 +159,19 @@ export function showStats() {
     });
 }
 
-const formatDays = (sec) => `${(sec / 86400).toFixed(1)} days`;
+interface Stats {
+  songs: number;
+  albums: number;
+  totalSec: number;
+  ratings: Record<string, number>;
+  tags: Record<string, number>;
+  years: Record<string, PlayStats>;
+  updateTime: string;
+}
+
+interface PlayStats {
+  plays: number;
+  totalSec: number;
+}
+
+const formatDays = (sec: number) => `${(sec / 86400).toFixed(1)} days`;

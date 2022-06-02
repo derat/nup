@@ -59,7 +59,7 @@ export function updateTitleAttributeForTruncation(
 export function createElement(
   type: string,
   className?: string,
-  parentElement?: HTMLElement,
+  parentElement?: HTMLElement | ShadowRoot,
   text?: string
 ) {
   const element = document.createElement(type);

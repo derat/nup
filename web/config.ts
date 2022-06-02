@@ -23,6 +23,9 @@ export default class Config {
   static FLOAT_NAMES_ = new Set([Config.PRE_AMP]);
   static INT_NAMES_ = new Set([Config.THEME, Config.GAIN_TYPE]);
 
+  callbacks_: ConfigCallback[];
+  values_: Record<string, number>;
+
   constructor() {
     this.callbacks_ = [];
     this.values_ = {
@@ -38,33 +41,32 @@ export default class Config {
   // |cb| will be invoked with two arguments: a string containing the pref's
   // name (see constants above) and an appropriately-typed second argument
   // containing the pref's value.
-  addCallback(cb) {
+  addCallback(cb: ConfigCallback) {
     this.callbacks_.push(cb);
   }
 
   // Gets the value of the preference identified by |name|. An error is thrown
   // if an invalid name is supplied.
-  get(name) {
+  get(name: string): number {
     if (this.values_.hasOwnProperty(name)) return this.values_[name];
     throw new Error(`Unknown pref "${name}"`);
   }
 
   // Sets |name| to |value|. An error is thrown if an invalid name is supplied
   // or the value is of an inappropriate type.
-  set(name, value) {
-    const origValue = value;
+  set(name: string, value: any) {
+    let parsed = 0;
     if (Config.FLOAT_NAMES_.has(name)) {
-      value = parseFloat(value);
-      if (isNaN(value)) throw new Error(`Non-float "${name}" "${origValue}"`);
-      this.values_[name] = value;
+      parsed = parseFloat(value);
+      if (isNaN(parsed)) throw new Error(`Non-float "${name}" "${value}"`);
     } else if (Config.INT_NAMES_.has(name)) {
-      value = parseInt(value);
-      if (isNaN(value)) throw new Error(`Non-int "${name}" "${origValue}"`);
-      this.values_[name] = value;
+      parsed = parseInt(value);
+      if (isNaN(parsed)) throw new Error(`Non-int "${name}" "${value}"`);
     } else {
       throw new Error(`Unknown pref "${name}"`);
     }
-    this.callbacks_.forEach((cb) => cb(name, value));
+    this.values_[name] = parsed;
+    this.callbacks_.forEach((cb) => cb(name, parsed));
   }
 
   // Loads and validates prefs from local storage.
@@ -95,10 +97,12 @@ export default class Config {
   }
 }
 
-let defaultConfig = null;
+type ConfigCallback = (name: string, value: number) => void;
+
+let defaultConfig: Config | null = null;
 
 // Returns a default singleton Config instance.
-export function getConfig() {
+export function getConfig(): Config {
   if (!defaultConfig) defaultConfig = new Config();
   return defaultConfig;
 }

@@ -43,6 +43,12 @@ customElements.define(
   class extends HTMLElement {
     static SUGGESTION_MARGIN_ = 4;
 
+    tabAdvancesFocus_: boolean;
+    words_: string[];
+    shadow_: ShadowRoot;
+    suggestionsDiv_: HTMLElement;
+    target_: HTMLInputElement | HTMLTextAreaElement | null;
+
     constructor() {
       super();
 
@@ -61,7 +67,7 @@ customElements.define(
       if (slotElements.length !== 1) {
         throw new Error('Editable element must be provided via slot');
       }
-      this.target_ = slotElements[0];
+      this.target_ = slotElements[0] as HTMLInputElement | HTMLTextAreaElement;
       this.target_.addEventListener('keydown', this.onKeyDown_);
       this.target_.addEventListener('focus', this.onFocus_);
       this.target_.spellcheck = false;
@@ -70,14 +76,14 @@ customElements.define(
     }
 
     disconnectedCallback() {
-      this.target_.removeEventListener('keydown', this.onKeyDown_);
-      this.target_.removeEventListener('focus', this.onFocus_);
+      this.target_?.removeEventListener('keydown', this.onKeyDown_);
+      this.target_?.removeEventListener('focus', this.onFocus_);
       this.target_ = null;
 
       document.removeEventListener('click', this.onDocumentClick_);
     }
 
-    set words(words) {
+    set words(words: string[]) {
       this.words_ = words.slice(0);
     }
 
@@ -119,7 +125,7 @@ customElements.define(
       this.target_.selectionStart = this.target_.selectionEnd;
     };
 
-    onKeyDown_ = (e) => {
+    onKeyDown_ = (e: KeyboardEvent) => {
       this.hideSuggestions_();
 
       if (e.key !== 'Tab' || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
@@ -165,7 +171,7 @@ customElements.define(
       e.stopPropagation();
     };
 
-    showSuggestions_(words) {
+    showSuggestions_(words: string[]) {
       const cont = this.suggestionsDiv_;
       while (cont.childNodes.length > 0) cont.removeChild(cont.lastChild);
 
@@ -188,7 +194,7 @@ customElements.define(
       const offset =
         this.target_.offsetTop +
         this.target_.offsetHeight +
-        this.constructor.SUGGESTION_MARGIN_;
+        (this.constructor as any).SUGGESTION_MARGIN_;
       this.suggestionsDiv_.style.top = `${offset}px`;
       this.suggestionsDiv_.style.left = `${this.target_.offsetLeft}px`;
 
@@ -199,7 +205,7 @@ customElements.define(
       this.suggestionsDiv_.classList.remove('shown');
     }
 
-    findMatches_(prefix) {
+    findMatches_(prefix: string) {
       return this.words_.filter((w) => w.startsWith(prefix));
     }
   }
@@ -207,5 +213,5 @@ customElements.define(
 
 // Adds a space to the beginning of |s| if it doesn't already start with one.
 // If |ifEmpty| is false, doesn't add spaces to empty strings.
-const prependSpace = (s, ifEmpty = true) =>
+const prependSpace = (s: string, ifEmpty = true) =>
   (s.startsWith(' ') || (s === '' && !ifEmpty) ? '' : ' ') + s;
