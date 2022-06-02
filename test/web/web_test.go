@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -1263,20 +1262,4 @@ func (fs unionFS) Open(name string) (http.File, error) {
 		}
 	}
 	return nil, err
-}
-
-func TestTypeScript(t *testing.T) {
-	cmd := exec.Command("tsc",
-		"--allowJs",
-		"--noEmit",
-		"--noFallthroughCasesInSwitch",
-		"--noImplicitAny",
-		"--noUnusedLocals",
-		"--target", "es2020",
-		"../../web/index.js",
-		"../../web/global.d.ts",
-	)
-	if stdout, err := cmd.Output(); err != nil {
-		t.Errorf("tsc failed: %v\n%s", err, stdout)
-	}
 }
