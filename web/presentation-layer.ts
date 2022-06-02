@@ -196,55 +196,33 @@ const template = createTemplate(`
 customElements.define(
   'presentation-layer',
   class extends HTMLElement {
-    duration_: number;
-    lastPos_: number;
-    visible_: boolean;
-    currentFilename_: string | null;
-    nextFilename_: string | null;
-    shadow_: ShadowRoot;
-    currentCover_: HTMLImageElement;
-    oldCover_: HTMLImageElement;
-    currentDetails_: HTMLElement;
-    currentArtist_: HTMLElement;
-    currentTitle_: HTMLElement;
-    currentAlbum_: HTMLElement;
-    progressBar_: HTMLElement;
-    timeDiv_: HTMLElement;
-    durationDiv_: HTMLElement;
-    nextDiv_: HTMLElement;
-    nextCover_: HTMLImageElement;
-    nextArtist_: HTMLElement;
-    nextTitle_: HTMLElement;
-    nextAlbum_: HTMLElement;
+    duration_ = 0; // duration of current song in seconds
+    lastPos_ = 0; // last value in seconds passed to updatePosition()
+    visible_ = false;
+    currentFilename_: string | null = null;
+    nextFilename_: string | null = null;
+
+    shadow_ = createShadow(this, template);
+    currentCover_ = $('current-cover', this.shadow_) as HTMLImageElement;
+    oldCover_ = $('old-cover', this.shadow_) as HTMLImageElement;
+
+    currentDetails_ = $('current-details', this.shadow_);
+    currentArtist_ = $('current-artist', this.shadow_);
+    currentTitle_ = $('current-title', this.shadow_);
+    currentAlbum_ = $('current-album', this.shadow_);
+
+    progressBar_ = $('progress-bar', this.shadow_);
+    timeDiv_ = $('current-time', this.shadow_);
+    durationDiv_ = $('current-duration', this.shadow_);
+
+    nextDiv_ = $('next', this.shadow_);
+    nextCover_ = $('next-cover', this.shadow_) as HTMLImageElement;
+    nextArtist_ = $('next-artist', this.shadow_);
+    nextTitle_ = $('next-title', this.shadow_);
+    nextAlbum_ = $('next-album', this.shadow_);
 
     constructor() {
       super();
-
-      this.duration_ = 0; // duration of current song in seconds
-      this.lastPos_ = 0; // last value in seconds passed to updatePosition()
-      this.visible_ = false;
-      this.currentFilename_ = null;
-      this.nextFilename_ = null;
-
-      this.shadow_ = createShadow(this, template);
-
-      this.currentCover_ = $('current-cover', this.shadow_) as HTMLImageElement;
-      this.oldCover_ = $('old-cover', this.shadow_) as HTMLImageElement;
-
-      this.currentDetails_ = $('current-details', this.shadow_);
-      this.currentArtist_ = $('current-artist', this.shadow_);
-      this.currentTitle_ = $('current-title', this.shadow_);
-      this.currentAlbum_ = $('current-album', this.shadow_);
-
-      this.progressBar_ = $('progress-bar', this.shadow_);
-      this.timeDiv_ = $('current-time', this.shadow_);
-      this.durationDiv_ = $('current-duration', this.shadow_);
-
-      this.nextDiv_ = $('next', this.shadow_);
-      this.nextCover_ = $('next-cover', this.shadow_) as HTMLImageElement;
-      this.nextArtist_ = $('next-artist', this.shadow_);
-      this.nextTitle_ = $('next-title', this.shadow_);
-      this.nextAlbum_ = $('next-album', this.shadow_);
 
       this.shadow_.host.addEventListener('click', (e) => {
         this.dispatchEvent(new Event('hide'));

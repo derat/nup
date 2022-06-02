@@ -42,22 +42,11 @@ const template = createTemplate(`
 export class TagSuggester extends HTMLElement {
   static SUGGESTION_MARGIN_ = 4;
 
-  tabAdvancesFocus_: boolean;
-  words_: string[];
-  shadow_: ShadowRoot;
-  suggestionsDiv_: HTMLElement;
-  target_: HTMLInputElement | HTMLTextAreaElement | null;
-
-  constructor() {
-    super();
-
-    this.tabAdvancesFocus_ = this.hasAttribute('tab-advances-focus');
-    this.words_ = [];
-
-    this.shadow_ = createShadow(this, template);
-    this.suggestionsDiv_ = $('suggestions', this.shadow_);
-    this.target_ = null;
-  }
+  tabAdvancesFocus_ = this.hasAttribute('tab-advances-focus');
+  words_: string[] = [];
+  shadow_ = createShadow(this, template);
+  suggestionsDiv_ = $('suggestions', this.shadow_);
+  target_: HTMLInputElement | HTMLTextAreaElement | null = null;
 
   connectedCallback() {
     const slotElements = this.shadow_.querySelector('slot').assignedElements();

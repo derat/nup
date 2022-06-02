@@ -12,48 +12,25 @@ export default class Updater {
   static MIN_RETRY_DELAY_MS_ = 500; // Half a second.
   static MAX_RETRY_DELAY_MS_ = 300 * 1000; // Five minutes.
 
-  retryTimeoutId_: number | null;
-  lastRetryDelayMs_: number;
-  queuedPlayReports_: PlayReport[];
-  queuedRatingsAndTags_: SongUpdateMap;
-  inProgressPlayReports_: PlayReport[];
-  inProgressRatingsAndTags_: SongUpdateMap;
+  retryTimeoutId_: number | null = null; // for doRetry_()
+  lastRetryDelayMs_ = 0; // used by scheduleRetry_()
+
+  queuedPlayReports_ = readObject(
+    Updater.QUEUED_PLAY_REPORTS_KEY_,
+    []
+  ) as PlayReport[];
+
+  queuedRatingsAndTags_ = readObject(
+    Updater.QUEUED_RATINGS_AND_TAGS_KEY_,
+    {}
+  ) as SongUpdateMap;
+
+  inProgressPlayReports_: PlayReport[] = [];
+  inProgressRatingsAndTags_: SongUpdateMap = {};
+
   initialRetryDone_: Promise<void>;
 
   constructor() {
-    this.retryTimeoutId_ = null; // for doRetry_()
-    this.lastRetryDelayMs_ = 0; // used by scheduleRetry_()
-
-    // Play reports that still need to be sent to the server.
-    //
-    // [
-    //   {'songId': '5459812892540928', 'startTime': 1638363333.676},
-    //   {'songId': '4926489086656512', 'startTime': 1638363383.521},
-    //   ...
-    // ]
-    this.queuedPlayReports_ = readObject(
-      Updater.QUEUED_PLAY_REPORTS_KEY_,
-      []
-    ) as PlayReport[];
-
-    // Rating and/or tags updates that still need to be sent to the server,
-    // keyed by song ID.
-    //
-    // {
-    //   '4926489086656512': {'rating': 5,  'tags': ['metal']},
-    //   '5459812892540928': {'rating': null, 'tags': ['instrumental', 'mellow']},
-    //   '5656003198582784': {'rating': 2, 'tags': null},
-    //   ...
-    // }
-    this.queuedRatingsAndTags_ = readObject(
-      Updater.QUEUED_RATINGS_AND_TAGS_KEY_,
-      {}
-    ) as SongUpdateMap;
-
-    // Play reports and rating/tags updates that are currently being sent.
-    this.inProgressPlayReports_ = [];
-    this.inProgressRatingsAndTags_ = {};
-
     // Move updates that were in-progress during the last run into the queue.
     for (const play of readObject(
       Updater.IN_PROGRESS_PLAY_REPORTS_KEY_,
@@ -61,6 +38,7 @@ export default class Updater {
     ) as PlayReport[]) {
       this.queuedPlayReports_.push(play);
     }
+
     for (const [songId, data] of Object.entries(
       readObject(Updater.IN_PROGRESS_RATINGS_AND_TAGS_KEY_, {}) as SongUpdateMap
     )) {
@@ -77,7 +55,7 @@ export default class Updater {
 
   // Releases resources. Should be called if destroying the object.
   destroy() {
-    window.clearTimeout(this.retryTimeoutId_);
+    if (this.retryTimeoutId_) window.clearTimeout(this.retryTimeoutId_);
     this.retryTimeoutId_ = null;
 
     window.removeEventListener('online', this.onOnline_);

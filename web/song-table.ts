@@ -186,35 +186,29 @@ customElements.define(
   class SongTable extends HTMLElement {
     static RESIZE_TIMEOUT_MS_ = 1000; // delay after resize to update titles
 
-    lastClickedCheckboxIndex_: number; // 0 is header
-    numCheckedSongs_: number;
-    shadow_: ShadowRoot;
-    table_: HTMLTableElement;
-    rowSongs_: WeakMap<HTMLTableRowElement, Song>;
-    resizeTimeoutId_: number | null;
+    lastClickedCheckboxIndex_ = -1; // 0 is header
+    numCheckedSongs_ = 0;
+    shadow_ = createShadow(this, template);
+    table_ = this.shadow_.querySelector('table') as HTMLTableElement;
+    rowSongs_: WeakMap<HTMLTableRowElement, Song> = new WeakMap();
+    resizeTimeoutId_: number | null = null;
     resizeObserver_: ResizeObserver;
-    dragImage_: HTMLImageElement;
-    dragTarget_: HTMLElement;
-    dragFromIndex_: number;
-    dragToIndex_: number;
-    dragListRect_: DOMRect | null;
-    headingCheckbox_: HTMLInputElement;
+    dragImage_ = createElement('img') as HTMLImageElement;
+    dragTarget_ = $('drag-target', this.shadow_);
+    dragFromIndex_ = -1;
+    dragToIndex_ = -1;
+    dragListRect_: DOMRect | null = null;
+    headingCheckbox_ = this.shadow_.querySelector(
+      'input[type="checkbox"]'
+    ) as HTMLInputElement;
 
     constructor() {
       super();
 
-      this.lastClickedCheckboxIndex_ = -1;
-      this.numCheckedSongs_ = 0;
-
-      this.shadow_ = createShadow(this, template);
       this.shadow_.adoptedStyleSheets = [commonStyles];
-
-      this.table_ = this.shadow_.querySelector('table') as HTMLTableElement;
-      this.rowSongs_ = new WeakMap();
 
       // When the table is resized, update all of the rows' title attributes
       // after a short delay.
-      this.resizeTimeoutId_ = null;
       this.resizeObserver_ = new ResizeObserver((entries) => {
         if (this.resizeTimeoutId_) window.clearTimeout(this.resizeTimeoutId_);
         this.resizeTimeoutId_ = window.setTimeout(() => {
@@ -226,15 +220,6 @@ customElements.define(
       });
       this.resizeObserver_.observe(this.table_);
 
-      this.dragImage_ = createElement('img') as HTMLImageElement;
-      this.dragTarget_ = $('drag-target', this.shadow_);
-      this.dragFromIndex_ = -1;
-      this.dragToIndex_ = -1;
-      this.dragListRect_ = null;
-
-      this.headingCheckbox_ = this.shadow_.querySelector(
-        'input[type="checkbox"]'
-      );
       this.headingCheckbox_.addEventListener('click', (e) => {
         this.onCheckboxClick_(this.headingCheckbox_, e.shiftKey);
       });

@@ -56,42 +56,26 @@ customElements.define(
     static PAUSE_GAIN_ = 0.001; // target audio gain when pausing
     static RESUME_WHEN_ONLINE_SEC_ = 30; // maximum delay for auto-resume when online
 
-    audioCtx_: AudioContext;
-    gainNode_: GainNode;
-    gain_: number;
-    audioSrc_: MediaElementAudioSourceNode | null;
+    audioCtx_ = new AudioContext();
+    gainNode_ = this.audioCtx_.createGain();
+    audioSrc_: MediaElementAudioSourceNode | null = null;
+    gain_ = 1;
 
-    shadow_: ShadowRoot;
-    audio_: HTMLAudioElement;
-    preloadAudio_: HTMLAudioElement | null;
+    shadow_ = createShadow(this, template);
+    audio_ = this.shadow_.querySelector('audio') as HTMLAudioElement;
+    preloadAudio_: HTMLAudioElement | null = null;
 
-    lastUpdateTime_: number | null; // time at last 'timeupdate' or 'play' event
-    lastUpdatePos_: number; // position at last 'timeupdate' event
-    playtime_: number; // total playtime of |src| in seconds
-    pauseTimeoutId_: number | null; // calls audio_.pause() after dropping gain
-    pausedForOfflineTime_: number | null; // seconds since epoch when auto-paused
-    numErrors_: number; // consecutive playback errors
+    lastUpdateTime_: number | null = null; // last 'timeupdate' or 'play' event
+    lastUpdatePos_ = 0; // position at last 'timeupdate' event
+    playtime_ = 0; // total playtime of |src| in seconds
+    pauseTimeoutId_: number | null = null; // audio_.pause() after gain lower
+    pausedForOfflineTime_: number | null = null; // time when auto-paused
+    numErrors_ = 0; // consecutive playback errors
 
     constructor() {
       super();
-
-      this.audioCtx_ = new AudioContext();
-      this.gainNode_ = this.audioCtx_.createGain();
       this.gainNode_.connect(this.audioCtx_.destination);
-      this.gain_ = 1;
-      this.audioSrc_ = null;
-
-      this.shadow_ = createShadow(this, template);
-      this.audio_ = this.shadow_.querySelector('audio');
       this.configureAudio_();
-      this.preloadAudio_ = null;
-
-      this.lastUpdateTime_ = null;
-      this.lastUpdatePos_ = 0;
-      this.playtime_ = 0;
-      this.pauseTimeoutId_ = null;
-      this.pausedForOfflineTime_ = null;
-      this.numErrors_ = 0;
     }
 
     connectedCallback() {

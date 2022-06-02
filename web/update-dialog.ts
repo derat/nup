@@ -61,10 +61,11 @@ export default class UpdateDialog {
   song_: Song;
   tags_: string[]; // all tags known by server
   callback_: UpdateCallback;
-  rating_: number; // rating set in dialog
-  dialog_: HTMLDialogElement;
-  ratingSpan_: HTMLElement;
-  tagsTextarea_: HTMLTextAreaElement;
+  rating_ = -1; // rating set in dialog
+  dialog_ = createDialog(template, 'update');
+  shadow_ = this.dialog_.firstElementChild.shadowRoot;
+  ratingSpan_ = $('rating', this.shadow_);
+  tagsTextarea_ = $('tags-textarea', this.shadow_) as HTMLTextAreaElement;
 
   // |song| is the song to update, and |tags| is an array of available tags.
   // When the dialog is closed, |callback| is invoked with the updated rating
@@ -74,8 +75,6 @@ export default class UpdateDialog {
     this.song_ = song;
     this.tags_ = tags;
     this.callback_ = callback;
-    this.rating_ = -1;
-    this.dialog_ = createDialog(template, 'update');
 
     // This sucks, but I don't want to put this styling in index.html.
     this.dialog_.style.borderRadius = '4px';
@@ -86,13 +85,11 @@ export default class UpdateDialog {
     ).getPropertyValue('--margin');
     this.dialog_.style.position = 'absolute';
 
-    const shadow = this.dialog_.firstElementChild.shadowRoot;
-    const get = (id: string) => $(id, shadow);
+    $('close-icon', this.shadow_).addEventListener('click', () =>
+      this.close(true)
+    );
+    ($('tag-suggester', this.shadow_) as TagSuggester).words = tags;
 
-    get('close-icon').addEventListener('click', () => this.close(true));
-    (get('tag-suggester') as TagSuggester).words = tags;
-
-    this.ratingSpan_ = get('rating');
     this.ratingSpan_.addEventListener('keydown', this.onRatingSpanKeyDown_);
     for (let i = 1; i <= 5; i++) {
       const anchor = this.ratingSpan_.children[i - 1];
@@ -101,7 +98,6 @@ export default class UpdateDialog {
     }
     this.setRating_(song.rating);
 
-    this.tagsTextarea_ = get('tags-textarea') as HTMLTextAreaElement;
     this.tagsTextarea_.value = song.tags.length
       ? song.tags.sort().join(' ') + ' ' // append space to ease editing
       : '';

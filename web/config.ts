@@ -23,16 +23,14 @@ export default class Config {
   static FLOAT_NAMES_ = new Set([Config.PRE_AMP]);
   static INT_NAMES_ = new Set([Config.THEME, Config.GAIN_TYPE]);
 
-  callbacks_: ConfigCallback[];
-  values_: Record<string, number>;
+  callbacks_: ConfigCallback[] = [];
+  values_: Record<string, number> = {
+    [Config.THEME]: Config.THEME_AUTO,
+    [Config.GAIN_TYPE]: Config.GAIN_AUTO,
+    [Config.PRE_AMP]: 0,
+  };
 
   constructor() {
-    this.callbacks_ = [];
-    this.values_ = {
-      [Config.THEME]: Config.THEME_AUTO,
-      [Config.GAIN_TYPE]: Config.GAIN_AUTO,
-      [Config.PRE_AMP]: 0,
-    };
     this.load_();
   }
 
