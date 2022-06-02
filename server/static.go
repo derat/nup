@@ -27,7 +27,7 @@ const (
 	staticDir = "web" // directory relative to app containing static files
 
 	bundleFile       = "bundle.js" // generated file containing bundled JS
-	bundleEntryPoint = "index.js"  // entry point used to create bundle
+	bundleEntryPoint = "index.ts"  // entry point used to create bundle
 
 	indexFile             = "index.html"      // file that initially loads JS
 	entryPointPlaceholder = "{{ENTRY_POINT}}" // script placeholder in indexFile

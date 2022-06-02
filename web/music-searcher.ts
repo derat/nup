@@ -281,380 +281,371 @@ const template = createTemplate(`
 // - |clearFirst|: true if playlist should be cleared first
 // - |afterCurrent|: true to insert songs after current song (rather than at end)
 // - |shuffled|: true if search results were shuffled
-customElements.define(
-  'music-searcher',
-  class extends HTMLElement {
-    fetchController_: AbortController | null = null;
-    shadow_ = createShadow(this, template);
+export class MusicSearcher extends HTMLElement {
+  fetchController_: AbortController | null = null;
+  shadow_ = createShadow(this, template);
 
-    // Convenience methods for initializing members.
-    getInput_ = (id: string) => $(id, this.shadow_) as HTMLInputElement;
-    getSelect_ = (id: string) => $(id, this.shadow_) as HTMLSelectElement;
-    getButton_ = (id: string) => $(id, this.shadow_) as HTMLButtonElement;
+  // Convenience methods for initializing members.
+  getInput_ = (id: string) => $(id, this.shadow_) as HTMLInputElement;
+  getSelect_ = (id: string) => $(id, this.shadow_) as HTMLSelectElement;
+  getButton_ = (id: string) => $(id, this.shadow_) as HTMLButtonElement;
 
-    keywordsInput_ = this.getInput_('keywords-input');
-    tagSuggester_ = $('tags-suggester', this.shadow_) as TagSuggester;
-    tagsInput_ = this.getInput_('tags-input');
-    shuffleCheckbox_ = this.getInput_('shuffle-checkbox');
-    firstTrackCheckbox_ = this.getInput_('first-track-checkbox');
-    unratedCheckbox_ = this.getInput_('unrated-checkbox');
-    minRatingSelect_ = this.getSelect_('min-rating-select');
-    orderByLastPlayedCheckbox_ = this.getInput_(
-      'order-by-last-played-checkbox'
+  keywordsInput_ = this.getInput_('keywords-input');
+  tagSuggester_ = $('tags-suggester', this.shadow_) as TagSuggester;
+  tagsInput_ = this.getInput_('tags-input');
+  shuffleCheckbox_ = this.getInput_('shuffle-checkbox');
+  firstTrackCheckbox_ = this.getInput_('first-track-checkbox');
+  unratedCheckbox_ = this.getInput_('unrated-checkbox');
+  minRatingSelect_ = this.getSelect_('min-rating-select');
+  orderByLastPlayedCheckbox_ = this.getInput_('order-by-last-played-checkbox');
+  maxPlaysInput_ = this.getInput_('max-plays-input');
+  firstPlayedSelect_ = this.getSelect_('first-played-select');
+  lastPlayedSelect_ = this.getSelect_('last-played-select');
+  presetSelect_ = this.getSelect_('preset-select');
+
+  resultsTable_ = $('results-table', this.shadow_) as SongTable;
+  waitingDiv_ = $('waiting', this.shadow_);
+  presets_: SearchPreset[] = [];
+  resultsShuffled_ = false;
+
+  constructor() {
+    super();
+
+    this.shadow_.adoptedStyleSheets = [commonStyles];
+
+    this.keywordsInput_.addEventListener('keydown', this.onFormKeyDown_);
+    $('keywords-clear', this.shadow_).addEventListener(
+      'click',
+      () => (this.keywordsInput_.value = '')
     );
-    maxPlaysInput_ = this.getInput_('max-plays-input');
-    firstPlayedSelect_ = this.getSelect_('first-played-select');
-    lastPlayedSelect_ = this.getSelect_('last-played-select');
-    presetSelect_ = this.getSelect_('preset-select');
 
-    resultsTable_ = $('results-table', this.shadow_) as SongTable;
-    waitingDiv_ = $('waiting', this.shadow_);
-    presets_: SearchPreset[] = [];
-    resultsShuffled_ = false;
+    this.tagsInput_.addEventListener('keydown', this.onFormKeyDown_);
+    $('tags-clear', this.shadow_).addEventListener(
+      'click',
+      () => (this.tagsInput_.value = '')
+    );
 
-    constructor() {
-      super();
+    this.shuffleCheckbox_.addEventListener('keydown', this.onFormKeyDown_);
+    this.firstTrackCheckbox_.addEventListener('keydown', this.onFormKeyDown_);
+    this.unratedCheckbox_.addEventListener('keydown', this.onFormKeyDown_);
+    this.unratedCheckbox_.addEventListener('change', () =>
+      this.updateFormDisabledState_()
+    );
+    this.orderByLastPlayedCheckbox_.addEventListener(
+      'keydown',
+      this.onFormKeyDown_
+    );
+    this.maxPlaysInput_.addEventListener('keydown', this.onFormKeyDown_);
+    this.presetSelect_.addEventListener('change', this.onPresetSelectChange_);
 
-      this.shadow_.adoptedStyleSheets = [commonStyles];
+    this.getButton_('search-button').addEventListener('click', () =>
+      this.submitQuery_(false)
+    );
+    this.getButton_('reset-button').addEventListener('click', () =>
+      this.reset_(null, null, null, true /* clearResults */)
+    );
+    this.getButton_('lucky-button').addEventListener('click', () =>
+      this.doLuckySearch_()
+    );
 
-      this.keywordsInput_.addEventListener('keydown', this.onFormKeyDown_);
-      $('keywords-clear', this.shadow_).addEventListener(
-        'click',
-        () => (this.keywordsInput_.value = '')
-      );
+    this.getButton_('append-button').addEventListener('click', () =>
+      this.enqueueSearchResults_(
+        false /* clearFirst */,
+        false /* afterCurrent */
+      )
+    );
+    this.getButton_('insert-button').addEventListener('click', () =>
+      this.enqueueSearchResults_(false, true)
+    );
+    this.getButton_('replace-button').addEventListener('click', () =>
+      this.enqueueSearchResults_(true, false)
+    );
 
-      this.tagsInput_.addEventListener('keydown', this.onFormKeyDown_);
-      $('tags-clear', this.shadow_).addEventListener(
-        'click',
-        () => (this.tagsInput_.value = '')
+    this.resultsTable_.addEventListener('field', (e: CustomEvent) => {
+      this.reset_(
+        e.detail.artist,
+        e.detail.album,
+        e.detail.albumId,
+        false /* clearResults */
       );
+    });
+    this.resultsTable_.addEventListener('check', (e: CustomEvent) => {
+      const checked = !!e.detail.count;
+      this.getButton_('append-button').disabled =
+        this.getButton_('insert-button').disabled =
+        this.getButton_('replace-button').disabled =
+          !checked;
+    });
+    this.resultsTable_.addEventListener('menu', (e: CustomEvent) => {
+      const idx = e.detail.index;
+      const orig = e.detail.orig;
+      orig.preventDefault();
+      const menu = createMenu(orig.pageX, orig.pageY, [
+        {
+          id: 'info',
+          text: 'Info…',
+          cb: () => showSongInfo(this.resultsTable_.getSong(idx)),
+        },
+        {
+          id: 'debug',
+          text: 'Debug…',
+          cb: () => window.open(getDumpSongUrl(e.detail.songId), '_blank'),
+        },
+      ]);
 
-      this.shuffleCheckbox_.addEventListener('keydown', this.onFormKeyDown_);
-      this.firstTrackCheckbox_.addEventListener('keydown', this.onFormKeyDown_);
-      this.unratedCheckbox_.addEventListener('keydown', this.onFormKeyDown_);
-      this.unratedCheckbox_.addEventListener('change', () =>
-        this.updateFormDisabledState_()
-      );
-      this.orderByLastPlayedCheckbox_.addEventListener(
-        'keydown',
-        this.onFormKeyDown_
-      );
-      this.maxPlaysInput_.addEventListener('keydown', this.onFormKeyDown_);
-      this.presetSelect_.addEventListener('change', this.onPresetSelectChange_);
-
-      this.getButton_('search-button').addEventListener('click', () =>
-        this.submitQuery_(false)
-      );
-      this.getButton_('reset-button').addEventListener('click', () =>
-        this.reset_(null, null, null, true /* clearResults */)
-      );
-      this.getButton_('lucky-button').addEventListener('click', () =>
-        this.doLuckySearch_()
-      );
-
-      this.getButton_('append-button').addEventListener('click', () =>
-        this.enqueueSearchResults_(
-          false /* clearFirst */,
-          false /* afterCurrent */
-        )
-      );
-      this.getButton_('insert-button').addEventListener('click', () =>
-        this.enqueueSearchResults_(false, true)
-      );
-      this.getButton_('replace-button').addEventListener('click', () =>
-        this.enqueueSearchResults_(true, false)
-      );
-
-      this.resultsTable_.addEventListener('field', (e: CustomEvent) => {
-        this.reset_(
-          e.detail.artist,
-          e.detail.album,
-          e.detail.albumId,
-          false /* clearResults */
-        );
+      // Highlight the row while the menu is open.
+      this.resultsTable_.setRowMenuShown(idx, true);
+      menu.addEventListener('close', () => {
+        this.resultsTable_.setRowMenuShown(idx, false);
       });
-      this.resultsTable_.addEventListener('check', (e: CustomEvent) => {
-        const checked = !!e.detail.count;
-        this.getButton_('append-button').disabled =
-          this.getButton_('insert-button').disabled =
-          this.getButton_('replace-button').disabled =
-            !checked;
-      });
-      this.resultsTable_.addEventListener('menu', (e: CustomEvent) => {
-        const idx = e.detail.index;
-        const orig = e.detail.orig;
-        orig.preventDefault();
-        const menu = createMenu(orig.pageX, orig.pageY, [
-          {
-            id: 'info',
-            text: 'Info…',
-            cb: () => showSongInfo(this.resultsTable_.getSong(idx)),
-          },
-          {
-            id: 'debug',
-            text: 'Debug…',
-            cb: () => window.open(getDumpSongUrl(e.detail.songId), '_blank'),
-          },
-        ]);
+    });
 
-        // Highlight the row while the menu is open.
-        this.resultsTable_.setRowMenuShown(idx, true);
-        menu.addEventListener('close', () => {
-          this.resultsTable_.setRowMenuShown(idx, false);
-        });
-      });
-
-      this.getPresetsFromServer_();
-    }
-
-    connectedCallback() {
-      document.body.addEventListener('keydown', this.onBodyKeyDown_);
-    }
-
-    disconnectedCallback() {
-      document.body.removeEventListener('keydown', this.onBodyKeyDown_);
-    }
-
-    // Uses |tags| as autocomplete suggestions in the tags search field.
-    set tags(tags: string[]) {
-      // Also suggest negative tags.
-      this.tagSuggester_.words = tags.concat(tags.map((t) => '-' + t));
-    }
-
-    // Resets the search fields using the supplied (optional) values.
-    resetFields(artist?: string, album?: string, albumId?: string) {
-      this.reset_(artist, album, albumId, false);
-    }
-
-    resetForTesting() {
-      this.reset_(null, null, null, true /* clearResults */);
-    }
-
-    getPresetsFromServer_() {
-      fetch('presets', { method: 'GET' })
-        .then((res) => handleFetchError(res))
-        .then((res) => res.json())
-        .then((presets) => {
-          if (!presets) return;
-          this.presets_ = presets;
-          for (const p of presets) {
-            const opt = document.createElement('option');
-            opt.text = p.name;
-            this.presetSelect_.add(opt);
-          }
-          console.log(`Loaded ${presets.length} preset(s)`);
-        })
-        .catch((err) => {
-          console.error(`Failed loading presets: ${err}`);
-        });
-    }
-
-    submitQuery_(appendToQueue: boolean) {
-      let terms: String[] = [];
-      if (this.keywordsInput_.value.trim()) {
-        terms = terms.concat(parseQueryString(this.keywordsInput_.value));
-      }
-      if (this.tagsInput_.value.trim()) {
-        terms.push('tags=' + encodeURIComponent(this.tagsInput_.value.trim()));
-      }
-      if (
-        !this.minRatingSelect_.disabled &&
-        this.minRatingSelect_.value !== ''
-      ) {
-        terms.push('minRating=' + this.minRatingSelect_.value);
-      }
-      if (this.shuffleCheckbox_.checked) terms.push('shuffle=1');
-      if (this.firstTrackCheckbox_.checked) terms.push('firstTrack=1');
-      if (this.unratedCheckbox_.checked) terms.push('unrated=1');
-      if (this.orderByLastPlayedCheckbox_.checked) {
-        terms.push('orderByLastPlayed=1');
-      }
-      if (parseInt(this.maxPlaysInput_.value) >= 0) {
-        terms.push('maxPlays=' + parseInt(this.maxPlaysInput_.value));
-      }
-      const firstPlayed = parseInt(this.firstPlayedSelect_.value);
-      if (firstPlayed !== 0) {
-        terms.push(
-          `minFirstPlayed=${Math.round(getCurrentTimeSec()) - firstPlayed}`
-        );
-      }
-      const lastPlayed = parseInt(this.lastPlayedSelect_.value);
-      if (lastPlayed !== 0) {
-        terms.push(
-          `maxLastPlayed=${Math.round(getCurrentTimeSec()) - lastPlayed}`
-        );
-      }
-
-      if (!terms.length) {
-        showMessageDialog('Invalid Search', 'You must supply search terms.');
-        return;
-      }
-
-      const url = 'query?' + terms.join('&');
-      console.log(`Sending query: ${url}`);
-
-      const shuffled = this.shuffleCheckbox_.checked;
-
-      this.fetchController_?.abort();
-      this.fetchController_ = new AbortController();
-      const signal = this.fetchController_.signal;
-
-      this.waitingDiv_.classList.add('shown');
-
-      fetch(url, { method: 'GET', signal })
-        .then((res) => handleFetchError(res))
-        .then((res) => res.json())
-        .then((songs: Song[]) => {
-          console.log('Got response with ' + songs.length + ' song(s)');
-          this.resultsTable_.setSongs(songs);
-          this.resultsTable_.setAllCheckboxes(true);
-          this.resultsShuffled_ = shuffled;
-          if (appendToQueue) {
-            this.enqueueSearchResults_(true, true);
-          } else if (songs.length > 0 && songs[0].coverFilename) {
-            // If we aren't automatically enqueuing the results, prefetch the
-            // cover image for the first song so it'll be ready to go.
-            new Image().src = getCoverUrl(
-              songs[0].coverFilename,
-              smallCoverSize
-            );
-          }
-        })
-        .catch((err) => {
-          showMessageDialog('Search Failed', err.toString());
-        })
-        .finally(() => {
-          this.waitingDiv_.classList.remove('shown');
-        });
-    }
-
-    enqueueSearchResults_(clearFirst: boolean, afterCurrent: boolean) {
-      const songs = this.resultsTable_.checkedSongs;
-      if (!songs.length) return;
-
-      const detail = {
-        songs,
-        clearFirst,
-        afterCurrent,
-        shuffled: this.resultsShuffled_,
-      };
-      this.dispatchEvent(new CustomEvent('enqueue', { detail }));
-
-      if (songs.length === this.resultsTable_.numSongs) {
-        this.resultsTable_.setSongs([]);
-      }
-    }
-
-    // Resets all of the fields in the search form. If |newArtist|, |newAlbum|,
-    // or |newAlbumId| are non-null, the supplied values are used. Also jumps to
-    // the top of the page so the form is visible.
-    reset_(
-      newArtist: string | null,
-      newAlbum: string | null,
-      newAlbumId: string | null,
-      clearResults: boolean
-    ) {
-      const keywords = [];
-      const clean = (s: string) => {
-        s = s.replace(/"/g, '\\"');
-        if (s.includes(' ')) s = '"' + s + '"';
-        return s;
-      };
-      if (newArtist) keywords.push('artist:' + clean(newArtist));
-      if (newAlbum) keywords.push('album:' + clean(newAlbum));
-      if (newAlbumId) keywords.push('albumId:' + clean(newAlbumId));
-
-      this.keywordsInput_.value = keywords.join(' ');
-      this.tagsInput_.value = '';
-      this.shuffleCheckbox_.checked = false;
-      this.firstTrackCheckbox_.checked = false;
-      this.unratedCheckbox_.checked = false;
-      this.minRatingSelect_.selectedIndex = 0;
-      this.orderByLastPlayedCheckbox_.checked = false;
-      this.maxPlaysInput_.value = '';
-      this.firstPlayedSelect_.selectedIndex = 0;
-      this.lastPlayedSelect_.selectedIndex = 0;
-      this.presetSelect_.selectedIndex = 0;
-
-      this.updateFormDisabledState_();
-
-      if (clearResults) this.resultsTable_.setSongs([]);
-      this.scrollIntoView();
-    }
-
-    // Handles the "I'm Feeling Lucky" button being clicked.
-    doLuckySearch_() {
-      if (
-        this.keywordsInput_.value.trim() === '' &&
-        this.tagsInput_.value.trim() === '' &&
-        !this.shuffleCheckbox_.checked &&
-        !this.firstTrackCheckbox_.checked &&
-        !this.unratedCheckbox_.checked &&
-        this.minRatingSelect_.selectedIndex === 0 &&
-        !this.orderByLastPlayedCheckbox_.checked &&
-        !(parseInt(this.maxPlaysInput_.value) >= 0) &&
-        this.firstPlayedSelect_.selectedIndex === 0 &&
-        this.lastPlayedSelect_.selectedIndex === 0
-      ) {
-        this.reset_(null, null, null, false /* clearResults */);
-        this.shuffleCheckbox_.checked = true;
-        this.minRatingSelect_.selectedIndex = 4; // 4 stars
-      }
-      this.submitQuery_(true);
-    }
-
-    // Handle a key being pressed in the search form.
-    onFormKeyDown_ = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        this.submitQuery_(false);
-      } else if ([' ', 'ArrowLeft', 'ArrowRight', '/'].includes(e.key)) {
-        e.stopPropagation();
-      }
-    };
-
-    updateFormDisabledState_() {
-      this.minRatingSelect_.disabled = this.unratedCheckbox_.checked;
-    }
-
-    onPresetSelectChange_ = () => {
-      const index = this.presetSelect_.selectedIndex;
-      if (index === 0) return; // ignore '...' item
-
-      const preset = this.presets_[index - 1]; // skip '...' item
-      this.reset_(null, null, null, false /* clearResults */);
-      this.presetSelect_.selectedIndex = index;
-
-      this.tagsInput_.value = preset.tags;
-      this.minRatingSelect_.selectedIndex = clamp(preset.minRating, 0, 5);
-      this.unratedCheckbox_.checked = preset.unrated;
-      this.orderByLastPlayedCheckbox_.checked = preset.orderByLastPlayed;
-      this.firstPlayedSelect_.selectedIndex = preset.firstPlayed;
-      this.lastPlayedSelect_.selectedIndex = preset.lastPlayed;
-      this.maxPlaysInput_.value =
-        preset.maxPlays >= 0 ? preset.maxPlays.toString() : '';
-      this.firstTrackCheckbox_.checked = preset.firstTrack;
-      this.shuffleCheckbox_.checked = preset.shuffle;
-
-      this.updateFormDisabledState_();
-
-      // Unfocus the element so that arrow keys or Page Up/Down won't select new
-      // presets.
-      this.presetSelect_.blur();
-
-      this.submitQuery_(preset.play);
-    };
-
-    onBodyKeyDown_ = (e: KeyboardEvent) => {
-      if (isDialogShown() || isMenuShown()) return;
-
-      if (e.key === '/') {
-        this.keywordsInput_.focus();
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
+    this.getPresetsFromServer_();
   }
-);
+
+  connectedCallback() {
+    document.body.addEventListener('keydown', this.onBodyKeyDown_);
+  }
+
+  disconnectedCallback() {
+    document.body.removeEventListener('keydown', this.onBodyKeyDown_);
+  }
+
+  // Uses |tags| as autocomplete suggestions in the tags search field.
+  set tags(tags: string[]) {
+    // Also suggest negative tags.
+    this.tagSuggester_.words = tags.concat(tags.map((t) => '-' + t));
+  }
+
+  // Resets the search fields using the supplied (optional) values.
+  resetFields(artist?: string, album?: string, albumId?: string) {
+    this.reset_(artist, album, albumId, false);
+  }
+
+  resetForTesting() {
+    this.reset_(null, null, null, true /* clearResults */);
+  }
+
+  getPresetsFromServer_() {
+    fetch('presets', { method: 'GET' })
+      .then((res) => handleFetchError(res))
+      .then((res) => res.json())
+      .then((presets) => {
+        if (!presets) return;
+        this.presets_ = presets;
+        for (const p of presets) {
+          const opt = document.createElement('option');
+          opt.text = p.name;
+          this.presetSelect_.add(opt);
+        }
+        console.log(`Loaded ${presets.length} preset(s)`);
+      })
+      .catch((err) => {
+        console.error(`Failed loading presets: ${err}`);
+      });
+  }
+
+  submitQuery_(appendToQueue: boolean) {
+    let terms: String[] = [];
+    if (this.keywordsInput_.value.trim()) {
+      terms = terms.concat(parseQueryString(this.keywordsInput_.value));
+    }
+    if (this.tagsInput_.value.trim()) {
+      terms.push('tags=' + encodeURIComponent(this.tagsInput_.value.trim()));
+    }
+    if (!this.minRatingSelect_.disabled && this.minRatingSelect_.value !== '') {
+      terms.push('minRating=' + this.minRatingSelect_.value);
+    }
+    if (this.shuffleCheckbox_.checked) terms.push('shuffle=1');
+    if (this.firstTrackCheckbox_.checked) terms.push('firstTrack=1');
+    if (this.unratedCheckbox_.checked) terms.push('unrated=1');
+    if (this.orderByLastPlayedCheckbox_.checked) {
+      terms.push('orderByLastPlayed=1');
+    }
+    if (parseInt(this.maxPlaysInput_.value) >= 0) {
+      terms.push('maxPlays=' + parseInt(this.maxPlaysInput_.value));
+    }
+    const firstPlayed = parseInt(this.firstPlayedSelect_.value);
+    if (firstPlayed !== 0) {
+      terms.push(
+        `minFirstPlayed=${Math.round(getCurrentTimeSec()) - firstPlayed}`
+      );
+    }
+    const lastPlayed = parseInt(this.lastPlayedSelect_.value);
+    if (lastPlayed !== 0) {
+      terms.push(
+        `maxLastPlayed=${Math.round(getCurrentTimeSec()) - lastPlayed}`
+      );
+    }
+
+    if (!terms.length) {
+      showMessageDialog('Invalid Search', 'You must supply search terms.');
+      return;
+    }
+
+    const url = 'query?' + terms.join('&');
+    console.log(`Sending query: ${url}`);
+
+    const shuffled = this.shuffleCheckbox_.checked;
+
+    this.fetchController_?.abort();
+    this.fetchController_ = new AbortController();
+    const signal = this.fetchController_.signal;
+
+    this.waitingDiv_.classList.add('shown');
+
+    fetch(url, { method: 'GET', signal })
+      .then((res) => handleFetchError(res))
+      .then((res) => res.json())
+      .then((songs: Song[]) => {
+        console.log('Got response with ' + songs.length + ' song(s)');
+        this.resultsTable_.setSongs(songs);
+        this.resultsTable_.setAllCheckboxes(true);
+        this.resultsShuffled_ = shuffled;
+        if (appendToQueue) {
+          this.enqueueSearchResults_(true, true);
+        } else if (songs.length > 0 && songs[0].coverFilename) {
+          // If we aren't automatically enqueuing the results, prefetch the
+          // cover image for the first song so it'll be ready to go.
+          new Image().src = getCoverUrl(songs[0].coverFilename, smallCoverSize);
+        }
+      })
+      .catch((err) => {
+        showMessageDialog('Search Failed', err.toString());
+      })
+      .finally(() => {
+        this.waitingDiv_.classList.remove('shown');
+      });
+  }
+
+  enqueueSearchResults_(clearFirst: boolean, afterCurrent: boolean) {
+    const songs = this.resultsTable_.checkedSongs;
+    if (!songs.length) return;
+
+    const detail = {
+      songs,
+      clearFirst,
+      afterCurrent,
+      shuffled: this.resultsShuffled_,
+    };
+    this.dispatchEvent(new CustomEvent('enqueue', { detail }));
+
+    if (songs.length === this.resultsTable_.numSongs) {
+      this.resultsTable_.setSongs([]);
+    }
+  }
+
+  // Resets all of the fields in the search form. If |newArtist|, |newAlbum|,
+  // or |newAlbumId| are non-null, the supplied values are used. Also jumps to
+  // the top of the page so the form is visible.
+  reset_(
+    newArtist: string | null,
+    newAlbum: string | null,
+    newAlbumId: string | null,
+    clearResults: boolean
+  ) {
+    const keywords = [];
+    const clean = (s: string) => {
+      s = s.replace(/"/g, '\\"');
+      if (s.includes(' ')) s = '"' + s + '"';
+      return s;
+    };
+    if (newArtist) keywords.push('artist:' + clean(newArtist));
+    if (newAlbum) keywords.push('album:' + clean(newAlbum));
+    if (newAlbumId) keywords.push('albumId:' + clean(newAlbumId));
+
+    this.keywordsInput_.value = keywords.join(' ');
+    this.tagsInput_.value = '';
+    this.shuffleCheckbox_.checked = false;
+    this.firstTrackCheckbox_.checked = false;
+    this.unratedCheckbox_.checked = false;
+    this.minRatingSelect_.selectedIndex = 0;
+    this.orderByLastPlayedCheckbox_.checked = false;
+    this.maxPlaysInput_.value = '';
+    this.firstPlayedSelect_.selectedIndex = 0;
+    this.lastPlayedSelect_.selectedIndex = 0;
+    this.presetSelect_.selectedIndex = 0;
+
+    this.updateFormDisabledState_();
+
+    if (clearResults) this.resultsTable_.setSongs([]);
+    this.scrollIntoView();
+  }
+
+  // Handles the "I'm Feeling Lucky" button being clicked.
+  doLuckySearch_() {
+    if (
+      this.keywordsInput_.value.trim() === '' &&
+      this.tagsInput_.value.trim() === '' &&
+      !this.shuffleCheckbox_.checked &&
+      !this.firstTrackCheckbox_.checked &&
+      !this.unratedCheckbox_.checked &&
+      this.minRatingSelect_.selectedIndex === 0 &&
+      !this.orderByLastPlayedCheckbox_.checked &&
+      !(parseInt(this.maxPlaysInput_.value) >= 0) &&
+      this.firstPlayedSelect_.selectedIndex === 0 &&
+      this.lastPlayedSelect_.selectedIndex === 0
+    ) {
+      this.reset_(null, null, null, false /* clearResults */);
+      this.shuffleCheckbox_.checked = true;
+      this.minRatingSelect_.selectedIndex = 4; // 4 stars
+    }
+    this.submitQuery_(true);
+  }
+
+  // Handle a key being pressed in the search form.
+  onFormKeyDown_ = (e: KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      this.submitQuery_(false);
+    } else if ([' ', 'ArrowLeft', 'ArrowRight', '/'].includes(e.key)) {
+      e.stopPropagation();
+    }
+  };
+
+  updateFormDisabledState_() {
+    this.minRatingSelect_.disabled = this.unratedCheckbox_.checked;
+  }
+
+  onPresetSelectChange_ = () => {
+    const index = this.presetSelect_.selectedIndex;
+    if (index === 0) return; // ignore '...' item
+
+    const preset = this.presets_[index - 1]; // skip '...' item
+    this.reset_(null, null, null, false /* clearResults */);
+    this.presetSelect_.selectedIndex = index;
+
+    this.tagsInput_.value = preset.tags;
+    this.minRatingSelect_.selectedIndex = clamp(preset.minRating, 0, 5);
+    this.unratedCheckbox_.checked = preset.unrated;
+    this.orderByLastPlayedCheckbox_.checked = preset.orderByLastPlayed;
+    this.firstPlayedSelect_.selectedIndex = preset.firstPlayed;
+    this.lastPlayedSelect_.selectedIndex = preset.lastPlayed;
+    this.maxPlaysInput_.value =
+      preset.maxPlays >= 0 ? preset.maxPlays.toString() : '';
+    this.firstTrackCheckbox_.checked = preset.firstTrack;
+    this.shuffleCheckbox_.checked = preset.shuffle;
+
+    this.updateFormDisabledState_();
+
+    // Unfocus the element so that arrow keys or Page Up/Down won't select new
+    // presets.
+    this.presetSelect_.blur();
+
+    this.submitQuery_(preset.play);
+  };
+
+  onBodyKeyDown_ = (e: KeyboardEvent) => {
+    if (isDialogShown() || isMenuShown()) return;
+
+    if (e.key === '/') {
+      this.keywordsInput_.focus();
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+}
+
+customElements.define('music-searcher', MusicSearcher);
 
 function parseQueryString(text: string) {
   const terms: string[] = [];

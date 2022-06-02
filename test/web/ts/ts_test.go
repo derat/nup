@@ -19,7 +19,7 @@ func TestTypeScript(t *testing.T) {
 		"--noImplicitAny",
 		"--noUnusedLocals",
 		"--target", "es2020",
-		filepath.Join(webDir, "index.js"),
+		filepath.Join(webDir, "index.ts"),
 		filepath.Join(webDir, "global.d.ts"),
 	)
 	if stdout, err := cmd.Output(); err != nil {

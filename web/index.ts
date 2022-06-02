@@ -6,8 +6,8 @@ import './construct-style-sheets-polyfill.js';
 
 import { $, commonStyles, handleFetchError, smallCoverSize } from './common.js';
 import Config, { getConfig } from './config.js';
-import { isDialogShown } from './dialog.js';
-import { isMenuShown } from './menu.js';
+import type { MusicPlayer } from './music-player.js';
+import type { MusicSearcher } from './music-searcher.js';
 
 document.adoptedStyleSheets = [commonStyles];
 
@@ -21,14 +21,14 @@ import './song-table.js';
 import './tag-suggester.js';
 
 const config = getConfig();
-const player = document.querySelector('music-player');
-const searcher = document.querySelector('music-searcher');
+const player = document.querySelector('music-player') as MusicPlayer;
+const searcher = document.querySelector('music-searcher') as MusicSearcher;
 
 // Watch for theme changes.
 const darkMediaQuery = '(prefers-color-scheme: dark)';
-const updateTheme = (theme) => {
+const updateTheme = () => {
   let dark = false;
-  switch (theme) {
+  switch (config.get(Config.THEME)) {
     case Config.THEME_AUTO:
       dark = window.matchMedia(darkMediaQuery).matches;
       break;
@@ -41,19 +41,19 @@ const updateTheme = (theme) => {
   if (dark) document.documentElement.setAttribute('data-theme', 'dark');
   else document.documentElement.removeAttribute('data-theme');
 };
-config.addCallback((k, v) => k === Config.THEME && updateTheme(v));
+config.addCallback((k: string, _) => k === Config.THEME && updateTheme());
 window.matchMedia(darkMediaQuery).addListener((e) => updateTheme());
-updateTheme(config.get(Config.THEME));
+updateTheme();
 
 // Tags known by the server.
-let serverTags = [];
+let serverTags: string[] = [];
 
 // Returns a promise that will be resolved once tags are fetched.
 const fetchServerTags = () =>
   fetch('tags', { method: 'GET' })
     .then((res) => handleFetchError(res))
     .then((res) => res.json())
-    .then((tags) => {
+    .then((tags: string[]) => {
       console.log(`Fetched ${tags.length} tag(s)`);
       serverTags = player.tags = searcher.tags = tags;
     })
@@ -63,31 +63,32 @@ const fetchServerTags = () =>
 fetchServerTags();
 
 // Use the cover art as the favicon.
-player.addEventListener('cover', (e) => {
-  const favicon = $('favicon');
+player.addEventListener('cover', (e: CustomEvent) => {
+  const favicon = $('favicon') as HTMLLinkElement;
+  const setSize = (s: string) => favicon.sizes.replace(favicon.sizes[0], s);
   if (e.detail.url) {
     favicon.href = e.detail.url;
     // The server can fall back to JPEG here if it doesn't have a WebP image
     // at the requested size, but I'm guessing that the browser will sniff the
     // type anyway.
     favicon.type = 'image/webp';
-    favicon.sizes = `${smallCoverSize}x${smallCoverSize}`;
+    setSize(`${smallCoverSize}x${smallCoverSize}`);
   } else {
-    favicon.href = 'favicon.ico';
+    favicon.href = 'favicon-v1.ico';
     favicon.type = 'image/png';
-    favicon.sizes = '48x48';
+    setSize('48x48');
   }
 });
 
 // Wire up components.
-player.addEventListener('field', (e) => {
+player.addEventListener('field', (e: CustomEvent) => {
   searcher.resetFields(e.detail.artist, e.detail.album, e.detail.albumId);
 });
-player.addEventListener('newtags', (e) => {
+player.addEventListener('newtags', (e: CustomEvent) => {
   serverTags = serverTags.concat(e.detail.tags);
   player.tags = searcher.tags = serverTags;
 });
-searcher.addEventListener('enqueue', (e) => {
+searcher.addEventListener('enqueue', (e: CustomEvent) => {
   player.enqueueSongs(
     e.detail.songs,
     e.detail.clearFirst,
@@ -97,16 +98,21 @@ searcher.addEventListener('enqueue', (e) => {
 });
 
 // Used by web tests.
-document.test = {
+(document as any).test = {
   reset: () => {
     player.resetForTesting();
     searcher.resetForTesting();
     // Make a hacky attempt to close any modal dialogs.
     [...document.querySelectorAll('dialog')].forEach((d) => d.close());
   },
-  setPlayDelayMs: (delayMs) => (player.playDelayMs_ = delayMs),
+  setPlayDelayMs: (delayMs: number) => (player.playDelayMs_ = delayMs),
   updateTags: async () => await fetchServerTags(),
-  dragElement: (src, dest, offsetX, offsetY) => {
+  dragElement: (
+    src: HTMLElement,
+    dest: HTMLElement,
+    offsetX: number,
+    offsetY: number
+  ) => {
     const dataTransfer = { setDragImage: () => {} };
     let dropEffect = 'none';
     Object.defineProperty(dataTransfer, 'dropEffect', {
@@ -114,7 +120,7 @@ document.test = {
       set: (v) => (dropEffect = v),
     });
 
-    const makeEvent = (type, clientX, clientY) => {
+    const makeEvent = (type: string, clientX: number, clientY: number) => {
       const ev = new DragEvent(type, {
         bubbles: true,
         cancelable: true,
