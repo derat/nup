@@ -3,6 +3,7 @@
 
 import { $, clamp, createTemplate } from './common.js';
 import { createDialog } from './dialog.js';
+import type { TagSuggester } from './tag-suggester.js';
 
 const template = createTemplate(`
 <style>
@@ -89,7 +90,7 @@ export default class UpdateDialog {
     const get = (id: string) => $(id, shadow);
 
     get('close-icon').addEventListener('click', () => this.close(true));
-    (get('tag-suggester') as any).words = tags;
+    (get('tag-suggester') as TagSuggester).words = tags;
 
     this.ratingSpan_ = get('rating');
     this.ratingSpan_.addEventListener('keydown', this.onRatingSpanKeyDown_);

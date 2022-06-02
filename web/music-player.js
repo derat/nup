@@ -173,7 +173,6 @@ customElements.define(
   'music-player',
   class extends HTMLElement {
     static SEEK_SEC_ = 10; // seconds to skip when seeking forward or back
-    static MAX_RETRIES_ = 2; // number of consecutive playback errors to retry
     static NOTIFICATION_SEC_ = 3; // duration to show song-change notification
     static PLAY_DELAY_MS_ = 500; // delay before playing when cycling track
     static PRELOAD_SEC_ = 20; // seconds before end of song to load next song

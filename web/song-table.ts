@@ -183,20 +183,34 @@ const rowTemplate = createTemplate(`
 // reordered within song-table.
 customElements.define(
   'song-table',
-  class extends HTMLElement {
+  class SongTable extends HTMLElement {
     static RESIZE_TIMEOUT_MS_ = 1000; // delay after resize to update titles
+
+    lastClickedCheckboxIndex_: number; // 0 is header
+    numCheckedSongs_: number;
+    shadow_: ShadowRoot;
+    table_: HTMLTableElement;
+    rowSongs_: WeakMap<HTMLTableRowElement, Song>;
+    resizeTimeoutId_: number | null;
+    resizeObserver_: ResizeObserver;
+    dragImage_: HTMLImageElement;
+    dragTarget_: HTMLElement;
+    dragFromIndex_: number;
+    dragToIndex_: number;
+    dragListRect_: DOMRect | null;
+    headingCheckbox_: HTMLInputElement;
 
     constructor() {
       super();
 
-      this.lastClickedCheckboxIndex_ = -1; // 0 is header
+      this.lastClickedCheckboxIndex_ = -1;
       this.numCheckedSongs_ = 0;
 
       this.shadow_ = createShadow(this, template);
       this.shadow_.adoptedStyleSheets = [commonStyles];
 
-      this.table_ = this.shadow_.querySelector('table');
-      this.rowSongs_ = new WeakMap(); // row element to song object
+      this.table_ = this.shadow_.querySelector('table') as HTMLTableElement;
+      this.rowSongs_ = new WeakMap();
 
       // When the table is resized, update all of the rows' title attributes
       // after a short delay.
@@ -208,11 +222,11 @@ customElements.define(
           for (let i = 0; i < this.songRows_.length; i++) {
             this.updateSongRowTitleAttributes_(i);
           }
-        }, this.constructor.RESIZE_TIMEOUT_MS_);
+        }, SongTable.RESIZE_TIMEOUT_MS_);
       });
       this.resizeObserver_.observe(this.table_);
 
-      this.dragImage_ = createElement('img');
+      this.dragImage_ = createElement('img') as HTMLImageElement;
       this.dragTarget_ = $('drag-target', this.shadow_);
       this.dragFromIndex_ = -1;
       this.dragToIndex_ = -1;
@@ -268,46 +282,46 @@ customElements.define(
     }
 
     // |songRows_| is efficient, but it's regrettably an HTMLCollection.
-    get songRows_() {
+    get songRows_(): HTMLCollection {
       return this.table_.tBodies[0].rows;
     }
     // |songRowsArray_| is convenient (map, indexOf, etc.) but slow.
-    get songRowsArray_() {
-      return [...this.songRows_];
+    get songRowsArray_(): HTMLTableRowElement[] {
+      return [...this.songRows_] as HTMLTableRowElement[];
     }
 
-    get songs() {
+    get songs(): Song[] {
       return this.songRowsArray_.map((r) => this.rowSongs_.get(r)); // shallow copy
     }
     get numSongs() {
       return this.songRows_.length;
     }
-    getSong(index) {
-      return this.rowSongs_.get(this.songRows_[index]);
+    getSong(index: number): Song {
+      return this.rowSongs_.get(this.songRows_[index] as HTMLTableRowElement);
     }
 
     get checkedSongs() {
       return !this.useCheckboxes_
         ? []
         : this.songRowsArray_
-            .filter((r) => r.cells[0].children[0].checked)
+            .filter((r) => (r.cells[0].children[0] as HTMLInputElement).checked)
             .map((r) => this.rowSongs_.get(r));
     }
 
     // Marks the row at |index| as being active (or not).
     // The row receives a strong highlight.
-    setRowActive(index, active) {
+    setRowActive(index: number, active: boolean) {
       this.setRowClass_(index, 'active', active);
     }
 
     // Marks the row at |index| as having its context menu shown (or not).
     // The row receives a faint highlight.
-    setRowMenuShown(index, menuShown) {
+    setRowMenuShown(index: number, menuShown: boolean) {
       this.setRowClass_(index, 'menu', menuShown);
     }
 
     // Helper method that adds or removes |cls| from the row at |index|.
-    setRowClass_(index, cls, add) {
+    setRowClass_(index: number, cls: string, add: boolean) {
       if (index < 0 || index >= this.numSongs) return;
 
       const row = this.songRows_[index];
@@ -316,7 +330,7 @@ customElements.define(
     }
 
     // Scrolls the table so that the row at |index| is in view.
-    scrollToRow(index) {
+    scrollToRow(index: number) {
       if (index < 0 || index >= this.numSongs) return;
       this.songRows_[index].scrollIntoView({
         behavior: 'smooth',
@@ -325,7 +339,7 @@ customElements.define(
     }
 
     // Sets all checkboxes to |checked|.
-    setAllCheckboxes(checked) {
+    setAllCheckboxes(checked: boolean) {
       if (!this.useCheckboxes_) return;
 
       this.headingCheckbox_.checked = checked;
@@ -334,7 +348,7 @@ customElements.define(
 
     // Updates the table to contain |newSongs| while trying to be smart about
     // not doing any more work than necessary.
-    setSongs(newSongs) {
+    setSongs(newSongs: Song[]) {
       const oldSongs = this.songs;
 
       // Walk forward from the beginning and backward from the end to look for
@@ -390,13 +404,13 @@ customElements.define(
     }
 
     // Emits a |name| CustomEvent with its 'detail' property set to |detail|.
-    emitEvent_(name, detail) {
+    emitEvent_(name: string, detail: any) {
       this.dispatchEvent(new CustomEvent(name, { detail }));
     }
 
     // Inserts and initializes a new song row at |index| (ignoring the header
     // row).
-    insertSongRow_(index) {
+    insertSongRow_(index: number) {
       // Cloning the template produces a DocumentFragment, so attach it to the
       // DOM so we can get the actual <tr> to use in event listeners.
       const tbody = this.table_.querySelector('tbody');
@@ -404,12 +418,12 @@ customElements.define(
         rowTemplate.content.cloneNode(true),
         tbody.children ? tbody.children[index] : null
       );
-      const row = tbody.children[index];
+      const row = tbody.children[index] as HTMLTableRowElement;
 
       row
         .querySelector('input[type="checkbox"]')
-        .addEventListener('click', (e) =>
-          this.onCheckboxClick_(e.target, e.shiftKey)
+        .addEventListener('click', (e: MouseEvent) =>
+          this.onCheckboxClick_(e.target as HTMLInputElement, e.shiftKey)
         );
       row.querySelector('.artist a').addEventListener('click', () => {
         this.emitEvent_('field', { artist: this.rowSongs_.get(row).artist });
@@ -418,11 +432,11 @@ customElements.define(
         const song = this.rowSongs_.get(row);
         this.emitEvent_('field', { albumId: song.albumId, album: song.album });
       });
-      row.addEventListener('contextmenu', (e) => {
+      row.addEventListener('contextmenu', (e: MouseEvent) => {
         this.emitEvent_('menu', {
           songId: this.rowSongs_.get(row).songId,
           index: this.songRowsArray_.indexOf(row), // don't use orig (stale) index
-          orig: e, // PointerEvent
+          orig: e,
         });
       });
       row.addEventListener('dragstart', (e) => {
@@ -440,38 +454,46 @@ customElements.define(
     }
 
     // Deletes the row at |index| (ignoring the header row).
-    deleteSongRow_(index) {
+    deleteSongRow_(index: number) {
       this.table_.deleteRow(index + 1); // skip header
     }
 
     // Updates the row at |index| to display data about |song| and attaches
     // |song| to the row. Also updates the row's title attributes (which can
     // trigger a reflow) unless |deferTitles| is true.
-    updateSongRow_(index, song, deferTitles) {
-      const row = this.songRows_[index];
+    updateSongRow_(index: number, song: Song, deferTitles: boolean) {
+      const row = this.songRows_[index] as HTMLTableRowElement;
       row.classList.remove('active');
 
       this.rowSongs_.set(row, song);
 
-      const update = (cell, text, textInChild) =>
-        ((textInChild ? cell.firstChild : cell).innerText = text);
+      const update = (
+        cell: HTMLTableCellElement,
+        text: string,
+        textInChild: boolean
+      ) =>
+        ((textInChild
+          ? (cell.firstElementChild as HTMLElement)
+          : cell
+        ).innerText = text);
       update(row.cells[1], song.artist, true);
       update(row.cells[2], song.title, false);
       update(row.cells[3], song.album, true);
-      update(row.cells[4], formatDuration(parseFloat(song.length)), false);
+      update(row.cells[4], formatDuration(song.length), false);
 
       if (!deferTitles) this.updateSongRowTitleAttributes_(index);
     }
 
     // Adds or removes 'title' attributes from each of the specified row's cells
     // depending on whether its text is elided or not.
-    updateSongRowTitleAttributes_(index) {
-      const update = (cell, textInChild) =>
+    updateSongRowTitleAttributes_(index: number) {
+      const update = (cell: HTMLTableCellElement, textInChild: boolean) =>
         updateTitleAttributeForTruncation(
           cell,
-          (textInChild ? cell.firstChild : cell).innerText
+          (textInChild ? (cell.firstElementChild as HTMLElement) : cell)
+            .innerText
         );
-      const row = this.songRows_[index];
+      const row = this.songRows_[index] as HTMLTableRowElement;
       update(row.cells[1], true);
       update(row.cells[2], false);
       update(row.cells[3], true);
@@ -479,8 +501,9 @@ customElements.define(
     }
 
     // Handles one of the checkboxes being clicked.
-    onCheckboxClick_(checkbox, shiftHeld) {
-      const getCheckbox = (i) => this.table_.rows[i].cells[0].children[0];
+    onCheckboxClick_(checkbox: HTMLInputElement, shiftHeld: boolean) {
+      const getCheckbox = (i: number) =>
+        this.table_.rows[i].cells[0].children[0] as HTMLInputElement;
 
       let index = -1;
       for (let i = 0; i < this.table_.rows.length; i++) {
@@ -493,7 +516,7 @@ customElements.define(
 
       if (index === 0) {
         for (let i = 1; i < this.table_.rows.length; i++) {
-          getCheckbox(i).checked = checked ? 'checked' : null;
+          getCheckbox(i).checked = checked;
         }
         this.numCheckedSongs_ = checked ? this.numSongs : 0;
       } else {
@@ -510,10 +533,10 @@ customElements.define(
             for (let i = start; i <= end; i++) {
               const c = getCheckbox(i);
               if (checked && !c.checked) {
-                c.checked = 'checked';
+                c.checked = true;
                 this.numCheckedSongs_++;
               } else if (!checked && c.checked) {
-                c.checked = null;
+                c.checked = false;
                 this.numCheckedSongs_--;
               }
             }
@@ -530,7 +553,7 @@ customElements.define(
     // Updates |headingCheckbox_|'s visual state for the current number of
     // checked songs.
     updateHeadingCheckbox_() {
-      this.headingCheckbox_.checked = this.numCheckedSongs_ ? 'checked' : null;
+      this.headingCheckbox_.checked = this.numCheckedSongs_ > 0;
       if (this.numCheckedSongs_ && this.numCheckedSongs_ !== this.numSongs) {
         this.headingCheckbox_.classList.add('transparent');
       } else {
@@ -538,14 +561,14 @@ customElements.define(
       }
     }
 
-    onDragEnter_ = (e) => {
+    onDragEnter_ = (e: DragEvent) => {
       if (!this.inDrag_) return;
       e.preventDefault(); // needed to allow dropping
       e.stopPropagation();
       e.dataTransfer.dropEffect = 'move';
     };
 
-    onDragOver_ = (e) => {
+    onDragOver_ = (e: DragEvent) => {
       if (!this.inDrag_) return;
       e.preventDefault(); // needed to allow dropping
       e.stopPropagation();
@@ -556,7 +579,7 @@ customElements.define(
       }
     };
 
-    onDragEnd_ = (e) => {
+    onDragEnd_ = (e: DragEvent) => {
       if (!this.inDrag_) return;
       e.preventDefault();
       e.stopPropagation();
@@ -584,7 +607,7 @@ customElements.define(
       this.emitEvent_('reorder', { fromIndex: from, toIndex: to });
     };
 
-    getDragEventIndex_(e) {
+    getDragEventIndex_(e: DragEvent) {
       const ey = e.clientY;
       const list = this.dragListRect_;
       const nsongs = this.songRows_.length;

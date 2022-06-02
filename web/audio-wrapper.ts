@@ -50,10 +50,27 @@ const template = createTemplate(`
 // looked in April 2022.
 customElements.define(
   'audio-wrapper',
-  class extends HTMLElement {
+  class AudioWrapper extends HTMLElement {
     static GAIN_CHANGE_SEC_ = 0.03; // duration for audio gain changes
+    static MAX_RETRIES_ = 2; // number of consecutive playback errors to retry
     static PAUSE_GAIN_ = 0.001; // target audio gain when pausing
     static RESUME_WHEN_ONLINE_SEC_ = 30; // maximum delay for auto-resume when online
+
+    audioCtx_: AudioContext;
+    gainNode_: GainNode;
+    gain_: number;
+    audioSrc_: MediaElementAudioSourceNode | null;
+
+    shadow_: ShadowRoot;
+    audio_: HTMLAudioElement;
+    preloadAudio_: HTMLAudioElement | null;
+
+    lastUpdateTime_: number | null; // time at last 'timeupdate' or 'play' event
+    lastUpdatePos_: number; // position at last 'timeupdate' event
+    playtime_: number; // total playtime of |src| in seconds
+    pauseTimeoutId_: number | null; // calls audio_.pause() after dropping gain
+    pausedForOfflineTime_: number | null; // seconds since epoch when auto-paused
+    numErrors_: number; // consecutive playback errors
 
     constructor() {
       super();
@@ -69,13 +86,12 @@ customElements.define(
       this.configureAudio_();
       this.preloadAudio_ = null;
 
-      this.lastUpdateTime_ = null; // time at last 'timeupdate' or 'play' event
-      this.lastUpdatePos_ = 0; // position at last 'timeupdate' event
-      this.playtime_ = 0; // total playtime of |src| in seconds
-
-      this.pauseTimeoutId_ = null; // calls audio_.pause() after dropping gain
-      this.pausedForOfflineTime_ = null; // seconds since epoch when auto-paused
-      this.numErrors_ = 0; // consecutive playback errors
+      this.lastUpdateTime_ = null;
+      this.lastUpdatePos_ = 0;
+      this.playtime_ = 0;
+      this.pauseTimeoutId_ = null;
+      this.pausedForOfflineTime_ = null;
+      this.numErrors_ = 0;
     }
 
     connectedCallback() {
@@ -105,7 +121,7 @@ customElements.define(
     }
 
     // Deconfigures |audio_| and replaces it with |audio|.
-    replaceAudio_(audio) {
+    replaceAudio_(audio: HTMLAudioElement) {
       this.audio_.removeAttribute('src');
       this.audio_.removeEventListener('ended', this.onEnded_);
       this.audio_.removeEventListener('error', this.onError_);
@@ -113,7 +129,7 @@ customElements.define(
       this.audio_.removeEventListener('play', this.onPlay_);
       this.audio_.removeEventListener('timeupdate', this.onTimeUpdate_);
 
-      this.audioSrc_.disconnect();
+      this.audioSrc_?.disconnect();
       this.audioSrc_ = null;
 
       this.audio_.parentNode.replaceChild(audio, this.audio_);
@@ -121,29 +137,29 @@ customElements.define(
       this.configureAudio_();
     }
 
-    onOnline_ = (e) => {
+    onOnline_ = () => {
       // Automatically resume playing if we previously paused due to going
       // offline: https://github.com/derat/nup/issues/17
       if (this.pausedForOfflineTime_ !== null) {
         console.log('Back online');
         const elapsed = getCurrentTimeSec() - this.pausedForOfflineTime_;
-        const resume = elapsed <= this.constructor.RESUME_WHEN_ONLINE_SEC_;
+        const resume = elapsed <= AudioWrapper.RESUME_WHEN_ONLINE_SEC_;
         this.pausedForOfflineTime_ = null;
         this.reloadAudio_();
         if (resume) this.audio_.play();
       }
     };
 
-    onEnded_ = (e) => {
+    onEnded_ = (e: Event) => {
       this.resendAudioEvent_(e);
     };
 
-    onError_ = (e) => {
+    onError_ = (e: Event) => {
       if (e.target !== this.audio_) return;
 
       this.numErrors_++;
 
-      const error = e.target.error;
+      const error = (e.target as HTMLAudioElement).error;
       console.log(`Got playback error ${error.code} (${error.message})`);
       switch (error.code) {
         case error.MEDIA_ERR_ABORTED: // 1
@@ -155,7 +171,7 @@ customElements.define(
             console.log('Offline; pausing');
             this.audio_.pause();
             this.pausedForOfflineTime_ = getCurrentTimeSec();
-          } else if (this.numErrors_ <= this.constructor.MAX_RETRIES_) {
+          } else if (this.numErrors_ <= AudioWrapper.MAX_RETRIES_) {
             console.log(`Retrying from position ${this.lastUpdatePos_}`);
             this.reloadAudio_();
             this.audio_.play();
@@ -167,17 +183,17 @@ customElements.define(
       }
     };
 
-    onPause_ = (e) => {
+    onPause_ = (e: Event) => {
       this.lastUpdateTime_ = null;
       this.resendAudioEvent_(e);
     };
 
-    onPlay_ = (e) => {
+    onPlay_ = (e: Event) => {
       this.lastUpdateTime_ = getCurrentTimeSec();
       this.resendAudioEvent_(e);
     };
 
-    onTimeUpdate_ = (e) => {
+    onTimeUpdate_ = (e: Event) => {
       if (e.target !== this.audio_) return;
 
       const pos = this.audio_.currentTime;
@@ -201,7 +217,7 @@ customElements.define(
     };
 
     // Dispatches a new event based on |e|.
-    resendAudioEvent_(e) {
+    resendAudioEvent_(e: Event) {
       const ne = new Event(e.type);
       Object.defineProperty(ne, 'target', { value: e.target });
       this.dispatchEvent(ne);
@@ -216,7 +232,7 @@ customElements.define(
     }
 
     // Sets |gainNode_|'s gain to |v|.
-    setAudioGain_(v) {
+    setAudioGain_(v: number) {
       // Per https://developer.mozilla.org/en-US/docs/Web/API/GainNode:
       // "If modified, the new gain is instantly applied, causing unaesthetic
       // 'clicks' in the resulting audio. To prevent this from happening, never
@@ -232,7 +248,7 @@ customElements.define(
       const g = this.gainNode_.gain;
       const t = this.audioCtx_.currentTime;
       g.setValueAtTime(g.value, t);
-      g.exponentialRampToValueAtTime(v, t + this.constructor.GAIN_CHANGE_SEC_);
+      g.exponentialRampToValueAtTime(v, t + AudioWrapper.GAIN_CHANGE_SEC_);
     }
 
     // Cancels |pauseTimeoutId_| if non-null.
@@ -245,11 +261,11 @@ customElements.define(
     get src() {
       return this.audio_.src;
     }
-    set src(src) {
+    set src(src: string) {
       // Deal with "The AudioContext was not allowed to start. It must be
       // resumed (or created) after a user gesture on the page.":
       // https://developers.google.com/web/updates/2017/09/autoplay-policy-changes#webaudio
-      const ctx = this.gainNode_.context;
+      const ctx = this.gainNode_.context as AudioContext;
       if (ctx.state === 'suspended') ctx.resume();
 
       if (!src) {
@@ -274,7 +290,7 @@ customElements.define(
 
     // Sigh: https://github.com/prettier/prettier/issues/5287
     /* prettier-ignore */ get currentTime() { return this.audio_.currentTime; }
-    /* prettier-ignore */ set currentTime(t) { this.audio_.currentTime = t; }
+    /* prettier-ignore */ set currentTime(t: number) { this.audio_.currentTime = t; }
     /* prettier-ignore */ get duration() { return this.audio_.duration; }
     /* prettier-ignore */ get paused() { return this.audio_.paused; }
     /* prettier-ignore */ get seekable() { return this.audio_.seekable; }
@@ -291,11 +307,11 @@ customElements.define(
 
       // Avoid pops caused by abruptly stopping playback:
       // https://github.com/derat/nup/issues/34
-      this.setAudioGain_(this.constructor.PAUSE_GAIN_);
+      this.setAudioGain_(AudioWrapper.PAUSE_GAIN_);
       this.pauseTimeoutId_ = window.setTimeout(() => {
         this.pauseTimeoutId_ = null;
         this.audio_.pause();
-      }, this.constructor.GAIN_CHANGE_SEC_ * 1000);
+      }, AudioWrapper.GAIN_CHANGE_SEC_ * 1000);
     }
 
     load() {
@@ -304,7 +320,7 @@ customElements.define(
 
     // prettier-ignore
     get gain() { return this.gain_; }
-    set gain(v) {
+    set gain(v: number) {
       this.setAudioGain_(v);
       this.gain_ = v;
     }
@@ -316,11 +332,12 @@ customElements.define(
     get preloadSrc() {
       return this.preloadAudio_ ? this.preloadAudio_.src : null;
     }
-    set preloadSrc(src) {
-      if (this.preloadAudio_ && this.preloadAudio_.src === src) return;
-      this.preloadAudio_ = template.content
-        .cloneNode(true)
-        .querySelector('audio');
+    set preloadSrc(src: string) {
+      if (this.preloadAudio_?.src === src) return;
+      // This is split over multiple lines solely to prevent Prettier from
+      // doing some of the most hideous formatting that I've ever seen.
+      const el = template.content.firstElementChild.cloneNode(true);
+      this.preloadAudio_ = el as HTMLAudioElement;
       this.preloadAudio_.src = src;
     }
   }
