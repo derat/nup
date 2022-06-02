@@ -193,154 +193,148 @@ const template = createTemplate(`
 //
 // When the next track information is clicked, a 'next' event is emitted.
 // When a click is received anywhere else, a 'hide' event is emitted.
-customElements.define(
-  'presentation-layer',
-  class extends HTMLElement {
-    duration_ = 0; // duration of current song in seconds
-    lastPos_ = 0; // last value in seconds passed to updatePosition()
-    visible_ = false;
-    currentFilename_: string | null = null;
-    nextFilename_: string | null = null;
+export class PresentationLayer extends HTMLElement {
+  duration_ = 0; // duration of current song in seconds
+  lastPos_ = 0; // last value in seconds passed to updatePosition()
+  visible_ = false;
+  currentFilename_: string | null = null;
+  nextFilename_: string | null = null;
 
-    shadow_ = createShadow(this, template);
-    currentCover_ = $('current-cover', this.shadow_) as HTMLImageElement;
-    oldCover_ = $('old-cover', this.shadow_) as HTMLImageElement;
+  shadow_ = createShadow(this, template);
+  currentCover_ = $('current-cover', this.shadow_) as HTMLImageElement;
+  oldCover_ = $('old-cover', this.shadow_) as HTMLImageElement;
 
-    currentDetails_ = $('current-details', this.shadow_);
-    currentArtist_ = $('current-artist', this.shadow_);
-    currentTitle_ = $('current-title', this.shadow_);
-    currentAlbum_ = $('current-album', this.shadow_);
+  currentDetails_ = $('current-details', this.shadow_);
+  currentArtist_ = $('current-artist', this.shadow_);
+  currentTitle_ = $('current-title', this.shadow_);
+  currentAlbum_ = $('current-album', this.shadow_);
 
-    progressBar_ = $('progress-bar', this.shadow_);
-    timeDiv_ = $('current-time', this.shadow_);
-    durationDiv_ = $('current-duration', this.shadow_);
+  progressBar_ = $('progress-bar', this.shadow_);
+  timeDiv_ = $('current-time', this.shadow_);
+  durationDiv_ = $('current-duration', this.shadow_);
 
-    nextDiv_ = $('next', this.shadow_);
-    nextCover_ = $('next-cover', this.shadow_) as HTMLImageElement;
-    nextArtist_ = $('next-artist', this.shadow_);
-    nextTitle_ = $('next-title', this.shadow_);
-    nextAlbum_ = $('next-album', this.shadow_);
+  nextDiv_ = $('next', this.shadow_);
+  nextCover_ = $('next-cover', this.shadow_) as HTMLImageElement;
+  nextArtist_ = $('next-artist', this.shadow_);
+  nextTitle_ = $('next-title', this.shadow_);
+  nextAlbum_ = $('next-album', this.shadow_);
 
-    constructor() {
-      super();
+  constructor() {
+    super();
 
-      this.shadow_.host.addEventListener('click', (e) => {
-        this.dispatchEvent(new Event('hide'));
-        e.stopPropagation();
-      });
-      this.nextDiv_.addEventListener('click', (e) => {
-        this.dispatchEvent(new Event('next'));
-        e.stopPropagation();
-      });
+    this.shadow_.host.addEventListener('click', (e) => {
+      this.dispatchEvent(new Event('hide'));
+      e.stopPropagation();
+    });
+    this.nextDiv_.addEventListener('click', (e) => {
+      this.dispatchEvent(new Event('next'));
+      e.stopPropagation();
+    });
 
-      this.updateSongs(null, null);
+    this.updateSongs(null, null);
+  }
+
+  updateSongs(currentSong: Song | null, nextSong: Song | null) {
+    if (!currentSong) {
+      this.currentDetails_.classList.add('hidden');
+      this.currentFilename_ = null;
+      this.style.backgroundImage = '';
+    } else {
+      this.currentDetails_.classList.remove('hidden');
+      this.currentArtist_.innerText = currentSong.artist;
+      this.currentTitle_.innerText = currentSong.title;
+      this.currentAlbum_.innerText = currentSong.album;
+
+      this.progressBar_.style.width = '0px';
+      this.timeDiv_.innerText = '';
+      this.durationDiv_.innerText = formatDuration(currentSong.length);
+      this.duration_ = currentSong.length;
+      this.currentFilename_ = currentSong.coverFilename;
+
+      // Set the host element's background to the low-resolution cover image
+      // (which we've probably already loaded). If the presentation layer
+      // isn't currently visible but gets shown later, this image will act as
+      // a placeholder while we're loading the full-res version. We use the
+      // host element instead of |currentCover_| since Chrome appears to clear
+      // <img> elements when a new image is being loaded in response to a
+      // change to the src attribute.
+      const url = getCoverUrl(this.currentFilename_, smallCoverSize);
+      // Escape characters: https://stackoverflow.com/a/33541245
+      this.style.backgroundImage = `url("${encodeURI(url)}")`;
     }
 
-    updateSongs(currentSong: Song | null, nextSong: Song | null) {
-      if (!currentSong) {
-        this.currentDetails_.classList.add('hidden');
-        this.currentFilename_ = null;
-        this.style.backgroundImage = '';
-      } else {
-        this.currentDetails_.classList.remove('hidden');
-        this.currentArtist_.innerText = currentSong.artist;
-        this.currentTitle_.innerText = currentSong.title;
-        this.currentAlbum_.innerText = currentSong.album;
+    // Make the "old" cover image display the image that we were just
+    // displaying, if any, and then fade out. We swap in a new image to
+    // retrigger the fade-out animation.
+    const el = this.currentCover_.cloneNode(true) as HTMLImageElement;
+    el.id = 'old-cover';
+    this.oldCover_.parentNode.replaceChild(el, this.oldCover_);
+    this.oldCover_ = el;
 
-        this.progressBar_.style.width = '0px';
-        this.timeDiv_.innerText = '';
-        this.durationDiv_.innerText = formatDuration(currentSong.length);
-        this.duration_ = currentSong.length;
-        this.currentFilename_ = currentSong.coverFilename;
+    // Load the full-resolution cover image if we're visible.
+    updateImg(
+      this.currentCover_,
+      this.visible ? getCoverUrl(this.currentFilename_) : null
+    );
 
-        // Set the host element's background to the low-resolution cover image
-        // (which we've probably already loaded). If the presentation layer
-        // isn't currently visible but gets shown later, this image will act as
-        // a placeholder while we're loading the full-res version. We use the
-        // host element instead of |currentCover_| since Chrome appears to clear
-        // <img> elements when a new image is being loaded in response to a
-        // change to the src attribute.
-        const url = getCoverUrl(this.currentFilename_, smallCoverSize);
-        // Escape characters: https://stackoverflow.com/a/33541245
-        this.style.backgroundImage = `url("${encodeURI(url)}")`;
-      }
-
-      // Make the "old" cover image display the image that we were just
-      // displaying, if any, and then fade out. We swap in a new image to
-      // retrigger the fade-out animation.
-      const el = this.currentCover_.cloneNode(true) as HTMLImageElement;
-      el.id = 'old-cover';
-      this.oldCover_.parentNode.replaceChild(el, this.oldCover_);
-      this.oldCover_ = el;
-
-      // Load the full-resolution cover image if we're visible.
-      updateImg(
-        this.currentCover_,
-        this.visible ? getCoverUrl(this.currentFilename_) : null
-      );
-
-      if (!nextSong) {
-        this.nextDiv_.classList.add('hidden');
-        this.nextFilename_ = null;
-      } else {
-        this.nextDiv_.classList.remove('hidden');
-        this.nextArtist_.innerText = nextSong.artist;
-        this.nextTitle_.innerText = nextSong.title;
-        this.nextAlbum_.innerText = nextSong.album;
-        this.nextFilename_ = nextSong.coverFilename;
-      }
-      updateImg(
-        this.nextCover_,
-        getCoverUrl(this.nextFilename_, smallCoverSize)
-      );
-
-      // Preload the next track's full-resolution cover.
-      if (this.visible && this.nextFilename_) {
-        preloadImage(getCoverUrl(this.nextFilename_));
-      }
+    if (!nextSong) {
+      this.nextDiv_.classList.add('hidden');
+      this.nextFilename_ = null;
+    } else {
+      this.nextDiv_.classList.remove('hidden');
+      this.nextArtist_.innerText = nextSong.artist;
+      this.nextTitle_.innerText = nextSong.title;
+      this.nextAlbum_.innerText = nextSong.album;
+      this.nextFilename_ = nextSong.coverFilename;
     }
+    updateImg(this.nextCover_, getCoverUrl(this.nextFilename_, smallCoverSize));
 
-    updatePosition(sec: number) {
-      this.lastPos_ = sec;
-
-      if (!this.visible || this.duration_ <= 0) return;
-
-      // Make the bar overlap with the border to avoid hairline gaps.
-      const fraction = Math.min(sec / this.duration_, 1);
-      this.progressBar_.style.width = `calc(${fraction} * (100% + 2px))`;
-
-      const str = formatDuration(sec);
-      if (this.timeDiv_.innerText !== str) this.timeDiv_.innerText = str;
-    }
-
-    get visible() {
-      return this.visible_;
-    }
-    set visible(visible: boolean) {
-      if (this.visible_ === visible) return;
-
-      if (visible) {
-        // If we weren't visible when updateSongs() was last called, we haven't
-        // loaded the current cover image yet or preloaded the next one, so do
-        // it now.
-        updateImg(this.currentCover_, getCoverUrl(this.currentFilename_));
-        if (this.nextFilename_) preloadImage(getCoverUrl(this.nextFilename_));
-
-        // Make sure the progress bar and displayed time are correct.
-        this.updatePosition(this.lastPos_);
-
-        // Prevent the old cover from fading out again.
-        // Its animation seems to be repeated whenever it becomes visible.
-        this.oldCover_.classList.add('hidden');
-      }
-
-      visible
-        ? this.classList.add('visible')
-        : this.classList.remove('visible');
-      this.visible_ = visible;
+    // Preload the next track's full-resolution cover.
+    if (this.visible && this.nextFilename_) {
+      preloadImage(getCoverUrl(this.nextFilename_));
     }
   }
-);
+
+  updatePosition(sec: number) {
+    this.lastPos_ = sec;
+
+    if (!this.visible || this.duration_ <= 0) return;
+
+    // Make the bar overlap with the border to avoid hairline gaps.
+    const fraction = Math.min(sec / this.duration_, 1);
+    this.progressBar_.style.width = `calc(${fraction} * (100% + 2px))`;
+
+    const str = formatDuration(sec);
+    if (this.timeDiv_.innerText !== str) this.timeDiv_.innerText = str;
+  }
+
+  get visible() {
+    return this.visible_;
+  }
+  set visible(visible: boolean) {
+    if (this.visible_ === visible) return;
+
+    if (visible) {
+      // If we weren't visible when updateSongs() was last called, we haven't
+      // loaded the current cover image yet or preloaded the next one, so do
+      // it now.
+      updateImg(this.currentCover_, getCoverUrl(this.currentFilename_));
+      if (this.nextFilename_) preloadImage(getCoverUrl(this.nextFilename_));
+
+      // Make sure the progress bar and displayed time are correct.
+      this.updatePosition(this.lastPos_);
+
+      // Prevent the old cover from fading out again.
+      // Its animation seems to be repeated whenever it becomes visible.
+      this.oldCover_.classList.add('hidden');
+    }
+
+    visible ? this.classList.add('visible') : this.classList.remove('visible');
+    this.visible_ = visible;
+  }
+}
+
+customElements.define('presentation-layer', PresentationLayer);
 
 function updateImg(img: HTMLImageElement, url: string | null) {
   if (url) {

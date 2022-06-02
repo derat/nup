@@ -1,9 +1,9 @@
 // Copyright 2010 Daniel Erat.
 // All rights reserved.
 
+import type { AudioWrapper } from './audio-wrapper.js';
 import {
   $,
-  clamp,
   commonStyles,
   createShadow,
   createTemplate,
@@ -14,7 +14,6 @@ import {
   getDumpSongUrl,
   getRatingString,
   getSongUrl,
-  handleFetchError,
   moveItem,
   preloadImage,
   smallCoverSize,
@@ -24,7 +23,9 @@ import Config, { getConfig } from './config.js';
 import { isDialogShown } from './dialog.js';
 import { createMenu, isMenuShown } from './menu.js';
 import { showOptionsDialog } from './options-dialog.js';
+import type { PresentationLayer } from './presentation-layer.js';
 import { showSongInfo } from './song-info.js';
+import type { SongTable } from './song-table.js';
 import { showStats } from './stats.js';
 import UpdateDialog from './update-dialog.js';
 import Updater from './updater.js';
@@ -171,38 +172,53 @@ const template = createTemplate(`
 // is available.
 customElements.define(
   'music-player',
-  class extends HTMLElement {
+  class MusicPlayer extends HTMLElement {
     static SEEK_SEC_ = 10; // seconds to skip when seeking forward or back
     static NOTIFICATION_SEC_ = 3; // duration to show song-change notification
     static PLAY_DELAY_MS_ = 500; // delay before playing when cycling track
     static PRELOAD_SEC_ = 20; // seconds before end of song to load next song
     static TIME_UPDATE_SLOP_MS_ = 10; // time to wait past second boundary
 
+    config_ = getConfig();
+    updater_: Updater | null = null; // initialized in connectedCallback()
+    songs_: Song[] = []; // songs in the order in which they should be played
+    tags_: string[] = []; // available tags loaded from server
+    currentIndex_ = -1; // index into |songs| of current track
+    startTime_: number | null = null; // seconds since epoch for current track
+    reportedCurrentTrack_ = false; // already reported current as played?
+    reachedEndOfSongs_ = false; // did we hit end of last song?
+    updateDialog_: UpdateDialog | null = null;
+    notification_: Notification | null = null; // for song changes
+    closeNotificationTimeoutId_: number | null = null; // closeNotification_()
+    playDelayMs_ = MusicPlayer.PLAY_DELAY_MS_;
+    playTimeoutId_: number | null = null; // for playInternal_()
+    lastTimeUpdatePos_ = 0; // audio position in last onTimeUpdate_()
+    timeUpdateTimeoutId_: number | null = null; // onTimeUpdate_()
+    shuffled_ = false; // playlist contains shuffled songs
+
+    shadow_ = createShadow(this, template);
+    presentationLayer_ = this.shadow_.querySelector(
+      'presentation-layer'
+    ) as PresentationLayer;
+    audio_ = this.shadow_.querySelector('audio-wrapper') as AudioWrapper;
+    playlistTable_ = $('playlist', this.shadow_) as SongTable;
+
+    coverDiv_ = $('cover-div', this.shadow_);
+    coverImage_ = $('cover-img', this.shadow_) as HTMLImageElement;
+    ratingOverlayDiv_ = $('rating-overlay', this.shadow_);
+    artistDiv_ = $('artist', this.shadow_);
+    titleDiv_ = $('title', this.shadow_);
+    albumDiv_ = $('album', this.shadow_);
+    timeDiv_ = $('time', this.shadow_);
+    prevButton_ = $('prev', this.shadow_) as HTMLButtonElement;
+    nextButton_ = $('next', this.shadow_) as HTMLButtonElement;
+    playPauseButton_ = $('play-pause', this.shadow_) as HTMLButtonElement;
+
     constructor() {
       super();
 
-      this.config_ = getConfig();
-      this.updater_ = null; // initialized in connectedCallback()
-      this.songs_ = []; // songs in the order in which they should be played
-      this.tags_ = []; // available tags loaded from server
-      this.currentIndex_ = -1; // index into |songs| of current track
-      this.startTime_ = null; // seconds since epoch when current track started
-      this.reportedCurrentTrack_ = false; // already reported current as played?
-      this.reachedEndOfSongs_ = false; // did we hit end of last song?
-      this.updateDialog_ = null; // currently-shown UpdateDialog
-      this.notification_ = null; // currently-shown song-change notification
-      this.closeNotificationTimeoutId_ = null; // for closeNotification_()
-      this.playDelayMs_ = this.constructor.PLAY_DELAY_MS_;
-      this.playTimeoutId_ = null; // for playInternal_()
-      this.lastTimeUpdatePos_ = 0; // audio position in last onTimeUpdate_()
-      this.timeUpdateTimeoutId_ = null; // for synthetic onTimeUpdate_() call
-      this.shuffled_ = false; // playlist contains shuffled songs
-
-      this.shadow_ = createShadow(this, template);
       this.shadow_.adoptedStyleSheets = [commonStyles];
 
-      this.presentationLayer_ =
-        this.shadow_.querySelector('presentation-layer');
       this.presentationLayer_.addEventListener('next', () => {
         this.cycleTrack_(1, false /* delayPlay */);
       });
@@ -218,12 +234,10 @@ customElements.define(
         }
       });
 
-      const get = (id) => $(id, this.shadow_);
-
-      this.menuButton_ = get('menu-button');
-      this.menuButton_.addEventListener('click', (e) => {
-        const rect = this.menuButton_.getBoundingClientRect();
-        const menu = createMenu(
+      const menuButton = $('menu-button', this.shadow_);
+      menuButton.addEventListener('click', () => {
+        const rect = menuButton.getBoundingClientRect();
+        createMenu(
           rect.right + 12, // compensate for right padding
           rect.bottom,
           [
@@ -267,15 +281,12 @@ customElements.define(
         );
       });
 
-      this.audio_ = this.shadow_.querySelector('audio-wrapper');
       this.audio_.addEventListener('ended', this.onEnded_);
       this.audio_.addEventListener('pause', this.onPause_);
       this.audio_.addEventListener('play', this.onPlay_);
       this.audio_.addEventListener('timeupdate', this.onTimeUpdate_);
       this.audio_.addEventListener('error', this.onError_);
 
-      this.coverDiv_ = get('cover-div');
-      this.coverImage_ = get('cover-img');
       this.coverImage_.addEventListener('click', () =>
         this.showUpdateDialog_()
       );
@@ -283,30 +294,20 @@ customElements.define(
         this.updateMediaSessionMetadata_(true /* imageLoaded */)
       );
 
-      this.ratingOverlayDiv_ = get('rating-overlay');
-      this.artistDiv_ = get('artist');
-      this.titleDiv_ = get('title');
-      this.albumDiv_ = get('album');
-      this.timeDiv_ = get('time');
-
-      this.prevButton_ = get('prev');
       this.prevButton_.addEventListener('click', () =>
         this.cycleTrack_(-1, true /* delayPlay */)
       );
-      this.nextButton_ = get('next');
       this.nextButton_.addEventListener('click', () =>
         this.cycleTrack_(1, true /* delayPlay */)
       );
-      this.playPauseButton_ = get('play-pause');
       this.playPauseButton_.addEventListener('click', () =>
         this.togglePause_()
       );
 
-      this.playlistTable_ = get('playlist');
-      this.playlistTable_.addEventListener('field', (e) => {
+      this.playlistTable_.addEventListener('field', (e: CustomEvent) => {
         this.dispatchEvent(new CustomEvent('field', { detail: e.detail }));
       });
-      this.playlistTable_.addEventListener('reorder', (e) => {
+      this.playlistTable_.addEventListener('reorder', (e: CustomEvent) => {
         this.currentIndex_ = moveItem(
           this.songs_,
           e.detail.fromIndex,
@@ -317,7 +318,7 @@ customElements.define(
         this.updateButtonState_();
         // TODO: Preload the next song if needed.
       });
-      this.playlistTable_.addEventListener('menu', (e) => {
+      this.playlistTable_.addEventListener('menu', (e: CustomEvent) => {
         const idx = e.detail.index;
         const orig = e.detail.orig;
         orig.preventDefault();
@@ -369,10 +370,10 @@ customElements.define(
         ms.setActionHandler('play', () => this.play_(false /* delay */));
         ms.setActionHandler('pause', () => this.pause_());
         ms.setActionHandler('seekbackward', () =>
-          this.seek_(-this.constructor.SEEK_SEC_)
+          this.seek_(-MusicPlayer.SEEK_SEC_)
         );
         ms.setActionHandler('seekforward', () =>
-          this.seek_(this.constructor.SEEK_SEC_)
+          this.seek_(MusicPlayer.SEEK_SEC_)
         );
         ms.setActionHandler('previoustrack', () =>
           this.cycleTrack_(-1, true /* delayPlay */)
@@ -416,7 +417,7 @@ customElements.define(
       window.removeEventListener('beforeunload', this.onBeforeUnload_);
     }
 
-    set tags(tags) {
+    set tags(tags: string[]) {
       this.tags_ = tags;
     }
 
@@ -426,7 +427,7 @@ customElements.define(
       if (!document.hidden) this.onTimeUpdate_();
     };
 
-    onKeyDown_ = (e) => {
+    onKeyDown_ = (e: KeyboardEvent) => {
       if (isDialogShown() || isMenuShown()) return;
 
       if (
@@ -471,10 +472,10 @@ customElements.define(
             this.setPresentationLayerVisible_(false);
             return true;
           } else if (e.key === 'ArrowLeft') {
-            this.seek_(-this.constructor.SEEK_SEC_);
+            this.seek_(-MusicPlayer.SEEK_SEC_);
             return true;
           } else if (e.key === 'ArrowRight') {
-            this.seek_(this.constructor.SEEK_SEC_);
+            this.seek_(MusicPlayer.SEEK_SEC_);
             return true;
           }
           return false;
@@ -487,7 +488,6 @@ customElements.define(
 
     onBeforeUnload_ = () => {
       this.closeNotification_();
-      return null;
     };
 
     get currentSong_() {
@@ -507,7 +507,12 @@ customElements.define(
     // If |afterCurrent| is true, |songs| are inserted immediately after the
     // current song. Otherwise, they are appended to the end of the playlist.
     // |shuffled| is used for the 'auto' gain adjustment setting.
-    enqueueSongs(songs, clearFirst, afterCurrent, shuffled) {
+    enqueueSongs(
+      songs: Song[],
+      clearFirst: boolean,
+      afterCurrent: boolean,
+      shuffled: boolean
+    ) {
       if (clearFirst) this.removeSongs_(0, this.songs_.length);
 
       let index = afterCurrent
@@ -520,9 +525,9 @@ customElements.define(
       this.playlistTable_.setSongs(this.songs_);
 
       if (this.currentIndex_ === -1) {
-        this.selectTrack_(0, false /* delayPlay */);
+        this.selectTrack_(0);
       } else if (this.reachedEndOfSongs_) {
-        this.cycleTrack_(1, false /* delayPlay */);
+        this.cycleTrack_(1);
       } else {
         this.updateButtonState_();
         this.updatePresentationLayerSongs_();
@@ -530,7 +535,7 @@ customElements.define(
     }
 
     // Removes |len| songs starting at index |start| from the playlist.
-    removeSongs_(start, len) {
+    removeSongs_(start: number, len: number) {
       if (start < 0 || len <= 0 || start + len > this.songs_.length) return;
 
       this.songs_.splice(start, len);
@@ -561,7 +566,7 @@ customElements.define(
       // If there are songs after the last-removed one, switch to the first of
       // them.
       if (this.songs_.length > start) {
-        this.selectTrack_(start, false /* delayPlay */);
+        this.selectTrack_(start);
         return;
       }
 
@@ -570,21 +575,21 @@ customElements.define(
       // TODO: Pausing is hokey. It'd probably be better to act as if we'd
       // actually reached the end of the last song, but that'd probably require
       // waiting for its duration to be loaded so we can seek.
-      this.selectTrack_(this.songs_.length, false /* delayPlay */);
+      this.selectTrack_(this.songs_.length);
       this.pause_();
     }
 
     // Plays the song at |offset| in the playlist relative to the current song.
     // If |delayPlay| is true, waits a bit before actually playing the audio
     // (in case the user might be about to select a different track).
-    cycleTrack_(offset, delayPlay) {
+    cycleTrack_(offset: number, delayPlay = false) {
       this.selectTrack_(this.currentIndex_ + offset, delayPlay);
     }
 
     // Plays the song at |index| in the playlist.
     // If |delayPlay| is true, waits a bit before actually playing the audio
     // (in case the user might be about to select a different track).
-    selectTrack_(index, delayPlay) {
+    selectTrack_(index: number, delayPlay = false) {
       if (!this.songs_.length) {
         this.currentIndex_ = -1;
         this.updateSongDisplay_();
@@ -651,7 +656,7 @@ customElements.define(
       // This prevents ugly laggy updates here and in <presentation-layer>.
       // Note that this will probably only work for non-admin users due to an
       // App Engine "feature": https://github.com/derat/nup/issues/1
-      const precacheCover = (s) => {
+      const precacheCover = (s?: Song) => {
         if (!s?.coverFilename) return;
         preloadImage(getCoverUrl(s.coverFilename, smallCoverSize));
       };
@@ -686,7 +691,7 @@ customElements.define(
         : '';
     }
 
-    updateMediaSessionMetadata_(imageLoaded) {
+    updateMediaSessionMetadata_(imageLoaded: boolean) {
       if (!('mediaSession' in navigator)) return;
 
       const song = this.currentSong_;
@@ -695,22 +700,21 @@ customElements.define(
         return;
       }
 
-      const data = {
+      const artwork: MediaImage[] = [];
+      if (imageLoaded) {
+        const img = this.coverImage_;
+        artwork.push({
+          src: img.src,
+          sizes: `${img.naturalWidth}x${img.naturalHeight}`,
+          type: 'image/webp',
+        });
+      }
+      navigator.mediaSession.metadata = new MediaMetadata({
         title: song.title,
         artist: song.artist,
         album: song.album,
-      };
-      if (imageLoaded) {
-        const img = this.coverImage_;
-        data.artwork = [
-          {
-            src: img.src,
-            sizes: `${img.naturalWidth}x${img.naturalHeight}`,
-            type: 'image/webp',
-          },
-        ];
-      }
-      navigator.mediaSession.metadata = new MediaMetadata(data);
+        artwork,
+      });
     }
 
     updatePresentationLayerSongs_() {
@@ -736,7 +740,7 @@ customElements.define(
       const song = this.currentSong_;
       if (!song) return;
 
-      const options = {
+      const options: NotificationOptions = {
         body: `${song.title}\n${song.album}\n${formatDuration(song.length)}`,
       };
       if (song.coverFilename) {
@@ -746,7 +750,7 @@ customElements.define(
       this.closeNotificationTimeoutId_ = window.setTimeout(() => {
         this.closeNotificationTimeoutId_ = null;
         this.closeNotification_();
-      }, this.constructor.NOTIFICATION_SEC_ * 1000);
+      }, MusicPlayer.NOTIFICATION_SEC_ * 1000);
     }
 
     closeNotification_() {
@@ -766,7 +770,7 @@ customElements.define(
     //
     // If |delay| is true, waits a bit before loading media and playing;
     // otherwise starts playing immediately.
-    play_(delay) {
+    play_(delay: boolean) {
       if (!this.currentSong_) return;
 
       this.cancelPlayTimeout_();
@@ -836,7 +840,7 @@ customElements.define(
       this.audio_.paused ? this.play_(false /* delay */) : this.pause_();
     }
 
-    seek_(seconds) {
+    seek_(seconds: number) {
       if (!this.audio_.seekable) return;
 
       const newTime = Math.max(this.audio_.currentTime + seconds, 0);
@@ -888,7 +892,7 @@ customElements.define(
 
       // Preload the next song once we're nearing the end of this one.
       if (
-        pos >= dur - this.constructor.PRELOAD_SEC_ &&
+        pos >= dur - MusicPlayer.PRELOAD_SEC_ &&
         this.nextSong_ &&
         !this.audio_.preloadSrc
       ) {
@@ -909,7 +913,7 @@ customElements.define(
         this.timeUpdateTimeoutId_ = window.setTimeout(() => {
           this.timeUpdateTimeoutId_ = null;
           this.onTimeUpdate_();
-        }, nextMs + this.constructor.TIME_UPDATE_SLOP_MS_);
+        }, nextMs + MusicPlayer.TIME_UPDATE_SLOP_MS_);
       }
 
       this.lastTimeUpdatePos_ = pos;
@@ -957,7 +961,7 @@ customElements.define(
     }
 
     // Shows or hides the presentation layer.
-    setPresentationLayerVisible_(visible) {
+    setPresentationLayerVisible_(visible: boolean) {
       if (this.presentationLayer_.visible === visible) return;
       this.presentationLayer_.visible = visible;
       this.dispatchEvent(new CustomEvent('present', { detail: { visible } }));
@@ -986,9 +990,7 @@ customElements.define(
       let scale = 10 ** (adj / 20);
 
       // TODO: Add an option to prevent clipping instead of always doing this?
-      if (song && song.peakAmp !== undefined) {
-        scale = Math.min(scale, 1 / song.peakAmp);
-      }
+      if (song?.peakAmp) scale = Math.min(scale, 1 / song.peakAmp);
 
       console.log(`Scaling amplitude by ${scale.toFixed(3)}`);
       this.audio_.gain = scale;

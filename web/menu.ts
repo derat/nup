@@ -89,7 +89,7 @@ export function createMenu(
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         menu.close();
-        item.cb();
+        if (item.cb) item.cb();
       });
     }
   }
@@ -123,7 +123,7 @@ export function createMenu(
 
 interface MenuItem {
   text: string; // menu item text, or '-' to insert separator instead
-  cb: () => void; // callback to run when clicked
+  cb?: () => void; // callback to run when clicked
   id?: string; // ID for element (used in tests)
   hotkey?: string; // text describing menu's accelerator
 }
