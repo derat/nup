@@ -10,7 +10,7 @@ import {
   test,
 } from './test.js';
 import MockWindow from './mock-window.js';
-import Config from './config.js';
+import { Config, ConfigKey, GainType, Pref, Theme } from './config.js';
 
 suite('config', () => {
   let w = null;
@@ -23,40 +23,40 @@ suite('config', () => {
 
   test('saveAndReload', () => {
     let cfg = new Config();
-    cfg.set(Config.THEME, Config.THEME_DARK);
-    cfg.set(Config.GAIN_TYPE, Config.GAIN_NONE);
-    cfg.set(Config.PRE_AMP, 0.3);
+    cfg.set(Pref.THEME, Theme.DARK);
+    cfg.set(Pref.GAIN_TYPE, GainType.NONE);
+    cfg.set(Pref.PRE_AMP, 0.3);
     cfg.save();
 
     cfg = new Config();
-    expectEq(cfg.get(Config.THEME), Config.THEME_DARK, 'THEME');
-    expectEq(cfg.get(Config.GAIN_TYPE), Config.GAIN_NONE, 'GAIN_TYPE');
-    expectEq(cfg.get(Config.PRE_AMP), 0.3, 'PRE_AMP');
+    expectEq(cfg.get(Pref.THEME), Theme.DARK, 'Theme');
+    expectEq(cfg.get(Pref.GAIN_TYPE), GainType.NONE, 'GainType');
+    expectEq(cfg.get(Pref.PRE_AMP), 0.3, 'PreAmp');
   });
 
   test('ignoreInvalidConfig', () => {
-    window.localStorage.setItem(Config.CONFIG_KEY, 'not json');
+    window.localStorage.setItem(ConfigKey, 'not json');
 
     // These match the defaults from the c'tor.
     const cfg = new Config();
-    expectEq(cfg.get(Config.THEME), Config.THEME_AUTO);
-    expectEq(cfg.get(Config.GAIN_TYPE), Config.GAIN_AUTO);
-    expectEq(cfg.get(Config.PRE_AMP), 0);
+    expectEq(cfg.get(Pref.THEME), Theme.AUTO);
+    expectEq(cfg.get(Pref.GAIN_TYPE), GainType.AUTO);
+    expectEq(cfg.get(Pref.PRE_AMP), 0);
   });
 
   test('skipInvalidPrefs', () => {
     // This matches #load().
     window.localStorage.setItem(
-      Config.CONFIG_KEY,
+      ConfigKey,
       JSON.stringify({
         bogus: 2.3,
-        [Config.THEME]: Config.THEME_DARK,
+        [Pref.THEME]: Theme.DARK,
       })
     );
 
     // We should still load the valid theme pref.
     const cfg = new Config();
-    expectEq(cfg.get(Config.THEME), Config.THEME_DARK);
+    expectEq(cfg.get(Pref.THEME), Theme.DARK);
   });
 
   test('addCallback', () => {
@@ -64,35 +64,32 @@ suite('config', () => {
     const seen = []; // [name, value] pairs
     cfg.addCallback((n, v) => seen.push([n, v]));
 
-    cfg.set(Config.THEME, Config.THEME_DARK);
-    cfg.set(Config.GAIN_TYPE, Config.GAIN_NONE);
-    cfg.set(Config.PRE_AMP, 0.3);
+    cfg.set(Pref.THEME, Theme.DARK);
+    cfg.set(Pref.GAIN_TYPE, GainType.NONE);
+    cfg.set(Pref.PRE_AMP, 0.3);
     expectEq(seen, [
-      [Config.THEME, Config.THEME_DARK],
-      [Config.GAIN_TYPE, Config.GAIN_NONE],
-      [Config.PRE_AMP, 0.3],
+      [Pref.THEME, Theme.DARK],
+      [Pref.GAIN_TYPE, GainType.NONE],
+      [Pref.PRE_AMP, 0.3],
     ]);
   });
 
   test('invalid', () => {
     const cfg = new Config();
-    cfg.set(Config.THEME, Config.THEME_DARK);
-    cfg.set(Config.PRE_AMP, 0.3);
+    cfg.set(Pref.THEME, Theme.DARK);
+    cfg.set(Pref.PRE_AMP, 0.3);
 
-    expectThrows(() => cfg.set(Config.THEME, 'abc'), 'Setting int to string');
-    expectThrows(() => cfg.set(Config.THEME, null), 'Setting int to null');
+    expectThrows(() => cfg.set(Pref.THEME, 'abc'), 'Setting int to string');
+    expectThrows(() => cfg.set(Pref.THEME, null), 'Setting int to null');
     expectThrows(
-      () => cfg.set(Config.THEME, undefined),
+      () => cfg.set(Pref.THEME, undefined),
       'Setting int to undefined'
     );
 
+    expectThrows(() => cfg.set(Pref.PRE_AMP, 'abc'), 'Setting float to string');
+    expectThrows(() => cfg.set(Pref.PRE_AMP, null), 'Setting float to null');
     expectThrows(
-      () => cfg.set(Config.PRE_AMP, 'abc'),
-      'Setting float to string'
-    );
-    expectThrows(() => cfg.set(Config.PRE_AMP, null), 'Setting float to null');
-    expectThrows(
-      () => cfg.set(Config.PRE_AMP, undefined),
+      () => cfg.set(Pref.PRE_AMP, undefined),
       'Setting float to undefined'
     );
 
@@ -100,7 +97,7 @@ suite('config', () => {
     expectThrows(() => cfg.set('bogus', 2), 'Setting unknown pref');
 
     // The original values should be retained.
-    expectEq(cfg.get(Config.THEME), Config.THEME_DARK);
-    expectEq(cfg.get(Config.PRE_AMP), 0.3);
+    expectEq(cfg.get(Pref.THEME), Theme.DARK);
+    expectEq(cfg.get(Pref.PRE_AMP), 0.3);
   });
 });

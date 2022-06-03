@@ -2,7 +2,7 @@
 // All rights reserved.
 
 import { $, createTemplate } from './common.js';
-import Config, { getConfig } from './config.js';
+import { getConfig, Pref } from './config.js';
 import { createDialog } from './dialog.js';
 
 const template = createTemplate(`
@@ -82,22 +82,22 @@ export function showOptionsDialog() {
   dialog.addEventListener('close', () => config.save());
 
   const themeSelect = $('theme-select', shadow) as HTMLSelectElement;
-  themeSelect.value = config.get(Config.THEME).toString();
+  themeSelect.value = config.get(Pref.THEME).toString();
   themeSelect.addEventListener('change', () =>
-    config.set(Config.THEME, themeSelect.value)
+    config.set(Pref.THEME, themeSelect.value)
   );
 
   const gainTypeSelect = $('gain-type-select', shadow) as HTMLSelectElement;
-  gainTypeSelect.value = config.get(Config.GAIN_TYPE).toString();
+  gainTypeSelect.value = config.get(Pref.GAIN_TYPE).toString();
   gainTypeSelect.addEventListener('change', () =>
-    config.set(Config.GAIN_TYPE, gainTypeSelect.value)
+    config.set(Pref.GAIN_TYPE, gainTypeSelect.value)
   );
 
   const preAmpSpan = $('pre-amp-span', shadow);
   const updatePreAmpSpan = (v: number) =>
     (preAmpSpan.innerText = `${v > 0 ? '+' : ''}${v} dB`);
 
-  const preAmpValue = config.get(Config.PRE_AMP);
+  const preAmpValue = config.get(Pref.PRE_AMP);
   updatePreAmpSpan(preAmpValue);
 
   const preAmpRange = $('pre-amp-range', shadow) as HTMLInputElement;
@@ -106,7 +106,7 @@ export function showOptionsDialog() {
     updatePreAmpSpan(parseFloat(preAmpRange.value))
   );
   preAmpRange.addEventListener('change', () =>
-    config.set(Config.PRE_AMP, preAmpRange.value)
+    config.set(Pref.PRE_AMP, preAmpRange.value)
   );
 
   $('ok-button', shadow).addEventListener('click', () => dialog.close());

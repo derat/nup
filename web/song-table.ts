@@ -164,6 +164,8 @@ const rowTemplate = createTemplate(`
 </tr>
 `);
 
+const RESIZE_TIMEOUT_MS = 1000; // delay after resize to update titles
+
 // <song-table> displays a list of songs.
 //
 // If the 'use-checkboxes' attribute is set, checkboxes will be displayed at the
@@ -182,8 +184,6 @@ const rowTemplate = createTemplate(`
 // |detail.fromIndex| and |detail.toIndex| properties. The song is automatically
 // reordered within song-table.
 export class SongTable extends HTMLElement {
-  static #RESIZE_TIMEOUT_MS = 1000; // delay after resize to update titles
-
   #lastClickedCheckboxIndex = -1; // 0 is header
   #numCheckedSongs = 0;
   #shadow = createShadow(this, template);
@@ -214,7 +214,7 @@ export class SongTable extends HTMLElement {
         for (let i = 0; i < this.#songRows.length; i++) {
           this.#updateSongRowTitleAttributes(i);
         }
-      }, SongTable.#RESIZE_TIMEOUT_MS);
+      }, RESIZE_TIMEOUT_MS);
     });
     this.#resizeObserver.observe(this.#table);
 

@@ -3,25 +3,21 @@
 
 import { handleFetchError } from './common.js';
 
+const QUEUED_PLAY_REPORTS_KEY = 'queued_play_reports';
+const IN_PROGRESS_PLAY_REPORTS_KEY = 'in_progress_play_reports';
+const QUEUED_RATINGS_AND_TAGS_KEY = 'queued_ratings_and_tags';
+const IN_PROGRESS_RATINGS_AND_TAGS_KEY = 'in_progress_ratings_and_tags';
+const MIN_RETRY_DELAY_MS = 500;
+const MAX_RETRY_DELAY_MS = 300 * 1000;
+
 export default class Updater {
-  static #QUEUED_PLAY_REPORTS_KEY = 'queued_play_reports';
-  static #IN_PROGRESS_PLAY_REPORTS_KEY = 'in_progress_play_reports';
-  static #QUEUED_RATINGS_AND_TAGS_KEY = 'queued_ratings_and_tags';
-  static #IN_PROGRESS_RATINGS_AND_TAGS_KEY = 'in_progress_ratings_and_tags';
-
-  static #MIN_RETRY_DELAY_MS = 500; // Half a second.
-  static #MAX_RETRY_DELAY_MS = 300 * 1000; // Five minutes.
-
   #retryTimeoutId: number | null = null; // for #doRetry()
   #lastRetryDelayMs = 0; // used by #scheduleRetry()
 
-  #queuedPlayReports = readObject(
-    Updater.#QUEUED_PLAY_REPORTS_KEY,
-    []
-  ) as PlayReport[];
+  #queuedPlayReports = readObject(QUEUED_PLAY_REPORTS_KEY, []) as PlayReport[];
 
   #queuedRatingsAndTags = readObject(
-    Updater.#QUEUED_RATINGS_AND_TAGS_KEY,
+    QUEUED_RATINGS_AND_TAGS_KEY,
     {}
   ) as SongUpdateMap;
 
@@ -33,14 +29,14 @@ export default class Updater {
   constructor() {
     // Move updates that were in-progress during the last run into the queue.
     for (const play of readObject(
-      Updater.#IN_PROGRESS_PLAY_REPORTS_KEY,
+      IN_PROGRESS_PLAY_REPORTS_KEY,
       []
     ) as PlayReport[]) {
       this.#queuedPlayReports.push(play);
     }
 
     for (const [songId, data] of Object.entries(
-      readObject(Updater.#IN_PROGRESS_RATINGS_AND_TAGS_KEY, {}) as SongUpdateMap
+      readObject(IN_PROGRESS_RATINGS_AND_TAGS_KEY, {}) as SongUpdateMap
     )) {
       this.#queuedRatingsAndTags[songId] = data;
     }
@@ -163,19 +159,19 @@ export default class Updater {
   // Persists the current state to local storage.
   #writeState() {
     localStorage.setItem(
-      Updater.#QUEUED_PLAY_REPORTS_KEY,
+      QUEUED_PLAY_REPORTS_KEY,
       JSON.stringify(this.#queuedPlayReports)
     );
     localStorage.setItem(
-      Updater.#QUEUED_RATINGS_AND_TAGS_KEY,
+      QUEUED_RATINGS_AND_TAGS_KEY,
       JSON.stringify(this.#queuedRatingsAndTags)
     );
     localStorage.setItem(
-      Updater.#IN_PROGRESS_PLAY_REPORTS_KEY,
+      IN_PROGRESS_PLAY_REPORTS_KEY,
       JSON.stringify(this.#inProgressPlayReports)
     );
     localStorage.setItem(
-      Updater.#IN_PROGRESS_RATINGS_AND_TAGS_KEY,
+      IN_PROGRESS_RATINGS_AND_TAGS_KEY,
       JSON.stringify(this.#inProgressRatingsAndTags)
     );
   }
@@ -205,8 +201,8 @@ export default class Updater {
       ? 0
       : this.#lastRetryDelayMs > 0
       ? this.#lastRetryDelayMs * 2
-      : Updater.#MIN_RETRY_DELAY_MS;
-    delayMs = Math.min(delayMs, Updater.#MAX_RETRY_DELAY_MS);
+      : MIN_RETRY_DELAY_MS;
+    delayMs = Math.min(delayMs, MAX_RETRY_DELAY_MS);
 
     console.log(`Scheduling retry in ${delayMs} ms`);
     this.#retryTimeoutId = window.setTimeout(() => {

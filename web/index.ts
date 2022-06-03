@@ -5,7 +5,7 @@
 import './construct-style-sheets-polyfill.js';
 
 import { $, commonStyles, handleFetchError, smallCoverSize } from './common.js';
-import Config, { getConfig } from './config.js';
+import { getConfig, Pref, Theme } from './config.js';
 import type { MusicPlayer } from './music-player.js';
 import type { MusicSearcher } from './music-searcher.js';
 
@@ -28,20 +28,20 @@ const searcher = document.querySelector('music-searcher') as MusicSearcher;
 const darkMediaQuery = '(prefers-color-scheme: dark)';
 const updateTheme = () => {
   let dark = false;
-  switch (config.get(Config.THEME)) {
-    case Config.THEME_AUTO:
+  switch (config.get(Pref.THEME)) {
+    case Theme.AUTO:
       dark = window.matchMedia(darkMediaQuery).matches;
       break;
-    case Config.THEME_LIGHT:
+    case Theme.LIGHT:
       break;
-    case Config.THEME_DARK:
+    case Theme.DARK:
       dark = true;
       break;
   }
   if (dark) document.documentElement.setAttribute('data-theme', 'dark');
   else document.documentElement.removeAttribute('data-theme');
 };
-config.addCallback((k: string, _) => k === Config.THEME && updateTheme());
+config.addCallback((k: string, _) => k === Pref.THEME && updateTheme());
 window.matchMedia(darkMediaQuery).addListener((e) => updateTheme());
 updateTheme();
 

@@ -1,33 +1,41 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
+// Names to pass to Config.get() or Config.set().
+export enum Pref {
+  THEME = 'theme',
+  GAIN_TYPE = 'gainType',
+  PRE_AMP = 'preAmp',
+}
+
+// Values for Pref.THEME.
+export enum Theme {
+  AUTO = 0,
+  LIGHT = 1,
+  DARK = 2,
+}
+
+// Values for Pref.GAIN_TYPE.
+export enum GainType {
+  ALBUM = 0,
+  TRACK = 1,
+  NONE = 2,
+  AUTO = 3,
+}
+
+// localStorage key; exported for tests.
+export const ConfigKey = 'config';
+
+const FLOAT_NAMES = new Set([Pref.PRE_AMP]);
+const INT_NAMES = new Set([Pref.THEME, Pref.GAIN_TYPE]);
+
 // Config provides persistent storage for preferences.
-export default class Config {
-  // Names to pass to get() or set().
-  static THEME = 'theme';
-  static GAIN_TYPE = 'gainType';
-  static PRE_AMP = 'preAmp';
-
-  // Values for THEME.
-  static THEME_AUTO = 0;
-  static THEME_LIGHT = 1;
-  static THEME_DARK = 2;
-
-  // Values for GAIN_TYPE.
-  static GAIN_ALBUM = 0;
-  static GAIN_TRACK = 1;
-  static GAIN_NONE = 2;
-  static GAIN_AUTO = 3;
-
-  static CONFIG_KEY = 'config'; // localStorage key; public for tests
-  static #FLOAT_NAMES = new Set([Config.PRE_AMP]);
-  static #INT_NAMES = new Set([Config.THEME, Config.GAIN_TYPE]);
-
+export class Config {
   #callbacks: ConfigCallback[] = [];
-  #values: Record<string, number> = {
-    [Config.THEME]: Config.THEME_AUTO,
-    [Config.GAIN_TYPE]: Config.GAIN_AUTO,
-    [Config.PRE_AMP]: 0,
+  #values: Record<Pref, any> = {
+    [Pref.THEME]: Theme.AUTO,
+    [Pref.GAIN_TYPE]: GainType.AUTO,
+    [Pref.PRE_AMP]: 0,
   };
 
   constructor() {
@@ -45,19 +53,19 @@ export default class Config {
 
   // Gets the value of the preference identified by |name|. An error is thrown
   // if an invalid name is supplied.
-  get(name: string): number {
+  get(name: Pref): any {
     if (this.#values.hasOwnProperty(name)) return this.#values[name];
     throw new Error(`Unknown pref "${name}"`);
   }
 
   // Sets |name| to |value|. An error is thrown if an invalid name is supplied
   // or the value is of an inappropriate type.
-  set(name: string, value: any) {
+  set(name: Pref, value: any) {
     let parsed = 0;
-    if (Config.#FLOAT_NAMES.has(name)) {
+    if (FLOAT_NAMES.has(name)) {
       parsed = parseFloat(value);
       if (isNaN(parsed)) throw new Error(`Non-float "${name}" "${value}"`);
-    } else if (Config.#INT_NAMES.has(name)) {
+    } else if (INT_NAMES.has(name)) {
       parsed = parseInt(value);
       if (isNaN(parsed)) throw new Error(`Non-int "${name}" "${value}"`);
     } else {
@@ -69,7 +77,7 @@ export default class Config {
 
   // Loads and validates prefs from local storage.
   #load() {
-    const json = localStorage.getItem(Config.CONFIG_KEY);
+    const json = localStorage.getItem(ConfigKey);
     if (!json) return;
 
     let loaded = {};
@@ -82,7 +90,7 @@ export default class Config {
 
     Object.entries(loaded).forEach(([name, value]) => {
       try {
-        this.set(name, value);
+        this.set(name as Pref, value);
       } catch (e) {
         console.error(`Skipping bad pref "${name}": ${e}`);
       }
@@ -91,11 +99,11 @@ export default class Config {
 
   // Saves all prefs to local storage.
   save() {
-    localStorage.setItem(Config.CONFIG_KEY, JSON.stringify(this.#values));
+    localStorage.setItem(ConfigKey, JSON.stringify(this.#values));
   }
 }
 
-type ConfigCallback = (name: string, value: number) => void;
+type ConfigCallback = (name: Pref, value: number) => void;
 
 let defaultConfig: Config | null = null;
 

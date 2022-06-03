@@ -19,7 +19,7 @@ import {
   smallCoverSize,
   updateTitleAttributeForTruncation,
 } from './common.js';
-import Config, { getConfig } from './config.js';
+import { getConfig, GainType, Pref } from './config.js';
 import { isDialogShown } from './dialog.js';
 import { createMenu, isMenuShown } from './menu.js';
 import { showOptionsDialog } from './options-dialog.js';
@@ -153,6 +153,12 @@ const template = createTemplate(`
 <song-table id="playlist"></song-table>
 `);
 
+const SEEK_SEC = 10; // seconds to skip when seeking forward or back
+const NOTIFICATION_SEC = 3; // duration to show song-change notification
+const PLAY_DELAY_MS = 500; // delay before playing when cycling track
+const PRELOAD_SEC = 20; // seconds before end of song to load next song
+const TIME_UPDATE_SLOP_MS = 10; // time to wait past second boundary
+
 // <music-player> plays and displays information about songs. It also maintains
 // and displays a playlist. Songs can be enqueued by calling enqueueSongs().
 //
@@ -171,12 +177,6 @@ const template = createTemplate(`
 // URL to a |smallCoverSize| WebP image. This property is null if no cover art
 // is available.
 export class MusicPlayer extends HTMLElement {
-  static #SEEK_SEC = 10; // seconds to skip when seeking forward or back
-  static #NOTIFICATION_SEC = 3; // duration to show song-change notification
-  static #PLAY_DELAY_MS = 500; // delay before playing when cycling track
-  static #PRELOAD_SEC = 20; // seconds before end of song to load next song
-  static #TIME_UPDATE_SLOP_MS = 10; // time to wait past second boundary
-
   #config = getConfig();
   #updater: Updater | null = null; // initialized in connectedCallback()
   #songs: Song[] = []; // songs in the order in which they should be played
@@ -188,7 +188,7 @@ export class MusicPlayer extends HTMLElement {
   #updateDialog: UpdateDialog | null = null;
   #notification: Notification | null = null; // for song changes
   #closeNotificationTimeoutId: number | null = null; // #closeNotification()
-  #playDelayMs = MusicPlayer.#PLAY_DELAY_MS;
+  #playDelayMs = PLAY_DELAY_MS;
   #playTimeoutId: number | null = null; // for #playInternal()
   #lastTimeUpdatePos = 0; // audio position in last #onTimeUpdate()
   #timeUpdateTimeoutId: number | null = null; // #onTimeUpdate()
@@ -227,7 +227,7 @@ export class MusicPlayer extends HTMLElement {
     // We're leaking this callback, but it doesn't matter in practice since
     // music-player never gets removed from the DOM.
     this.#config.addCallback((name, value) => {
-      if (name === Config.GAIN_TYPE || name === Config.PRE_AMP) {
+      if ([Pref.GAIN_TYPE, Pref.PRE_AMP].includes(name)) {
         this.#updateGain();
       }
     });
@@ -363,12 +363,8 @@ export class MusicPlayer extends HTMLElement {
       const ms = navigator.mediaSession;
       ms.setActionHandler('play', () => this.#play());
       ms.setActionHandler('pause', () => this.#pause());
-      ms.setActionHandler('seekbackward', () =>
-        this.#seek(-MusicPlayer.#SEEK_SEC)
-      );
-      ms.setActionHandler('seekforward', () =>
-        this.#seek(MusicPlayer.#SEEK_SEC)
-      );
+      ms.setActionHandler('seekbackward', () => this.#seek(-SEEK_SEC));
+      ms.setActionHandler('seekforward', () => this.#seek(SEEK_SEC));
       ms.setActionHandler('previoustrack', () =>
         this.#cycleTrack(-1, true /* delayPlay */)
       );
@@ -466,10 +462,10 @@ export class MusicPlayer extends HTMLElement {
           this.#setPresentationLayerVisible(false);
           return true;
         } else if (e.key === 'ArrowLeft') {
-          this.#seek(-MusicPlayer.#SEEK_SEC);
+          this.#seek(-SEEK_SEC);
           return true;
         } else if (e.key === 'ArrowRight') {
-          this.#seek(MusicPlayer.#SEEK_SEC);
+          this.#seek(SEEK_SEC);
           return true;
         }
         return false;
@@ -744,7 +740,7 @@ export class MusicPlayer extends HTMLElement {
     this.#closeNotificationTimeoutId = window.setTimeout(() => {
       this.#closeNotificationTimeoutId = null;
       this.#closeNotification();
-    }, MusicPlayer.#NOTIFICATION_SEC * 1000);
+    }, NOTIFICATION_SEC * 1000);
   }
 
   #closeNotification() {
@@ -883,11 +879,7 @@ export class MusicPlayer extends HTMLElement {
     }
 
     // Preload the next song once we're nearing the end of this one.
-    if (
-      pos >= dur - MusicPlayer.#PRELOAD_SEC &&
-      this.#nextSong &&
-      !this.#audio.preloadSrc
-    ) {
+    if (pos >= dur - PRELOAD_SEC && this.#nextSong && !this.#audio.preloadSrc) {
       const url = getSongUrl(this.#nextSong.filename);
       console.log(`Preloading ${this.#nextSong.songId} (${url})`);
       this.#audio.preloadSrc = url;
@@ -905,7 +897,7 @@ export class MusicPlayer extends HTMLElement {
       this.#timeUpdateTimeoutId = window.setTimeout(() => {
         this.#timeUpdateTimeoutId = null;
         this.#onTimeUpdate();
-      }, nextMs + MusicPlayer.#TIME_UPDATE_SLOP_MS);
+      }, nextMs + TIME_UPDATE_SLOP_MS);
     }
 
     this.#lastTimeUpdatePos = pos;
@@ -959,18 +951,18 @@ export class MusicPlayer extends HTMLElement {
   // This implements the approach described at
   // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification.
   #updateGain() {
-    let adj = this.#config.get(Config.PRE_AMP); // decibels
+    let adj = this.#config.get(Pref.PRE_AMP); // decibels
 
     const song = this.#currentSong;
     if (song) {
-      let gainType = this.#config.get(Config.GAIN_TYPE);
-      if (gainType === Config.GAIN_AUTO) {
-        gainType = this.#shuffled ? Config.GAIN_TRACK : Config.GAIN_ALBUM;
+      let gainType = this.#config.get(Pref.GAIN_TYPE);
+      if (gainType === GainType.AUTO) {
+        gainType = this.#shuffled ? GainType.TRACK : GainType.ALBUM;
       }
 
-      if (gainType === Config.GAIN_ALBUM) {
+      if (gainType === GainType.ALBUM) {
         adj += song.albumGain ?? 0;
-      } else if (gainType === Config.GAIN_TRACK) {
+      } else if (gainType === GainType.TRACK) {
         adj += song.trackGain ?? 0;
       }
     }

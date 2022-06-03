@@ -38,10 +38,9 @@ const template = createTemplate(`
 <div id="suggestions"></div>
 `);
 
-// This class is exported so it can be used as a type.
-export class TagSuggester extends HTMLElement {
-  static #SUGGESTION_MARGIN = 4;
+const SUGGESTION_MARGIN = 4;
 
+export class TagSuggester extends HTMLElement {
   #tabAdvancesFocus = this.hasAttribute('tab-advances-focus');
   #words: string[] = [];
   #shadow = createShadow(this, template);
@@ -184,9 +183,7 @@ export class TagSuggester extends HTMLElement {
 
     // Move the suggestions a bit below the target.
     const offset =
-      this.#target!.offsetTop +
-      this.#target!.offsetHeight +
-      TagSuggester.#SUGGESTION_MARGIN;
+      this.#target!.offsetTop + this.#target!.offsetHeight + SUGGESTION_MARGIN;
     this.#suggestionsDiv.style.top = `${offset}px`;
     this.#suggestionsDiv.style.left = `${this.#target!.offsetLeft}px`;
 

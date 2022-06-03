@@ -14,6 +14,11 @@ const template = createTemplate(`
 </audio>
 `);
 
+const GAIN_CHANGE_SEC = 0.03; // duration for audio gain changes
+const MAX_RETRIES = 2; // number of consecutive playback errors to retry
+const PAUSE_GAIN = 0.001; // target audio gain when pausing
+const RESUME_WHEN_ONLINE_SEC = 30; // maximum delay for auto-resume when online
+
 // <audio-wrapper> wraps the <audio> element to hide some of its complexity.
 //
 // It transparently forwards a subset of <audio>'s properties, events, and
@@ -49,11 +54,6 @@ const template = createTemplate(`
 // about this too. I didn't find any Chromium issues discussing this when I
 // looked in April 2022.
 export class AudioWrapper extends HTMLElement {
-  static #GAIN_CHANGE_SEC = 0.03; // duration for audio gain changes
-  static #MAX_RETRIES = 2; // number of consecutive playback errors to retry
-  static #PAUSE_GAIN = 0.001; // target audio gain when pausing
-  static #RESUME_WHEN_ONLINE_SEC = 30; // maximum delay for auto-resume when online
-
   #audioCtx = new AudioContext();
   #gainNode = this.#audioCtx.createGain();
   #audioSrc: MediaElementAudioSourceNode | null = null;
@@ -125,7 +125,7 @@ export class AudioWrapper extends HTMLElement {
     if (this.#pausedForOfflineTime !== null) {
       console.log('Back online');
       const elapsed = getCurrentTimeSec() - this.#pausedForOfflineTime;
-      const resume = elapsed <= AudioWrapper.#RESUME_WHEN_ONLINE_SEC;
+      const resume = elapsed <= RESUME_WHEN_ONLINE_SEC;
       this.#pausedForOfflineTime = null;
       this.#reloadAudio();
       if (resume) this.#audio.play();
@@ -153,7 +153,7 @@ export class AudioWrapper extends HTMLElement {
           console.log('Offline; pausing');
           this.#audio.pause();
           this.#pausedForOfflineTime = getCurrentTimeSec();
-        } else if (this.#numErrors <= AudioWrapper.#MAX_RETRIES) {
+        } else if (this.#numErrors <= MAX_RETRIES) {
           console.log(`Retrying from position ${this.#lastUpdatePos}`);
           this.#reloadAudio();
           this.#audio.play();
@@ -230,7 +230,7 @@ export class AudioWrapper extends HTMLElement {
     const g = this.#gainNode.gain;
     const t = this.#audioCtx.currentTime;
     g.setValueAtTime(g.value, t);
-    g.exponentialRampToValueAtTime(v, t + AudioWrapper.#GAIN_CHANGE_SEC);
+    g.exponentialRampToValueAtTime(v, t + GAIN_CHANGE_SEC);
   }
 
   // Cancels #pauseTimeoutId if non-null.
@@ -289,11 +289,11 @@ export class AudioWrapper extends HTMLElement {
 
     // Avoid pops caused by abruptly stopping playback:
     // https://github.com/derat/nup/issues/34
-    this.#setAudioGain(AudioWrapper.#PAUSE_GAIN);
+    this.#setAudioGain(PAUSE_GAIN);
     this.#pauseTimeoutId = window.setTimeout(() => {
       this.#pauseTimeoutId = null;
       this.#audio.pause();
-    }, AudioWrapper.#GAIN_CHANGE_SEC * 1000);
+    }, GAIN_CHANGE_SEC * 1000);
   }
 
   load() {
