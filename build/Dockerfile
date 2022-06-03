@@ -29,8 +29,9 @@ RUN apt-get install -y \
     google-cloud-sdk-app-engine-go \
     google-cloud-sdk-app-engine-python \
     google-cloud-sdk-datastore-emulator \
-    node-typescript \
+    npm \
     python-is-python2 \
     unzip \
     xvfb
+RUN npm install -g typescript@4.7.2
 RUN sh -e /tmp/install_chromedriver.sh

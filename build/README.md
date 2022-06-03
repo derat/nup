@@ -13,7 +13,7 @@ to build a container and submit it to the [Container Registry].
 
 ```
 gcloud --project ${PROJECT_ID} builds submit \
-  --tag gcr.io/${PROJECT_ID}/nup-test
+  --tag gcr.io/${PROJECT_ID}/nup-test --timeout=20m
 ```
 
 [Cloud Build]: https://cloud.google.com/build
