@@ -63,7 +63,7 @@ export default class UpdateDialog {
   callback_: UpdateCallback;
   rating_ = -1; // rating set in dialog
   dialog_ = createDialog(template, 'update');
-  shadow_ = this.dialog_.firstElementChild.shadowRoot;
+  shadow_ = this.dialog_.firstElementChild!.shadowRoot!;
   ratingSpan_ = $('rating', this.shadow_);
   tagsTextarea_ = $('tags-textarea', this.shadow_) as HTMLTextAreaElement;
 

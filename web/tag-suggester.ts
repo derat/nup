@@ -49,12 +49,15 @@ export class TagSuggester extends HTMLElement {
   target_: HTMLInputElement | HTMLTextAreaElement | null = null;
 
   connectedCallback() {
-    const slotElements = this.shadow_.querySelector('slot').assignedElements();
-    if (slotElements.length !== 1) {
+    const slotElements = this.shadow_.querySelector('slot')?.assignedElements();
+    if (slotElements?.length !== 1) {
       throw new Error('Editable element must be provided via slot');
     }
     this.target_ = slotElements[0] as HTMLInputElement | HTMLTextAreaElement;
-    this.target_.addEventListener('keydown', this.onKeyDown_);
+    this.target_.addEventListener(
+      'keydown',
+      this.onKeyDown_ as EventListenerOrEventListenerObject
+    );
     this.target_.addEventListener('focus', this.onFocus_);
     this.target_.spellcheck = false;
 
@@ -62,7 +65,10 @@ export class TagSuggester extends HTMLElement {
   }
 
   disconnectedCallback() {
-    this.target_?.removeEventListener('keydown', this.onKeyDown_);
+    this.target_?.removeEventListener(
+      'keydown',
+      this.onKeyDown_ as EventListenerOrEventListenerObject
+    );
     this.target_?.removeEventListener('focus', this.onFocus_);
     this.target_ = null;
 
@@ -76,8 +82,8 @@ export class TagSuggester extends HTMLElement {
   // Breaks |target_|'s text up into the current word (based on the caret
   // position) and the parts before and after it.
   getTextParts_() {
-    const text = this.target_.value;
-    const caret = this.target_.selectionStart;
+    const text = this.target_!.value;
+    const caret = this.target_!.selectionStart ?? 0;
 
     let start = caret;
     while (start > 0 && text[start - 1] !== ' ') start--;
@@ -108,7 +114,7 @@ export class TagSuggester extends HTMLElement {
     // Preserve the caret position but remove the selection. Otherwise,
     // tabbing to the field selects its contents, which makes it too easy to
     // accidentally clear it.
-    this.target_.selectionStart = this.target_.selectionEnd;
+    this.target_!.selectionStart = this.target_!.selectionEnd;
   };
 
   onKeyDown_ = (e: KeyboardEvent) => {
@@ -125,9 +131,9 @@ export class TagSuggester extends HTMLElement {
     if (matches.length === 1) {
       // If there's a single match, use it.
       const word = matches[0];
-      const old = this.target_.value;
+      const old = this.target_!.value;
       const text = parts.before + word + prependSpace(parts.after);
-      this.target_.value = text;
+      this.target_!.value = text;
 
       // Bail out before stopping the event if we want tab to advance the
       // focus and we didn't do anything.
@@ -136,7 +142,7 @@ export class TagSuggester extends HTMLElement {
       // Move the caret to the beginning of the next word.
       let next = parts.before.length + word.length;
       while (next < text.length && text[next] === ' ') next++;
-      this.target_.selectionStart = this.target_.selectionEnd = next;
+      this.target_!.selectionStart = this.target_!.selectionEnd = next;
     } else if (matches.length > 1) {
       // Complete as much of the word as we can and show suggestions.
       let prefix = parts.word;
@@ -146,9 +152,9 @@ export class TagSuggester extends HTMLElement {
         prefix = newPrefix;
       }
 
-      this.target_.value =
+      this.target_!.value =
         parts.before + prefix + prependSpace(parts.after, false);
-      this.target_.selectionStart = this.target_.selectionEnd =
+      this.target_!.selectionStart = this.target_!.selectionEnd =
         parts.before.length + prefix.length;
       this.showSuggestions_(matches.sort());
     }
@@ -159,7 +165,7 @@ export class TagSuggester extends HTMLElement {
 
   showSuggestions_(words: string[]) {
     const cont = this.suggestionsDiv_;
-    while (cont.childNodes.length > 0) cont.removeChild(cont.lastChild);
+    while (cont.childNodes.length > 0) cont.removeChild(cont.lastChild!);
 
     for (let i = 0; i < words.length; i++) {
       const word = words[i];
@@ -170,19 +176,19 @@ export class TagSuggester extends HTMLElement {
       item.addEventListener('click', () => {
         this.hideSuggestions_();
         const parts = this.getTextParts_();
-        this.target_.value = parts.before + word + prependSpace(parts.after);
-        this.target_.focus();
+        this.target_!.value = parts.before + word + prependSpace(parts.after);
+        this.target_!.focus();
       });
       cont.appendChild(item);
     }
 
     // Move the suggestions a bit below the target.
     const offset =
-      this.target_.offsetTop +
-      this.target_.offsetHeight +
+      this.target_!.offsetTop +
+      this.target_!.offsetHeight +
       TagSuggester.SUGGESTION_MARGIN_;
     this.suggestionsDiv_.style.top = `${offset}px`;
-    this.suggestionsDiv_.style.left = `${this.target_.offsetLeft}px`;
+    this.suggestionsDiv_.style.left = `${this.target_!.offsetLeft}px`;
 
     this.suggestionsDiv_.classList.add('shown');
   }

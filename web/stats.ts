@@ -122,7 +122,7 @@ const template = createTemplate(`
 // Shows a modal dialog containing stats fetched from the server.
 export function showStats() {
   const dialog = createDialog(template, 'stats');
-  const shadow = dialog.firstElementChild.shadowRoot;
+  const shadow = dialog.firstElementChild!.shadowRoot!;
   $('dismiss-button', shadow).addEventListener('click', () => dialog.close());
 
   fetch('stats', { method: 'GET' })

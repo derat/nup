@@ -6,8 +6,14 @@ export const emptyImg =
   'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
 // Returns the element under |root| with ID |id|.
-export const $ = (id: string, root: Document | ShadowRoot = document) =>
-  root.getElementById(id);
+export function $(
+  id: string,
+  root: Document | ShadowRoot = document
+): HTMLElement {
+  const el = root.getElementById(id);
+  if (!el) throw new Error(`Didn't find element #${id}`);
+  return el;
+}
 
 // Clamps |val| between |min| and |max|.
 export const clamp = (val: number, min: number, max: number) =>
@@ -58,9 +64,9 @@ export function updateTitleAttributeForTruncation(
 // Creates and returns a new |type| element. All other parameters are optional.
 export function createElement(
   type: string,
-  className?: string,
-  parentElement?: HTMLElement | ShadowRoot,
-  text?: string
+  className: string | null = null,
+  parentElement: HTMLElement | ShadowRoot | null = null,
+  text: string | null = null
 ) {
   const element = document.createElement(type);
   if (className) element.className = className;
@@ -94,11 +100,11 @@ export const smallCoverSize = 256;
 export const largeCoverSize = 512;
 
 // Returns a URL for the cover image identified by |filename|.
-// If |filename| is empty, an empty string is returned.
+// If |filename| is null or empty, an empty string is returned.
 // If |size| isn't supplied, returns the full-size, possibly-non-square image.
 // Otherwise (i.e. |smallCoverSize| or |largeCoverSize|), returns a scaled,
 // square version.
-export function getCoverUrl(filename: string, size = 0) {
+export function getCoverUrl(filename: string | null, size = 0) {
   if (!filename) return '';
   let path = `/cover?filename=${encodeURIComponent(filename)}`;
   if (size) path += `&size=${size}&webp=1`;

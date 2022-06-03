@@ -78,7 +78,7 @@ const template = createTemplate(`
 export function showOptionsDialog() {
   const config = getConfig();
   const dialog = createDialog(template, 'options');
-  const shadow = dialog.firstElementChild.shadowRoot;
+  const shadow = dialog.firstElementChild!.shadowRoot!;
   dialog.addEventListener('close', () => config.save());
 
   const themeSelect = $('theme-select', shadow) as HTMLSelectElement;

@@ -5,7 +5,7 @@
 declare interface Song {
   sha1: string;
   songId: string;
-  filename?: string;
+  filename: string;
   coverFilename?: string;
   artist: string;
   title: string;

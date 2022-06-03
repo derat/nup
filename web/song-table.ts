@@ -274,13 +274,19 @@ export class SongTable extends HTMLElement {
   }
 
   get songs(): Song[] {
-    return this.songRowsArray_.map((r) => this.rowSongs_.get(r)); // shallow copy
+    return this.songRowsArray_.map((r) => this.rowSongs_.get(r)!); // shallow copy
   }
   get numSongs() {
     return this.songRows_.length;
   }
   getSong(index: number): Song {
-    return this.rowSongs_.get(this.songRows_[index] as HTMLTableRowElement);
+    return this.getRowSong_(this.songRows_[index] as HTMLTableRowElement);
+  }
+
+  getRowSong_(row: HTMLTableRowElement): Song {
+    const song = this.rowSongs_.get(row);
+    if (!song) throw new Error('No song for row');
+    return song;
   }
 
   get checkedSongs() {
@@ -288,7 +294,7 @@ export class SongTable extends HTMLElement {
       ? []
       : this.songRowsArray_
           .filter((r) => (r.cells[0].children[0] as HTMLInputElement).checked)
-          .map((r) => this.rowSongs_.get(r));
+          .map((r) => this.getRowSong_(r));
   }
 
   // Marks the row at |index| as being active (or not).
@@ -396,7 +402,7 @@ export class SongTable extends HTMLElement {
   insertSongRow_(index: number) {
     // Cloning the template produces a DocumentFragment, so attach it to the
     // DOM so we can get the actual <tr> to use in event listeners.
-    const tbody = this.table_.querySelector('tbody');
+    const tbody = this.table_.querySelector('tbody')!;
     tbody.insertBefore(
       rowTemplate.content.cloneNode(true),
       tbody.children ? tbody.children[index] : null
@@ -404,32 +410,34 @@ export class SongTable extends HTMLElement {
     const row = tbody.children[index] as HTMLTableRowElement;
 
     row
-      .querySelector('input[type="checkbox"]')
-      .addEventListener('click', (e: MouseEvent) =>
-        this.onCheckboxClick_(e.target as HTMLInputElement, e.shiftKey)
-      );
-    row.querySelector('.artist a').addEventListener('click', () => {
-      this.emitEvent_('field', { artist: this.rowSongs_.get(row).artist });
+      .querySelector('input[type="checkbox"]')!
+      .addEventListener('click', ((e: MouseEvent) =>
+        this.onCheckboxClick_(
+          e.target as HTMLInputElement,
+          e.shiftKey
+        )) as EventListenerOrEventListenerObject);
+    row.querySelector('.artist a')!.addEventListener('click', () => {
+      this.emitEvent_('field', { artist: this.getRowSong_(row).artist });
     });
-    row.querySelector('.album a').addEventListener('click', () => {
-      const song = this.rowSongs_.get(row);
+    row.querySelector('.album a')!.addEventListener('click', () => {
+      const song = this.getRowSong_(row);
       this.emitEvent_('field', { albumId: song.albumId, album: song.album });
     });
     row.addEventListener('contextmenu', (e: MouseEvent) => {
       this.emitEvent_('menu', {
-        songId: this.rowSongs_.get(row).songId,
+        songId: this.getRowSong_(row).songId,
         index: this.songRowsArray_.indexOf(row), // don't use orig (stale) index
         orig: e,
       });
     });
-    row.addEventListener('dragstart', (e) => {
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setDragImage(this.dragImage_, 0, 0);
+    row.addEventListener('dragstart', (e: DragEvent) => {
+      e.dataTransfer!.effectAllowed = 'move';
+      e.dataTransfer!.setDragImage(this.dragImage_, 0, 0);
       row.classList.add('dragged');
       this.dragFromIndex_ = this.dragToIndex_ =
         this.songRowsArray_.indexOf(row);
       this.dragListRect_ = this.table_
-        .querySelector('tbody')
+        .querySelector('tbody')!
         .getBoundingClientRect();
       this.moveDragTarget_();
       this.showDragTarget_();
@@ -547,7 +555,7 @@ export class SongTable extends HTMLElement {
     if (!this.inDrag_) return;
     e.preventDefault(); // needed to allow dropping
     e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer!.dropEffect = 'move';
   };
 
   onDragOver_ = (e: DragEvent) => {
@@ -575,10 +583,15 @@ export class SongTable extends HTMLElement {
 
     // The browser sets the drop effect to 'none' if the drag was aborted
     // e.g. with the Escape key or by dropping outside the window.
-    if (e.dataTransfer.dropEffect === 'none' || to === from) return;
+    if (e.dataTransfer!.dropEffect === 'none' || to === from) return;
 
+    if (from < 0 || from >= this.songRows_.length) {
+      throw new Error(
+        `From index ${from} not in [0, ${this.songRows_.length})`
+      );
+    }
     const row = this.songRows_[from];
-    const tbody = row.parentNode;
+    const tbody = row.parentNode!;
     if (to < from) {
       tbody.insertBefore(row, this.songRows_[to]);
     } else if (to < this.numSongs - 1) {
@@ -590,6 +603,7 @@ export class SongTable extends HTMLElement {
   };
 
   getDragEventIndex_(e: DragEvent) {
+    if (!this.dragListRect_) throw new Error('Missing drag rect');
     const ey = e.clientY;
     const list = this.dragListRect_;
     const nsongs = this.songRows_.length;
@@ -623,6 +637,7 @@ export class SongTable extends HTMLElement {
 
   // Shows |dragTarget_| and updates its size and position.
   showDragTarget_() {
+    if (!this.dragListRect_) throw new Error('Missing drag rect');
     this.dragTarget_.classList.add('visible');
     this.dragTarget_.style.width = this.dragListRect_.width + 'px';
     this.moveDragTarget_();
@@ -635,6 +650,7 @@ export class SongTable extends HTMLElement {
 
   // Updates |dragTarget_|'s Y position for |dragToIndex_|.
   moveDragTarget_() {
+    if (!this.dragListRect_) throw new Error('Missing drag rect');
     const idx =
       this.dragToIndex_ + (this.dragToIndex_ > this.dragFromIndex_ ? 1 : 0);
     const y =

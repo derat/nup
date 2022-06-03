@@ -361,22 +361,22 @@ export class MusicSearcher extends HTMLElement {
       this.enqueueSearchResults_(true, false)
     );
 
-    this.resultsTable_.addEventListener('field', (e: CustomEvent) => {
+    this.resultsTable_.addEventListener('field', ((e: CustomEvent) => {
       this.reset_(
         e.detail.artist,
         e.detail.album,
         e.detail.albumId,
         false /* clearResults */
       );
-    });
-    this.resultsTable_.addEventListener('check', (e: CustomEvent) => {
+    }) as EventListenerOrEventListenerObject);
+    this.resultsTable_.addEventListener('check', ((e: CustomEvent) => {
       const checked = !!e.detail.count;
       this.getButton_('append-button').disabled =
         this.getButton_('insert-button').disabled =
         this.getButton_('replace-button').disabled =
           !checked;
-    });
-    this.resultsTable_.addEventListener('menu', (e: CustomEvent) => {
+    }) as EventListenerOrEventListenerObject);
+    this.resultsTable_.addEventListener('menu', ((e: CustomEvent) => {
       const idx = e.detail.index;
       const orig = e.detail.orig;
       orig.preventDefault();
@@ -398,7 +398,7 @@ export class MusicSearcher extends HTMLElement {
       menu.addEventListener('close', () => {
         this.resultsTable_.setRowMenuShown(idx, false);
       });
-    });
+    }) as EventListenerOrEventListenerObject);
 
     this.getPresetsFromServer_();
   }
@@ -418,7 +418,11 @@ export class MusicSearcher extends HTMLElement {
   }
 
   // Resets the search fields using the supplied (optional) values.
-  resetFields(artist?: string, album?: string, albumId?: string) {
+  resetFields(
+    artist: string | null = null,
+    album: string | null = null,
+    albumId: string | null = null
+  ) {
     this.reset_(artist, album, albumId, false);
   }
 
@@ -689,9 +693,9 @@ function parseQueryString(text: string) {
       // The server splits on non-alphanumeric characters to make keywords.
       // Split on miscellaneous punctuation here to at least handle some of this.
       keywords = keywords.concat(
-        match[1].split(/[-_+=~!?@#$%^&*()'".,:;]+/).filter((s) => s.length)
+        match![1].split(/[-_+=~!?@#$%^&*()'".,:;]+/).filter((s) => s.length)
       );
-      text = match[2];
+      text = match![2];
     }
     text = text.trim();
   }

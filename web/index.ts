@@ -63,7 +63,7 @@ const fetchServerTags = () =>
 fetchServerTags();
 
 // Use the cover art as the favicon.
-player.addEventListener('cover', (e: CustomEvent) => {
+player.addEventListener('cover', ((e: CustomEvent) => {
   const favicon = $('favicon') as HTMLLinkElement;
   const setSize = (s: string) => favicon.sizes.replace(favicon.sizes[0], s);
   if (e.detail.url) {
@@ -78,24 +78,24 @@ player.addEventListener('cover', (e: CustomEvent) => {
     favicon.type = 'image/png';
     setSize('48x48');
   }
-});
+}) as EventListenerOrEventListenerObject);
 
 // Wire up components.
-player.addEventListener('field', (e: CustomEvent) => {
+player.addEventListener('field', ((e: CustomEvent) => {
   searcher.resetFields(e.detail.artist, e.detail.album, e.detail.albumId);
-});
-player.addEventListener('newtags', (e: CustomEvent) => {
+}) as EventListenerOrEventListenerObject);
+player.addEventListener('newtags', ((e: CustomEvent) => {
   serverTags = serverTags.concat(e.detail.tags);
   player.tags = searcher.tags = serverTags;
-});
-searcher.addEventListener('enqueue', (e: CustomEvent) => {
+}) as EventListenerOrEventListenerObject);
+searcher.addEventListener('enqueue', ((e: CustomEvent) => {
   player.enqueueSongs(
     e.detail.songs,
     e.detail.clearFirst,
     e.detail.afterCurrent,
     e.detail.shuffled
   );
-});
+}) as EventListenerOrEventListenerObject);
 
 // Used by web tests.
 (document as any).test = {

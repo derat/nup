@@ -93,8 +93,8 @@ export function createDialog(
 // Creates and shows a modal dialog with the supplied title and text.
 // The dialog is not returned.
 export function showMessageDialog(title: string, message: string) {
-  const dialog = createDialog(msgTemplate, null);
-  const shadow = dialog.firstElementChild.shadowRoot;
+  const dialog = createDialog(msgTemplate);
+  const shadow = dialog.firstElementChild!.shadowRoot!;
   $('title', shadow).innerText = title;
   $('message', shadow).innerText = message;
   $('ok-button', shadow).addEventListener('click', () => dialog.close());

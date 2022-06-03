@@ -114,7 +114,7 @@ export class AudioWrapper extends HTMLElement {
     this.audioSrc_?.disconnect();
     this.audioSrc_ = null;
 
-    this.audio_.parentNode.replaceChild(audio, this.audio_);
+    this.audio_.parentNode!.replaceChild(audio, this.audio_);
     this.audio_ = audio;
     this.configureAudio_();
   }
@@ -141,7 +141,7 @@ export class AudioWrapper extends HTMLElement {
 
     this.numErrors_++;
 
-    const error = (e.target as HTMLAudioElement).error;
+    const error = (e.target as HTMLAudioElement).error!;
     console.log(`Got playback error ${error.code} (${error.message})`);
     switch (error.code) {
       case error.MEDIA_ERR_ABORTED: // 1
@@ -241,9 +241,9 @@ export class AudioWrapper extends HTMLElement {
   }
 
   get src() {
-    return this.audio_.src;
+    return this.audio_.src ?? null;
   }
-  set src(src: string) {
+  set src(src: string | null) {
     // Deal with "The AudioContext was not allowed to start. It must be
     // resumed (or created) after a user gesture on the page.":
     // https://developers.google.com/web/updates/2017/09/autoplay-policy-changes#webaudio
@@ -253,8 +253,8 @@ export class AudioWrapper extends HTMLElement {
     if (!src) {
       this.audio_.pause();
       this.audio_.removeAttribute('src');
-    } else if (this.preloadSrc === src && !this.preloadAudio_.error) {
-      this.replaceAudio_(this.preloadAudio_);
+    } else if (this.preloadSrc === src && !this.preloadAudio_?.error) {
+      this.replaceAudio_(this.preloadAudio_!);
       this.preloadAudio_ = null;
     } else {
       this.audio_.src = src;
@@ -312,13 +312,18 @@ export class AudioWrapper extends HTMLElement {
   // about doing this using MSE, although it seems pretty complicated and the
   // current approach here seems to work reasonably well most of the time.
   get preloadSrc() {
-    return this.preloadAudio_ ? this.preloadAudio_.src : null;
+    return this.preloadAudio_?.src ?? null;
   }
-  set preloadSrc(src: string) {
+  set preloadSrc(src: string | null) {
+    if (src === null) {
+      this.preloadAudio_ = null;
+      return;
+    }
+
     if (this.preloadAudio_?.src === src) return;
     // This is split over multiple lines solely to prevent Prettier from
     // doing some of the most hideous formatting that I've ever seen.
-    const el = template.content.firstElementChild.cloneNode(true);
+    const el = template.content.firstElementChild!.cloneNode(true);
     this.preloadAudio_ = el as HTMLAudioElement;
     this.preloadAudio_.src = src;
   }

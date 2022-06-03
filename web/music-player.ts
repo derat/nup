@@ -298,21 +298,21 @@ export class MusicPlayer extends HTMLElement {
     );
     this.playPauseButton_.addEventListener('click', () => this.togglePause_());
 
-    this.playlistTable_.addEventListener('field', (e: CustomEvent) => {
+    this.playlistTable_.addEventListener('field', ((e: CustomEvent) => {
       this.dispatchEvent(new CustomEvent('field', { detail: e.detail }));
-    });
-    this.playlistTable_.addEventListener('reorder', (e: CustomEvent) => {
+    }) as EventListenerOrEventListenerObject);
+    this.playlistTable_.addEventListener('reorder', ((e: CustomEvent) => {
       this.currentIndex_ = moveItem(
         this.songs_,
         e.detail.fromIndex,
         e.detail.toIndex,
         this.currentIndex_
-      );
+      )!;
       this.updatePresentationLayerSongs_();
       this.updateButtonState_();
       // TODO: Preload the next song if needed.
-    });
-    this.playlistTable_.addEventListener('menu', (e: CustomEvent) => {
+    }) as EventListenerOrEventListenerObject);
+    this.playlistTable_.addEventListener('menu', ((e: CustomEvent) => {
       const idx = e.detail.index;
       const orig = e.detail.orig;
       orig.preventDefault();
@@ -351,7 +351,7 @@ export class MusicPlayer extends HTMLElement {
       menu.addEventListener('close', () => {
         this.playlistTable_.setRowMenuShown(idx, false);
       });
-    });
+    }) as EventListenerOrEventListenerObject);
 
     this.updateSongDisplay_();
   }
@@ -386,7 +386,7 @@ export class MusicPlayer extends HTMLElement {
   }
 
   disconnectedCallback() {
-    this.updater_.destroy();
+    this.updater_?.destroy();
     this.updater_ = null;
 
     this.cancelCloseNotificationTimeout_();
@@ -769,7 +769,7 @@ export class MusicPlayer extends HTMLElement {
     if (delay) {
       console.log(`Playing in ${this.playDelayMs_} ms`);
       this.playTimeoutId_ = window.setTimeout(() => {
-        this.playTimeoutId_ = undefined;
+        this.playTimeoutId_ = null;
         this.playInternal_();
       }, this.playDelayMs_);
     } else {
@@ -867,7 +867,7 @@ export class MusicPlayer extends HTMLElement {
     const dur = song.length;
 
     if (!this.reportedCurrentTrack_ && (played >= 240 || played > dur / 2)) {
-      this.updater_.reportPlay(song.songId, this.startTime_);
+      this.updater_?.reportPlay(song.songId, this.startTime_!);
       this.reportedCurrentTrack_ = true;
     }
 
@@ -926,7 +926,7 @@ export class MusicPlayer extends HTMLElement {
 
       if (rating === null && tags === null) return;
 
-      this.updater_.rateAndTag(song.songId, rating, tags);
+      this.updater_?.rateAndTag(song.songId, rating, tags);
 
       if (rating !== null) {
         song.rating = rating;

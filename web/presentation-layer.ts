@@ -249,7 +249,7 @@ export class PresentationLayer extends HTMLElement {
       this.timeDiv_.innerText = '';
       this.durationDiv_.innerText = formatDuration(currentSong.length);
       this.duration_ = currentSong.length;
-      this.currentFilename_ = currentSong.coverFilename;
+      this.currentFilename_ = currentSong.coverFilename ?? null;
 
       // Set the host element's background to the low-resolution cover image
       // (which we've probably already loaded). If the presentation layer
@@ -268,7 +268,7 @@ export class PresentationLayer extends HTMLElement {
     // retrigger the fade-out animation.
     const el = this.currentCover_.cloneNode(true) as HTMLImageElement;
     el.id = 'old-cover';
-    this.oldCover_.parentNode.replaceChild(el, this.oldCover_);
+    this.oldCover_.parentNode!.replaceChild(el, this.oldCover_);
     this.oldCover_ = el;
 
     // Load the full-resolution cover image if we're visible.
@@ -285,7 +285,7 @@ export class PresentationLayer extends HTMLElement {
       this.nextArtist_.innerText = nextSong.artist;
       this.nextTitle_.innerText = nextSong.title;
       this.nextAlbum_.innerText = nextSong.album;
-      this.nextFilename_ = nextSong.coverFilename;
+      this.nextFilename_ = nextSong.coverFilename ?? null;
     }
     updateImg(this.nextCover_, getCoverUrl(this.nextFilename_, smallCoverSize));
 
