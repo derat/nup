@@ -100,12 +100,12 @@ searcher.addEventListener('enqueue', ((e: CustomEvent) => {
 // Used by web tests.
 (document as any).test = {
   reset: () => {
-    player.resetForTesting();
-    searcher.resetForTesting();
+    player.resetForTest();
+    searcher.resetForTest();
     // Make a hacky attempt to close any modal dialogs.
     [...document.querySelectorAll('dialog')].forEach((d) => d.close());
   },
-  setPlayDelayMs: (delayMs: number) => (player.playDelayMs_ = delayMs),
+  setPlayDelayMs: (ms: number) => player.setPlayDelayMsForTest(ms),
   updateTags: async () => await fetchServerTags(),
   dragElement: (
     src: HTMLElement,

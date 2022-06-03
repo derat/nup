@@ -35,7 +35,7 @@ suite('config', () => {
   });
 
   test('ignoreInvalidConfig', () => {
-    window.localStorage.setItem(Config.CONFIG_KEY_, 'not json');
+    window.localStorage.setItem(Config.CONFIG_KEY, 'not json');
 
     // These match the defaults from the c'tor.
     const cfg = new Config();
@@ -45,9 +45,9 @@ suite('config', () => {
   });
 
   test('skipInvalidPrefs', () => {
-    // This matches load_().
+    // This matches #load().
     window.localStorage.setItem(
-      Config.CONFIG_KEY_,
+      Config.CONFIG_KEY,
       JSON.stringify({
         bogus: 2.3,
         [Config.THEME]: Config.THEME_DARK,

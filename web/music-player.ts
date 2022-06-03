@@ -171,68 +171,68 @@ const template = createTemplate(`
 // URL to a |smallCoverSize| WebP image. This property is null if no cover art
 // is available.
 export class MusicPlayer extends HTMLElement {
-  static SEEK_SEC_ = 10; // seconds to skip when seeking forward or back
-  static NOTIFICATION_SEC_ = 3; // duration to show song-change notification
-  static PLAY_DELAY_MS_ = 500; // delay before playing when cycling track
-  static PRELOAD_SEC_ = 20; // seconds before end of song to load next song
-  static TIME_UPDATE_SLOP_MS_ = 10; // time to wait past second boundary
+  static #SEEK_SEC = 10; // seconds to skip when seeking forward or back
+  static #NOTIFICATION_SEC = 3; // duration to show song-change notification
+  static #PLAY_DELAY_MS = 500; // delay before playing when cycling track
+  static #PRELOAD_SEC = 20; // seconds before end of song to load next song
+  static #TIME_UPDATE_SLOP_MS = 10; // time to wait past second boundary
 
-  config_ = getConfig();
-  updater_: Updater | null = null; // initialized in connectedCallback()
-  songs_: Song[] = []; // songs in the order in which they should be played
-  tags_: string[] = []; // available tags loaded from server
-  currentIndex_ = -1; // index into |songs| of current track
-  startTime_: number | null = null; // seconds since epoch for current track
-  reportedCurrentTrack_ = false; // already reported current as played?
-  reachedEndOfSongs_ = false; // did we hit end of last song?
-  updateDialog_: UpdateDialog | null = null;
-  notification_: Notification | null = null; // for song changes
-  closeNotificationTimeoutId_: number | null = null; // closeNotification_()
-  playDelayMs_ = MusicPlayer.PLAY_DELAY_MS_;
-  playTimeoutId_: number | null = null; // for playInternal_()
-  lastTimeUpdatePos_ = 0; // audio position in last onTimeUpdate_()
-  timeUpdateTimeoutId_: number | null = null; // onTimeUpdate_()
-  shuffled_ = false; // playlist contains shuffled songs
+  #config = getConfig();
+  #updater: Updater | null = null; // initialized in connectedCallback()
+  #songs: Song[] = []; // songs in the order in which they should be played
+  #tags: string[] = []; // available tags loaded from server
+  #currentIndex = -1; // index into #songs of current track
+  #startTime: number | null = null; // seconds since epoch for current track
+  #reportedCurrentTrack = false; // already reported current as played?
+  #reachedEndOfSongs = false; // did we hit end of last song?
+  #updateDialog: UpdateDialog | null = null;
+  #notification: Notification | null = null; // for song changes
+  #closeNotificationTimeoutId: number | null = null; // #closeNotification()
+  #playDelayMs = MusicPlayer.#PLAY_DELAY_MS;
+  #playTimeoutId: number | null = null; // for #playInternal()
+  #lastTimeUpdatePos = 0; // audio position in last #onTimeUpdate()
+  #timeUpdateTimeoutId: number | null = null; // #onTimeUpdate()
+  #shuffled = false; // playlist contains shuffled songs
 
-  shadow_ = createShadow(this, template);
-  presentationLayer_ = this.shadow_.querySelector(
+  #shadow = createShadow(this, template);
+  #presentationLayer = this.#shadow.querySelector(
     'presentation-layer'
   ) as PresentationLayer;
-  audio_ = this.shadow_.querySelector('audio-wrapper') as AudioWrapper;
-  playlistTable_ = $('playlist', this.shadow_) as SongTable;
+  #audio = this.#shadow.querySelector('audio-wrapper') as AudioWrapper;
+  #playlistTable = $('playlist', this.#shadow) as SongTable;
 
-  coverDiv_ = $('cover-div', this.shadow_);
-  coverImage_ = $('cover-img', this.shadow_) as HTMLImageElement;
-  ratingOverlayDiv_ = $('rating-overlay', this.shadow_);
-  artistDiv_ = $('artist', this.shadow_);
-  titleDiv_ = $('title', this.shadow_);
-  albumDiv_ = $('album', this.shadow_);
-  timeDiv_ = $('time', this.shadow_);
-  prevButton_ = $('prev', this.shadow_) as HTMLButtonElement;
-  nextButton_ = $('next', this.shadow_) as HTMLButtonElement;
-  playPauseButton_ = $('play-pause', this.shadow_) as HTMLButtonElement;
+  #coverDiv = $('cover-div', this.#shadow);
+  #coverImage = $('cover-img', this.#shadow) as HTMLImageElement;
+  #ratingOverlayDiv = $('rating-overlay', this.#shadow);
+  #artistDiv = $('artist', this.#shadow);
+  #titleDiv = $('title', this.#shadow);
+  #albumDiv = $('album', this.#shadow);
+  #timeDiv = $('time', this.#shadow);
+  #prevButton = $('prev', this.#shadow) as HTMLButtonElement;
+  #nextButton = $('next', this.#shadow) as HTMLButtonElement;
+  #playPauseButton = $('play-pause', this.#shadow) as HTMLButtonElement;
 
   constructor() {
     super();
 
-    this.shadow_.adoptedStyleSheets = [commonStyles];
+    this.#shadow.adoptedStyleSheets = [commonStyles];
 
-    this.presentationLayer_.addEventListener('next', () => {
-      this.cycleTrack_(1, false /* delayPlay */);
+    this.#presentationLayer.addEventListener('next', () => {
+      this.#cycleTrack(1, false /* delayPlay */);
     });
-    this.presentationLayer_.addEventListener('hide', () => {
-      this.setPresentationLayerVisible_(false);
+    this.#presentationLayer.addEventListener('hide', () => {
+      this.#setPresentationLayerVisible(false);
     });
 
     // We're leaking this callback, but it doesn't matter in practice since
     // music-player never gets removed from the DOM.
-    this.config_.addCallback((name, value) => {
+    this.#config.addCallback((name, value) => {
       if (name === Config.GAIN_TYPE || name === Config.PRE_AMP) {
-        this.updateGain_();
+        this.#updateGain();
       }
     });
 
-    const menuButton = $('menu-button', this.shadow_);
+    const menuButton = $('menu-button', this.#shadow);
     menuButton.addEventListener('click', () => {
       const rect = menuButton.getBoundingClientRect();
       createMenu(
@@ -242,7 +242,7 @@ export class MusicPlayer extends HTMLElement {
           {
             id: 'present',
             text: 'Presentation',
-            cb: () => this.setPresentationLayerVisible_(true),
+            cb: () => this.#setPresentationLayerVisible(true),
             hotkey: 'Alt+V',
           },
           {
@@ -260,7 +260,7 @@ export class MusicPlayer extends HTMLElement {
             id: 'info',
             text: 'Song info…',
             cb: () => {
-              const song = this.currentSong_;
+              const song = this.#currentSong;
               if (song) showSongInfo(song);
             },
             hotkey: 'Alt+I',
@@ -269,7 +269,7 @@ export class MusicPlayer extends HTMLElement {
             id: 'debug',
             text: 'Debug…',
             cb: () => {
-              const song = this.currentSong_;
+              const song = this.#currentSong;
               if (song) window.open(getDumpSongUrl(song.songId), '_blank');
             },
             hotkey: 'Alt+D',
@@ -279,40 +279,40 @@ export class MusicPlayer extends HTMLElement {
       );
     });
 
-    this.audio_.addEventListener('ended', this.onEnded_);
-    this.audio_.addEventListener('pause', this.onPause_);
-    this.audio_.addEventListener('play', this.onPlay_);
-    this.audio_.addEventListener('timeupdate', this.onTimeUpdate_);
-    this.audio_.addEventListener('error', this.onError_);
+    this.#audio.addEventListener('ended', this.#onEnded);
+    this.#audio.addEventListener('pause', this.#onPause);
+    this.#audio.addEventListener('play', this.#onPlay);
+    this.#audio.addEventListener('timeupdate', this.#onTimeUpdate);
+    this.#audio.addEventListener('error', this.#onError);
 
-    this.coverImage_.addEventListener('click', () => this.showUpdateDialog_());
-    this.coverImage_.addEventListener('load', () =>
-      this.updateMediaSessionMetadata_(true /* imageLoaded */)
+    this.#coverImage.addEventListener('click', () => this.#showUpdateDialog());
+    this.#coverImage.addEventListener('load', () =>
+      this.#updateMediaSessionMetadata(true /* imageLoaded */)
     );
 
-    this.prevButton_.addEventListener('click', () =>
-      this.cycleTrack_(-1, true /* delayPlay */)
+    this.#prevButton.addEventListener('click', () =>
+      this.#cycleTrack(-1, true /* delayPlay */)
     );
-    this.nextButton_.addEventListener('click', () =>
-      this.cycleTrack_(1, true /* delayPlay */)
+    this.#nextButton.addEventListener('click', () =>
+      this.#cycleTrack(1, true /* delayPlay */)
     );
-    this.playPauseButton_.addEventListener('click', () => this.togglePause_());
+    this.#playPauseButton.addEventListener('click', () => this.#togglePause());
 
-    this.playlistTable_.addEventListener('field', ((e: CustomEvent) => {
+    this.#playlistTable.addEventListener('field', ((e: CustomEvent) => {
       this.dispatchEvent(new CustomEvent('field', { detail: e.detail }));
     }) as EventListenerOrEventListenerObject);
-    this.playlistTable_.addEventListener('reorder', ((e: CustomEvent) => {
-      this.currentIndex_ = moveItem(
-        this.songs_,
+    this.#playlistTable.addEventListener('reorder', ((e: CustomEvent) => {
+      this.#currentIndex = moveItem(
+        this.#songs,
         e.detail.fromIndex,
         e.detail.toIndex,
-        this.currentIndex_
+        this.#currentIndex
       )!;
-      this.updatePresentationLayerSongs_();
-      this.updateButtonState_();
+      this.#updatePresentationLayerSongs();
+      this.#updateButtonState();
       // TODO: Preload the next song if needed.
     }) as EventListenerOrEventListenerObject);
-    this.playlistTable_.addEventListener('menu', ((e: CustomEvent) => {
+    this.#playlistTable.addEventListener('menu', ((e: CustomEvent) => {
       const idx = e.detail.index;
       const orig = e.detail.orig;
       orig.preventDefault();
@@ -321,23 +321,23 @@ export class MusicPlayer extends HTMLElement {
         {
           id: 'play',
           text: 'Play',
-          cb: () => this.selectTrack_(idx),
+          cb: () => this.#selectTrack(idx),
         },
         {
           id: 'remove',
           text: 'Remove',
-          cb: () => this.removeSongs_(idx, 1),
+          cb: () => this.#removeSongs(idx, 1),
         },
         {
           id: 'truncate',
           text: 'Truncate',
-          cb: () => this.removeSongs_(idx, this.songs_.length - idx),
+          cb: () => this.#removeSongs(idx, this.#songs.length - idx),
         },
         { text: '-' },
         {
           id: 'info',
           text: 'Info…',
-          cb: () => showSongInfo(this.songs_[idx]),
+          cb: () => showSongInfo(this.#songs[idx]),
         },
         {
           id: 'debug',
@@ -347,51 +347,51 @@ export class MusicPlayer extends HTMLElement {
       ]);
 
       // Highlight the row while the menu is open.
-      this.playlistTable_.setRowMenuShown(idx, true);
+      this.#playlistTable.setRowMenuShown(idx, true);
       menu.addEventListener('close', () => {
-        this.playlistTable_.setRowMenuShown(idx, false);
+        this.#playlistTable.setRowMenuShown(idx, false);
       });
     }) as EventListenerOrEventListenerObject);
 
-    this.updateSongDisplay_();
+    this.#updateSongDisplay();
   }
 
   connectedCallback() {
-    this.updater_ = new Updater();
+    this.#updater = new Updater();
 
     if ('mediaSession' in navigator) {
       const ms = navigator.mediaSession;
-      ms.setActionHandler('play', () => this.play_());
-      ms.setActionHandler('pause', () => this.pause_());
+      ms.setActionHandler('play', () => this.#play());
+      ms.setActionHandler('pause', () => this.#pause());
       ms.setActionHandler('seekbackward', () =>
-        this.seek_(-MusicPlayer.SEEK_SEC_)
+        this.#seek(-MusicPlayer.#SEEK_SEC)
       );
       ms.setActionHandler('seekforward', () =>
-        this.seek_(MusicPlayer.SEEK_SEC_)
+        this.#seek(MusicPlayer.#SEEK_SEC)
       );
       ms.setActionHandler('previoustrack', () =>
-        this.cycleTrack_(-1, true /* delayPlay */)
+        this.#cycleTrack(-1, true /* delayPlay */)
       );
       ms.setActionHandler('nexttrack', () =>
-        this.cycleTrack_(1, true /* delayPlay */)
+        this.#cycleTrack(1, true /* delayPlay */)
       );
     }
 
     document.addEventListener(
       'visibilitychange',
-      this.onDocumentVisibilityChange_
+      this.#onDocumentVisibilityChange
     );
-    document.body.addEventListener('keydown', this.onKeyDown_);
-    window.addEventListener('beforeunload', this.onBeforeUnload_);
+    document.body.addEventListener('keydown', this.#onKeyDown);
+    window.addEventListener('beforeunload', this.#onBeforeUnload);
   }
 
   disconnectedCallback() {
-    this.updater_?.destroy();
-    this.updater_ = null;
+    this.#updater?.destroy();
+    this.#updater = null;
 
-    this.cancelCloseNotificationTimeout_();
-    this.cancelPlayTimeout_();
-    this.cancelTimeUpdateTimeout_();
+    this.#cancelCloseNotificationTimeout();
+    this.#cancelPlayTimeout();
+    this.#cancelTimeUpdateTimeout();
 
     if ('mediaSession' in navigator) {
       const ms = navigator.mediaSession;
@@ -405,71 +405,71 @@ export class MusicPlayer extends HTMLElement {
 
     document.removeEventListener(
       'visibilitychange',
-      this.onDocumentVisibilityChange_
+      this.#onDocumentVisibilityChange
     );
-    document.body.removeEventListener('keydown', this.onKeyDown_);
-    window.removeEventListener('beforeunload', this.onBeforeUnload_);
+    document.body.removeEventListener('keydown', this.#onKeyDown);
+    window.removeEventListener('beforeunload', this.#onBeforeUnload);
   }
 
   set tags(tags: string[]) {
-    this.tags_ = tags;
+    this.#tags = tags;
   }
 
-  onDocumentVisibilityChange_ = () => {
+  #onDocumentVisibilityChange = () => {
     // We hold off on updating the displayed time while the document is
     // hidden, so update it as soon as the document is shown.
-    if (!document.hidden) this.onTimeUpdate_();
+    if (!document.hidden) this.#onTimeUpdate();
   };
 
-  onKeyDown_ = (e: KeyboardEvent) => {
+  #onKeyDown = (e: KeyboardEvent) => {
     if (isDialogShown() || isMenuShown()) return;
 
     if (
       (() => {
         if (e.altKey && e.key === 'd') {
-          const song = this.currentSong_;
+          const song = this.#currentSong;
           if (song) window.open(getDumpSongUrl(song.songId), '_blank');
-          this.setPresentationLayerVisible_(false);
+          this.#setPresentationLayerVisible(false);
           return true;
         } else if (e.altKey && e.key === 'i') {
-          const song = this.currentSong_;
+          const song = this.#currentSong;
           if (song) showSongInfo(song);
-          this.setPresentationLayerVisible_(false);
+          this.#setPresentationLayerVisible(false);
           return true;
         } else if (e.altKey && e.key === 'n') {
-          this.cycleTrack_(1, true /* delay */);
+          this.#cycleTrack(1, true /* delay */);
           return true;
         } else if (e.altKey && e.key === 'o') {
           showOptionsDialog();
-          this.setPresentationLayerVisible_(false);
+          this.#setPresentationLayerVisible(false);
           return true;
         } else if (e.altKey && e.key === 'p') {
-          this.cycleTrack_(-1, true /* delay */);
+          this.#cycleTrack(-1, true /* delay */);
           return true;
         } else if (e.altKey && e.key === 'r') {
-          this.showUpdateDialog_();
-          this.updateDialog_?.focusRating();
-          this.setPresentationLayerVisible_(false);
+          this.#showUpdateDialog();
+          this.#updateDialog?.focusRating();
+          this.#setPresentationLayerVisible(false);
           return true;
         } else if (e.altKey && e.key === 't') {
-          this.showUpdateDialog_();
-          this.updateDialog_?.focusTags();
-          this.setPresentationLayerVisible_(false);
+          this.#showUpdateDialog();
+          this.#updateDialog?.focusTags();
+          this.#setPresentationLayerVisible(false);
           return true;
         } else if (e.altKey && e.key === 'v') {
-          this.setPresentationLayerVisible_(!this.presentationLayer_.visible);
+          this.#setPresentationLayerVisible(!this.#presentationLayer.visible);
           return true;
         } else if (e.key === ' ') {
-          this.togglePause_();
+          this.#togglePause();
           return true;
-        } else if (e.key === 'Escape' && this.presentationLayer_.visible) {
-          this.setPresentationLayerVisible_(false);
+        } else if (e.key === 'Escape' && this.#presentationLayer.visible) {
+          this.#setPresentationLayerVisible(false);
           return true;
         } else if (e.key === 'ArrowLeft') {
-          this.seek_(-MusicPlayer.SEEK_SEC_);
+          this.#seek(-MusicPlayer.#SEEK_SEC);
           return true;
         } else if (e.key === 'ArrowRight') {
-          this.seek_(MusicPlayer.SEEK_SEC_);
+          this.#seek(MusicPlayer.#SEEK_SEC);
           return true;
         }
         return false;
@@ -480,20 +480,23 @@ export class MusicPlayer extends HTMLElement {
     }
   };
 
-  onBeforeUnload_ = () => {
-    this.closeNotification_();
+  #onBeforeUnload = () => {
+    this.#closeNotification();
   };
 
-  get currentSong_() {
-    return this.songs_[this.currentIndex_] ?? null;
+  get #currentSong() {
+    return this.#songs[this.#currentIndex] ?? null;
   }
-  get nextSong_() {
-    return this.songs_[this.currentIndex_ + 1] ?? null;
+  get #nextSong() {
+    return this.#songs[this.#currentIndex + 1] ?? null;
   }
 
-  resetForTesting() {
-    if (this.songs_.length) this.removeSongs_(0, this.songs_.length);
-    this.updateDialog_?.close(false /* save */);
+  resetForTest() {
+    if (this.#songs.length) this.#removeSongs(0, this.#songs.length);
+    this.#updateDialog?.close(false /* save */);
+  }
+  setPlayDelayMsForTest(ms: number) {
+    this.#playDelayMs = ms;
   }
 
   // Adds |songs| to the playlist.
@@ -507,60 +510,60 @@ export class MusicPlayer extends HTMLElement {
     afterCurrent: boolean,
     shuffled: boolean
   ) {
-    if (clearFirst) this.removeSongs_(0, this.songs_.length);
+    if (clearFirst) this.#removeSongs(0, this.#songs.length);
 
     let index = afterCurrent
-      ? Math.min(this.currentIndex_ + 1, this.songs_.length)
-      : this.songs_.length;
-    songs.forEach((s) => this.songs_.splice(index++, 0, s));
+      ? Math.min(this.#currentIndex + 1, this.#songs.length)
+      : this.#songs.length;
+    songs.forEach((s) => this.#songs.splice(index++, 0, s));
 
-    if (shuffled && songs.length) this.shuffled_ = true;
+    if (shuffled && songs.length) this.#shuffled = true;
 
-    this.playlistTable_.setSongs(this.songs_);
+    this.#playlistTable.setSongs(this.#songs);
 
-    if (this.currentIndex_ === -1) {
-      this.selectTrack_(0);
-    } else if (this.reachedEndOfSongs_) {
-      this.cycleTrack_(1);
+    if (this.#currentIndex === -1) {
+      this.#selectTrack(0);
+    } else if (this.#reachedEndOfSongs) {
+      this.#cycleTrack(1);
     } else {
-      this.updateButtonState_();
-      this.updatePresentationLayerSongs_();
+      this.#updateButtonState();
+      this.#updatePresentationLayerSongs();
     }
   }
 
   // Removes |len| songs starting at index |start| from the playlist.
-  removeSongs_(start: number, len: number) {
-    if (start < 0 || len <= 0 || start + len > this.songs_.length) return;
+  #removeSongs(start: number, len: number) {
+    if (start < 0 || len <= 0 || start + len > this.#songs.length) return;
 
-    this.songs_.splice(start, len);
-    this.playlistTable_.setSongs(this.songs_);
+    this.#songs.splice(start, len);
+    this.#playlistTable.setSongs(this.#songs);
 
-    if (!this.songs_.length) this.shuffled_ = false;
+    if (!this.#songs.length) this.#shuffled = false;
 
     // If we're keeping the current song, things are pretty simple.
     const end = start + len - 1;
-    if (start > this.currentIndex_ || end < this.currentIndex_) {
+    if (start > this.#currentIndex || end < this.#currentIndex) {
       // If we're removing songs before the current one, we need to update the
       // index and highlighting.
-      if (end < this.currentIndex_) {
-        this.playlistTable_.setRowActive(this.currentIndex_, false);
-        this.currentIndex_ -= len;
-        this.playlistTable_.setRowActive(this.currentIndex_, true);
+      if (end < this.#currentIndex) {
+        this.#playlistTable.setRowActive(this.#currentIndex, false);
+        this.#currentIndex -= len;
+        this.#playlistTable.setRowActive(this.#currentIndex, true);
       }
-      this.updateButtonState_();
-      this.updatePresentationLayerSongs_();
+      this.#updateButtonState();
+      this.#updatePresentationLayerSongs();
       return;
     }
 
     // Stop playing the (just-removed) current song and choose a new one.
-    this.audio_.src = null;
-    this.playlistTable_.setRowActive(this.currentIndex_, false);
-    this.currentIndex_ = -1;
+    this.#audio.src = null;
+    this.#playlistTable.setRowActive(this.#currentIndex, false);
+    this.#currentIndex = -1;
 
     // If there are songs after the last-removed one, switch to the first of
     // them.
-    if (this.songs_.length > start) {
-      this.selectTrack_(start);
+    if (this.#songs.length > start) {
+      this.#selectTrack(start);
       return;
     }
 
@@ -569,77 +572,77 @@ export class MusicPlayer extends HTMLElement {
     // TODO: Pausing is hokey. It'd probably be better to act as if we'd
     // actually reached the end of the last song, but that'd probably require
     // waiting for its duration to be loaded so we can seek.
-    this.selectTrack_(this.songs_.length);
-    this.pause_();
+    this.#selectTrack(this.#songs.length);
+    this.#pause();
   }
 
   // Plays the song at |offset| in the playlist relative to the current song.
   // If |delayPlay| is true, waits a bit before actually playing the audio
   // (in case the user might be about to select a different track).
-  cycleTrack_(offset: number, delayPlay = false) {
-    this.selectTrack_(this.currentIndex_ + offset, delayPlay);
+  #cycleTrack(offset: number, delayPlay = false) {
+    this.#selectTrack(this.#currentIndex + offset, delayPlay);
   }
 
   // Plays the song at |index| in the playlist.
   // If |delayPlay| is true, waits a bit before actually playing the audio
   // (in case the user might be about to select a different track).
-  selectTrack_(index: number, delayPlay = false) {
-    if (!this.songs_.length) {
-      this.currentIndex_ = -1;
-      this.updateSongDisplay_();
-      this.updateButtonState_();
-      this.updatePresentationLayerSongs_();
-      this.reachedEndOfSongs_ = false;
+  #selectTrack(index: number, delayPlay = false) {
+    if (!this.#songs.length) {
+      this.#currentIndex = -1;
+      this.#updateSongDisplay();
+      this.#updateButtonState();
+      this.#updatePresentationLayerSongs();
+      this.#reachedEndOfSongs = false;
       return;
     }
 
     if (index < 0) index = 0;
-    else if (index >= this.songs_.length) index = this.songs_.length - 1;
+    else if (index >= this.#songs.length) index = this.#songs.length - 1;
 
-    if (index === this.currentIndex_) return;
+    if (index === this.#currentIndex) return;
 
-    this.playlistTable_.setRowActive(this.currentIndex_, false);
-    this.playlistTable_.setRowActive(index, true);
-    this.playlistTable_.scrollToRow(index);
-    this.currentIndex_ = index;
-    this.audio_.src = null;
+    this.#playlistTable.setRowActive(this.#currentIndex, false);
+    this.#playlistTable.setRowActive(index, true);
+    this.#playlistTable.scrollToRow(index);
+    this.#currentIndex = index;
+    this.#audio.src = null;
 
-    this.updateSongDisplay_();
-    this.updatePresentationLayerSongs_();
-    this.updateButtonState_();
-    this.play_(delayPlay);
+    this.#updateSongDisplay();
+    this.#updatePresentationLayerSongs();
+    this.#updateButtonState();
+    this.#play(delayPlay);
 
-    if (!document.hasFocus()) this.showNotification_();
+    if (!document.hasFocus()) this.#showNotification();
   }
 
-  updateButtonState_() {
-    this.prevButton_.disabled = this.currentIndex_ <= 0;
-    this.nextButton_.disabled =
-      this.currentIndex_ < 0 || this.currentIndex_ >= this.songs_.length - 1;
-    this.playPauseButton_.disabled = this.currentIndex_ < 0;
+  #updateButtonState() {
+    this.#prevButton.disabled = this.#currentIndex <= 0;
+    this.#nextButton.disabled =
+      this.#currentIndex < 0 || this.#currentIndex >= this.#songs.length - 1;
+    this.#playPauseButton.disabled = this.#currentIndex < 0;
   }
 
-  updateSongDisplay_() {
-    const song = this.currentSong_;
+  #updateSongDisplay() {
+    const song = this.#currentSong;
     document.title = song ? `${song.artist} - ${song.title}` : 'Player';
 
-    this.artistDiv_.innerText = song ? song.artist : '';
-    this.titleDiv_.innerText = song ? song.title : '';
-    this.albumDiv_.innerText = song ? song.album : '';
-    this.timeDiv_.innerText = '';
+    this.#artistDiv.innerText = song ? song.artist : '';
+    this.#titleDiv.innerText = song ? song.title : '';
+    this.#albumDiv.innerText = song ? song.album : '';
+    this.#timeDiv.innerText = '';
 
-    updateTitleAttributeForTruncation(this.artistDiv_, song ? song.artist : '');
-    updateTitleAttributeForTruncation(this.titleDiv_, song ? song.title : '');
-    updateTitleAttributeForTruncation(this.albumDiv_, song ? song.album : '');
+    updateTitleAttributeForTruncation(this.#artistDiv, song ? song.artist : '');
+    updateTitleAttributeForTruncation(this.#titleDiv, song ? song.title : '');
+    updateTitleAttributeForTruncation(this.#albumDiv, song ? song.album : '');
 
     if (song && song.coverFilename) {
       const url = getCoverUrl(song.coverFilename, smallCoverSize);
-      this.coverImage_.src = url;
-      this.coverDiv_.classList.remove('empty');
+      this.#coverImage.src = url;
+      this.#coverDiv.classList.remove('empty');
       this.dispatchEvent(new CustomEvent('cover', { detail: { url } }));
     } else {
-      this.coverImage_.src = emptyImg;
-      this.coverDiv_.classList.add('empty');
+      this.#coverImage.src = emptyImg;
+      this.#coverDiv.classList.add('empty');
       this.dispatchEvent(new CustomEvent('cover', { detail: { url: null } }));
     }
 
@@ -651,23 +654,23 @@ export class MusicPlayer extends HTMLElement {
       if (!s?.coverFilename) return;
       preloadImage(getCoverUrl(s.coverFilename, smallCoverSize));
     };
-    precacheCover(this.songs_[this.currentIndex_ + 1]);
-    precacheCover(this.songs_[this.currentIndex_ + 2]);
+    precacheCover(this.#songs[this.#currentIndex + 1]);
+    precacheCover(this.#songs[this.#currentIndex + 2]);
 
-    this.updateCoverTitleAttribute_();
-    this.updateRatingOverlay_();
-    // Metadata will be updated again after |coverImage_| is loaded.
-    this.updateMediaSessionMetadata_(false /* imageLoaded */);
+    this.#updateCoverTitleAttribute();
+    this.#updateRatingOverlay();
+    // Metadata will be updated again after |#coverImage| is loaded.
+    this.#updateMediaSessionMetadata(false /* imageLoaded */);
   }
 
-  updateCoverTitleAttribute_() {
-    const song = this.currentSong_;
+  #updateCoverTitleAttribute() {
+    const song = this.#currentSong;
     if (!song) {
-      this.coverImage_.title = '';
+      this.#coverImage.title = '';
       return;
     }
 
-    this.coverImage_.title =
+    this.#coverImage.title =
       getRatingString(song.rating, '★', '☆', 'Unrated', 'Rating: ') +
       '\n' +
       (song.tags.length
@@ -675,17 +678,17 @@ export class MusicPlayer extends HTMLElement {
         : '(Alt+R or Alt+T to edit)');
   }
 
-  updateRatingOverlay_() {
-    const song = this.currentSong_;
-    this.ratingOverlayDiv_.innerText = song
+  #updateRatingOverlay() {
+    const song = this.#currentSong;
+    this.#ratingOverlayDiv.innerText = song
       ? getRatingString(song.rating, '★', '', '', '')
       : '';
   }
 
-  updateMediaSessionMetadata_(imageLoaded: boolean) {
+  #updateMediaSessionMetadata(imageLoaded: boolean) {
     if (!('mediaSession' in navigator)) return;
 
-    const song = this.currentSong_;
+    const song = this.#currentSong;
     if (!song) {
       navigator.mediaSession.metadata = null;
       return;
@@ -693,7 +696,7 @@ export class MusicPlayer extends HTMLElement {
 
     const artwork: MediaImage[] = [];
     if (imageLoaded) {
-      const img = this.coverImage_;
+      const img = this.#coverImage;
       artwork.push({
         src: img.src,
         sizes: `${img.naturalWidth}x${img.naturalHeight}`,
@@ -708,14 +711,14 @@ export class MusicPlayer extends HTMLElement {
     });
   }
 
-  updatePresentationLayerSongs_() {
-    this.presentationLayer_.updateSongs(
-      this.currentSong_,
-      this.songs_[this.currentIndex_ + 1] ?? null
+  #updatePresentationLayerSongs() {
+    this.#presentationLayer.updateSongs(
+      this.#currentSong,
+      this.#songs[this.#currentIndex + 1] ?? null
     );
   }
 
-  showNotification_() {
+  #showNotification() {
     if (!('Notification' in window)) return;
 
     if (Notification.permission !== 'granted') {
@@ -725,10 +728,10 @@ export class MusicPlayer extends HTMLElement {
       return;
     }
 
-    this.closeNotification_();
-    this.cancelCloseNotificationTimeout_();
+    this.#closeNotification();
+    this.#cancelCloseNotificationTimeout();
 
-    const song = this.currentSong_;
+    const song = this.#currentSong;
     if (!song) return;
 
     const options: NotificationOptions = {
@@ -737,74 +740,74 @@ export class MusicPlayer extends HTMLElement {
     if (song.coverFilename) {
       options.icon = getCoverUrl(song.coverFilename, smallCoverSize);
     }
-    this.notification_ = new Notification(`${song.artist}`, options);
-    this.closeNotificationTimeoutId_ = window.setTimeout(() => {
-      this.closeNotificationTimeoutId_ = null;
-      this.closeNotification_();
-    }, MusicPlayer.NOTIFICATION_SEC_ * 1000);
+    this.#notification = new Notification(`${song.artist}`, options);
+    this.#closeNotificationTimeoutId = window.setTimeout(() => {
+      this.#closeNotificationTimeoutId = null;
+      this.#closeNotification();
+    }, MusicPlayer.#NOTIFICATION_SEC * 1000);
   }
 
-  closeNotification_() {
-    this.notification_?.close();
-    this.notification_ = null;
+  #closeNotification() {
+    this.#notification?.close();
+    this.#notification = null;
   }
 
-  cancelCloseNotificationTimeout_() {
-    if (this.closeNotificationTimeoutId_ === null) return;
-    window.clearTimeout(this.closeNotificationTimeoutId_);
-    this.closeNotificationTimeoutId_ = null;
+  #cancelCloseNotificationTimeout() {
+    if (this.#closeNotificationTimeoutId === null) return;
+    window.clearTimeout(this.#closeNotificationTimeoutId);
+    this.#closeNotificationTimeoutId = null;
   }
 
-  // Starts playback. If |currentSong_| isn't being played, switches to it
+  // Starts playback. If |#currentSong| isn't being played, switches to it
   // even if we were already playing. Also restarts playback if we were
   // stopped at the end of the last song in the playlist.
   //
   // If |delay| is true, waits a bit before loading media and playing;
   // otherwise starts playing immediately.
-  play_(delay = false) {
-    if (!this.currentSong_) return;
+  #play(delay = false) {
+    if (!this.#currentSong) return;
 
-    this.cancelPlayTimeout_();
+    this.#cancelPlayTimeout();
 
     if (delay) {
-      console.log(`Playing in ${this.playDelayMs_} ms`);
-      this.playTimeoutId_ = window.setTimeout(() => {
-        this.playTimeoutId_ = null;
-        this.playInternal_();
-      }, this.playDelayMs_);
+      console.log(`Playing in ${this.#playDelayMs} ms`);
+      this.#playTimeoutId = window.setTimeout(() => {
+        this.#playTimeoutId = null;
+        this.#playInternal();
+      }, this.#playDelayMs);
     } else {
-      this.playInternal_();
+      this.#playInternal();
     }
   }
 
-  cancelPlayTimeout_() {
-    if (this.playTimeoutId_ === null) return;
-    window.clearTimeout(this.playTimeoutId_);
-    this.playTimeoutId_ = null;
+  #cancelPlayTimeout() {
+    if (this.#playTimeoutId === null) return;
+    window.clearTimeout(this.#playTimeoutId);
+    this.#playTimeoutId = null;
   }
 
-  // Internal method called by play_().
-  playInternal_() {
-    const song = this.currentSong_;
+  // Internal method called by #play().
+  #playInternal() {
+    const song = this.#currentSong;
     if (!song) return;
 
     // Get an absolute URL since that's what we'll get from the <audio>
     // element: https://stackoverflow.com/a/44547904
     const url = getSongUrl(song.filename);
-    if (this.audio_.src !== url || this.reachedEndOfSongs_) {
+    if (this.#audio.src !== url || this.#reachedEndOfSongs) {
       console.log(`Starting ${song.songId} (${url})`);
-      this.audio_.src = url;
-      this.audio_.currentTime = 0;
+      this.#audio.src = url;
+      this.#audio.currentTime = 0;
 
-      this.startTime_ = getCurrentTimeSec();
-      this.reportedCurrentTrack_ = false;
-      this.reachedEndOfSongs_ = false;
-      this.lastTimeUpdatePos_ = 0;
-      this.updateGain_();
+      this.#startTime = getCurrentTimeSec();
+      this.#reportedCurrentTrack = false;
+      this.#reachedEndOfSongs = false;
+      this.#lastTimeUpdatePos = 0;
+      this.#updateGain();
     }
 
     console.log('Playing');
-    this.audio_.play().catch((e) => {
+    this.#audio.play().catch((e) => {
       // play() actually returns a promise that is resolved after playback
       // actually starts. If we change the <audio>'s src or call its pause()
       // method while in the preparatory state, it complains. Ignore those
@@ -822,147 +825,147 @@ export class MusicPlayer extends HTMLElement {
   }
 
   // Pauses playback. Safe to call if already paused or stopped.
-  pause_() {
+  #pause() {
     console.log('Pausing');
-    this.audio_.pause();
+    this.#audio.pause();
   }
 
-  togglePause_() {
-    this.audio_.paused ? this.play_() : this.pause_();
+  #togglePause() {
+    this.#audio.paused ? this.#play() : this.#pause();
   }
 
-  seek_(seconds: number) {
-    if (!this.audio_.seekable) return;
+  #seek(seconds: number) {
+    if (!this.#audio.seekable) return;
 
-    const newTime = Math.max(this.audio_.currentTime + seconds, 0);
-    if (newTime < this.audio_.duration) this.audio_.currentTime = newTime;
+    const newTime = Math.max(this.#audio.currentTime + seconds, 0);
+    if (newTime < this.#audio.duration) this.#audio.currentTime = newTime;
   }
 
-  onEnded_ = () => {
-    this.cancelTimeUpdateTimeout_();
-    if (this.currentIndex_ >= this.songs_.length - 1) {
-      this.reachedEndOfSongs_ = true;
+  #onEnded = () => {
+    this.#cancelTimeUpdateTimeout();
+    if (this.#currentIndex >= this.#songs.length - 1) {
+      this.#reachedEndOfSongs = true;
     } else {
-      this.cycleTrack_(1, false /* delay */);
+      this.#cycleTrack(1, false /* delay */);
     }
   };
 
-  onPause_ = () => {
-    this.cancelTimeUpdateTimeout_();
-    this.playPauseButton_.innerText = '▶';
-    this.playPauseButton_.title = 'Play (Space)';
+  #onPause = () => {
+    this.#cancelTimeUpdateTimeout();
+    this.#playPauseButton.innerText = '▶';
+    this.#playPauseButton.title = 'Play (Space)';
   };
 
-  onPlay_ = () => {
-    this.playPauseButton_.innerText = '⏸';
-    this.playPauseButton_.title = 'Pause (Space)';
+  #onPlay = () => {
+    this.#playPauseButton.innerText = '⏸';
+    this.#playPauseButton.title = 'Pause (Space)';
   };
 
-  onTimeUpdate_ = () => {
-    const song = this.currentSong_;
+  #onTimeUpdate = () => {
+    const song = this.#currentSong;
     if (song === null) return;
 
-    const pos = this.audio_.currentTime;
-    const played = this.audio_.playtime;
+    const pos = this.#audio.currentTime;
+    const played = this.#audio.playtime;
     const dur = song.length;
 
-    if (!this.reportedCurrentTrack_ && (played >= 240 || played > dur / 2)) {
-      this.updater_?.reportPlay(song.songId, this.startTime_!);
-      this.reportedCurrentTrack_ = true;
+    if (!this.#reportedCurrentTrack && (played >= 240 || played > dur / 2)) {
+      this.#updater?.reportPlay(song.songId, this.#startTime!);
+      this.#reportedCurrentTrack = true;
     }
 
     // Only update the displayed time while the document is visible.
     if (!document.hidden) {
       const str = dur ? `${formatDuration(pos)} / ${formatDuration(dur)}` : '';
-      if (this.timeDiv_.innerText !== str) this.timeDiv_.innerText = str;
+      if (this.#timeDiv.innerText !== str) this.#timeDiv.innerText = str;
 
-      this.presentationLayer_.updatePosition(pos);
+      this.#presentationLayer.updatePosition(pos);
     }
 
     // Preload the next song once we're nearing the end of this one.
     if (
-      pos >= dur - MusicPlayer.PRELOAD_SEC_ &&
-      this.nextSong_ &&
-      !this.audio_.preloadSrc
+      pos >= dur - MusicPlayer.#PRELOAD_SEC &&
+      this.#nextSong &&
+      !this.#audio.preloadSrc
     ) {
-      const url = getSongUrl(this.nextSong_.filename);
-      console.log(`Preloading ${this.nextSong_.songId} (${url})`);
-      this.audio_.preloadSrc = url;
+      const url = getSongUrl(this.#nextSong.filename);
+      console.log(`Preloading ${this.#nextSong.songId} (${url})`);
+      this.#audio.preloadSrc = url;
     }
 
     // Schedule a fake update for just after when we expect the playback
     // position to cross the next second boundary. Only do this when we're
     // actually making progress, though.
     if (
-      !this.audio_.paused &&
-      pos > this.lastTimeUpdatePos_ &&
-      this.timeUpdateTimeoutId_ === null
+      !this.#audio.paused &&
+      pos > this.#lastTimeUpdatePos &&
+      this.#timeUpdateTimeoutId === null
     ) {
       const nextMs = 1000 * (Math.floor(pos + 1) - pos);
-      this.timeUpdateTimeoutId_ = window.setTimeout(() => {
-        this.timeUpdateTimeoutId_ = null;
-        this.onTimeUpdate_();
-      }, nextMs + MusicPlayer.TIME_UPDATE_SLOP_MS_);
+      this.#timeUpdateTimeoutId = window.setTimeout(() => {
+        this.#timeUpdateTimeoutId = null;
+        this.#onTimeUpdate();
+      }, nextMs + MusicPlayer.#TIME_UPDATE_SLOP_MS);
     }
 
-    this.lastTimeUpdatePos_ = pos;
+    this.#lastTimeUpdatePos = pos;
   };
 
-  onError_ = () => {
-    this.cycleTrack_(1, false /* delay */);
+  #onError = () => {
+    this.#cycleTrack(1, false /* delay */);
   };
 
-  cancelTimeUpdateTimeout_() {
-    if (this.timeUpdateTimeoutId_ === null) return;
-    window.clearTimeout(this.timeUpdateTimeoutId_);
-    this.timeUpdateTimeoutId_ = null;
+  #cancelTimeUpdateTimeout() {
+    if (this.#timeUpdateTimeoutId === null) return;
+    window.clearTimeout(this.#timeUpdateTimeoutId);
+    this.#timeUpdateTimeoutId = null;
   }
 
-  showUpdateDialog_() {
-    const song = this.currentSong_;
-    if (this.updateDialog_ || !song) return;
-    this.updateDialog_ = new UpdateDialog(song, this.tags_, (rating, tags) => {
-      this.updateDialog_ = null;
+  #showUpdateDialog() {
+    const song = this.#currentSong;
+    if (this.#updateDialog || !song) return;
+    this.#updateDialog = new UpdateDialog(song, this.#tags, (rating, tags) => {
+      this.#updateDialog = null;
 
       if (rating === null && tags === null) return;
 
-      this.updater_?.rateAndTag(song.songId, rating, tags);
+      this.#updater?.rateAndTag(song.songId, rating, tags);
 
       if (rating !== null) {
         song.rating = rating;
-        this.updateRatingOverlay_();
+        this.#updateRatingOverlay();
       }
       if (tags !== null) {
         song.tags = tags;
-        const created = tags.filter((t) => !this.tags_.includes(t));
+        const created = tags.filter((t) => !this.#tags.includes(t));
         if (created.length > 0) {
           this.dispatchEvent(
             new CustomEvent('newtags', { detail: { tags: created } })
           );
         }
       }
-      this.updateCoverTitleAttribute_();
+      this.#updateCoverTitleAttribute();
     });
   }
 
   // Shows or hides the presentation layer.
-  setPresentationLayerVisible_(visible: boolean) {
-    if (this.presentationLayer_.visible === visible) return;
-    this.presentationLayer_.visible = visible;
+  #setPresentationLayerVisible(visible: boolean) {
+    if (this.#presentationLayer.visible === visible) return;
+    this.#presentationLayer.visible = visible;
     this.dispatchEvent(new CustomEvent('present', { detail: { visible } }));
   }
 
   // Adjusts |audio|'s gain appropriately for the current song and settings.
   // This implements the approach described at
   // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification.
-  updateGain_() {
-    let adj = this.config_.get(Config.PRE_AMP); // decibels
+  #updateGain() {
+    let adj = this.#config.get(Config.PRE_AMP); // decibels
 
-    const song = this.currentSong_;
+    const song = this.#currentSong;
     if (song) {
-      let gainType = this.config_.get(Config.GAIN_TYPE);
+      let gainType = this.#config.get(Config.GAIN_TYPE);
       if (gainType === Config.GAIN_AUTO) {
-        gainType = this.shuffled_ ? Config.GAIN_TRACK : Config.GAIN_ALBUM;
+        gainType = this.#shuffled ? Config.GAIN_TRACK : Config.GAIN_ALBUM;
       }
 
       if (gainType === Config.GAIN_ALBUM) {
@@ -978,7 +981,7 @@ export class MusicPlayer extends HTMLElement {
     if (song?.peakAmp) scale = Math.min(scale, 1 / song.peakAmp);
 
     console.log(`Scaling amplitude by ${scale.toFixed(3)}`);
-    this.audio_.gain = scale;
+    this.#audio.gain = scale;
   }
 }
 

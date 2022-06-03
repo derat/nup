@@ -49,97 +49,97 @@ const template = createTemplate(`
 // about this too. I didn't find any Chromium issues discussing this when I
 // looked in April 2022.
 export class AudioWrapper extends HTMLElement {
-  static GAIN_CHANGE_SEC_ = 0.03; // duration for audio gain changes
-  static MAX_RETRIES_ = 2; // number of consecutive playback errors to retry
-  static PAUSE_GAIN_ = 0.001; // target audio gain when pausing
-  static RESUME_WHEN_ONLINE_SEC_ = 30; // maximum delay for auto-resume when online
+  static #GAIN_CHANGE_SEC = 0.03; // duration for audio gain changes
+  static #MAX_RETRIES = 2; // number of consecutive playback errors to retry
+  static #PAUSE_GAIN = 0.001; // target audio gain when pausing
+  static #RESUME_WHEN_ONLINE_SEC = 30; // maximum delay for auto-resume when online
 
-  audioCtx_ = new AudioContext();
-  gainNode_ = this.audioCtx_.createGain();
-  audioSrc_: MediaElementAudioSourceNode | null = null;
-  gain_ = 1;
+  #audioCtx = new AudioContext();
+  #gainNode = this.#audioCtx.createGain();
+  #audioSrc: MediaElementAudioSourceNode | null = null;
+  #gain = 1;
 
-  shadow_ = createShadow(this, template);
-  audio_ = this.shadow_.querySelector('audio') as HTMLAudioElement;
-  preloadAudio_: HTMLAudioElement | null = null;
+  #shadow = createShadow(this, template);
+  #audio = this.#shadow.querySelector('audio') as HTMLAudioElement;
+  #preloadAudio: HTMLAudioElement | null = null;
 
-  lastUpdateTime_: number | null = null; // last 'timeupdate' or 'play' event
-  lastUpdatePos_ = 0; // position at last 'timeupdate' event
-  playtime_ = 0; // total playtime of |src| in seconds
-  pauseTimeoutId_: number | null = null; // audio_.pause() after gain lower
-  pausedForOfflineTime_: number | null = null; // time when auto-paused
-  numErrors_ = 0; // consecutive playback errors
+  #lastUpdateTime: number | null = null; // last 'timeupdate' or 'play' event
+  #lastUpdatePos = 0; // position at last 'timeupdate' event
+  #playtime = 0; // total playtime of |src| in seconds
+  #pauseTimeoutId: number | null = null; // #audio.pause() after gain lower
+  #pausedForOfflineTime: number | null = null; // time when auto-paused
+  #numErrors = 0; // consecutive playback errors
 
   constructor() {
     super();
-    this.gainNode_.connect(this.audioCtx_.destination);
-    this.configureAudio_();
+    this.#gainNode.connect(this.#audioCtx.destination);
+    this.#configureAudio();
   }
 
   connectedCallback() {
-    window.addEventListener('online', this.onOnline_);
+    window.addEventListener('online', this.#onOnline);
   }
 
   disconnectedCallback() {
-    window.removeEventListener('online', this.onOnline_);
+    window.removeEventListener('online', this.#onOnline);
 
-    if (this.pauseTimeoutId_) {
-      window.clearTimeout(this.pauseTimeoutId_);
-      this.pauseTimeoutId_ = null;
+    if (this.#pauseTimeoutId) {
+      window.clearTimeout(this.#pauseTimeoutId);
+      this.#pauseTimeoutId = null;
     }
   }
 
-  // Adds event handlers to |audio_| and recreates |audioSrc_| to route
-  // |audio_|'s output through |gainNode_|.
-  configureAudio_() {
-    this.audio_.addEventListener('ended', this.onEnded_);
-    this.audio_.addEventListener('error', this.onError_);
-    this.audio_.addEventListener('pause', this.onPause_);
-    this.audio_.addEventListener('play', this.onPlay_);
-    this.audio_.addEventListener('timeupdate', this.onTimeUpdate_);
+  // Adds event handlers to #audio and recreates #audioSrc to route
+  // #audio's output through #gainNode.
+  #configureAudio() {
+    this.#audio.addEventListener('ended', this.#onEnded);
+    this.#audio.addEventListener('error', this.#onError);
+    this.#audio.addEventListener('pause', this.#onPause);
+    this.#audio.addEventListener('play', this.#onPlay);
+    this.#audio.addEventListener('timeupdate', this.#onTimeUpdate);
 
-    this.audioSrc_ = this.audioCtx_.createMediaElementSource(this.audio_);
-    this.audioSrc_.connect(this.gainNode_);
+    this.#audioSrc = this.#audioCtx.createMediaElementSource(this.#audio);
+    this.#audioSrc.connect(this.#gainNode);
   }
 
-  // Deconfigures |audio_| and replaces it with |audio|.
-  replaceAudio_(audio: HTMLAudioElement) {
-    this.audio_.removeAttribute('src');
-    this.audio_.removeEventListener('ended', this.onEnded_);
-    this.audio_.removeEventListener('error', this.onError_);
-    this.audio_.removeEventListener('pause', this.onPause_);
-    this.audio_.removeEventListener('play', this.onPlay_);
-    this.audio_.removeEventListener('timeupdate', this.onTimeUpdate_);
+  // Deconfigures #audio and replaces it with |audio|.
+  #replaceAudio(audio: HTMLAudioElement) {
+    this.#audio.removeAttribute('src');
+    this.#audio.removeEventListener('ended', this.#onEnded);
+    this.#audio.removeEventListener('error', this.#onError);
+    this.#audio.removeEventListener('pause', this.#onPause);
+    this.#audio.removeEventListener('play', this.#onPlay);
+    this.#audio.removeEventListener('timeupdate', this.#onTimeUpdate);
 
-    this.audioSrc_?.disconnect();
-    this.audioSrc_ = null;
+    this.#audioSrc?.disconnect();
+    this.#audioSrc = null;
 
-    this.audio_.parentNode!.replaceChild(audio, this.audio_);
-    this.audio_ = audio;
-    this.configureAudio_();
+    this.#audio.parentNode!.replaceChild(audio, this.#audio);
+    this.#audio = audio;
+    this.#configureAudio();
   }
 
-  onOnline_ = () => {
+  #onOnline = () => {
     // Automatically resume playing if we previously paused due to going
     // offline: https://github.com/derat/nup/issues/17
-    if (this.pausedForOfflineTime_ !== null) {
+    if (this.#pausedForOfflineTime !== null) {
       console.log('Back online');
-      const elapsed = getCurrentTimeSec() - this.pausedForOfflineTime_;
-      const resume = elapsed <= AudioWrapper.RESUME_WHEN_ONLINE_SEC_;
-      this.pausedForOfflineTime_ = null;
-      this.reloadAudio_();
-      if (resume) this.audio_.play();
+      const elapsed = getCurrentTimeSec() - this.#pausedForOfflineTime;
+      const resume = elapsed <= AudioWrapper.#RESUME_WHEN_ONLINE_SEC;
+      this.#pausedForOfflineTime = null;
+      this.#reloadAudio();
+      if (resume) this.#audio.play();
     }
   };
 
-  onEnded_ = (e: Event) => {
-    this.resendAudioEvent_(e);
+  #onEnded = (e: Event) => {
+    this.#resendAudioEvent(e);
   };
 
-  onError_ = (e: Event) => {
-    if (e.target !== this.audio_) return;
+  #onError = (e: Event) => {
+    if (e.target !== this.#audio) return;
 
-    this.numErrors_++;
+    this.#numErrors++;
 
     const error = (e.target as HTMLAudioElement).error!;
     console.log(`Got playback error ${error.code} (${error.message})`);
@@ -151,70 +151,70 @@ export class AudioWrapper extends HTMLElement {
       case error.MEDIA_ERR_SRC_NOT_SUPPORTED: // 4
         if (!navigator.onLine) {
           console.log('Offline; pausing');
-          this.audio_.pause();
-          this.pausedForOfflineTime_ = getCurrentTimeSec();
-        } else if (this.numErrors_ <= AudioWrapper.MAX_RETRIES_) {
-          console.log(`Retrying from position ${this.lastUpdatePos_}`);
-          this.reloadAudio_();
-          this.audio_.play();
+          this.#audio.pause();
+          this.#pausedForOfflineTime = getCurrentTimeSec();
+        } else if (this.#numErrors <= AudioWrapper.#MAX_RETRIES) {
+          console.log(`Retrying from position ${this.#lastUpdatePos}`);
+          this.#reloadAudio();
+          this.#audio.play();
         } else {
-          console.log(`Giving up after ${this.numErrors_} errors`);
-          this.resendAudioEvent_(e);
+          console.log(`Giving up after ${this.#numErrors} errors`);
+          this.#resendAudioEvent(e);
         }
         break;
     }
   };
 
-  onPause_ = (e: Event) => {
-    this.lastUpdateTime_ = null;
-    this.resendAudioEvent_(e);
+  #onPause = (e: Event) => {
+    this.#lastUpdateTime = null;
+    this.#resendAudioEvent(e);
   };
 
-  onPlay_ = (e: Event) => {
-    this.lastUpdateTime_ = getCurrentTimeSec();
-    this.resendAudioEvent_(e);
+  #onPlay = (e: Event) => {
+    this.#lastUpdateTime = getCurrentTimeSec();
+    this.#resendAudioEvent(e);
   };
 
-  onTimeUpdate_ = (e: Event) => {
-    if (e.target !== this.audio_) return;
+  #onTimeUpdate = (e: Event) => {
+    if (e.target !== this.#audio) return;
 
-    const pos = this.audio_.currentTime;
-    if (pos === this.lastUpdatePos_) return;
+    const pos = this.#audio.currentTime;
+    if (pos === this.#lastUpdatePos) return;
 
     const now = getCurrentTimeSec();
-    if (this.lastUpdateTime_ !== null) {
+    if (this.#lastUpdateTime !== null) {
       // Playback can hang if the network is flaky, so make sure that we don't
       // incorrectly increment the playtime by the wall time if the position
       // didn't move as much: https://github.com/derat/nup/issues/20
-      const timeDiff = now - this.lastUpdateTime_;
-      const posDiff = pos - this.lastUpdatePos_;
-      this.playtime_ += clamp(timeDiff, 0, posDiff);
+      const timeDiff = now - this.#lastUpdateTime;
+      const posDiff = pos - this.#lastUpdatePos;
+      this.#playtime += clamp(timeDiff, 0, posDiff);
     }
 
-    this.lastUpdateTime_ = now;
-    this.lastUpdatePos_ = pos;
-    this.numErrors_ = 0;
+    this.#lastUpdateTime = now;
+    this.#lastUpdatePos = pos;
+    this.#numErrors = 0;
 
-    this.resendAudioEvent_(e);
+    this.#resendAudioEvent(e);
   };
 
   // Dispatches a new event based on |e|.
-  resendAudioEvent_(e: Event) {
+  #resendAudioEvent(e: Event) {
     const ne = new Event(e.type);
     Object.defineProperty(ne, 'target', { value: e.target });
     this.dispatchEvent(ne);
   }
 
-  // Reinitializes |audio_|. This is sometimes needed to get it back into a
+  // Reinitializes #audio. This is sometimes needed to get it back into a
   // playable state after a network error -- otherwise, play() triggers a 'The
   // element has no supported sources.' error.
-  reloadAudio_() {
-    this.audio_.load();
-    this.audio_.currentTime = this.lastUpdatePos_;
+  #reloadAudio() {
+    this.#audio.load();
+    this.#audio.currentTime = this.#lastUpdatePos;
   }
 
-  // Sets |gainNode_|'s gain to |v|.
-  setAudioGain_(v: number) {
+  // Sets #gainNode's gain to |v|.
+  #setAudioGain(v: number) {
     // Per https://developer.mozilla.org/en-US/docs/Web/API/GainNode:
     // "If modified, the new gain is instantly applied, causing unaesthetic
     // 'clicks' in the resulting audio. To prevent this from happening, never
@@ -227,84 +227,84 @@ export class AudioWrapper extends HTMLElement {
     // https://stackoverflow.com/a/34480323
     // https://stackoverflow.com/a/61924161
     // etc.
-    const g = this.gainNode_.gain;
-    const t = this.audioCtx_.currentTime;
+    const g = this.#gainNode.gain;
+    const t = this.#audioCtx.currentTime;
     g.setValueAtTime(g.value, t);
-    g.exponentialRampToValueAtTime(v, t + AudioWrapper.GAIN_CHANGE_SEC_);
+    g.exponentialRampToValueAtTime(v, t + AudioWrapper.#GAIN_CHANGE_SEC);
   }
 
-  // Cancels |pauseTimeoutId_| if non-null.
-  cancelPauseTimeout_() {
-    if (this.pauseTimeoutId_ === null) return;
-    window.clearTimeout(this.pauseTimeoutId_);
-    this.pauseTimeoutId_ = null;
+  // Cancels #pauseTimeoutId if non-null.
+  #cancelPauseTimeout() {
+    if (this.#pauseTimeoutId === null) return;
+    window.clearTimeout(this.#pauseTimeoutId);
+    this.#pauseTimeoutId = null;
   }
 
   get src() {
-    return this.audio_.src ?? null;
+    return this.#audio.src ?? null;
   }
   set src(src: string | null) {
     // Deal with "The AudioContext was not allowed to start. It must be
     // resumed (or created) after a user gesture on the page.":
     // https://developers.google.com/web/updates/2017/09/autoplay-policy-changes#webaudio
-    const ctx = this.gainNode_.context as AudioContext;
+    const ctx = this.#gainNode.context as AudioContext;
     if (ctx.state === 'suspended') ctx.resume();
 
     if (!src) {
-      this.audio_.pause();
-      this.audio_.removeAttribute('src');
-    } else if (this.preloadSrc === src && !this.preloadAudio_?.error) {
-      this.replaceAudio_(this.preloadAudio_!);
-      this.preloadAudio_ = null;
+      this.#audio.pause();
+      this.#audio.removeAttribute('src');
+    } else if (this.preloadSrc === src && !this.#preloadAudio?.error) {
+      this.#replaceAudio(this.#preloadAudio!);
+      this.#preloadAudio = null;
     } else {
-      this.audio_.src = src;
+      this.#audio.src = src;
     }
 
     this.currentTime = 0;
-    this.lastUpdateTime_ = null;
-    this.lastUpdatePos_ = 0;
-    this.playtime_ = 0;
-    this.pausedForOfflineTime_ = null;
-    this.numErrors_ = 0;
+    this.#lastUpdateTime = null;
+    this.#lastUpdatePos = 0;
+    this.#playtime = 0;
+    this.#pausedForOfflineTime = null;
+    this.#numErrors = 0;
 
-    this.cancelPauseTimeout_();
+    this.#cancelPauseTimeout();
   }
 
   // Sigh: https://github.com/prettier/prettier/issues/5287
-  /* prettier-ignore */ get currentTime() { return this.audio_.currentTime; }
-  /* prettier-ignore */ set currentTime(t: number) { this.audio_.currentTime = t; }
-  /* prettier-ignore */ get duration() { return this.audio_.duration; }
-  /* prettier-ignore */ get paused() { return this.audio_.paused; }
-  /* prettier-ignore */ get seekable() { return this.audio_.seekable; }
-  /* prettier-ignore */ get playtime() { return this.playtime_; }
+  /* prettier-ignore */ get currentTime() { return this.#audio.currentTime; }
+  /* prettier-ignore */ set currentTime(t: number) { this.#audio.currentTime = t; }
+  /* prettier-ignore */ get duration() { return this.#audio.duration; }
+  /* prettier-ignore */ get paused() { return this.#audio.paused; }
+  /* prettier-ignore */ get seekable() { return this.#audio.seekable; }
+  /* prettier-ignore */ get playtime() { return this.#playtime; }
 
   play() {
-    this.cancelPauseTimeout_();
-    this.setAudioGain_(this.gain_); // restore pre-pause gain
-    return this.audio_.play();
+    this.#cancelPauseTimeout();
+    this.#setAudioGain(this.#gain); // restore pre-pause gain
+    return this.#audio.play();
   }
 
   pause() {
-    if (this.pauseTimeoutId_ !== null) return;
+    if (this.#pauseTimeoutId !== null) return;
 
     // Avoid pops caused by abruptly stopping playback:
     // https://github.com/derat/nup/issues/34
-    this.setAudioGain_(AudioWrapper.PAUSE_GAIN_);
-    this.pauseTimeoutId_ = window.setTimeout(() => {
-      this.pauseTimeoutId_ = null;
-      this.audio_.pause();
-    }, AudioWrapper.GAIN_CHANGE_SEC_ * 1000);
+    this.#setAudioGain(AudioWrapper.#PAUSE_GAIN);
+    this.#pauseTimeoutId = window.setTimeout(() => {
+      this.#pauseTimeoutId = null;
+      this.#audio.pause();
+    }, AudioWrapper.#GAIN_CHANGE_SEC * 1000);
   }
 
   load() {
-    this.audio_.load();
+    this.#audio.load();
   }
 
   // prettier-ignore
-  get gain() { return this.gain_; }
+  get gain() { return this.#gain; }
   set gain(v: number) {
-    this.setAudioGain_(v);
-    this.gain_ = v;
+    this.#setAudioGain(v);
+    this.#gain = v;
   }
 
   // TODO: Maybe try to implement proper gapless playback?
@@ -312,20 +312,20 @@ export class AudioWrapper extends HTMLElement {
   // about doing this using MSE, although it seems pretty complicated and the
   // current approach here seems to work reasonably well most of the time.
   get preloadSrc() {
-    return this.preloadAudio_?.src ?? null;
+    return this.#preloadAudio?.src ?? null;
   }
   set preloadSrc(src: string | null) {
     if (src === null) {
-      this.preloadAudio_ = null;
+      this.#preloadAudio = null;
       return;
     }
 
-    if (this.preloadAudio_?.src === src) return;
+    if (this.#preloadAudio?.src === src) return;
     // This is split over multiple lines solely to prevent Prettier from
     // doing some of the most hideous formatting that I've ever seen.
     const el = template.content.firstElementChild!.cloneNode(true);
-    this.preloadAudio_ = el as HTMLAudioElement;
-    this.preloadAudio_.src = src;
+    this.#preloadAudio = el as HTMLAudioElement;
+    this.#preloadAudio.src = src;
   }
 }
 

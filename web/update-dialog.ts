@@ -58,78 +58,78 @@ const template = createTemplate(`
 
 // UpdateDialog displays a dialog to update a song's rating and tags.
 export default class UpdateDialog {
-  song_: Song;
-  tags_: string[]; // all tags known by server
-  callback_: UpdateCallback;
-  rating_ = -1; // rating set in dialog
-  dialog_ = createDialog(template, 'update');
-  shadow_ = this.dialog_.firstElementChild!.shadowRoot!;
-  ratingSpan_ = $('rating', this.shadow_);
-  tagsTextarea_ = $('tags-textarea', this.shadow_) as HTMLTextAreaElement;
+  #song: Song;
+  #tags: string[]; // all tags known by server
+  #callback: UpdateCallback;
+  #rating = -1; // rating set in dialog
+  #dialog = createDialog(template, 'update');
+  #shadow = this.#dialog.firstElementChild!.shadowRoot!;
+  #ratingSpan = $('rating', this.#shadow);
+  #tagsTextarea = $('tags-textarea', this.#shadow) as HTMLTextAreaElement;
 
   // |song| is the song to update, and |tags| is an array of available tags.
   // When the dialog is closed, |callback| is invoked with the updated rating
   // (null if unchanged) and an array containing the updated tags (null if
   // unchanged).
   constructor(song: Song, tags: string[], callback: UpdateCallback) {
-    this.song_ = song;
-    this.tags_ = tags;
-    this.callback_ = callback;
+    this.#song = song;
+    this.#tags = tags;
+    this.#callback = callback;
 
     // This sucks, but I don't want to put this styling in index.html.
-    this.dialog_.style.borderRadius = '4px';
-    this.dialog_.style.margin = '0'; // needed to avoid centering
-    this.dialog_.style.padding = '8px';
-    this.dialog_.style.left = this.dialog_.style.top = getComputedStyle(
-      this.dialog_
+    this.#dialog.style.borderRadius = '4px';
+    this.#dialog.style.margin = '0'; // needed to avoid centering
+    this.#dialog.style.padding = '8px';
+    this.#dialog.style.left = this.#dialog.style.top = getComputedStyle(
+      this.#dialog
     ).getPropertyValue('--margin');
-    this.dialog_.style.position = 'absolute';
+    this.#dialog.style.position = 'absolute';
 
-    $('close-icon', this.shadow_).addEventListener('click', () =>
+    $('close-icon', this.#shadow).addEventListener('click', () =>
       this.close(true)
     );
-    ($('tag-suggester', this.shadow_) as TagSuggester).words = tags;
+    ($('tag-suggester', this.#shadow) as TagSuggester).words = tags;
 
-    this.ratingSpan_.addEventListener('keydown', this.onRatingSpanKeyDown_);
+    this.#ratingSpan.addEventListener('keydown', this.#onRatingSpanKeyDown);
     for (let i = 1; i <= 5; i++) {
-      const anchor = this.ratingSpan_.children[i - 1];
+      const anchor = this.#ratingSpan.children[i - 1];
       const rating = i;
-      anchor.addEventListener('click', () => this.setRating_(rating));
+      anchor.addEventListener('click', () => this.#setRating(rating));
     }
-    this.setRating_(song.rating);
+    this.#setRating(song.rating);
 
-    this.tagsTextarea_.value = song.tags.length
+    this.#tagsTextarea.value = song.tags.length
       ? song.tags.sort().join(' ') + ' ' // append space to ease editing
       : '';
-    this.tagsTextarea_.selectionStart = this.tagsTextarea_.selectionEnd =
-      this.tagsTextarea_.value.length;
+    this.#tagsTextarea.selectionStart = this.#tagsTextarea.selectionEnd =
+      this.#tagsTextarea.value.length;
 
-    document.body.addEventListener('keydown', this.onBodyKeyDown_);
+    document.body.addEventListener('keydown', this.#onBodyKeyDown);
   }
 
   focusRating() {
-    this.ratingSpan_.focus();
+    this.#ratingSpan.focus();
   }
   focusTags() {
-    this.tagsTextarea_.focus();
+    this.#tagsTextarea.focus();
   }
 
   close(save: boolean) {
-    document.body.removeEventListener('keydown', this.onBodyKeyDown_);
-    this.dialog_.close();
+    document.body.removeEventListener('keydown', this.#onBodyKeyDown);
+    this.#dialog.close();
 
     let rating = null;
     let tags = null;
 
     if (save) {
-      if (this.rating_ !== this.song_.rating) rating = this.rating_;
+      if (this.#rating !== this.#song.rating) rating = this.#rating;
 
-      const rawTags = this.tagsTextarea_.value.trim().split(/\s+/);
+      const rawTags = this.#tagsTextarea.value.trim().split(/\s+/);
       tags = [];
       for (let i = 0; i < rawTags.length; ++i) {
         const tag = rawTags[i].toLowerCase();
         if (tag === '') continue;
-        if (this.tags_.includes(tag) || this.song_.tags.includes(tag)) {
+        if (this.#tags.includes(tag) || this.#song.tags.includes(tag)) {
           tags.push(tag);
         } else if (tag[0] === '+' && tag.length > 1) {
           tags.push(tag.substring(1));
@@ -141,21 +141,21 @@ export default class UpdateDialog {
       tags = tags
         .sort()
         .filter((item, pos, self) => self.indexOf(item) === pos);
-      if (tags.join(' ') === this.song_.tags.sort().join(' ')) tags = null;
+      if (tags.join(' ') === this.#song.tags.sort().join(' ')) tags = null;
     }
 
-    this.callback_(rating, tags);
+    this.#callback(rating, tags);
   }
 
-  setRating_(rating: number) {
-    this.rating_ = rating;
+  #setRating(rating: number) {
+    this.#rating = rating;
     for (let i = 1; i <= 5; i++) {
-      const a = this.ratingSpan_.children[i - 1] as HTMLElement;
+      const a = this.#ratingSpan.children[i - 1] as HTMLElement;
       a.innerText = i <= rating ? '★' : '☆';
     }
   }
 
-  onBodyKeyDown_ = (e: KeyboardEvent) => {
+  #onBodyKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
       this.close(true);
     } else if (e.key === 'Escape') {
@@ -167,14 +167,14 @@ export default class UpdateDialog {
     }
   };
 
-  onRatingSpanKeyDown_ = (e: KeyboardEvent) => {
+  #onRatingSpanKeyDown = (e: KeyboardEvent) => {
     if (['0', '1', '2', '3', '4', '5'].includes(e.key)) {
-      this.setRating_(parseInt(e.key));
+      this.#setRating(parseInt(e.key));
       e.preventDefault();
       e.stopPropagation();
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      const rating = this.rating_ + (e.key === 'ArrowLeft' ? -1 : 1);
-      this.setRating_(clamp(rating, 0, 5));
+      const rating = this.#rating + (e.key === 'ArrowLeft' ? -1 : 1);
+      this.#setRating(clamp(rating, 0, 5));
       e.preventDefault();
       e.stopPropagation();
     }

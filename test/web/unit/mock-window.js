@@ -4,33 +4,33 @@
 import { error } from './test.js';
 
 export default class MockWindow {
-  constructor() {
-    this.old_ = {}; // orginal window properties as name -> value
-    this.fetches_ = {}; // resource -> array of Promises to hand out
-    this.timeouts_ = {}; // id -> { func, delay }
-    this.nextTimeoutId_ = 1;
-    this.localStorage_ = {};
-    this.listeners_ = {}; // event name -> array of funcs
+  #old = {}; // orginal window properties as name -> value
+  #fetches = {}; // resource -> array of Promises to hand out
+  #timeouts = {}; // id -> { func, delay }
+  #nextTimeoutId = 1;
+  #localStorage = {};
+  #listeners = {}; // event name -> array of funcs
 
-    this.replace_('addEventListener', (type, func, capture) => {
-      const ls = this.listeners_[type] || [];
+  constructor() {
+    this.#replace('addEventListener', (type, func, capture) => {
+      const ls = this.#listeners[type] || [];
       ls.push(func);
-      this.listeners_[type] = ls;
+      this.#listeners[type] = ls;
     });
 
-    this.replace_('setTimeout', (func, delay) => {
-      const id = this.nextTimeoutId_++;
-      this.timeouts_[id] = { func, delay: Math.max(delay, 0) };
+    this.#replace('setTimeout', (func, delay) => {
+      const id = this.#nextTimeoutId++;
+      this.#timeouts[id] = { func, delay: Math.max(delay, 0) };
       return id;
     });
 
-    this.replace_('clearTimeout', (id) => {
-      delete this.timeouts_[id];
+    this.#replace('clearTimeout', (id) => {
+      delete this.#timeouts[id];
     });
 
-    this.replace_('fetch', (resource, init) => {
+    this.#replace('fetch', (resource, init) => {
       const method = (init && init.method) || 'GET';
-      const promise = this.getFetchPromise_(resource, method);
+      const promise = this.#getFetchPromise(resource, method);
       if (!promise) {
         error(`Unexpected ${method} ${resource} fetch()`);
         return Promise.reject();
@@ -38,15 +38,15 @@ export default class MockWindow {
       return promise;
     });
 
-    this.replace_('localStorage', {
+    this.#replace('localStorage', {
       getItem: (key) =>
-        this.localStorage_.hasOwnProperty(key) ? this.localStorage_[key] : null,
-      setItem: (key, value) => (this.localStorage_[key] = value),
-      removeItem: (key) => delete this.localStorage_[key],
-      clear: () => (this.localStorage_ = {}),
+        this.#localStorage.hasOwnProperty(key) ? this.#localStorage[key] : null,
+      setItem: (key, value) => (this.#localStorage[key] = value),
+      removeItem: (key) => delete this.#localStorage[key],
+      clear: () => (this.#localStorage = {}),
     });
 
-    this.replace_('navigator', {
+    this.#replace('navigator', {
       onLine: true,
     });
   }
@@ -54,10 +54,10 @@ export default class MockWindow {
   // Restores the window object's original properties and verifies that
   // expectations were satisfied.
   finish() {
-    Object.entries(this.old_).forEach(([name, value]) =>
+    Object.entries(this.#old).forEach(([name, value]) =>
       Object.defineProperty(window, name, { value })
     );
-    Object.entries(this.fetches_).forEach(([key, promises]) => {
+    Object.entries(this.#fetches).forEach(([key, promises]) => {
       error(`${promises.length} unsatisfied ${key} fetch()`);
     });
   }
@@ -72,7 +72,7 @@ export default class MockWindow {
 
   // Emits event |ev| to all listeners registered for |ev.type|.
   emit(ev) {
-    for (const f of this.listeners_[ev.type] || []) f(ev);
+    for (const f of this.#listeners[ev.type] || []) f(ev);
   }
 
   // Expects |resource| (a URL) to be fetched once via |method| (e.g. "POST").
@@ -90,9 +90,9 @@ export default class MockWindow {
     const promise = new Promise((r) => (resolve = r));
 
     const key = fetchKey(resource, method);
-    const promises = this.fetches_[key] || [];
+    const promises = this.#fetches[key] || [];
     promises.push(promise);
-    this.fetches_[key] = promises;
+    this.#fetches[key] = promises;
 
     return () =>
       resolve({
@@ -103,27 +103,27 @@ export default class MockWindow {
       });
   }
 
-  // Removes and returns the first promise from |fetches_| with the supplied
+  // Removes and returns the first promise from |#fetches| with the supplied
   // resource and method, or null if no matching promise is found.
-  getFetchPromise_(resource, method) {
+  #getFetchPromise(resource, method) {
     const key = fetchKey(resource, method);
-    const promises = this.fetches_[key];
+    const promises = this.#fetches[key];
     if (!promises || !promises.length) return null;
 
     const promise = promises[0];
     promises.splice(0, 1);
-    if (!promises.length) delete this.fetches_[key];
+    if (!promises.length) delete this.#fetches[key];
     return promise;
   }
 
   // Number of fetch calls registered via expectFetch() that haven't been seen.
   get numUnsatisfiedFetches() {
-    return Object.values(this.fetches_).reduce((s, f) => s + f.length, 0);
+    return Object.values(this.#fetches).reduce((s, f) => s + f.length, 0);
   }
 
   // Number of pending timeouts added via setTimeout().
   get numTimeouts() {
-    return Object.keys(this.timeouts_).length;
+    return Object.keys(this.#timeouts).length;
   }
 
   // Advances time and runs timeouts that are scheduled to run within |millis|
@@ -133,17 +133,17 @@ export default class MockWindow {
     // Advance by the minimum amount needed for the earliest timeout to fire.
     const advance = Math.min(
       millis,
-      ...Object.values(this.timeouts_).map((i) => i.delay)
+      ...Object.values(this.#timeouts).map((i) => i.delay)
     );
 
     // Run all timeouts that are firing.
     // TODO: Should this also sort by ascending ID to break ties?
     const results = [];
-    for (const [id, info] of Object.entries(this.timeouts_)) {
+    for (const [id, info] of Object.entries(this.#timeouts)) {
       info.delay -= advance;
       if (info.delay <= 0) {
         results.push(info.func());
-        delete this.timeouts_[id];
+        delete this.#timeouts[id];
       }
     }
 
@@ -159,13 +159,13 @@ export default class MockWindow {
   // Clears all scheduled timeouts.
   // This can be useful when simulating an object being recreated.
   clearTimeouts() {
-    this.timeouts_ = {};
+    this.#timeouts = {};
   }
 
   // Replaces the window property |name| with |val|.
   // The original value is restored in finish().
-  replace_(name, value) {
-    this.old_[name] = window[name];
+  #replace(name, value) {
+    this.#old[name] = window[name];
 
     // This approach is needed for window.localStorage:
     // https://github.com/KaiSforza/mock-local-storage/issues/17
