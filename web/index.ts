@@ -1,9 +1,6 @@
 // Copyright 2020 Daniel Erat.
 // All rights reserved.
 
-// Needed by common.js for Firefox and Safari.
-import './construct-style-sheets-polyfill.js';
-
 import { $, commonStyles, handleFetchError, smallCoverSize } from './common.js';
 import { getConfig, Pref, Theme } from './config.js';
 import type { MusicPlayer } from './music-player.js';
