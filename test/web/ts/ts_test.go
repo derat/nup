@@ -15,6 +15,7 @@ const webDir = "../../../web"
 func TestTypeScript(t *testing.T) {
 	cmd := exec.Command("tsc",
 		"--allowJs",
+		"--forceConsistentCasingInFileNames",
 		"--noEmit",
 		"--noFallthroughCasesInSwitch",
 		"--noImplicitAny",
