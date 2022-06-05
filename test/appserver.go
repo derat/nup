@@ -25,9 +25,9 @@ import (
 // blocked on an HTTP connection in SYN_SENT to some random IPv6 address owned by Akamai (?).
 // When I increased this timeout to 10 minutes, it eventually proceeded (without logging anything).
 //
-// Not having any network connection apparently also adds a delay, but 30 seconds seems to be enough
-// to compensate for it (in practice, startup seems to take around 18 seconds when offline).
-const appserverTimeout = 30 * time.Second
+// Not having any network connection apparently also adds a delay, but 40 seconds seems to be enough
+// to compensate for it (in practice, startup seems to take around 20-30 seconds when offline).
+const appserverTimeout = 40 * time.Second
 
 // DevAppserver wraps a dev_appserver.py process.
 type DevAppserver struct {

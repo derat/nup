@@ -84,9 +84,12 @@ func main() {
 		addHandler("/flush_cache", http.MethodPost, rejectUnauth, handleFlushCache)
 	}
 
-	// TODO: It'd be nice to call getStaticFile(bundleFile, ...) here so that we're
-	// immediately ready to serve the bundle, but we don't have a context to use to
-	// get the config so we can figure out whether minification was requested.
+	// Generate the index file and JS bundle so we're ready to serve them.
+	// We can't check whether minification is enabled at this point (since we don't
+	// have a context to load the config from datastore), so just optimistically
+	// assume that it is.
+	getStaticFile(indexFile, true)
+	getStaticFile(bundleFile, true)
 
 	// The google.golang.org/appengine packages are (were?) deprecated, and the official way forward
 	// is (was?) to use the non-App-Engine-specific cloud.google.com/go packages and call
@@ -639,10 +642,11 @@ func handleStatic(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 		p = p[1:]
 	}
 
-	bundle := cfg.Bundle == nil || *cfg.Bundle
 	minify := cfg.Minify == nil || *cfg.Minify
-
-	if b, err := getStaticFile(p, bundle, minify); os.IsNotExist(err) {
+	if strings.HasSuffix(p, ".ts") {
+		// Serving TypeScript files doesn't make sense.
+		http.Error(w, "Not found", http.StatusNotFound)
+	} else if b, err := getStaticFile(p, minify); os.IsNotExist(err) {
 		http.Error(w, "Not found", http.StatusNotFound)
 	} else if err != nil {
 		log.Errorf(ctx, "Reading %q failed: %v", p, err)
