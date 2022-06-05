@@ -24,6 +24,7 @@ import (
 
 	"github.com/derat/nup/server/config"
 	"github.com/derat/nup/server/db"
+	"github.com/derat/nup/server/esbuild"
 	"github.com/derat/nup/test"
 
 	"github.com/evanw/esbuild/pkg/api"
@@ -1137,20 +1138,16 @@ func TestUnit(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, p := range paths {
-		b, err := ioutil.ReadFile(p)
+		ts, err := ioutil.ReadFile(p)
 		if err != nil {
 			t.Fatal(err)
 		}
-		res := api.Transform(string(b), api.TransformOptions{
-			Loader:  api.LoaderTS,
-			Charset: api.CharsetUTF8,
-			Format:  api.FormatESModule,
-		})
-		if len(res.Errors) > 0 {
-			t.Fatalf("Failed transforming %v: %v", p, res.Errors[0].Text)
+		js, err := esbuild.Transform(ts, api.LoaderTS, false /* minify */)
+		if err != nil {
+			t.Fatalf("Failed transforming %v: %v", p, err)
 		}
 		fn := strings.TrimSuffix(filepath.Base(p), ".ts") + ".js"
-		if err := ioutil.WriteFile(filepath.Join(tsDir, fn), res.Code, 0644); err != nil {
+		if err := ioutil.WriteFile(filepath.Join(tsDir, fn), js, 0644); err != nil {
 			t.Fatal(err)
 		}
 	}

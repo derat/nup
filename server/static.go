@@ -6,13 +6,14 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/derat/nup/server/esbuild"
 
 	"github.com/evanw/esbuild/pkg/api"
 
@@ -114,19 +115,9 @@ func getStaticFile(p string, bundle, minify bool) ([]byte, error) {
 
 	// Use esbuild to transform TypeScript into JavaScript.
 	if ts {
-		res := api.Transform(string(b), api.TransformOptions{
-			Charset:           api.CharsetUTF8,
-			Format:            api.FormatESModule,
-			Loader:            api.LoaderTS,
-			MinifyIdentifiers: minify,
-			MinifySyntax:      minify,
-			MinifyWhitespace:  minify,
-			Target:            api.ES2020,
-		})
-		if len(res.Errors) > 0 {
-			return nil, fmt.Errorf("transform: %v", res.Errors[0].Text)
+		if b, err = esbuild.Transform(b, api.LoaderTS, minify); err != nil {
+			return nil, err
 		}
-		b = res.Code
 	}
 
 	// Make index.html load the appropriate script depending on whether bundling is enabled.
@@ -220,24 +211,5 @@ func buildBundle(minify bool) ([]byte, error) {
 		}
 	}
 
-	// TODO: Write source map?
-	res := api.Build(api.BuildOptions{
-		AbsWorkingDir:     td,
-		Bundle:            true,
-		Charset:           api.CharsetUTF8,
-		EntryPoints:       []string{bundleEntryPoint},
-		Format:            api.FormatESModule,
-		MinifyIdentifiers: minify,
-		MinifySyntax:      minify,
-		MinifyWhitespace:  minify,
-		Outfile:           bundleFile,
-		Target:            api.ES2020,
-	})
-	if len(res.Errors) > 0 {
-		return nil, fmt.Errorf("bundle: %v", res.Errors[0].Text)
-	}
-	if n := len(res.OutputFiles); n != 1 {
-		return nil, fmt.Errorf("got %d output files", n)
-	}
-	return res.OutputFiles[0].Contents, nil
+	return esbuild.Bundle(td, []string{bundleEntryPoint}, bundleFile, minify)
 }
