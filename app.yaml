@@ -9,6 +9,15 @@ app_engine_apis: true
 # The app handles everything except binary files so it can do e.g. auth and
 # minification.
 handlers:
+  - url: /favicon\.ico
+    # Chrome seems to request favicon.ico automatically in some cases
+    # (e.g. when loading manifest.json), so serve the versioned file with
+    # a short expiration time.
+    static_files: web/favicon-v1.ico
+    secure: always
+    upload: web/favicon-v1.ico
+    expiration: 1h
+
   - url: /(.*\.(gif|ico|jpe?g|png|ttf|woff2?))
     static_files: web/\1
     secure: always
@@ -22,8 +31,11 @@ handlers:
     #  file, it should have a short (less than one hour) expiration time. In
     #  most cases, the default 10-minute expiration time is appropriate.
     #
-    # So, static files should have versioned names.
+    # So, static files should have versioned names. (And yeah, I previously saw
+    # App Engine serve stale versions of static files for far longer than their
+    # expiration.)
     expiration: 14d
+
   - url: /.*
     script: auto
     secure: always
