@@ -156,10 +156,17 @@ export default class UpdateDialog {
   }
 
   #onBodyKeyDown = (e: KeyboardEvent) => {
+    // Stop the event if we're closing the dialog, since it could be handled
+    // again by other components now that there's no longer a dialog open
+    // otherwise.
     if (e.key === 'Enter') {
       this.close(true);
+      e.preventDefault();
+      e.stopPropagation();
     } else if (e.key === 'Escape') {
       this.close(false);
+      e.preventDefault();
+      e.stopPropagation();
     } else if (e.altKey && e.key === 'r') {
       this.focusRating();
     } else if (e.altKey && e.key === 't') {
