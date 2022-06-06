@@ -13,6 +13,11 @@ import (
 )
 
 const (
+	// SourceMapExt contains the suffix that esbuild appends to a file (e.g. "foo.js")
+	// for its source map ("foo.js.map"). The source map should be served at this location
+	// since the code contains a comment referencing it.
+	SourceMapExt = ".map"
+
 	charset = api.CharsetUTF8
 	format  = api.FormatESModule
 	target  = api.ES2020
@@ -39,8 +44,8 @@ func Transform(src []byte, loader api.Loader, minify bool, fn string) ([]byte, e
 }
 
 // Bundle builds the supplied files into a single ES module.
-func Bundle(dir string, entryPoints []string, outFile string, minify bool) ([]byte, error) {
-	// TODO: Write source map?
+func Bundle(dir string, entryPoints []string, outFile string, minify bool) (
+	js, sourceMap []byte, err error) {
 	res := api.Build(api.BuildOptions{
 		AbsWorkingDir:     dir,
 		Bundle:            true,
@@ -51,15 +56,26 @@ func Bundle(dir string, entryPoints []string, outFile string, minify bool) ([]by
 		MinifySyntax:      minify,
 		MinifyWhitespace:  minify,
 		Outfile:           outFile,
+		Sourcemap:         api.SourceMapLinked,
 		Target:            target,
 	})
 	if len(res.Errors) > 0 {
-		return nil, errors.New(getMessage(res.Errors[0]))
+		return nil, nil, errors.New(getMessage(res.Errors[0]))
 	}
-	if n := len(res.OutputFiles); n != 1 {
-		return nil, fmt.Errorf("got %d output files; want 1", n)
+	if n := len(res.OutputFiles); n != 2 {
+		return nil, nil, fmt.Errorf("got %d output files; want 2", n)
 	}
-	return res.OutputFiles[0].Contents, nil
+	for _, of := range res.OutputFiles {
+		switch filepath.Base(of.Path) {
+		case outFile:
+			js = of.Contents
+		case outFile + SourceMapExt:
+			sourceMap = of.Contents
+		default:
+			return nil, nil, fmt.Errorf("unexpected output file %q", of.Path)
+		}
+	}
+	return js, sourceMap, nil
 }
 
 func getMessage(msg api.Message) string {

@@ -95,12 +95,13 @@ func getStaticFile(p string, minify bool) ([]byte, error) {
 
 	// The bundle file doesn't actually exist on-disk, so handle it first.
 	if p == bundleFile {
-		b, err := buildBundle()
+		js, sourceMap, err := buildBundle()
 		if err != nil {
 			return nil, err
 		}
-		staticFiles.Store(key, b)
-		return b, nil
+		staticFiles.Store(key, js)
+		staticFiles.Store(staticKey{p + esbuild.SourceMapExt, minify}, sourceMap)
+		return js, nil
 	}
 
 	fp := filepath.Join(staticDir, p)
@@ -233,20 +234,20 @@ func minifyTemplates(r io.Reader) ([]byte, error) {
 
 // buildBundle builds a single minified bundle file consisting of bundleEntryPoint
 // and all of its imports.
-func buildBundle() ([]byte, error) {
+func buildBundle() (js, sourceMap []byte, err error) {
 	// Write all the (possibly minified) .js and .ts files to a temp dir for esbuild.
 	// I think it'd be possible to write an esbuild plugin that returns these
 	// files from memory, but the plugin API is still experimental and we only
 	// hit this code path once per instance.
 	td, err := ioutil.TempDir("", "nup_bundle.*")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer os.RemoveAll(td)
 
 	paths, err := filepath.Glob(filepath.Join(staticDir, "*.[jt]s"))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, p := range paths {
 		// Don't minify or transform the code yet (esbuild.Bundle will do that later),
@@ -254,13 +255,13 @@ func buildBundle() ([]byte, error) {
 		base := filepath.Base(p)
 		b, err := getStaticFile(base, false /* minify */)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if b, err = minifyTemplates(bytes.NewReader(b)); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if err := ioutil.WriteFile(filepath.Join(td, base), b, 0644); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
