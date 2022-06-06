@@ -1140,7 +1140,7 @@ func TestUnit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		js, err := esbuild.Transform(ts, api.LoaderTS, false /* minify */)
+		js, err := esbuild.Transform(ts, api.LoaderTS, false /* minify */, filepath.Base(p))
 		if err != nil {
 			t.Fatalf("Failed transforming %v: %v", p, err)
 		}

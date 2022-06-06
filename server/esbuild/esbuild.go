@@ -7,6 +7,7 @@ package esbuild
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"github.com/evanw/esbuild/pkg/api"
 )
@@ -19,7 +20,8 @@ const (
 
 // Transform transforms the supplied code to an ES module.
 // loader (api.LoaderTS or api.LoaderJS) describes src's language.
-func Transform(src []byte, loader api.Loader, minify bool) ([]byte, error) {
+// If fn is supplied, it will be used as the filename in error messages.
+func Transform(src []byte, loader api.Loader, minify bool, fn string) ([]byte, error) {
 	res := api.Transform(string(src), api.TransformOptions{
 		Charset:           charset,
 		Format:            format,
@@ -27,10 +29,11 @@ func Transform(src []byte, loader api.Loader, minify bool) ([]byte, error) {
 		MinifyIdentifiers: minify,
 		MinifySyntax:      minify,
 		MinifyWhitespace:  minify,
+		Sourcefile:        fn,
 		Target:            target,
 	})
 	if len(res.Errors) > 0 {
-		return nil, errors.New(getMessage(res.Errors[0], false))
+		return nil, errors.New(getMessage(res.Errors[0]))
 	}
 	return res.Code, nil
 }
@@ -51,7 +54,7 @@ func Bundle(dir string, entryPoints []string, outFile string, minify bool) ([]by
 		Target:            target,
 	})
 	if len(res.Errors) > 0 {
-		return nil, errors.New(getMessage(res.Errors[0], true))
+		return nil, errors.New(getMessage(res.Errors[0]))
 	}
 	if n := len(res.OutputFiles); n != 1 {
 		return nil, fmt.Errorf("got %d output files; want 1", n)
@@ -59,14 +62,10 @@ func Bundle(dir string, entryPoints []string, outFile string, minify bool) ([]by
 	return res.OutputFiles[0].Contents, nil
 }
 
-func getMessage(msg api.Message, includeFile bool) string {
+func getMessage(msg api.Message) string {
 	var s string
-	loc := msg.Location
-	if loc != nil {
-		if includeFile {
-			s += loc.File + ":"
-		}
-		s += fmt.Sprintf("%d:%d: ", loc.Line, loc.Column)
+	if loc := msg.Location; loc != nil {
+		s = fmt.Sprintf("%s:%d:%d: ", filepath.Base(loc.File), loc.Line, loc.Column)
 	}
 	s += msg.Text
 	return s

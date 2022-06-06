@@ -133,7 +133,8 @@ func getStaticFile(p string, minify bool) ([]byte, error) {
 		// Transform TypeScript code to JavaScript. esbuild also appears to do some
 		// degree of minimization no matter what: blank lines and comments are stripped.
 		if ctype == tsType {
-			if b, err = esbuild.Transform(b, api.LoaderTS, false); err != nil {
+			base := filepath.Base(f.Name())
+			if b, err = esbuild.Transform(b, api.LoaderTS, false, base); err != nil {
 				return nil, err
 			}
 		}
@@ -176,7 +177,11 @@ func minifyAndTransformData(r io.Reader, ctype string) ([]byte, error) {
 		if ctype == tsType {
 			loader = api.LoaderTS
 		}
-		return esbuild.Transform(b, loader, true)
+		var fn string
+		if f, ok := r.(*os.File); ok {
+			fn = filepath.Base(f.Name())
+		}
+		return esbuild.Transform(b, loader, true, fn)
 	default:
 		var b bytes.Buffer
 		err := minifier.Minify(ctype, &b, r)
