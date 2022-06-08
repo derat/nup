@@ -84,17 +84,12 @@ const template = createTemplate(`
     white-space: nowrap;
   }
 
-  td a {
-    color: var(--text-color);
-    text-decoration: none;
+  td.artist, td.album {
     cursor: pointer;
   }
-  td a:hover {
+  td.artist:hover, td.album:hover {
     color: var(--link-color);
     text-decoration: underline;
-  }
-  tr.active td a {
-    color: var(--accent-text-color);
   }
 
   td.checkbox,
@@ -157,9 +152,9 @@ const template = createTemplate(`
 const rowTemplate = createTemplate(`
 <tr draggable="true">
   <td class="checkbox"><input type="checkbox" class="small" /></td>
-  <td class="artist"><a></a></td>
+  <td class="artist"></td>
   <td class="title"></td>
-  <td class="album"><a></a></td>
+  <td class="album"></td>
   <td class="time"></td>
 </tr>
 `);
@@ -184,10 +179,11 @@ const RESIZE_TIMEOUT_MS = 1000; // delay after resize to update titles
 // |detail.fromIndex| and |detail.toIndex| properties. The song is automatically
 // reordered within song-table.
 export class SongTable extends HTMLElement {
-  #lastClickedCheckboxIndex = -1; // 0 is header
+  #lastClickedCheckboxIndex = -1; // 0 is first song row
   #numCheckedSongs = 0;
   #shadow = createShadow(this, template);
   #table = this.#shadow.querySelector('table') as HTMLTableElement;
+  #tbody = this.#table.querySelector('tbody') as HTMLTableSectionElement;
   #rowSongs: WeakMap<HTMLTableRowElement, Song> = new WeakMap();
   #resizeTimeoutId: number | null = null;
   #resizeObserver: ResizeObserver;
@@ -205,6 +201,50 @@ export class SongTable extends HTMLElement {
 
     this.#shadow.adoptedStyleSheets = [commonStyles];
 
+    // Listen for click events on checkboxes or table cells.
+    this.#table.addEventListener('click', (e: MouseEvent) => {
+      const el = e.target as HTMLElement;
+      if (el.tagName === 'INPUT') {
+        this.#onCheckboxClick(el as HTMLInputElement, e.shiftKey);
+      } else if (el.tagName === 'TD') {
+        const row = el.closest('tr') as HTMLTableRowElement;
+        if (el.classList.contains('artist')) {
+          this.#emitEvent('field', { artist: this.#getRowSong(row).artist });
+        } else if (el.classList.contains('album')) {
+          const song = this.#getRowSong(row);
+          this.#emitEvent('field', {
+            albumId: song.albumId,
+            album: song.album,
+          });
+        }
+      }
+    });
+
+    // Listen for right-clicks that should display the context menu.
+    this.#tbody.addEventListener('contextmenu', (e: MouseEvent) => {
+      const el = e.target as HTMLElement;
+      const row = el.closest('tr') as HTMLTableRowElement;
+      this.#emitEvent('menu', {
+        songId: this.#getRowSong(row).songId,
+        index: this.#songRowsArray.indexOf(row),
+        orig: e,
+      });
+    });
+
+    // Listen for drag starts originating from table rows.
+    this.#tbody.addEventListener('dragstart', (e: DragEvent) => {
+      const el = e.target as HTMLElement;
+      const row = el.closest('tr') as HTMLTableRowElement;
+      e.dataTransfer!.effectAllowed = 'move';
+      e.dataTransfer!.setDragImage(this.#dragImage, 0, 0);
+      row.classList.add('dragged');
+      this.#dragFromIndex = this.#dragToIndex =
+        this.#songRowsArray.indexOf(row);
+      this.#dragListRect = this.#tbody.getBoundingClientRect();
+      this.#moveDragTarget();
+      this.#showDragTarget();
+    });
+
     // When the table is resized, update all of the rows' title attributes
     // after a short delay.
     this.#resizeObserver = new ResizeObserver((entries) => {
@@ -217,10 +257,6 @@ export class SongTable extends HTMLElement {
       }, RESIZE_TIMEOUT_MS);
     });
     this.#resizeObserver.observe(this.#table);
-
-    this.#headingCheckbox.addEventListener('click', (e) => {
-      this.#onCheckboxClick(this.#headingCheckbox, e.shiftKey);
-    });
 
     // Show/hide the header shadow when scrolling.
     this.addEventListener('scroll', (e) => {
@@ -370,16 +406,19 @@ export class SongTable extends HTMLElement {
 
     // Get to the correct number of rows.
     for (let i = numOldMiddleSongs; i < numNewMiddleSongs; i++) {
-      this.#insertSongRow(startMatchLength);
+      this.#tbody.insertBefore(
+        rowTemplate.content.cloneNode(true),
+        this.#tbody.rows?.item(startMatchLength) ?? null
+      );
     }
     for (let i = numOldMiddleSongs; i > numNewMiddleSongs; i--) {
-      this.#deleteSongRow(startMatchLength);
+      this.#tbody.deleteRow(startMatchLength);
     }
 
     // Update all of the rows in the middle to contain the correct data.
     for (let i = 0; i < numNewMiddleSongs; i++) {
       const index = startMatchLength + i;
-      this.#updateSongRow(index, newSongs[index], true /* deferTitles */);
+      this.#updateSongRow(index, newSongs[index]);
     }
     // Show or hide title attributes (which function as tooltips for elided
     // strings). Do this after updating all the rows so we trigger a single
@@ -397,146 +436,70 @@ export class SongTable extends HTMLElement {
     this.dispatchEvent(new CustomEvent(name, { detail }));
   }
 
-  // Inserts and initializes a new song row at |index| (ignoring the header
-  // row).
-  #insertSongRow(index: number) {
-    // Cloning the template produces a DocumentFragment, so attach it to the
-    // DOM so we can get the actual <tr> to use in event listeners.
-    const tbody = this.#table.querySelector('tbody')!;
-    tbody.insertBefore(
-      rowTemplate.content.cloneNode(true),
-      tbody.children ? tbody.children[index] : null
-    );
-    const row = tbody.children[index] as HTMLTableRowElement;
-
-    row
-      .querySelector('input[type="checkbox"]')!
-      .addEventListener('click', ((e: MouseEvent) =>
-        this.#onCheckboxClick(
-          e.target as HTMLInputElement,
-          e.shiftKey
-        )) as EventListenerOrEventListenerObject);
-    row.querySelector('.artist a')!.addEventListener('click', () => {
-      this.#emitEvent('field', { artist: this.#getRowSong(row).artist });
-    });
-    row.querySelector('.album a')!.addEventListener('click', () => {
-      const song = this.#getRowSong(row);
-      this.#emitEvent('field', { albumId: song.albumId, album: song.album });
-    });
-    row.addEventListener('contextmenu', (e: MouseEvent) => {
-      this.#emitEvent('menu', {
-        songId: this.#getRowSong(row).songId,
-        index: this.#songRowsArray.indexOf(row), // don't use orig (stale) index
-        orig: e,
-      });
-    });
-    row.addEventListener('dragstart', (e: DragEvent) => {
-      e.dataTransfer!.effectAllowed = 'move';
-      e.dataTransfer!.setDragImage(this.#dragImage, 0, 0);
-      row.classList.add('dragged');
-      this.#dragFromIndex = this.#dragToIndex =
-        this.#songRowsArray.indexOf(row);
-      this.#dragListRect = this.#table
-        .querySelector('tbody')!
-        .getBoundingClientRect();
-      this.#moveDragTarget();
-      this.#showDragTarget();
-    });
-  }
-
-  // Deletes the row at |index| (ignoring the header row).
-  #deleteSongRow(index: number) {
-    this.#table.deleteRow(index + 1); // skip header
-  }
-
   // Updates the row at |index| to display data about |song| and attaches
-  // |song| to the row. Also updates the row's title attributes (which can
-  // trigger a reflow) unless |deferTitles| is true.
-  #updateSongRow(index: number, song: Song, deferTitles: boolean) {
+  // |song| to the row.
+  //
+  // #updateSongRowTitleAttributes() should be called afterward to update the
+  // row's title attributes.
+  #updateSongRow(index: number, song: Song) {
     const row = this.#songRows[index] as HTMLTableRowElement;
+    this.#rowSongs.set(row, song);
     row.classList.remove('active');
 
-    this.#rowSongs.set(row, song);
-
-    const update = (
-      cell: HTMLTableCellElement,
-      text: string,
-      textInChild: boolean
-    ) =>
-      ((textInChild
-        ? (cell.firstElementChild as HTMLElement)
-        : cell
-      ).innerText = text);
-    update(row.cells[1], song.artist, true);
-    update(row.cells[2], song.title, false);
-    update(row.cells[3], song.album, true);
-    update(row.cells[4], formatDuration(song.length), false);
-
-    if (!deferTitles) this.#updateSongRowTitleAttributes(index);
+    (row.querySelector('.artist') as HTMLElement).innerText = song.artist;
+    (row.querySelector('.title') as HTMLElement).innerText = song.title;
+    (row.querySelector('.album') as HTMLElement).innerText = song.album;
+    (row.querySelector('.time') as HTMLElement).innerText = formatDuration(
+      song.length
+    );
   }
 
   // Adds or removes 'title' attributes from each of the specified row's cells
-  // depending on whether its text is elided or not.
+  // depending on whether its text is elided or not. This can trigger a reflow.
   #updateSongRowTitleAttributes(index: number) {
-    const update = (cell: HTMLTableCellElement, textInChild: boolean) =>
-      updateTitleAttributeForTruncation(
-        cell,
-        (textInChild ? (cell.firstElementChild as HTMLElement) : cell).innerText
-      );
     const row = this.#songRows[index] as HTMLTableRowElement;
-    update(row.cells[1], true);
-    update(row.cells[2], false);
-    update(row.cells[3], true);
+    const update = (cell: HTMLElement) =>
+      updateTitleAttributeForTruncation(cell, cell.innerText);
+    update(row.querySelector('.artist') as HTMLElement);
+    update(row.querySelector('.title') as HTMLElement);
+    update(row.querySelector('.album') as HTMLElement);
     // The time shouldn't overflow.
   }
 
   // Handles one of the checkboxes being clicked.
   #onCheckboxClick(checkbox: HTMLInputElement, shiftHeld: boolean) {
-    const getCheckbox = (i: number) =>
-      this.#table.rows[i].cells[0].children[0] as HTMLInputElement;
-
-    let index = -1;
-    for (let i = 0; i < this.#table.rows.length; i++) {
-      if (checkbox === getCheckbox(i)) {
-        index = i;
-        break;
-      }
-    }
+    const checkboxes = this.#tbody.querySelectorAll("input[type='checkbox']");
     const checked = checkbox.checked;
 
-    if (index === 0) {
-      for (let i = 1; i < this.#table.rows.length; i++) {
-        getCheckbox(i).checked = checked;
-      }
+    if (checkbox === this.#headingCheckbox) {
+      checkboxes.forEach((e) => ((e as HTMLInputElement).checked = checked));
       this.#numCheckedSongs = checked ? this.numSongs : 0;
+      this.#lastClickedCheckboxIndex = -1;
     } else {
+      const index = [...checkboxes].findIndex((e) => e === checkbox);
+      if (index < 0) throw new Error("Didn't find checkbox row");
       this.#numCheckedSongs += checked ? 1 : -1;
 
-      if (shiftHeld) {
-        if (
-          this.#lastClickedCheckboxIndex > 0 &&
-          this.#lastClickedCheckboxIndex < this.#table.rows.length &&
-          this.#lastClickedCheckboxIndex !== index
-        ) {
-          const start = Math.min(index, this.#lastClickedCheckboxIndex);
-          const end = Math.max(index, this.#lastClickedCheckboxIndex);
-          for (let i = start; i <= end; i++) {
-            const c = getCheckbox(i);
-            if (checked && !c.checked) {
-              c.checked = true;
-              this.#numCheckedSongs++;
-            } else if (!checked && c.checked) {
-              c.checked = false;
-              this.#numCheckedSongs--;
-            }
+      if (
+        shiftHeld &&
+        this.#lastClickedCheckboxIndex >= 0 &&
+        this.#lastClickedCheckboxIndex < checkboxes.length &&
+        this.#lastClickedCheckboxIndex !== index
+      ) {
+        const start = Math.min(index, this.#lastClickedCheckboxIndex);
+        const end = Math.max(index, this.#lastClickedCheckboxIndex);
+        for (let i = start; i <= end; i++) {
+          const cb = checkboxes.item(i) as HTMLInputElement;
+          if (cb.checked !== checked) {
+            cb.checked = checked;
+            this.#numCheckedSongs += checked ? 1 : -1;
           }
         }
       }
+      this.#lastClickedCheckboxIndex = index;
     }
 
     this.#updateHeadingCheckbox();
-    this.#lastClickedCheckboxIndex = index;
-
     this.#emitEvent('check', { count: this.#numCheckedSongs });
   }
 
