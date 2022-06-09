@@ -473,6 +473,19 @@ func TestPlayTimeQuery(t *testing.T) {
 		page.setStage(fmt.Sprintf("%s / %s", tc.first, tc.last))
 		page.clickOption(firstPlayedSelect, tc.first)
 		page.clickOption(lastPlayedSelect, tc.last)
+		// TODO: This sometimes fails with the following error:
+		//
+		//  page.go:341: Failed clicking [{tag name music-searcher} {id search-button}] at
+		//  web_test.go:476 (one year / ): unknown error - 64: element click intercepted: Element
+		//  <button id="search-button" type="button">...</button> is not clickable at point (575,
+		//  343). Other element would receive the click: <dialog class="dialog" open="">...</dialog>
+		//
+		// Confusingly, the search button has already been clicked for the day and week cases at
+		// this point. I don't see anything fishy in the browser or server logs: the two earlier
+		// queries are successful. I also don't know what could be opening a <dialog> at this point:
+		// music-searcher opens them for empty or failed searches, but neither of those should be
+		// happening here. I've added the dialog's class to the <dialog> element itself to make this
+		// easier to debug the next time it happens.
 		page.click(searchButton)
 		page.checkSearchResults(tc.want)
 	}

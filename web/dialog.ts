@@ -61,18 +61,20 @@ const msgTemplate = createTemplate(`
 let numDialogs = 0;
 
 // Creates and shows a modal dialog filled with the supplied template.
-// If |className| is supplied, it is added to dialog's shadow root.
-// The <dialog> element is returned, and the shadow root can be accessed
-// via |dialog.firstElementChild.shadowRoot|.
+// If |className| is supplied, it is added both to the <dialog> and to its
+// <span> child. The <dialog> element is returned, and the shadow root can be
+// accessed via |dialog.firstElementChild.shadowRoot|.
 export function createDialog(
   template: HTMLTemplateElement,
-  className?: string
+  className: string | null = null
 ): HTMLDialogElement {
   const dialog = createElement(
     'dialog',
     'dialog',
     document.body
   ) as HTMLDialogElement;
+  if (className) dialog.classList.add(className);
+
   dialog.addEventListener('close', () => {
     document.body.removeChild(dialog);
     numDialogs--;
