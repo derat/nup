@@ -4,6 +4,7 @@
 import type { AudioWrapper } from './audio-wrapper.js';
 import {
   $,
+  clamp,
   commonStyles,
   createShadow,
   createTemplate,
@@ -157,7 +158,7 @@ const SEEK_SEC = 10; // seconds to skip when seeking forward or back
 const NOTIFICATION_SEC = 3; // duration to show song-change notification
 const PLAY_DELAY_MS = 500; // delay before playing when cycling track
 const PRELOAD_SEC = 20; // seconds before end of song to load next song
-const TIME_UPDATE_SLOP_MS = 10; // time to wait past second boundary
+const UPDATE_POSITION_SLOP_MS = 10; // time to wait past second boundary
 
 // <play-view> plays and displays information about songs. It also maintains
 // and displays a playlist. Songs can be enqueued by calling enqueueSongs().
@@ -179,19 +180,19 @@ const TIME_UPDATE_SLOP_MS = 10; // time to wait past second boundary
 export class PlayView extends HTMLElement {
   #config = getConfig();
   #updater: Updater | null = null; // initialized in connectedCallback()
-  #songs: Song[] = []; // songs in the order in which they should be played
+  #songs: Song[] = []; // playlist
   #tags: string[] = []; // available tags loaded from server
   #currentIndex = -1; // index into #songs of current track
   #startTime: number | null = null; // seconds since epoch for current track
   #reportedCurrentTrack = false; // already reported current as played?
   #reachedEndOfSongs = false; // did we hit end of last song?
-  #updateDialog: UpdateDialog | null = null;
-  #notification: Notification | null = null; // for song changes
-  #closeNotificationTimeoutId: number | null = null; // #closeNotification()
+  #updateDialog: UpdateDialog | null = null; // edit rating and tags
+  #notification: Notification | null = null; // displays song changes
+  #closeNotificationTimeoutId: number | null = null;
   #playDelayMs = PLAY_DELAY_MS;
   #playTimeoutId: number | null = null; // for #playInternal()
-  #lastTimeUpdatePos = 0; // audio position in last #onTimeUpdate()
-  #timeUpdateTimeoutId: number | null = null; // #onTimeUpdate()
+  #lastUpdatePosition = 0; // audio position in last #updatePosition()
+  #updatePositionTimeoutId: number | null = null;
   #shuffled = false; // playlist contains shuffled songs
 
   #shadow = createShadow(this, template);
@@ -218,7 +219,7 @@ export class PlayView extends HTMLElement {
     this.#shadow.adoptedStyleSheets = [commonStyles];
 
     this.#presentationLayer.addEventListener('next', () => {
-      this.#cycleTrack(1, false /* delayPlay */);
+      this.#cycleTrack(1);
     });
     this.#presentationLayer.addEventListener('hide', () => {
       this.#setPresentationLayerVisible(false);
@@ -388,7 +389,7 @@ export class PlayView extends HTMLElement {
 
     this.#cancelCloseNotificationTimeout();
     this.#cancelPlayTimeout();
-    this.#cancelTimeUpdateTimeout();
+    this.#cancelUpdatePositionTimeout();
 
     if ('mediaSession' in navigator) {
       const ms = navigator.mediaSession;
@@ -415,7 +416,7 @@ export class PlayView extends HTMLElement {
   #onDocumentVisibilityChange = () => {
     // We hold off on updating the displayed time while the document is
     // hidden, so update it as soon as the document is shown.
-    if (!document.hidden) this.#onTimeUpdate();
+    if (!document.hidden) this.#updatePosition();
   };
 
   #onKeyDown = (e: KeyboardEvent) => {
@@ -434,14 +435,14 @@ export class PlayView extends HTMLElement {
           this.#setPresentationLayerVisible(false);
           return true;
         } else if (e.altKey && e.key === 'n') {
-          this.#cycleTrack(1, true /* delay */);
+          this.#cycleTrack(1, true /* delayPlay */);
           return true;
         } else if (e.altKey && e.key === 'o') {
           showOptionsDialog();
           this.#setPresentationLayerVisible(false);
           return true;
         } else if (e.altKey && e.key === 'p') {
-          this.#cycleTrack(-1, true /* delay */);
+          this.#cycleTrack(-1, true /* delayPlay */);
           return true;
         } else if (e.altKey && e.key === 'r') {
           this.#showUpdateDialog();
@@ -578,7 +579,7 @@ export class PlayView extends HTMLElement {
 
   // Plays the song at |offset| in the playlist relative to the current song.
   // If |delayPlay| is true, waits a bit before actually playing the audio
-  // (in case the user might be about to select a different track).
+  // (in case the user is going to cycle the track again).
   #cycleTrack(offset: number, delayPlay = false) {
     this.#selectTrack(this.#currentIndex + offset, delayPlay);
   }
@@ -596,9 +597,7 @@ export class PlayView extends HTMLElement {
       return;
     }
 
-    if (index < 0) index = 0;
-    else if (index >= this.#songs.length) index = this.#songs.length - 1;
-
+    index = clamp(index, 0, this.#songs.length - 1);
     if (index === this.#currentIndex) return;
 
     this.#playlistTable.setRowActive(this.#currentIndex, false);
@@ -612,7 +611,7 @@ export class PlayView extends HTMLElement {
     this.#updateButtonState();
     this.#play(delayPlay);
 
-    if (!document.hasFocus()) this.#showNotification();
+    if (document.hidden) this.#showNotification();
   }
 
   #updateButtonState() {
@@ -802,7 +801,7 @@ export class PlayView extends HTMLElement {
       this.#startTime = getCurrentTimeSec();
       this.#reportedCurrentTrack = false;
       this.#reachedEndOfSongs = false;
-      this.#lastTimeUpdatePos = 0;
+      this.#lastUpdatePosition = 0;
       this.#updateGain();
     }
 
@@ -836,32 +835,45 @@ export class PlayView extends HTMLElement {
 
   #seek(seconds: number) {
     if (!this.#audio.seekable) return;
-
     const newTime = Math.max(this.#audio.currentTime + seconds, 0);
-    if (newTime < this.#audio.duration) this.#audio.currentTime = newTime;
+    if (newTime >= this.#audio.duration) return;
+    this.#audio.currentTime = newTime;
+    this.#updatePosition();
   }
 
   #onEnded = () => {
-    this.#cancelTimeUpdateTimeout();
+    this.#updatePosition();
     if (this.#currentIndex >= this.#songs.length - 1) {
       this.#reachedEndOfSongs = true;
     } else {
-      this.#cycleTrack(1, false /* delay */);
+      this.#cycleTrack(1);
     }
   };
 
   #onPause = () => {
-    this.#cancelTimeUpdateTimeout();
+    this.#updatePosition();
     this.#playPauseButton.innerText = '▶';
     this.#playPauseButton.title = 'Play (Space)';
   };
 
   #onPlay = () => {
+    this.#updatePosition();
     this.#playPauseButton.innerText = '⏸';
     this.#playPauseButton.title = 'Pause (Space)';
   };
 
   #onTimeUpdate = () => {
+    // I was hoping I could just call #scheduleUpdatePosition() here, but it
+    // causes occasional failures in TestDisplayTimeWhilePlaying where it looks
+    // like seconds are being skipped sometimes.
+    this.#updatePosition();
+  };
+
+  #onError = () => {
+    this.#cycleTrack(1);
+  };
+
+  #updatePosition() {
     const song = this.#currentSong;
     if (song === null) return;
 
@@ -878,7 +890,6 @@ export class PlayView extends HTMLElement {
     if (!document.hidden) {
       const str = dur ? `${formatDuration(pos)} / ${formatDuration(dur)}` : '';
       if (this.#timeDiv.innerText !== str) this.#timeDiv.innerText = str;
-
       this.#presentationLayer.updatePosition(pos);
     }
 
@@ -889,32 +900,31 @@ export class PlayView extends HTMLElement {
       this.#audio.preloadSrc = url;
     }
 
-    // Schedule a fake update for just after when we expect the playback
-    // position to cross the next second boundary. Only do this when we're
-    // actually making progress, though.
-    if (
-      !this.#audio.paused &&
-      pos > this.#lastTimeUpdatePos &&
-      this.#timeUpdateTimeoutId === null
-    ) {
-      const nextMs = 1000 * (Math.floor(pos + 1) - pos);
-      this.#timeUpdateTimeoutId = window.setTimeout(() => {
-        this.#timeUpdateTimeoutId = null;
-        this.#onTimeUpdate();
-      }, nextMs + TIME_UPDATE_SLOP_MS);
-    }
+    // Only schedule the next update when we're actually making progress.
+    if (pos > this.#lastUpdatePosition) this.#scheduleUpdatePosition();
+    else this.#cancelUpdatePositionTimeout();
+    this.#lastUpdatePosition = pos;
+  }
 
-    this.#lastTimeUpdatePos = pos;
-  };
+  #scheduleUpdatePosition() {
+    this.#cancelUpdatePositionTimeout();
 
-  #onError = () => {
-    this.#cycleTrack(1, false /* delay */);
-  };
+    if (this.#audio.paused) return;
 
-  #cancelTimeUpdateTimeout() {
-    if (this.#timeUpdateTimeoutId === null) return;
-    window.clearTimeout(this.#timeUpdateTimeoutId);
-    this.#timeUpdateTimeoutId = null;
+    // Schedule the next update for just after when we expect the playback
+    // position to cross the next second boundary.
+    const pos = this.#audio.currentTime;
+    const nextMs = 1000 * (Math.floor(pos + 1) - pos);
+    this.#updatePositionTimeoutId = window.setTimeout(() => {
+      this.#updatePositionTimeoutId = null;
+      this.#updatePosition();
+    }, nextMs + UPDATE_POSITION_SLOP_MS);
+  }
+
+  #cancelUpdatePositionTimeout() {
+    if (this.#updatePositionTimeoutId === null) return;
+    window.clearTimeout(this.#updatePositionTimeoutId);
+    this.#updatePositionTimeoutId = null;
   }
 
   #showUpdateDialog() {
