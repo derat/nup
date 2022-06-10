@@ -50,12 +50,12 @@ var (
 	// Use selenium.ByCSSSelector instead for referencing deeply-nested elements.
 	body = joinLocs(loc{selenium.ByTagName, "body"})
 
-	optionsDialog   = joinLocs(body, loc{selenium.ByCSSSelector, ".dialog .options"})
+	optionsDialog   = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.options > span"})
 	optionsOKButton = joinLocs(optionsDialog, loc{selenium.ByID, "ok-button"})
 	gainTypeSelect  = joinLocs(optionsDialog, loc{selenium.ByID, "gain-type-select"})
 	preAmpRange     = joinLocs(optionsDialog, loc{selenium.ByID, "pre-amp-range"})
 
-	infoDialog        = joinLocs(body, loc{selenium.ByCSSSelector, ".dialog .info"})
+	infoDialog        = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.song-info > span"})
 	infoArtist        = joinLocs(infoDialog, loc{selenium.ByID, "artist"})
 	infoTitle         = joinLocs(infoDialog, loc{selenium.ByID, "title"})
 	infoAlbum         = joinLocs(infoDialog, loc{selenium.ByID, "album"})
@@ -65,9 +65,9 @@ var (
 	infoTags          = joinLocs(infoDialog, loc{selenium.ByID, "tags"})
 	infoDismissButton = joinLocs(infoDialog, loc{selenium.ByID, "dismiss-button"})
 
-	statsDialog = joinLocs(body, loc{selenium.ByCSSSelector, ".dialog .stats"})
+	statsDialog = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.stats > span"})
 
-	menu         = joinLocs(body, loc{selenium.ByCSSSelector, ".menu span"})
+	menu         = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.menu > span"})
 	menuPresent  = joinLocs(menu, loc{selenium.ByID, "present"})
 	menuOptions  = joinLocs(menu, loc{selenium.ByID, "options"})
 	menuStats    = joinLocs(menu, loc{selenium.ByID, "stats"})
@@ -94,7 +94,7 @@ var (
 	playlistTable = joinLocs(musicPlayer, loc{selenium.ByID, "playlist"},
 		loc{selenium.ByCSSSelector, "table"})
 
-	updateDialog       = joinLocs(body, loc{selenium.ByCSSSelector, ".dialog .update"})
+	updateDialog       = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.update > span"})
 	updateOneStar      = joinLocs(updateDialog, loc{selenium.ByCSSSelector, "#rating a:nth-child(1)"})
 	updateTwoStars     = joinLocs(updateDialog, loc{selenium.ByCSSSelector, "#rating a:nth-child(2)"})
 	updateThreeStars   = joinLocs(updateDialog, loc{selenium.ByCSSSelector, "#rating a:nth-child(3)"})

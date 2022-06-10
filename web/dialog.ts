@@ -61,9 +61,8 @@ const msgTemplate = createTemplate(`
 let numDialogs = 0;
 
 // Creates and shows a modal dialog filled with the supplied template.
-// If |className| is supplied, it is added both to the <dialog> and to its
-// <span> child. The <dialog> element is returned, and the shadow root can be
-// accessed via |dialog.firstElementChild.shadowRoot|.
+// |className| is added to the <dialog>. The <dialog> element is returned, and
+// the shadow root can be accessed via |dialog.firstElementChild.shadowRoot|.
 export function createDialog(
   template: HTMLTemplateElement,
   className: string | null = null
@@ -81,8 +80,10 @@ export function createDialog(
   });
 
   // It seems like it isn't possible to attach a shadow root directly to
-  // <dialog>, so add a wrapper element first.
-  const wrapper = createElement('span', className, dialog);
+  // <dialog>, so add a wrapper element first. See
+  // https://dom.spec.whatwg.org/#dom-element-attachshadow and
+  // https://github.com/WICG/webcomponents/issues/110.
+  const wrapper = createElement('span', null, dialog);
   const shadow = createShadow(wrapper, dialogStyle);
   shadow.adoptedStyleSheets = [commonStyles];
   shadow.appendChild(template.content.cloneNode(true));
