@@ -24,9 +24,9 @@ import { isDialogShown } from './dialog.js';
 import { createMenu, isMenuShown } from './menu.js';
 import { showOptionsDialog } from './options-dialog.js';
 import type { PresentationLayer } from './presentation-layer.js';
-import { showSongInfo } from './song-info.js';
+import { showSongInfoDialog } from './song-info-dialog.js';
 import type { SongTable } from './song-table.js';
-import { showStats } from './stats.js';
+import { showStatsDialog } from './stats-dialog.js';
 import UpdateDialog from './update-dialog.js';
 import Updater from './updater.js';
 
@@ -254,7 +254,7 @@ export class PlayView extends HTMLElement {
           {
             id: 'stats',
             text: 'Stats…',
-            cb: showStats,
+            cb: showStatsDialog,
             hotkey: 'Alt+S',
           },
           {
@@ -262,7 +262,7 @@ export class PlayView extends HTMLElement {
             text: 'Song info…',
             cb: () => {
               const song = this.#currentSong;
-              if (song) showSongInfo(song);
+              if (song) showSongInfoDialog(song);
             },
             hotkey: 'Alt+I',
           },
@@ -338,7 +338,7 @@ export class PlayView extends HTMLElement {
         {
           id: 'info',
           text: 'Info…',
-          cb: () => showSongInfo(this.#songs[idx]),
+          cb: () => showSongInfoDialog(this.#songs[idx]),
         },
         {
           id: 'debug',
@@ -430,7 +430,7 @@ export class PlayView extends HTMLElement {
           return true;
         } else if (e.altKey && e.key === 'i') {
           const song = this.#currentSong;
-          if (song) showSongInfo(song);
+          if (song) showSongInfoDialog(song);
           this.#setPresentationLayerVisible(false);
           return true;
         } else if (e.altKey && e.key === 'n') {
@@ -449,7 +449,7 @@ export class PlayView extends HTMLElement {
           this.#setPresentationLayerVisible(false);
           return true;
         } else if (e.altKey && e.key === 's') {
-          showStats();
+          showStatsDialog();
           this.#setPresentationLayerVisible(false);
         } else if (e.altKey && e.key === 't') {
           this.#showUpdateDialog();

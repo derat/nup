@@ -74,7 +74,7 @@ const template = createTemplate(`
 `);
 
 // Displays a modal dialog containing information about |song|.
-export function showSongInfo(song: Song) {
+export function showSongInfoDialog(song: Song) {
   const dialog = createDialog(template, 'song-info');
   const shadow = dialog.firstElementChild!.shadowRoot!;
 

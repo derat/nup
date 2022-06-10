@@ -120,7 +120,7 @@ const template = createTemplate(`
 `);
 
 // Shows a modal dialog containing stats fetched from the server.
-export function showStats() {
+export function showStatsDialog() {
   const dialog = createDialog(template, 'stats');
   const shadow = dialog.firstElementChild!.shadowRoot!;
   $('dismiss-button', shadow).addEventListener('click', () => dialog.close());

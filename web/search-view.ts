@@ -15,7 +15,7 @@ import {
 } from './common.js';
 import { isDialogShown, showMessageDialog } from './dialog.js';
 import { createMenu, isMenuShown } from './menu.js';
-import { showSongInfo } from './song-info.js';
+import { showSongInfoDialog } from './song-info-dialog.js';
 import type { SongTable } from './song-table.js';
 import type { TagSuggester } from './tag-suggester.js';
 
@@ -384,7 +384,7 @@ export class SearchView extends HTMLElement {
         {
           id: 'info',
           text: 'Info…',
-          cb: () => showSongInfo(this.#resultsTable.getSong(idx)),
+          cb: () => showSongInfoDialog(this.#resultsTable.getSong(idx)),
         },
         {
           id: 'debug',
