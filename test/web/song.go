@@ -80,7 +80,7 @@ func joinSongs(songs ...interface{}) []db.Song {
 // server, but we don't want to check filenames when we're inspecting the
 // playlist or search results.
 type songInfo struct {
-	artist, title, album string // metadata from either <song-table> row or <music-player>
+	artist, title, album string // metadata from either <song-table> row or <play-view>
 
 	active  *bool // song row is active/highlighted
 	checked *bool // song row is checked

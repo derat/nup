@@ -76,22 +76,22 @@ var (
 	menuRemove   = joinLocs(menu, loc{selenium.ByID, "remove"})
 	menuTruncate = joinLocs(menu, loc{selenium.ByID, "truncate"})
 
-	musicPlayer      = joinLocs(loc{selenium.ByTagName, "music-player"})
-	menuButton       = joinLocs(musicPlayer, loc{selenium.ByID, "menu-button"})
-	coverImage       = joinLocs(musicPlayer, loc{selenium.ByID, "cover-img"})
-	ratingOverlayDiv = joinLocs(musicPlayer, loc{selenium.ByID, "rating-overlay"})
-	artistDiv        = joinLocs(musicPlayer, loc{selenium.ByID, "artist"})
-	titleDiv         = joinLocs(musicPlayer, loc{selenium.ByID, "title"})
-	albumDiv         = joinLocs(musicPlayer, loc{selenium.ByID, "album"})
-	timeDiv          = joinLocs(musicPlayer, loc{selenium.ByID, "time"})
-	prevButton       = joinLocs(musicPlayer, loc{selenium.ByID, "prev"})
-	playPauseButton  = joinLocs(musicPlayer, loc{selenium.ByID, "play-pause"})
-	nextButton       = joinLocs(musicPlayer, loc{selenium.ByID, "next"})
+	playView         = joinLocs(loc{selenium.ByTagName, "play-view"})
+	menuButton       = joinLocs(playView, loc{selenium.ByID, "menu-button"})
+	coverImage       = joinLocs(playView, loc{selenium.ByID, "cover-img"})
+	ratingOverlayDiv = joinLocs(playView, loc{selenium.ByID, "rating-overlay"})
+	artistDiv        = joinLocs(playView, loc{selenium.ByID, "artist"})
+	titleDiv         = joinLocs(playView, loc{selenium.ByID, "title"})
+	albumDiv         = joinLocs(playView, loc{selenium.ByID, "album"})
+	timeDiv          = joinLocs(playView, loc{selenium.ByID, "time"})
+	prevButton       = joinLocs(playView, loc{selenium.ByID, "prev"})
+	playPauseButton  = joinLocs(playView, loc{selenium.ByID, "play-pause"})
+	nextButton       = joinLocs(playView, loc{selenium.ByID, "next"})
 
-	audioWrapper = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "audio-wrapper"})
+	audioWrapper = joinLocs(playView, loc{selenium.ByCSSSelector, "audio-wrapper"})
 	audio        = joinLocs(audioWrapper, loc{selenium.ByCSSSelector, "audio"})
 
-	playlistTable = joinLocs(musicPlayer, loc{selenium.ByID, "playlist"},
+	playlistTable = joinLocs(playView, loc{selenium.ByID, "playlist"},
 		loc{selenium.ByCSSSelector, "table"})
 
 	updateDialog       = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.update > span"})
@@ -104,7 +104,7 @@ var (
 	updateTagSuggester = joinLocs(updateDialog, loc{selenium.ByID, "tag-suggester"})
 	updateCloseImage   = joinLocs(updateDialog, loc{selenium.ByID, "close-icon"})
 
-	presentationLayer = joinLocs(musicPlayer, loc{selenium.ByCSSSelector, "presentation-layer"})
+	presentationLayer = joinLocs(playView, loc{selenium.ByCSSSelector, "presentation-layer"})
 	currentArtistDiv  = joinLocs(presentationLayer, loc{selenium.ByID, "current-artist"})
 	currentTitleDiv   = joinLocs(presentationLayer, loc{selenium.ByID, "current-title"})
 	currentAlbumDiv   = joinLocs(presentationLayer, loc{selenium.ByID, "current-album"})
@@ -112,27 +112,27 @@ var (
 	nextTitleDiv      = joinLocs(presentationLayer, loc{selenium.ByID, "next-title"})
 	nextAlbumDiv      = joinLocs(presentationLayer, loc{selenium.ByID, "next-album"})
 
-	musicSearcher             = joinLocs(loc{selenium.ByTagName, "music-searcher"})
-	keywordsInput             = joinLocs(musicSearcher, loc{selenium.ByID, "keywords-input"})
-	tagsInput                 = joinLocs(musicSearcher, loc{selenium.ByID, "tags-input"})
-	firstTrackCheckbox        = joinLocs(musicSearcher, loc{selenium.ByID, "first-track-checkbox"})
-	unratedCheckbox           = joinLocs(musicSearcher, loc{selenium.ByID, "unrated-checkbox"})
-	minRatingSelect           = joinLocs(musicSearcher, loc{selenium.ByID, "min-rating-select"})
-	orderByLastPlayedCheckbox = joinLocs(musicSearcher, loc{selenium.ByID, "order-by-last-played-checkbox"})
-	maxPlaysInput             = joinLocs(musicSearcher, loc{selenium.ByID, "max-plays-input"})
-	firstPlayedSelect         = joinLocs(musicSearcher, loc{selenium.ByID, "first-played-select"})
-	lastPlayedSelect          = joinLocs(musicSearcher, loc{selenium.ByID, "last-played-select"})
-	presetSelect              = joinLocs(musicSearcher, loc{selenium.ByID, "preset-select"})
-	searchButton              = joinLocs(musicSearcher, loc{selenium.ByID, "search-button"})
-	resetButton               = joinLocs(musicSearcher, loc{selenium.ByID, "reset-button"})
-	luckyButton               = joinLocs(musicSearcher, loc{selenium.ByID, "lucky-button"})
-	appendButton              = joinLocs(musicSearcher, loc{selenium.ByID, "append-button"})
-	insertButton              = joinLocs(musicSearcher, loc{selenium.ByID, "insert-button"})
-	replaceButton             = joinLocs(musicSearcher, loc{selenium.ByID, "replace-button"})
+	searchView                = joinLocs(loc{selenium.ByTagName, "search-view"})
+	keywordsInput             = joinLocs(searchView, loc{selenium.ByID, "keywords-input"})
+	tagsInput                 = joinLocs(searchView, loc{selenium.ByID, "tags-input"})
+	firstTrackCheckbox        = joinLocs(searchView, loc{selenium.ByID, "first-track-checkbox"})
+	unratedCheckbox           = joinLocs(searchView, loc{selenium.ByID, "unrated-checkbox"})
+	minRatingSelect           = joinLocs(searchView, loc{selenium.ByID, "min-rating-select"})
+	orderByLastPlayedCheckbox = joinLocs(searchView, loc{selenium.ByID, "order-by-last-played-checkbox"})
+	maxPlaysInput             = joinLocs(searchView, loc{selenium.ByID, "max-plays-input"})
+	firstPlayedSelect         = joinLocs(searchView, loc{selenium.ByID, "first-played-select"})
+	lastPlayedSelect          = joinLocs(searchView, loc{selenium.ByID, "last-played-select"})
+	presetSelect              = joinLocs(searchView, loc{selenium.ByID, "preset-select"})
+	searchButton              = joinLocs(searchView, loc{selenium.ByID, "search-button"})
+	resetButton               = joinLocs(searchView, loc{selenium.ByID, "reset-button"})
+	luckyButton               = joinLocs(searchView, loc{selenium.ByID, "lucky-button"})
+	appendButton              = joinLocs(searchView, loc{selenium.ByID, "append-button"})
+	insertButton              = joinLocs(searchView, loc{selenium.ByID, "insert-button"})
+	replaceButton             = joinLocs(searchView, loc{selenium.ByID, "replace-button"})
 
-	searchResultsCheckbox = joinLocs(musicSearcher, loc{selenium.ByID, "results-table"},
+	searchResultsCheckbox = joinLocs(searchView, loc{selenium.ByID, "results-table"},
 		loc{selenium.ByCSSSelector, `th input[type="checkbox"]`})
-	searchResultsTable = joinLocs(musicSearcher, loc{selenium.ByID, "results-table"},
+	searchResultsTable = joinLocs(searchView, loc{selenium.ByID, "results-table"},
 		loc{selenium.ByCSSSelector, "table"})
 )
 
@@ -211,7 +211,7 @@ func (p *page) configPage() {
 		if err := btn.Click(); err != nil {
 			p.t.Fatalf("Failed clicking login button at %v: %v", p.desc(), err)
 		}
-		p.getOrFail(musicPlayer)
+		p.getOrFail(playView)
 	}
 	if _, err := p.wd.ExecuteScript("document.test.setPlayDelayMs(10)", nil); err != nil {
 		p.t.Fatalf("Failed setting short play delay at %v: %v", p.desc(), err)

@@ -54,10 +54,10 @@
       }
       #container > :not(:last-child) {
         /* With Chrome on a high-DPI display, there's a 1-2 pixel white gap
-         * between the music-player component and its right border that I'm
+         * between the play-view component and its right border that I'm
          * utterly unable to get rid of. I've tried:
          *
-         * - setting a left border on music-searcher instead
+         * - setting a left border on search-view instead
          * - setting negative margins
          * - using grid-gap and background-color on #container
          * - making #container a flexbox and adding a dedicated div for the border
@@ -110,8 +110,8 @@
 
   <body>
     <div id="container">
-      <music-player></music-player>
-      <music-searcher></music-searcher>
+      <play-view></play-view>
+      <search-view></search-view>
     </div>
   </body>
 </html>

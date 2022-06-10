@@ -159,7 +159,7 @@ const PLAY_DELAY_MS = 500; // delay before playing when cycling track
 const PRELOAD_SEC = 20; // seconds before end of song to load next song
 const TIME_UPDATE_SLOP_MS = 10; // time to wait past second boundary
 
-// <music-player> plays and displays information about songs. It also maintains
+// <play-view> plays and displays information about songs. It also maintains
 // and displays a playlist. Songs can be enqueued by calling enqueueSongs().
 //
 // When new tags are created, a 'newtags' CustomEvent with a 'detail.tags'
@@ -176,7 +176,7 @@ const TIME_UPDATE_SLOP_MS = 10; // time to wait past second boundary
 // CustomEvent is emitted with a 'detail.url' string property corresponding to a
 // URL to a |smallCoverSize| WebP image. This property is null if no cover art
 // is available.
-export class MusicPlayer extends HTMLElement {
+export class PlayView extends HTMLElement {
   #config = getConfig();
   #updater: Updater | null = null; // initialized in connectedCallback()
   #songs: Song[] = []; // songs in the order in which they should be played
@@ -225,7 +225,7 @@ export class MusicPlayer extends HTMLElement {
     });
 
     // We're leaking this callback, but it doesn't matter in practice since
-    // music-player never gets removed from the DOM.
+    // play-view never gets removed from the DOM.
     this.#config.addCallback((name, value) => {
       if ([Pref.GAIN_TYPE, Pref.PRE_AMP].includes(name)) {
         this.#updateGain();
@@ -624,7 +624,7 @@ export class MusicPlayer extends HTMLElement {
 
   #updateSongDisplay() {
     const song = this.#currentSong;
-    document.title = song ? `${song.artist} - ${song.title}` : 'Player';
+    document.title = song ? `${song.artist} - ${song.title}` : 'nup';
 
     this.#artistDiv.innerText = song ? song.artist : '';
     this.#titleDiv.innerText = song ? song.title : '';
@@ -981,4 +981,4 @@ export class MusicPlayer extends HTMLElement {
   }
 }
 
-customElements.define('music-player', MusicPlayer);
+customElements.define('play-view', PlayView);

@@ -271,7 +271,7 @@ const template = createTemplate(`
 <div id="waiting">Waiting for server...</div>
 `);
 
-// <music-searcher> displays a form for sending queries to the server and
+// <search-view> displays a form for sending queries to the server and
 // displays the results in a <song-table>. It provides controls for enqueuing
 // some or all of the results.
 //
@@ -281,7 +281,7 @@ const template = createTemplate(`
 // - |clearFirst|: true if playlist should be cleared first
 // - |afterCurrent|: true to insert songs after current song (rather than at end)
 // - |shuffled|: true if search results were shuffled
-export class MusicSearcher extends HTMLElement {
+export class SearchView extends HTMLElement {
   #fetchController: AbortController | null = null;
   #shadow = createShadow(this, template);
 
@@ -649,7 +649,7 @@ export class MusicSearcher extends HTMLElement {
   };
 }
 
-customElements.define('music-searcher', MusicSearcher);
+customElements.define('search-view', SearchView);
 
 function parseQueryString(text: string) {
   const terms: string[] = [];

@@ -3,23 +3,23 @@
 
 import { $, commonStyles, handleFetchError, smallCoverSize } from './common.js';
 import { getConfig, Pref, Theme } from './config.js';
-import type { MusicPlayer } from './music-player.js';
-import type { MusicSearcher } from './music-searcher.js';
+import type { PlayView } from './play-view.js';
+import type { SearchView } from './search-view.js';
 
 document.adoptedStyleSheets = [commonStyles];
 
 // Import web components so they'll be included in the bundle.
 // If we weren't bundling, it'd be faster to load these from index.html.
 import './audio-wrapper.js';
-import './music-player.js';
-import './music-searcher.js';
+import './play-view.js';
 import './presentation-layer.js';
+import './search-view.js';
 import './song-table.js';
 import './tag-suggester.js';
 
 const config = getConfig();
-const player = document.querySelector('music-player') as MusicPlayer;
-const searcher = document.querySelector('music-searcher') as MusicSearcher;
+const playView = document.querySelector('play-view') as PlayView;
+const searchView = document.querySelector('search-view') as SearchView;
 
 // Watch for theme changes.
 const darkMediaQuery = '(prefers-color-scheme: dark)';
@@ -52,7 +52,7 @@ const fetchServerTags = () =>
     .then((res) => res.json())
     .then((tags: string[]) => {
       console.log(`Fetched ${tags.length} tag(s)`);
-      serverTags = player.tags = searcher.tags = tags;
+      serverTags = playView.tags = searchView.tags = tags;
     })
     .catch((err) => {
       console.error(`Failed fetching tags: ${err}`);
@@ -60,7 +60,7 @@ const fetchServerTags = () =>
 fetchServerTags();
 
 // Use the cover art as the favicon.
-player.addEventListener('cover', ((e: CustomEvent) => {
+playView.addEventListener('cover', ((e: CustomEvent) => {
   const favicon = $('favicon') as HTMLLinkElement;
   const setSize = (s: string) => favicon.sizes.replace(favicon.sizes[0], s);
   if (e.detail.url) {
@@ -78,15 +78,15 @@ player.addEventListener('cover', ((e: CustomEvent) => {
 }) as EventListenerOrEventListenerObject);
 
 // Wire up components.
-player.addEventListener('field', ((e: CustomEvent) => {
-  searcher.resetFields(e.detail.artist, e.detail.album, e.detail.albumId);
+playView.addEventListener('field', ((e: CustomEvent) => {
+  searchView.resetFields(e.detail.artist, e.detail.album, e.detail.albumId);
 }) as EventListenerOrEventListenerObject);
-player.addEventListener('newtags', ((e: CustomEvent) => {
+playView.addEventListener('newtags', ((e: CustomEvent) => {
   serverTags = serverTags.concat(e.detail.tags);
-  player.tags = searcher.tags = serverTags;
+  playView.tags = searchView.tags = serverTags;
 }) as EventListenerOrEventListenerObject);
-searcher.addEventListener('enqueue', ((e: CustomEvent) => {
-  player.enqueueSongs(
+searchView.addEventListener('enqueue', ((e: CustomEvent) => {
+  playView.enqueueSongs(
     e.detail.songs,
     e.detail.clearFirst,
     e.detail.afterCurrent,
@@ -97,12 +97,12 @@ searcher.addEventListener('enqueue', ((e: CustomEvent) => {
 // Used by web tests.
 (document as any).test = {
   reset: () => {
-    player.resetForTest();
-    searcher.resetForTest();
+    playView.resetForTest();
+    searchView.resetForTest();
     // Make a hacky attempt to close any modal dialogs.
     [...document.querySelectorAll('dialog')].forEach((d) => d.close());
   },
-  setPlayDelayMs: (ms: number) => player.setPlayDelayMsForTest(ms),
+  setPlayDelayMs: (ms: number) => playView.setPlayDelayMsForTest(ms),
   updateTags: async () => await fetchServerTags(),
   dragElement: (
     src: HTMLElement,

@@ -196,9 +196,9 @@ func writeLogHeader(s string) {
 }
 
 // Log messages usually look like this:
-//  http://localhost:8080/music-searcher.js 478:18 "Got response with 1 song(s)"
+//  http://localhost:8080/search-view.js 478:18 "Got response with 1 song(s)"
 // This regexp matches the filename, line number, and message.
-var logRegexp = regexp.MustCompile(`(?s)^https?://[^ ]+/([^ /]+\.js) (\d+):\d+ (.*)$`)
+var logRegexp = regexp.MustCompile(`(?s)^https?://[^ ]+/([^ /]+\.[jt]s) (\d+):\d+ (.*)$`)
 
 // copyBrowserLogs gets new log messages from the browser and writes them to browserLog.
 func copyBrowserLogs() {
@@ -475,7 +475,7 @@ func TestPlayTimeQuery(t *testing.T) {
 		page.clickOption(lastPlayedSelect, tc.last)
 		// TODO: This sometimes fails with the following error:
 		//
-		//  page.go:341: Failed clicking [{tag name music-searcher} {id search-button}] at
+		//  page.go:341: Failed clicking [{tag name search-view} {id search-button}] at
 		//  web_test.go:476 (one year / ): unknown error - 64: element click intercepted: Element
 		//  <button id="search-button" type="button">...</button> is not clickable at point (575,
 		//  343). Other element would receive the click: <dialog class="dialog" open="">...</dialog>
@@ -483,7 +483,7 @@ func TestPlayTimeQuery(t *testing.T) {
 		// Confusingly, the search button has already been clicked for the day and week cases at
 		// this point. I don't see anything fishy in the browser or server logs: the two earlier
 		// queries are successful. I also don't know what could be opening a <dialog> at this point:
-		// music-searcher opens them for empty or failed searches, but neither of those should be
+		// search-view opens them for empty or failed searches, but neither of those should be
 		// happening here. I've added the dialog's class to the <dialog> element itself to make this
 		// easier to debug the next time it happens.
 		page.click(searchButton)
