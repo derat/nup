@@ -255,6 +255,7 @@ export class MusicPlayer extends HTMLElement {
             id: 'stats',
             text: 'Stats…',
             cb: showStats,
+            hotkey: 'Alt+S',
           },
           {
             id: 'info',
@@ -447,6 +448,9 @@ export class MusicPlayer extends HTMLElement {
           this.#updateDialog?.focusRating();
           this.#setPresentationLayerVisible(false);
           return true;
+        } else if (e.altKey && e.key === 's') {
+          showStats();
+          this.#setPresentationLayerVisible(false);
         } else if (e.altKey && e.key === 't') {
           this.#showUpdateDialog();
           this.#updateDialog?.focusTags();
