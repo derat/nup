@@ -188,15 +188,17 @@ const template = createTemplate(`
 </div>
 `);
 
-// <presentation-layer> is a simple fullscreen overlay displaying information
-// about the current and next song.
+// <fullscreen-overlay> is a simple overlay used by <play-view> to display
+// information about the current and next song. The current song's cover image
+// covers the entire background.
 //
 // When the next track information is clicked, a 'next' event is emitted.
-// When a click is received anywhere else, a 'hide' event is emitted.
-export class PresentationLayer extends HTMLElement {
+export class FullscreenOverlay extends HTMLElement {
+  #visible = false; // view is visible
+
   #duration = 0; // duration of current song in seconds
-  #lastPos = 0; // last value in seconds passed to updatePosition()
-  #visible = false;
+  #position = 0; // last value in seconds passed to updatePosition()
+
   #currentFilename: string | null = null;
   #nextFilename: string | null = null;
 
@@ -222,8 +224,11 @@ export class PresentationLayer extends HTMLElement {
   constructor() {
     super();
 
+    this.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) this.visible = false;
+    });
     this.#shadow.host.addEventListener('click', (e) => {
-      this.dispatchEvent(new Event('hide'));
+      this.visible = false;
       e.stopPropagation();
     });
     this.#nextDiv.addEventListener('click', (e) => {
@@ -234,9 +239,28 @@ export class PresentationLayer extends HTMLElement {
     this.updateSongs(null, null);
   }
 
+  connectedCallback() {
+    document.addEventListener(
+      'visibilitychange',
+      this.#onDocumentVisibilityChange
+    );
+  }
+
+  disconnectedCallback() {
+    document.removeEventListener(
+      'visibilitychange',
+      this.#onDocumentVisibilityChange
+    );
+  }
+
+  #onDocumentVisibilityChange = () => {
+    if (!document.hidden && this.visible) this.updatePosition(this.#position);
+  };
+
   updateSongs(currentSong: Song | null, nextSong: Song | null) {
     if (!currentSong) {
       this.#currentDetails.classList.add('hidden');
+      this.#duration = 0;
       this.#currentFilename = null;
       this.style.backgroundImage = '';
     } else {
@@ -245,23 +269,24 @@ export class PresentationLayer extends HTMLElement {
       this.#currentTitle.innerText = currentSong.title;
       this.#currentAlbum.innerText = currentSong.album;
 
-      this.#progressBar.style.width = '0px';
       this.#timeDiv.innerText = '';
       this.#durationDiv.innerText = formatDuration(currentSong.length);
       this.#duration = currentSong.length;
       this.#currentFilename = currentSong.coverFilename ?? null;
 
       // Set the host element's background to the low-resolution cover image
-      // (which we've probably already loaded). If the presentation layer
-      // isn't currently visible but gets shown later, this image will act as
-      // a placeholder while we're loading the full-res version. We use the
-      // host element instead of |#currentCover| since Chrome appears to clear
-      // <img> elements when a new image is being loaded in response to a
-      // change to the src attribute.
+      // (which we've probably already loaded). If the overlay isn't currently
+      // visible but gets shown later, this image will act as a placeholder
+      // while we're loading the full-res version. We use the host element
+      // instead of |#currentCover| since Chrome appears to clear
+      // <img> elements when a new image is being loaded in response to a change
+      // to the src attribute.
       const url = getCoverUrl(this.#currentFilename, smallCoverSize);
       // Escape characters: https://stackoverflow.com/a/33541245
       this.style.backgroundImage = `url("${encodeURI(url)}")`;
     }
+
+    this.updatePosition(0);
 
     // Make the "old" cover image display the image that we were just
     // displaying, if any, and then fade out. We swap in a new image to
@@ -296,9 +321,9 @@ export class PresentationLayer extends HTMLElement {
   }
 
   updatePosition(sec: number) {
-    this.#lastPos = sec;
+    this.#position = sec;
 
-    if (!this.visible || this.#duration <= 0) return;
+    if (document.hidden || !this.visible || this.#duration <= 0) return;
 
     // Make the bar overlap with the border to avoid hairline gaps.
     const fraction = Math.min(sec / this.#duration, 1);
@@ -314,7 +339,12 @@ export class PresentationLayer extends HTMLElement {
   set visible(visible: boolean) {
     if (this.#visible === visible) return;
 
+    this.#visible = visible;
+
     if (visible) {
+      this.classList.add('visible');
+      this.requestFullscreen();
+
       // If we weren't visible when updateSongs() was last called, we haven't
       // loaded the current cover image yet or preloaded the next one, so do
       // it now.
@@ -322,19 +352,19 @@ export class PresentationLayer extends HTMLElement {
       if (this.#nextFilename) preloadImage(getCoverUrl(this.#nextFilename));
 
       // Make sure the progress bar and displayed time are correct.
-      this.updatePosition(this.#lastPos);
+      this.updatePosition(this.#position);
 
       // Prevent the old cover from fading out again.
       // Its animation seems to be repeated whenever it becomes visible.
       this.#oldCover.classList.add('hidden');
+    } else {
+      this.classList.remove('visible');
+      document.exitFullscreen();
     }
-
-    visible ? this.classList.add('visible') : this.classList.remove('visible');
-    this.#visible = visible;
   }
 }
 
-customElements.define('presentation-layer', PresentationLayer);
+customElements.define('fullscreen-overlay', FullscreenOverlay);
 
 function updateImg(img: HTMLImageElement, url: string | null) {
   if (url) {

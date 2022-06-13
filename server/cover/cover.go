@@ -20,7 +20,7 @@
 // https://github.com/chromium/chromium/blob/3abe39d/components/media_message_center/media_notification_view_modern_impl.cc#L50
 //
 // In the web interface, <play-view> uses 70x70 CSS pixels for the current song's cover and
-// <presentation-layer> uses 80x80 CSS pixels for the next song's cover. The song info dialog uses
+// <fullscreen-overlay> uses 80x80 CSS pixels for the next song's cover. The song info dialog uses
 // 192x192 CSS pixels. Favicons allegedly take a wide variety of sizes:
 // https://stackoverflow.com/a/26807004
 //

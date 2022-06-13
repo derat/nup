@@ -11,8 +11,8 @@ document.adoptedStyleSheets = [commonStyles];
 // Import web components so they'll be included in the bundle.
 // If we weren't bundling, it'd be faster to load these from index.html.
 import './audio-wrapper.js';
+import './fullscreen-overlay.js';
 import './play-view.js';
-import './presentation-layer.js';
 import './search-view.js';
 import './song-table.js';
 import './tag-suggester.js';

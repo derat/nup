@@ -68,7 +68,7 @@ var (
 	statsDialog = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.stats > span"})
 
 	menu         = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.menu > span"})
-	menuPresent  = joinLocs(menu, loc{selenium.ByID, "present"})
+	menuOverlay  = joinLocs(menu, loc{selenium.ByID, "overlay"})
 	menuOptions  = joinLocs(menu, loc{selenium.ByID, "options"})
 	menuStats    = joinLocs(menu, loc{selenium.ByID, "stats"})
 	menuInfo     = joinLocs(menu, loc{selenium.ByID, "info"})
@@ -104,13 +104,13 @@ var (
 	updateTagSuggester = joinLocs(updateDialog, loc{selenium.ByID, "tag-suggester"})
 	updateCloseImage   = joinLocs(updateDialog, loc{selenium.ByID, "close-icon"})
 
-	presentationLayer = joinLocs(playView, loc{selenium.ByCSSSelector, "presentation-layer"})
-	currentArtistDiv  = joinLocs(presentationLayer, loc{selenium.ByID, "current-artist"})
-	currentTitleDiv   = joinLocs(presentationLayer, loc{selenium.ByID, "current-title"})
-	currentAlbumDiv   = joinLocs(presentationLayer, loc{selenium.ByID, "current-album"})
-	nextArtistDiv     = joinLocs(presentationLayer, loc{selenium.ByID, "next-artist"})
-	nextTitleDiv      = joinLocs(presentationLayer, loc{selenium.ByID, "next-title"})
-	nextAlbumDiv      = joinLocs(presentationLayer, loc{selenium.ByID, "next-album"})
+	fullscreenOverlay = joinLocs(playView, loc{selenium.ByCSSSelector, "fullscreen-overlay"})
+	currentArtistDiv  = joinLocs(fullscreenOverlay, loc{selenium.ByID, "current-artist"})
+	currentTitleDiv   = joinLocs(fullscreenOverlay, loc{selenium.ByID, "current-title"})
+	currentAlbumDiv   = joinLocs(fullscreenOverlay, loc{selenium.ByID, "current-album"})
+	nextArtistDiv     = joinLocs(fullscreenOverlay, loc{selenium.ByID, "next-artist"})
+	nextTitleDiv      = joinLocs(fullscreenOverlay, loc{selenium.ByID, "next-title"})
+	nextAlbumDiv      = joinLocs(fullscreenOverlay, loc{selenium.ByID, "next-album"})
 
 	searchView                = joinLocs(loc{selenium.ByTagName, "search-view"})
 	keywordsInput             = joinLocs(searchView, loc{selenium.ByID, "keywords-input"})
@@ -695,8 +695,8 @@ func (p *page) checkPlaylist(songs []db.Song, checks ...songListCheck) {
 	}
 }
 
-// checkPresentation waits for the presentation layer to display the specified songs.
-func (p *page) checkPresentation(cur, next *db.Song) {
+// checkFullscreenOverlay waits for fullscreen-overlay to display the specified songs.
+func (p *page) checkFullscreenOverlay(cur, next *db.Song) {
 	var curWant, nextWant *songInfo
 	if cur != nil {
 		s := makeSongInfo(*cur)
@@ -745,7 +745,7 @@ func (p *page) checkPresentation(cur, next *db.Song) {
 		return nil
 	}); err != nil {
 		curGot, nextGot := getSongs()
-		msg := fmt.Sprintf("Bad presentation songs at %v\n", p.desc())
+		msg := fmt.Sprintf("Bad fullscreen-overlay songs at %v\n", p.desc())
 		msg += "Want:\n"
 		msg += "  " + curWant.String() + "\n"
 		msg += "  " + nextWant.String() + "\n"

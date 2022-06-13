@@ -1055,7 +1055,7 @@ func TestPresets(t *testing.T) {
 	}
 }
 
-func TestPresentation(t *testing.T) {
+func TestFullscreenOverlay(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
 	show := func() { page.emitKeyDown("v", 86, true /* alt */) }
@@ -1072,9 +1072,9 @@ func TestPresentation(t *testing.T) {
 	page.click(luckyButton)
 	page.checkPlaylist(joinSongs(song1, song2), hasActive(0))
 	show()
-	page.checkPresentation(&song1, &song2)
+	page.checkFullscreenOverlay(&song1, &song2)
 	page.sendKeys(body, selenium.EscapeKey, false)
-	page.checkPresentation(nil, nil)
+	page.checkFullscreenOverlay(nil, nil)
 
 	// Insert song3 after song1 and check that it's displayed as the next song.
 	page.setText(keywordsInput, "album:"+song3.Album)
@@ -1083,26 +1083,26 @@ func TestPresentation(t *testing.T) {
 	page.click(insertButton)
 	page.checkPlaylist(joinSongs(song1, song3, song2), hasActive(0))
 	show()
-	page.checkPresentation(&song1, &song3)
+	page.checkFullscreenOverlay(&song1, &song3)
 
 	// Skip to the next song.
 	next()
-	page.checkPresentation(&song3, &song2)
+	page.checkFullscreenOverlay(&song3, &song2)
 
-	// Skip to the last song. Displaying the update window should hide the presentation layer.
+	// Skip to the last song. Displaying the update window should hide the overlay.
 	next()
-	page.checkPresentation(&song2, nil)
+	page.checkFullscreenOverlay(&song2, nil)
 	rate()
-	page.checkPresentation(nil, nil)
+	page.checkFullscreenOverlay(nil, nil)
 	page.click(updateCloseImage)
 
-	// The presentation layer should be displayable via the menu too, and clicking on the layer
+	// The overlay should be displayable via the menu too, and clicking on the overlay
 	// should hide it.
 	page.click(menuButton)
-	page.click(menuPresent)
-	page.checkPresentation(&song2, nil)
-	page.click(presentationLayer)
-	page.checkPresentation(nil, nil)
+	page.click(menuOverlay)
+	page.checkFullscreenOverlay(&song2, nil)
+	page.click(fullscreenOverlay)
+	page.checkFullscreenOverlay(nil, nil)
 }
 
 func TestStats(t *testing.T) {

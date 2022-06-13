@@ -22,9 +22,9 @@ import {
 } from './common.js';
 import { getConfig, GainType, Pref } from './config.js';
 import { isDialogShown } from './dialog.js';
+import type { FullscreenOverlay } from './fullscreen-overlay.js';
 import { createMenu, isMenuShown } from './menu.js';
 import { showOptionsDialog } from './options-dialog.js';
-import type { PresentationLayer } from './presentation-layer.js';
 import { showSongInfoDialog } from './song-info-dialog.js';
 import type { SongTable } from './song-table.js';
 import { showStatsDialog } from './stats-dialog.js';
@@ -126,7 +126,7 @@ const template = createTemplate(`
   }
 </style>
 
-<presentation-layer></presentation-layer>
+<fullscreen-overlay></fullscreen-overlay>
 
 <div id="menu-button">⋯</div>
 
@@ -169,10 +169,6 @@ const UPDATE_POSITION_SLOP_MS = 10; // time to wait past second boundary
 // When an artist or album field in the playlist is clicked, a 'field'
 // CustomEvent is emitted. See <song-table> for more details.
 //
-// When the <presentation-layer>'s visibility changes, a 'present' CustomEvent
-// is emitted with a 'detail.visible' boolean property. The document's scrollbar
-// should be hidden while the layer is visible.
-//
 // When the current cover art changes due to a song change, a 'cover'
 // CustomEvent is emitted with a 'detail.url' string property corresponding to a
 // URL to a |smallCoverSize| WebP image. This property is null if no cover art
@@ -196,9 +192,9 @@ export class PlayView extends HTMLElement {
   #shuffled = false; // playlist contains shuffled songs
 
   #shadow = createShadow(this, template);
-  #presentationLayer = this.#shadow.querySelector(
-    'presentation-layer'
-  ) as PresentationLayer;
+  #overlay = this.#shadow.querySelector(
+    'fullscreen-overlay'
+  ) as FullscreenOverlay;
   #audio = this.#shadow.querySelector('audio-wrapper') as AudioWrapper;
   #playlistTable = $('playlist', this.#shadow) as SongTable;
 
@@ -218,12 +214,7 @@ export class PlayView extends HTMLElement {
 
     this.#shadow.adoptedStyleSheets = [commonStyles];
 
-    this.#presentationLayer.addEventListener('next', () => {
-      this.#cycleTrack(1);
-    });
-    this.#presentationLayer.addEventListener('hide', () => {
-      this.#setPresentationLayerVisible(false);
-    });
+    this.#overlay.addEventListener('next', () => this.#cycleTrack(1));
 
     // We're leaking this callback, but it doesn't matter in practice since
     // play-view never gets removed from the DOM.
@@ -241,9 +232,9 @@ export class PlayView extends HTMLElement {
         rect.bottom,
         [
           {
-            id: 'present',
-            text: 'Presentation',
-            cb: () => this.#setPresentationLayerVisible(true),
+            id: 'overlay',
+            text: 'Overlay',
+            cb: () => (this.#overlay.visible = true),
             hotkey: 'Alt+V',
           },
           {
@@ -310,7 +301,7 @@ export class PlayView extends HTMLElement {
         e.detail.toIndex,
         this.#currentIndex
       )!;
-      this.#updatePresentationLayerSongs();
+      this.#updateOverlaySongs();
       this.#updateButtonState();
       // TODO: Preload the next song if needed.
     }) as EventListenerOrEventListenerObject);
@@ -427,19 +418,19 @@ export class PlayView extends HTMLElement {
         if (e.altKey && e.key === 'd') {
           const song = this.#currentSong;
           if (song) window.open(getDumpSongUrl(song.songId), '_blank');
-          this.#setPresentationLayerVisible(false);
+          this.#overlay.visible = false;
           return true;
         } else if (e.altKey && e.key === 'i') {
           const song = this.#currentSong;
           if (song) showSongInfoDialog(song);
-          this.#setPresentationLayerVisible(false);
+          this.#overlay.visible = false;
           return true;
         } else if (e.altKey && e.key === 'n') {
           this.#cycleTrack(1, true /* delayPlay */);
           return true;
         } else if (e.altKey && e.key === 'o') {
           showOptionsDialog();
-          this.#setPresentationLayerVisible(false);
+          this.#overlay.visible = false;
           return true;
         } else if (e.altKey && e.key === 'p') {
           this.#cycleTrack(-1, true /* delayPlay */);
@@ -447,24 +438,24 @@ export class PlayView extends HTMLElement {
         } else if (e.altKey && e.key === 'r') {
           this.#showUpdateDialog();
           this.#updateDialog?.focusRating();
-          this.#setPresentationLayerVisible(false);
+          this.#overlay.visible = false;
           return true;
         } else if (e.altKey && e.key === 's') {
           showStatsDialog();
-          this.#setPresentationLayerVisible(false);
+          this.#overlay.visible = false;
         } else if (e.altKey && e.key === 't') {
           this.#showUpdateDialog();
           this.#updateDialog?.focusTags();
-          this.#setPresentationLayerVisible(false);
+          this.#overlay.visible = false;
           return true;
         } else if (e.altKey && e.key === 'v') {
-          this.#setPresentationLayerVisible(!this.#presentationLayer.visible);
+          this.#overlay.visible = !this.#overlay.visible;
           return true;
         } else if (e.key === ' ') {
           this.#togglePause();
           return true;
-        } else if (e.key === 'Escape' && this.#presentationLayer.visible) {
-          this.#setPresentationLayerVisible(false);
+        } else if (e.key === 'Escape' && this.#overlay.visible) {
+          this.#overlay.visible = false;
           return true;
         } else if (e.key === 'ArrowLeft') {
           this.#seek(-SEEK_SEC);
@@ -528,7 +519,7 @@ export class PlayView extends HTMLElement {
       this.#cycleTrack(1);
     } else {
       this.#updateButtonState();
-      this.#updatePresentationLayerSongs();
+      this.#updateOverlaySongs();
     }
   }
 
@@ -552,7 +543,7 @@ export class PlayView extends HTMLElement {
         this.#playlistTable.setRowActive(this.#currentIndex, true);
       }
       this.#updateButtonState();
-      this.#updatePresentationLayerSongs();
+      this.#updateOverlaySongs();
       return;
     }
 
@@ -592,7 +583,7 @@ export class PlayView extends HTMLElement {
       this.#currentIndex = -1;
       this.#updateSongDisplay();
       this.#updateButtonState();
-      this.#updatePresentationLayerSongs();
+      this.#updateOverlaySongs();
       this.#reachedEndOfSongs = false;
       return;
     }
@@ -607,7 +598,7 @@ export class PlayView extends HTMLElement {
     this.#audio.src = null;
 
     this.#updateSongDisplay();
-    this.#updatePresentationLayerSongs();
+    this.#updateOverlaySongs();
     this.#updateButtonState();
     this.#play(delayPlay);
 
@@ -646,7 +637,7 @@ export class PlayView extends HTMLElement {
     }
 
     // Cache the scaled cover images for the next song and the one after it.
-    // This prevents ugly laggy updates here and in <presentation-layer>.
+    // This prevents ugly laggy updates here and in <fullscreen-overlay>.
     // Note that this will probably only work for non-admin users due to an
     // App Engine "feature": https://github.com/derat/nup/issues/1
     const precacheCover = (s?: Song) => {
@@ -710,8 +701,8 @@ export class PlayView extends HTMLElement {
     });
   }
 
-  #updatePresentationLayerSongs() {
-    this.#presentationLayer.updateSongs(
+  #updateOverlaySongs() {
+    this.#overlay.updateSongs(
       this.#currentSong,
       this.#songs[this.#currentIndex + 1] ?? null
     );
@@ -886,11 +877,12 @@ export class PlayView extends HTMLElement {
       this.#reportedCurrentTrack = true;
     }
 
+    this.#overlay.updatePosition(pos);
+
     // Only update the displayed time while the document is visible.
     if (!document.hidden) {
       const str = dur ? `${formatDuration(pos)} / ${formatDuration(dur)}` : '';
       if (this.#timeDiv.innerText !== str) this.#timeDiv.innerText = str;
-      this.#presentationLayer.updatePosition(pos);
     }
 
     // Preload the next song once we're nearing the end of this one.
@@ -952,13 +944,6 @@ export class PlayView extends HTMLElement {
       }
       this.#updateCoverTitleAttribute();
     });
-  }
-
-  // Shows or hides the presentation layer.
-  #setPresentationLayerVisible(visible: boolean) {
-    if (this.#presentationLayer.visible === visible) return;
-    this.#presentationLayer.visible = visible;
-    this.dispatchEvent(new CustomEvent('present', { detail: { visible } }));
   }
 
   // Adjusts |audio|'s gain appropriately for the current song and settings.
