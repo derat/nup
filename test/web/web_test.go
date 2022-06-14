@@ -1099,7 +1099,7 @@ func TestFullscreenOverlay(t *testing.T) {
 	// The overlay should be displayable via the menu too, and clicking on the overlay
 	// should hide it.
 	page.click(menuButton)
-	page.click(menuOverlay)
+	page.click(menuFullscreen)
 	page.checkFullscreenOverlay(&song2, nil)
 	page.click(fullscreenOverlay)
 	page.checkFullscreenOverlay(nil, nil)

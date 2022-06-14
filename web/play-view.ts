@@ -232,8 +232,8 @@ export class PlayView extends HTMLElement {
         rect.bottom,
         [
           {
-            id: 'overlay',
-            text: 'Overlay',
+            id: 'fullscreen',
+            text: 'Fullscreen',
             cb: () => (this.#overlay.visible = true),
             hotkey: 'Alt+V',
           },

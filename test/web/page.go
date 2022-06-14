@@ -67,14 +67,14 @@ var (
 
 	statsDialog = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.stats > span"})
 
-	menu         = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.menu > span"})
-	menuOverlay  = joinLocs(menu, loc{selenium.ByID, "overlay"})
-	menuOptions  = joinLocs(menu, loc{selenium.ByID, "options"})
-	menuStats    = joinLocs(menu, loc{selenium.ByID, "stats"})
-	menuInfo     = joinLocs(menu, loc{selenium.ByID, "info"})
-	menuPlay     = joinLocs(menu, loc{selenium.ByID, "play"})
-	menuRemove   = joinLocs(menu, loc{selenium.ByID, "remove"})
-	menuTruncate = joinLocs(menu, loc{selenium.ByID, "truncate"})
+	menu           = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.menu > span"})
+	menuFullscreen = joinLocs(menu, loc{selenium.ByID, "fullscreen"})
+	menuOptions    = joinLocs(menu, loc{selenium.ByID, "options"})
+	menuStats      = joinLocs(menu, loc{selenium.ByID, "stats"})
+	menuInfo       = joinLocs(menu, loc{selenium.ByID, "info"})
+	menuPlay       = joinLocs(menu, loc{selenium.ByID, "play"})
+	menuRemove     = joinLocs(menu, loc{selenium.ByID, "remove"})
+	menuTruncate   = joinLocs(menu, loc{selenium.ByID, "truncate"})
 
 	playView         = joinLocs(loc{selenium.ByTagName, "play-view"})
 	menuButton       = joinLocs(playView, loc{selenium.ByID, "menu-button"})
