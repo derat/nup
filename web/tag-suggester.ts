@@ -9,6 +9,7 @@ const template = createTemplate(`
     display: contents;
   }
   #suggestions {
+    align-content: flex-start;
     background-color: var(--suggestions-color);
     border-radius: 4px;
     box-shadow: 0 1px 2px 1px rgba(0, 0, 0, 0.3);
@@ -17,17 +18,15 @@ const template = createTemplate(`
     flex-wrap: wrap;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 10px;
+    gap: 6px 8px;
     overflow: hidden;
-    padding: 6px 0 0 8px; /* see margin on div below */
+    padding: 6px 8px;
     position: absolute;
     text-overflow: ellipsis;
     z-index: 1;
   }
   #suggestions.shown {
     display: inline-flex;
-  }
-  #suggestions div {
-    margin: 0 8px 4px 0;
   }
   #suggestions div:hover {
     color: var(--text-hover-color);
@@ -186,6 +185,7 @@ export class TagSuggester extends HTMLElement {
       this.#target!.offsetTop + this.#target!.offsetHeight + SUGGESTION_MARGIN;
     this.#suggestionsDiv.style.top = `${offset}px`;
     this.#suggestionsDiv.style.left = `${this.#target!.offsetLeft}px`;
+    this.#suggestionsDiv.style.maxWidth = `${this.#target!.offsetWidth - 16}px`;
 
     this.#suggestionsDiv.classList.add('shown');
   }

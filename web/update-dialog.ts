@@ -79,6 +79,7 @@ export default class UpdateDialog {
     // This sucks, but I don't want to put this styling in index.html.
     this.#dialog.style.borderRadius = '4px';
     this.#dialog.style.margin = '0'; // needed to avoid centering
+    this.#dialog.style.overflow = 'visible'; // for suggestion popup
     this.#dialog.style.padding = '8px';
     this.#dialog.style.left = this.#dialog.style.top = getComputedStyle(
       this.#dialog
