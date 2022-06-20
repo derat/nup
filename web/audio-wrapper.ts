@@ -141,7 +141,7 @@ export class AudioWrapper extends HTMLElement {
 
     this.#numErrors++;
 
-    const error = (e.target as HTMLAudioElement).error!;
+    const error = this.#audio.error!;
     console.log(`Got playback error ${error.code} (${error.message})`);
     switch (error.code) {
       case error.MEDIA_ERR_ABORTED: // 1
@@ -250,10 +250,19 @@ export class AudioWrapper extends HTMLElement {
     const ctx = this.#gainNode.context as AudioContext;
     if (ctx.state === 'suspended') ctx.resume();
 
+    // Throw out the preload element if it encountered an error.
+    if (this.#preloadAudio?.error) {
+      const error = this.#preloadAudio.error;
+      console.log(
+        `Preload error ${error.code} (${error.message}) for ${this.preloadSrc}`
+      );
+      this.#preloadAudio = null;
+    }
+
     if (!src) {
       this.#audio.pause();
       this.#audio.removeAttribute('src');
-    } else if (this.preloadSrc === src && !this.#preloadAudio?.error) {
+    } else if (this.preloadSrc === src) {
       this.#replaceAudio(this.#preloadAudio!);
       this.#preloadAudio = null;
     } else {
@@ -321,10 +330,15 @@ export class AudioWrapper extends HTMLElement {
     }
 
     if (this.#preloadAudio?.src === src) return;
-    // This is split over multiple lines solely to prevent Prettier from
-    // doing some of the most hideous formatting that I've ever seen.
+
+    // It seems like the <audio> element needs to be attached to the document
+    // before setting its 'src' attribute; otherwise the element gets error code
+    // 4: "MEDIA_ELEMENT_ERROR: Media load rejected by URL safety check". I
+    // suspect that it's caused by the document being missing in this code:
+    // https://github.com/chromium/chromium/blob/41b188b8fa60155466e96829e3462f46e1ad6405/third_party/blink/renderer/core/html/media/html_media_element.cc#L1727
     const el = template.content.firstElementChild!.cloneNode(true);
     this.#preloadAudio = el as HTMLAudioElement;
+    this.#shadow.appendChild(this.#preloadAudio);
     this.#preloadAudio.src = src;
   }
 }
