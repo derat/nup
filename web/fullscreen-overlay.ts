@@ -359,7 +359,11 @@ export class FullscreenOverlay extends HTMLElement {
       this.#oldCover.classList.add('hidden');
     } else {
       this.classList.remove('visible');
-      document.exitFullscreen();
+      // Avoid an error when we get a fullscreenchange event after exiting
+      // fullscreen mode via the Escape key (handled by the browser, not us):
+      //   Uncaught (in promise) TypeError: Failed to execute 'exitFullscreen'
+      //   on 'Document': Document not active
+      if (document.fullscreenElement) document.exitFullscreen();
     }
   }
 }
