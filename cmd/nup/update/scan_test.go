@@ -5,9 +5,11 @@ package update
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
+	"syscall"
 	"testing"
 	"time"
 
@@ -162,19 +164,36 @@ func TestScanAndCompareSongs_NewFiles(t *testing.T) {
 		t.Errorf("scanAndCompareSongs(...) = %v; want %v", origDirs, want)
 	}
 
+	// This is super-cheesy, but ctimes appear to get rounded, so wait to move the files
+	// until the kernel is handing out ctimes that have moved past the last-update-time
+	// that we recorded earlier. Maybe I should just subtract a second from startTime?
+	// It's nice to exercise file and directory timestamps actually being updated, though.
+	for {
+		if func() time.Time {
+			f, err := ioutil.TempFile(dir, "temp.")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.Remove(f.Name())
+			defer f.Close()
+			fi, err := f.Stat()
+			if err != nil {
+				t.Fatal(err)
+			}
+			stat := fi.Sys().(*syscall.Stat_t)
+			return time.Unix(int64(stat.Ctim.Sec), int64(stat.Ctim.Nsec))
+		}().After(startTime) {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+
 	// Move the new files into various locations under the music dir.
 	mv := func(src, dst string) {
 		if err := os.Rename(src, dst); err != nil {
 			t.Fatal("Failed renaming file: ", err)
 		}
 	}
-
-	// This sleep statement is really gross, but it seems like without it, the rename is often
-	// (always?) fast enough that Song1s's ctime doesn't actually change during the rename,
-	// resulting in it not getting picked up by the second scan. I initially set this to 1 ms, but
-	// it was still flaky, so here we are...
-	time.Sleep(10 * time.Millisecond)
-
 	mv(filepath.Join(dir, test.Song1s.Filename),
 		filepath.Join(musicDir, oldArtist, oldAlbum, test.Song1s.Filename))
 	mv(filepath.Join(dir, newAlbum),
@@ -198,7 +217,7 @@ func TestScanAndCompareSongs_NewFiles(t *testing.T) {
 	}
 
 	// Do one more scan and check that no songs are returned.
-	newDirs = scanAndCompareSongs(t, "updated", musicDir, updateTime, newDirs, nil, []db.Song{})
+	newDirs = scanAndCompareSongs(t, "rescan", musicDir, updateTime, newDirs, nil, []db.Song{})
 	if !reflect.DeepEqual(newDirs, allDirs) {
 		t.Errorf("scanAndCompareSongs(...) = %v; want %v", newDirs, allDirs)
 	}
