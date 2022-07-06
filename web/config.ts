@@ -4,6 +4,7 @@
 // Names to pass to Config.get() or Config.set().
 export enum Pref {
   THEME = 'theme',
+  FULLSCREEN_MODE = 'fullscreenMode',
   GAIN_TYPE = 'gainType',
   PRE_AMP = 'preAmp',
 }
@@ -13,6 +14,12 @@ export enum Theme {
   AUTO = 0,
   LIGHT = 1,
   DARK = 2,
+}
+
+// Values for Pref.FULLSCREEN_MODE.
+export enum FullscreenMode {
+  SCREEN = 0,
+  WINDOW = 1,
 }
 
 // Values for Pref.GAIN_TYPE.
@@ -27,13 +34,14 @@ export enum GainType {
 export const ConfigKey = 'config';
 
 const FLOAT_NAMES = new Set([Pref.PRE_AMP]);
-const INT_NAMES = new Set([Pref.THEME, Pref.GAIN_TYPE]);
+const INT_NAMES = new Set([Pref.THEME, Pref.FULLSCREEN_MODE, Pref.GAIN_TYPE]);
 
 // Config provides persistent storage for preferences.
 export class Config {
   #callbacks: ConfigCallback[] = [];
   #values: Record<Pref, any> = {
     [Pref.THEME]: Theme.AUTO,
+    [Pref.FULLSCREEN_MODE]: FullscreenMode.SCREEN,
     [Pref.GAIN_TYPE]: GainType.AUTO,
     [Pref.PRE_AMP]: 0,
   };

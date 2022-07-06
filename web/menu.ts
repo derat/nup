@@ -13,6 +13,7 @@ const menuStyle = createTemplate(`
   .item {
     cursor: default;
     padding: 6px 12px;
+    user-select: none;
   }
   .item:hover {
     background-color: var(--menu-hover-color);

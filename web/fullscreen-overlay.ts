@@ -11,6 +11,7 @@ import {
   preloadImage,
   smallCoverSize,
 } from './common.js';
+import { getConfig, FullscreenMode, Pref } from './config.js';
 
 const template = createTemplate(`
 <style>
@@ -194,11 +195,11 @@ const template = createTemplate(`
 //
 // When the next track information is clicked, a 'next' event is emitted.
 export class FullscreenOverlay extends HTMLElement {
-  #visible = false; // view is visible
+  #config = getConfig();
 
+  #visible = false; // view is visible
   #duration = 0; // duration of current song in seconds
   #position = 0; // last value in seconds passed to updatePosition()
-
   #currentFilename: string | null = null;
   #nextFilename: string | null = null;
 
@@ -343,7 +344,10 @@ export class FullscreenOverlay extends HTMLElement {
 
     if (visible) {
       this.classList.add('visible');
-      this.requestFullscreen();
+
+      if (this.#config.get(Pref.FULLSCREEN_MODE) === FullscreenMode.SCREEN) {
+        this.requestFullscreen();
+      }
 
       // If we weren't visible when updateSongs() was last called, we haven't
       // loaded the current cover image yet or preloaded the next one, so do

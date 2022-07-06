@@ -17,7 +17,7 @@ const template = createTemplate(`
   }
   .label-col {
     display: inline-block;
-    width: 6em;
+    width: 8em;
   }
   #pre-amp-range {
     margin-right: 6px;
@@ -40,6 +40,18 @@ const template = createTemplate(`
         <option value="0">Auto</option>
         <option value="1">Light</option>
         <option value="2">Dark</option>
+      </select></span
+    >
+  </label>
+</div>
+
+<div class="row">
+  <label for="fullscreen-mode-select">
+    <span class="label-col">Fullscreen mode</span>
+    <span class="select-wrapper">
+      <select id="fullscreen-mode-select">
+        <option value="0">Screen</option>
+        <option value="1">Window</option>
       </select></span
     >
   </label>
@@ -85,6 +97,15 @@ export function showOptionsDialog() {
   themeSelect.value = config.get(Pref.THEME).toString();
   themeSelect.addEventListener('change', () =>
     config.set(Pref.THEME, themeSelect.value)
+  );
+
+  const fullscreenModeSelect = $(
+    'fullscreen-mode-select',
+    shadow
+  ) as HTMLSelectElement;
+  fullscreenModeSelect.value = config.get(Pref.FULLSCREEN_MODE).toString();
+  fullscreenModeSelect.addEventListener('change', () =>
+    config.set(Pref.FULLSCREEN_MODE, fullscreenModeSelect.value)
   );
 
   const gainTypeSelect = $('gain-type-select', shadow) as HTMLSelectElement;
