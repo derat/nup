@@ -30,8 +30,10 @@ const (
 	bundleFile       = "bundle.js" // generated file containing bundled JS
 	bundleEntryPoint = "index.ts"  // entry point used to create bundle
 
-	indexFile         = "index.html" // file that initially loads JS
-	scriptPlaceholder = "{{SCRIPT}}" // script placeholder in indexFile
+	indexFile            = "index.html"        // file that initially loads JS
+	scriptPlaceholder    = "{{SCRIPT}}"        // bundle script placeholder in indexFile
+	polyfillsPlaceholder = "{{POLYFILLS}}"     // polyfills script placeholder in indexFile
+	polyfillsFile        = "load-polyfills.js" // inlined script that loads polyfills
 )
 
 const (
@@ -141,13 +143,21 @@ func getStaticFile(p string, minify bool) ([]byte, error) {
 		}
 	}
 
-	// Make index.html load the appropriate script depending on whether minification is enabled.
+	// Replace placeholder variables in index.html.
 	if p == indexFile {
+		// Load the appropriate bundle script depending on whether minification is enabled.
 		ep := replaceSuffix(bundleEntryPoint, ".ts", ".js")
 		if minify {
 			ep = bundleFile
 		}
-		b = bytes.ReplaceAll(b, []byte(scriptPlaceholder), []byte(ep))
+		b = bytes.Replace(b, []byte(scriptPlaceholder), []byte(ep), 1)
+
+		// Inline the script for loading polyfills.
+		pb, err := getStaticFile(polyfillsFile, minify)
+		if err != nil {
+			return nil, err
+		}
+		b = bytes.Replace(b, []byte(polyfillsPlaceholder), bytes.TrimRight(pb, "\n"), 1)
 	}
 
 	staticFiles.Store(key, b)

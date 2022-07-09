@@ -5,17 +5,8 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <script>
-      // Polyfill needed to use adoptedStyleSheets and replaceSync() on Firefox and Safari:
-      // https://caniuse.com/mdn-api_cssstylesheet_replacesync
-      // https://caniuse.com/?search=adoptedStyleSheets
-      (async () => {
-        if (!('adoptedStyleSheets' in document)) {
-          await import('./construct-style-sheets-polyfill.js');
-        }
-      })();
-    </script>
-
+    <!-- prettier-ignore -->
+    <script>{{POLYFILLS}}</script>
     <script src="{{SCRIPT}}" type="module"></script>
 
     <link id="favicon" rel="shortcut icon" href="favicon-v1.ico" sizes="48x48" />
@@ -28,7 +19,6 @@
       type="font/woff2"
       crossorigin
     />
-
     <style>
       html {
         height: 100%;
@@ -109,9 +99,6 @@
   </head>
 
   <body>
-    <div id="container">
-      <play-view></play-view>
-      <search-view></search-view>
-    </div>
+    <div id="container"><play-view></play-view><search-view></search-view></div>
   </body>
 </html>
