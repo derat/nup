@@ -20,6 +20,7 @@ import (
 	"github.com/tdewolff/minify/v2"
 	"github.com/tdewolff/minify/v2/css"
 	"github.com/tdewolff/minify/v2/html"
+	"github.com/tdewolff/minify/v2/js"
 	"github.com/tdewolff/minify/v2/json"
 	"github.com/tdewolff/minify/v2/svg"
 )
@@ -30,10 +31,8 @@ const (
 	bundleFile       = "bundle.js" // generated file containing bundled JS
 	bundleEntryPoint = "index.ts"  // entry point used to create bundle
 
-	indexFile            = "index.html"        // file that initially loads JS
-	scriptPlaceholder    = "{{SCRIPT}}"        // bundle script placeholder in indexFile
-	polyfillsPlaceholder = "{{POLYFILLS}}"     // polyfills script placeholder in indexFile
-	polyfillsFile        = "load-polyfills.js" // inlined script that loads polyfills
+	indexFile         = "index.html" // file that initially loads JS
+	scriptPlaceholder = "{{SCRIPT}}" // script placeholder in indexFile
 )
 
 const (
@@ -62,9 +61,11 @@ func init() {
 	minifier.Add(htmlType, &html.Minifier{
 		KeepDefaultAttrVals: true, // avoid breaking "input[type='text']" selectors
 	})
+	// JS and TS files are minified and bundled by esbuild, but this is used to
+	// minify some trivial JS inlined in index.html.
+	minifier.AddFunc(jsType, js.Minify)
 	minifier.AddFunc(jsonType, json.Minify)
 	minifier.AddFunc(svgType, svg.Minify)
-	// JS and TS are minified by esbuild.
 }
 
 // staticFiles maps from a staticKey to a []byte containing the content of
@@ -143,21 +144,13 @@ func getStaticFile(p string, minify bool) ([]byte, error) {
 		}
 	}
 
-	// Replace placeholder variables in index.html.
+	// Make index.html load the appropriate script depending on whether minification is enabled.
 	if p == indexFile {
-		// Load the appropriate bundle script depending on whether minification is enabled.
 		ep := replaceSuffix(bundleEntryPoint, ".ts", ".js")
 		if minify {
 			ep = bundleFile
 		}
 		b = bytes.Replace(b, []byte(scriptPlaceholder), []byte(ep), 1)
-
-		// Inline the script for loading polyfills.
-		pb, err := getStaticFile(polyfillsFile, minify)
-		if err != nil {
-			return nil, err
-		}
-		b = bytes.Replace(b, []byte(polyfillsPlaceholder), bytes.TrimRight(pb, "\n"), 1)
 	}
 
 	staticFiles.Store(key, b)
