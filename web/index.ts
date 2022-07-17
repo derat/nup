@@ -22,6 +22,7 @@ const playView = document.querySelector('play-view') as PlayView;
 const searchView = document.querySelector('search-view') as SearchView;
 
 // Watch for theme changes.
+// The initial state is handled by code inlined in index.html's body.
 const darkMediaQuery = '(prefers-color-scheme: dark)';
 const updateTheme = () => {
   let dark = false;
@@ -40,7 +41,6 @@ const updateTheme = () => {
 };
 config.addCallback((k: string, _) => k === Pref.THEME && updateTheme());
 window.matchMedia(darkMediaQuery).addListener((e) => updateTheme());
-updateTheme();
 
 // Tags known by the server.
 let serverTags: string[] = [];

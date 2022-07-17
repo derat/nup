@@ -108,6 +108,21 @@
   </head>
 
   <body>
+    <script>
+      // This duplicates updateTheme() in index.ts. It's inlined here so that the correct theme will
+      // be used when the page is first displayed; otherwise there's a jarring white flash on load
+      // when the dark theme is requested.
+      (() => {
+        const config = localStorage.getItem('config'); // ConfigKey
+        const pref = JSON.parse(config ?? '{}').theme ?? 0; // Pref.THEME
+        if (
+          pref === 2 || // Theme.DARK
+          (pref === 0 && window.matchMedia('(prefers-color-scheme: dark)').matches) // Theme.AUTO
+        ) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
     <div id="container"><play-view></play-view><search-view></search-view></div>
   </body>
 </html>

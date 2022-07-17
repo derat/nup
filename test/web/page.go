@@ -48,10 +48,12 @@ var (
 
 	// Note that selenium.ByTagName doesn't seem to work within shadow roots.
 	// Use selenium.ByCSSSelector instead for referencing deeply-nested elements.
-	body = joinLocs(loc{selenium.ByTagName, "body"})
+	document = []loc(nil)
+	body     = joinLocs(loc{selenium.ByTagName, "body"})
 
 	optionsDialog   = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.options > span"})
 	optionsOKButton = joinLocs(optionsDialog, loc{selenium.ByID, "ok-button"})
+	themeSelect     = joinLocs(optionsDialog, loc{selenium.ByID, "theme-select"})
 	gainTypeSelect  = joinLocs(optionsDialog, loc{selenium.ByID, "gain-type-select"})
 	preAmpRange     = joinLocs(optionsDialog, loc{selenium.ByID, "pre-amp-range"})
 
@@ -154,6 +156,14 @@ const (
 	oneYear     = "one year"
 	threeYears  = "three years"
 	fiveYears   = "five years"
+
+	// Text and values for themeSelect options.
+	themeAuto       = "Auto"
+	themeLight      = "Light"
+	themeDark       = "Dark"
+	themeAutoValue  = "0"
+	themeLightValue = "1"
+	themeDarkValue  = "2"
 
 	// Text and values for gainTypeSelect options.
 	gainAuto       = "Auto"
@@ -270,8 +280,11 @@ func (p *page) getOrFail(locs []loc) selenium.WebElement {
 //
 // If there is more than one element in locs, they will be used successively, e.g.
 // loc[1] is used to search inside the element matched by loc[0].
+//
 // If an element has a shadow root (per its 'shadowRoot' property),
 // the shadow root will be used for the next search.
+//
+// If locs is empty, the document element is returned.
 //
 // This is based on Python code that initially used the 'return arguments[0].shadowRoot' approach
 // described at https://stackoverflow.com/a/37253205/6882947, but that seems to have broken as a
@@ -289,24 +302,28 @@ func (p *page) getOrFail(locs []loc) selenium.WebElement {
 // find elements, but the current approach seems to work for now.
 func (p *page) getNoWait(locs []loc) (selenium.WebElement, error) {
 	var query string
-	for len(locs) > 0 {
-		if query != "" {
-			query = "expand(" + query + ")"
-		} else {
-			query = "document"
+	if len(locs) == 0 {
+		query = "document.documentElement"
+	} else {
+		for len(locs) > 0 {
+			if query != "" {
+				query = "expand(" + query + ")"
+			} else {
+				query = "document"
+			}
+			by, value := locs[0].by, locs[0].value
+			switch by {
+			case selenium.ByID:
+				query += ".getElementById('" + value + "')"
+			case selenium.ByTagName:
+				query += ".getElementsByTagName('" + value + "').item(0)"
+			case selenium.ByCSSSelector:
+				query += ".querySelector('" + value + "')"
+			default:
+				return nil, fmt.Errorf("invalid 'by' %q", by)
+			}
+			locs = locs[1:]
 		}
-		by, value := locs[0].by, locs[0].value
-		switch by {
-		case selenium.ByID:
-			query += ".getElementById('" + value + "')"
-		case selenium.ByTagName:
-			query += ".getElementsByTagName('" + value + "').item(0)"
-		case selenium.ByCSSSelector:
-			query += ".querySelector('" + value + "')"
-		default:
-			return nil, fmt.Errorf("invalid 'by' %q", by)
-		}
-		locs = locs[1:]
 	}
 
 	script := "const expand = e => e.shadowRoot || e; return " + query

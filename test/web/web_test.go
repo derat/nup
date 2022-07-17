@@ -957,6 +957,12 @@ func TestOptions(t *testing.T) {
 	page.clickOption(gainTypeSelect, gainTrack)
 	page.checkAttr(gainTypeSelect, "value", gainTrackValue)
 
+	// The dark theme should be used as soon as it's selected.
+	page.checkAttr(themeSelect, "value", themeAutoValue)
+	page.clickOption(themeSelect, themeDark)
+	page.checkAttr(themeSelect, "value", themeDarkValue)
+	page.checkAttr(document, "data-theme", "dark")
+
 	// I *think* that this clicks the middle of the range. This might be a
 	// no-op since it should be 0, which is the default. :-/
 	page.click(preAmpRange)
@@ -974,6 +980,7 @@ func TestOptions(t *testing.T) {
 
 	page.reload()
 	show()
+	page.checkAttr(themeSelect, "value", themeDarkValue)
 	page.checkAttr(gainTypeSelect, "value", gainTrackValue)
 	page.checkAttr(preAmpRange, "value", origPreAmp)
 	// TODO: For reasons that are unclear to me, clicking the OK button ocasionally fails at this
@@ -981,6 +988,9 @@ func TestOptions(t *testing.T) {
 	// the dialog with the escape key instead.
 	page.sendKeys(body, selenium.EscapeKey, false)
 	page.checkGone(optionsOKButton)
+
+	// The dark theme should still be used.
+	page.checkAttr(document, "data-theme", "dark")
 }
 
 func TestSongInfo(t *testing.T) {
