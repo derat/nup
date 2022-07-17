@@ -258,10 +258,15 @@ export class SongTable extends HTMLElement {
     });
     this.#resizeObserver.observe(this.#table);
 
-    // Show/hide the header shadow when scrolling.
     this.addEventListener('scroll', (e) => {
+      // Show/hide the header shadow when scrolling.
       if (this.scrollTop) this.#table.classList.add('scrolled');
       else this.#table.classList.remove('scrolled');
+
+      // Update the rect used to determine the target position when dragging.
+      if (this.#inDrag) {
+        this.#dragListRect = this.#tbody.getBoundingClientRect();
+      }
     });
   }
 
