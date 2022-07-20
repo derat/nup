@@ -262,6 +262,13 @@ commonStyles.replaceSync(`
   --suggestions-color: #444;
 }
 
+html {
+  color-scheme: light;
+}
+html[data-theme='dark'] {
+  color-scheme: dark;
+}
+
 span.x-icon {
   color: var(--icon-color);
   font-family: fontello, sans-serif;
