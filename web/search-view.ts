@@ -338,27 +338,35 @@ export class SearchView extends HTMLElement {
     this.#maxPlaysInput.addEventListener('keydown', this.#onFormKeyDown);
     this.#presetSelect.addEventListener('change', this.#onPresetSelectChange);
 
-    this.#getButton('search-button').addEventListener('click', () =>
-      this.#submitQuery(false)
-    );
-    this.#getButton('reset-button').addEventListener('click', () =>
-      this.#reset(null, null, null, true /* clearResults */)
-    );
-    this.#getButton('lucky-button').addEventListener('click', () =>
-      this.#doLuckySearch()
-    );
-
-    this.#getButton('append-button').addEventListener('click', () =>
+    const handleButton = (id: string, cb: () => void) => {
+      const button = this.#getButton(id);
+      button.addEventListener('click', () => {
+        // Unfocus the button so it isn't visibly focused when a <dialog> is
+        // closed.
+        button.blur();
+        cb();
+      });
+    };
+    handleButton('search-button', () => this.#submitQuery(false));
+    handleButton('reset-button', () => this.#reset(null, null, null, true));
+    handleButton('lucky-button', () => this.#doLuckySearch());
+    handleButton('append-button', () =>
       this.#enqueueSearchResults(
         false /* clearFirst */,
         false /* afterCurrent */
       )
     );
-    this.#getButton('insert-button').addEventListener('click', () =>
-      this.#enqueueSearchResults(false, true)
+    handleButton('insert-button', () =>
+      this.#enqueueSearchResults(
+        false /* clearFirst */,
+        true /* afterCurrent */
+      )
     );
-    this.#getButton('replace-button').addEventListener('click', () =>
-      this.#enqueueSearchResults(true, false)
+    handleButton('replace-button', () =>
+      this.#enqueueSearchResults(
+        true /* clearFirst */,
+        false /* afterCurrent */
+      )
     );
 
     this.#resultsTable.addEventListener('field', ((e: CustomEvent) => {
@@ -597,7 +605,7 @@ export class SearchView extends HTMLElement {
     this.#submitQuery(true);
   }
 
-  // Handle a key being pressed in the search form.
+  // Handles a key being pressed in the search form.
   #onFormKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
       this.#submitQuery(false);
