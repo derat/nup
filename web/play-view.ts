@@ -952,6 +952,7 @@ export class PlayView extends HTMLElement {
   #updateGain() {
     let adj = this.#config.get(Pref.PRE_AMP); // decibels
 
+    let reason = '';
     const song = this.#currentSong;
     if (song) {
       let gainType = this.#config.get(Pref.GAIN_TYPE);
@@ -961,8 +962,10 @@ export class PlayView extends HTMLElement {
 
       if (gainType === GainType.ALBUM) {
         adj += song.albumGain ?? 0;
+        reason = ' for album';
       } else if (gainType === GainType.TRACK) {
         adj += song.trackGain ?? 0;
+        reason = ' for track';
       }
     }
 
@@ -971,7 +974,7 @@ export class PlayView extends HTMLElement {
     // TODO: Add an option to prevent clipping instead of always doing this?
     if (song?.peakAmp) scale = Math.min(scale, 1 / song.peakAmp);
 
-    console.log(`Scaling amplitude by ${scale.toFixed(3)}`);
+    console.log(`Scaling amplitude by ${scale.toFixed(3)}${reason}`);
     this.#audio.gain = scale;
   }
 }
