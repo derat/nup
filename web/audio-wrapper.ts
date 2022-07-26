@@ -92,6 +92,7 @@ export class AudioWrapper extends HTMLElement {
   // Adds event handlers to #audio and recreates #audioSrc to route
   // #audio's output through #gainNode.
   #configureAudio() {
+    this.#audio.addEventListener('canplay', this.#onCanPlay);
     this.#audio.addEventListener('ended', this.#onEnded);
     this.#audio.addEventListener('error', this.#onError);
     this.#audio.addEventListener('pause', this.#onPause);
@@ -105,6 +106,7 @@ export class AudioWrapper extends HTMLElement {
   // Deconfigures #audio and replaces it with |audio|.
   #replaceAudio(audio: HTMLAudioElement) {
     this.#audio.removeAttribute('src');
+    this.#audio.removeEventListener('canplay', this.#onCanPlay);
     this.#audio.removeEventListener('ended', this.#onEnded);
     this.#audio.removeEventListener('error', this.#onError);
     this.#audio.removeEventListener('pause', this.#onPause);
@@ -130,6 +132,10 @@ export class AudioWrapper extends HTMLElement {
       this.#reloadAudio();
       if (resume) this.#audio.play();
     }
+  };
+
+  #onCanPlay = (e: Event) => {
+    this.#resendAudioEvent(e);
   };
 
   #onEnded = (e: Event) => {

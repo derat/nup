@@ -122,12 +122,9 @@ const template = createTemplate(`
     min-width: 80px; /* avoid width jump when font is loaded */
   }
   #waiting {
-    background-color: #a00;
-    border-radius: 8px;
-    color: #fff;
     display: none;
-    font-size: 11px;
-    padding: 5px;
+    font-size: 14px;
+    opacity: 0.9;
     position: fixed;
     right: var(--margin);
     top: var(--margin);
@@ -268,7 +265,7 @@ const template = createTemplate(`
 
 <song-table id="results-table" use-checkboxes></song-table>
 
-<div id="waiting">Waiting for server...</div>
+<div id="waiting" class="spinner"></div>
 `);
 
 // <search-view> displays a form for sending queries to the server and

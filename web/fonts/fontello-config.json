@@ -59,6 +59,12 @@
       "css": "fast-backward",
       "code": 9198,
       "src": "mfglabs"
+    },
+    {
+      "uid": "9bc2902722abb366a213a052ade360bc",
+      "css": "spin6",
+      "code": 10227,
+      "src": "fontelico"
     }
   ]
 }

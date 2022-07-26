@@ -193,8 +193,8 @@ commonStyles.replaceSync(`
  * handy custom font generated using fontello.com. */
 @font-face {
   font-family: 'fontello';
-  src: url('fonts/fontello-v1.woff2') format('woff2'),
-    url('fonts/fontello-v1.woff') format('woff');
+  src: url('fonts/fontello-v2.woff2') format('woff2'),
+    url('fonts/fontello-v2.woff') format('woff');
   font-display: block; /* avoid showing fallback fonts */
   font-style: normal;
   font-weight: normal;
@@ -269,17 +269,34 @@ html[data-theme='dark'] {
   color-scheme: dark;
 }
 
-span.x-icon {
+.x-icon {
   color: var(--icon-color);
   font-family: fontello, sans-serif;
   font-size: 10px;
   padding: 4px;
 }
-span.x-icon:hover {
+.x-icon:hover {
   color: var(--icon-hover-color);
 }
-span.x-icon::before {
+.x-icon::before {
   content: '×';
+}
+
+.spinner {
+  animation: spin 1s infinite linear;
+  font-family: var(--icon-font-family);
+  transform-origin: 50% 45%;
+}
+.spinner::after {
+  content: '⟳';
+}
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 button {

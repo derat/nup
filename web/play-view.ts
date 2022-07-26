@@ -78,6 +78,19 @@ const template = createTemplate(`
      * image will still be clickable even if the cover is missing. */
     opacity: 0;
   }
+  #loading-overlay {
+    color: #fff;
+    display: none;
+    font-size: 12px;
+    left: 62px;
+    opacity: 0.8;
+    position: absolute;
+    text-shadow: 0 0 8px #000;
+    top: 15px;
+  }
+  #loading-overlay.visible {
+    display: block;
+  }
   #rating-overlay {
     color: #fff;
     font-family: var(--icon-font-family);
@@ -135,6 +148,7 @@ const template = createTemplate(`
 <div id="song-info">
   <div id="cover-div">
     <img id="cover-img" />
+    <div id="loading-overlay" class="spinner"></div>
     <div id="rating-overlay"></div>
   </div>
   <div id="details">
@@ -200,7 +214,8 @@ export class PlayView extends HTMLElement {
 
   #coverDiv = $('cover-div', this.#shadow);
   #coverImage = $('cover-img', this.#shadow) as HTMLImageElement;
-  #ratingOverlayDiv = $('rating-overlay', this.#shadow);
+  #loadingOverlay = $('loading-overlay', this.#shadow);
+  #ratingOverlay = $('rating-overlay', this.#shadow);
   #artistDiv = $('artist', this.#shadow);
   #titleDiv = $('title', this.#shadow);
   #albumDiv = $('album', this.#shadow);
@@ -272,6 +287,7 @@ export class PlayView extends HTMLElement {
       );
     });
 
+    this.#audio.addEventListener('canplay', this.#onCanPlay);
     this.#audio.addEventListener('ended', this.#onEnded);
     this.#audio.addEventListener('pause', this.#onPause);
     this.#audio.addEventListener('play', this.#onPlay);
@@ -670,7 +686,7 @@ export class PlayView extends HTMLElement {
 
   #updateRatingOverlay() {
     const song = this.#currentSong;
-    this.#ratingOverlayDiv.innerText = song
+    this.#ratingOverlay.innerText = song
       ? getRatingString(song.rating, '★', '', '', '')
       : '';
   }
@@ -758,6 +774,7 @@ export class PlayView extends HTMLElement {
     if (!this.#currentSong) return;
 
     this.#cancelPlayTimeout();
+    this.#showLoadingOverlay(); // hidden in #onCanPlay and #onError
 
     if (delay) {
       console.log(`Playing in ${this.#playDelayMs} ms`);
@@ -832,6 +849,10 @@ export class PlayView extends HTMLElement {
     this.#updatePosition();
   }
 
+  #onCanPlay = () => {
+    this.#hideLoadingOverlay();
+  };
+
   #onEnded = () => {
     this.#updatePosition();
     if (this.#currentIndex >= this.#songs.length - 1) {
@@ -861,6 +882,7 @@ export class PlayView extends HTMLElement {
   };
 
   #onError = () => {
+    this.#hideLoadingOverlay();
     this.#cycleTrack(1);
   };
 
@@ -918,6 +940,9 @@ export class PlayView extends HTMLElement {
     window.clearTimeout(this.#updatePositionTimeoutId);
     this.#updatePositionTimeoutId = null;
   }
+
+  #showLoadingOverlay = () => this.#loadingOverlay.classList.add('visible');
+  #hideLoadingOverlay = () => this.#loadingOverlay.classList.remove('visible');
 
   #showUpdateDialog() {
     const song = this.#currentSong;
