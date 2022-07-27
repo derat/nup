@@ -287,10 +287,10 @@ export class PlayView extends HTMLElement {
       );
     });
 
-    this.#audio.addEventListener('canplay', this.#onCanPlay);
     this.#audio.addEventListener('ended', this.#onEnded);
     this.#audio.addEventListener('pause', this.#onPause);
     this.#audio.addEventListener('play', this.#onPlay);
+    this.#audio.addEventListener('playing', this.#onPlaying);
     this.#audio.addEventListener('timeupdate', this.#onTimeUpdate);
     this.#audio.addEventListener('error', this.#onError);
 
@@ -774,7 +774,7 @@ export class PlayView extends HTMLElement {
     if (!this.#currentSong) return;
 
     this.#cancelPlayTimeout();
-    this.#showLoadingOverlay(); // hidden in #onCanPlay and #onError
+    this.#showLoadingOverlay(); // hidden in #onPlaying and #onError
 
     if (delay) {
       console.log(`Playing in ${this.#playDelayMs} ms`);
@@ -796,7 +796,10 @@ export class PlayView extends HTMLElement {
   // Internal method called by #play().
   #playInternal() {
     const song = this.#currentSong;
-    if (!song) return;
+    if (!song) {
+      this.#hideLoadingOverlay();
+      return;
+    }
 
     // Get an absolute URL since that's what we'll get from the <audio>
     // element: https://stackoverflow.com/a/44547904
@@ -849,10 +852,6 @@ export class PlayView extends HTMLElement {
     this.#updatePosition();
   }
 
-  #onCanPlay = () => {
-    this.#hideLoadingOverlay();
-  };
-
   #onEnded = () => {
     this.#updatePosition();
     if (this.#currentIndex >= this.#songs.length - 1) {
@@ -872,6 +871,10 @@ export class PlayView extends HTMLElement {
     this.#updatePosition();
     this.#playPauseButton.innerText = '⏸';
     this.#playPauseButton.title = 'Pause (Space)';
+  };
+
+  #onPlaying = () => {
+    this.#hideLoadingOverlay();
   };
 
   #onTimeUpdate = () => {

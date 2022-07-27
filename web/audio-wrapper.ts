@@ -92,11 +92,11 @@ export class AudioWrapper extends HTMLElement {
   // Adds event handlers to #audio and recreates #audioSrc to route
   // #audio's output through #gainNode.
   #configureAudio() {
-    this.#audio.addEventListener('canplay', this.#onCanPlay);
     this.#audio.addEventListener('ended', this.#onEnded);
     this.#audio.addEventListener('error', this.#onError);
     this.#audio.addEventListener('pause', this.#onPause);
     this.#audio.addEventListener('play', this.#onPlay);
+    this.#audio.addEventListener('playing', this.#onPlaying);
     this.#audio.addEventListener('timeupdate', this.#onTimeUpdate);
 
     this.#audioSrc = this.#audioCtx.createMediaElementSource(this.#audio);
@@ -106,11 +106,11 @@ export class AudioWrapper extends HTMLElement {
   // Deconfigures #audio and replaces it with |audio|.
   #replaceAudio(audio: HTMLAudioElement) {
     this.#audio.removeAttribute('src');
-    this.#audio.removeEventListener('canplay', this.#onCanPlay);
     this.#audio.removeEventListener('ended', this.#onEnded);
     this.#audio.removeEventListener('error', this.#onError);
     this.#audio.removeEventListener('pause', this.#onPause);
     this.#audio.removeEventListener('play', this.#onPlay);
+    this.#audio.removeEventListener('playing', this.#onPlaying);
     this.#audio.removeEventListener('timeupdate', this.#onTimeUpdate);
 
     this.#audioSrc?.disconnect();
@@ -134,7 +134,7 @@ export class AudioWrapper extends HTMLElement {
     }
   };
 
-  #onCanPlay = (e: Event) => {
+  #onPlaying = (e: Event) => {
     this.#resendAudioEvent(e);
   };
 
