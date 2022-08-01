@@ -40,6 +40,9 @@ const template = createTemplate(`
   .bg-img.hidden {
     visibility: hidden;
   }
+  .bg-img.pixelated {
+    image-rendering: pixelated;
+  }
 
   @keyframes fade-out {
     0% {
@@ -189,6 +192,8 @@ const template = createTemplate(`
 </div>
 `);
 
+const PIXELATED_SIZE = 256; // pixelate bg images at this size and lower
+
 // <fullscreen-overlay> is a simple overlay used by <play-view> to display
 // information about the current and next song. The current song's cover image
 // covers the entire background.
@@ -235,6 +240,17 @@ export class FullscreenOverlay extends HTMLElement {
     this.#nextDiv.addEventListener('click', (e) => {
       this.dispatchEvent(new Event('next'));
       e.stopPropagation();
+    });
+
+    // Pixelate low-resolution cover images, since blurring them often looks
+    // even worse.
+    this.#currentCover.addEventListener('load', () => {
+      const pixelated =
+        this.#currentCover.naturalWidth <= PIXELATED_SIZE ||
+        this.#currentCover.naturalHeight <= PIXELATED_SIZE;
+      pixelated
+        ? this.#currentCover.classList.add('pixelated')
+        : this.#currentCover.classList.remove('pixelated');
     });
 
     this.updateSongs(null, null);
