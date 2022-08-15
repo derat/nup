@@ -32,10 +32,21 @@ const template = createTemplate(`
   }
 
   .bg-img {
-    height: 100%;
-    width: 100%;
+    /* Big hack to match the server's logic for cropping non-square
+     * placeholder images: https://github.com/derat/nup/issues/41
+     * Make the img element square using the max of the window's width and
+     * height, center it (https://stackoverflow.com/a/36466785), and use
+     * 'object-fit: cover' to crop the portion of the image that doesn't fit.
+     * So, we're essentially cropping twice: once to fit in the square img
+     * element, and a second time to drop the parts of the img that don't fit in
+     * the window. */
+    height: max(100vw, 100vh);
+    left: 50%;
     object-fit: cover;
-    position: absolute;
+    position: fixed;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: max(100vw, 100vh);
   }
   .bg-img.hidden {
     visibility: hidden;
