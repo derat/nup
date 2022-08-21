@@ -495,7 +495,9 @@ export class SearchView extends HTMLElement {
     const url = 'query?' + terms.join('&');
     console.log(`Sending query: ${url}`);
 
-    const shuffled = this.#shuffleCheckbox.checked;
+    // 'Order by last played' essentially shuffles the results.
+    const shuffled =
+      this.#shuffleCheckbox.checked || this.#orderByLastPlayedCheckbox.checked;
 
     this.#fetchController?.abort();
     this.#fetchController = new AbortController();
