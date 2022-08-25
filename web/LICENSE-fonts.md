@@ -1,4 +1,34 @@
+# Font and icon license info
 
+## MFG Labs
+
+The [MFG Labs icon set] from [MFG Labs] is licensed under a
+[Creative Commons Attribution 3.0 License].
+
+This repository includes SVG versions of individual icons downloaded from
+<https://iconpharm.com/web-app/category/flat/mfglabs-iconset>.
+
+[MFG Labs icon set]: https://mfglabs.github.io/mfglabs-iconset/
+[MFG Labs]: https://www.mfglabs.com/
+[Creative Commons Attribution 3.0 License]: https://creativecommons.org/licenses/by/3.0/
+
+## Fontelico
+
+The [Fontelico collection] from [Fontello] is licensed under a
+[Creative Commons Attribution 3.0 License].
+
+[Fontelico collection]: https://github.com/fontello/fontelico.font
+[Fontello]: https://fontello.com/
+
+## Roboto
+
+The [Roboto font] was designed by [Christian Robertson] and is licensed under
+the [Apache License, Version 2.0].
+
+[Roboto font]: https://fonts.google.com/specimen/Roboto
+[Apache License, Version 2.0]: https://www.apache.org/licenses/LICENSE-2.0
+
+```
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -200,3 +230,4 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+```

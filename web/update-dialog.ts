@@ -1,30 +1,47 @@
 // Copyright 2022 Daniel Erat.
 // All rights reserved.
 
-import { $, clamp, createTemplate } from './common.js';
+import {
+  $,
+  clamp,
+  createTemplate,
+  emptyStarIcon,
+  setIcon,
+  starIcon,
+  xIcon,
+} from './common.js';
 import { createDialog } from './dialog.js';
 import type { TagSuggester } from './tag-suggester.js';
 
 const template = createTemplate(`
 <style>
   #close-icon {
-    cursor: pointer;
+    padding: 6px;
     position: absolute;
-    right: 5px;
-    top: 5px;
+    right: 0;
+    top: 0;
+  }
+  #rating-row {
+    align-items: center;
+    display: flex;
+    margin-bottom: -1px;
+    margin-top: 1px;
+    height: 18px;
   }
   #rating {
-    font-family: var(--icon-font-family);
-    font-size: 16px;
+    display: flex;
+    margin-left: 2px;
+    margin-top: 2px;
   }
-  #rating a {
-    color: var(--text-color);
+  #rating svg {
     cursor: pointer;
-    display: inline-block;
-    min-width: 17px; /* black and white stars have different sizes :-/ */
+    fill: var(--text-color);
+    height: 20px;
+    margin-right: -3px;
     opacity: 0.6;
+    width: 20px;
   }
-  #rating a:hover {
+  #rating svg:hover {
     opacity: 0.9;
   }
   #tags-textarea {
@@ -44,12 +61,16 @@ const template = createTemplate(`
   }
 </style>
 
-<span id="close-icon" class="x-icon" title="Close"></span>
-<div>
+<svg id="close-icon" title="Close"></svg>
+<div id="rating-row">
   Rating:
-  <span id="rating" tabindex="0">
-    <a></a><a></a><a></a><a></a><a></a>
-  </span>
+  <div id="rating" tabindex="0">
+    <a><svg></svg></a>
+    <a><svg></svg></a>
+    <a><svg></svg></a>
+    <a><svg></svg></a>
+    <a><svg></svg></a>
+  </div>
 </div>
 <tag-suggester id="tag-suggester">
   <textarea id="tags-textarea" slot="text" placeholder="Tags"></textarea>
@@ -86,8 +107,9 @@ export default class UpdateDialog {
     ).getPropertyValue('--margin');
     this.#dialog.style.position = 'absolute';
 
-    $('close-icon', this.#shadow).addEventListener('click', () =>
-      this.close(true)
+    setIcon($('close-icon', this.#shadow), xIcon).addEventListener(
+      'click',
+      () => this.close(true)
     );
     ($('tag-suggester', this.#shadow) as TagSuggester).words = tags;
 
@@ -151,8 +173,10 @@ export default class UpdateDialog {
   #setRating(rating: number) {
     this.#rating = rating;
     for (let i = 1; i <= 5; i++) {
-      const a = this.#ratingSpan.children[i - 1] as HTMLElement;
-      a.innerText = i <= rating ? '★' : '☆';
+      setIcon(
+        this.#ratingSpan.children[i - 1]!.firstChild as HTMLElement,
+        i <= rating ? starIcon : emptyStarIcon
+      );
     }
   }
 

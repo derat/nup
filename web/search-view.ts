@@ -11,7 +11,10 @@ import {
   getCurrentTimeSec,
   getDumpSongUrl,
   handleFetchError,
+  setIcon,
   smallCoverSize,
+  spinnerIcon,
+  xIcon,
 } from './common.js';
 import { isDialogShown, showMessageDialog } from './dialog.js';
 import { createMenu, isMenuShown } from './menu.js';
@@ -49,7 +52,7 @@ const template = createTemplate(`
     margin-bottom: 0;
   }
   #search-form .row .checkbox-col {
-    width: 8em;
+    width: 7em;
   }
   #search-form .row .label-col {
     width: 6em;
@@ -74,17 +77,10 @@ const template = createTemplate(`
   }
   #keywords-clear,
   #tags-clear {
-    bottom: 1px;
-    cursor: pointer;
+    left: -28px;
+    margin: auto 0;
     padding: 6px 8px;
     position: relative;
-    right: 26px;
-  }
-  #min-rating-select {
-    /* The stars are too close together, but letter-spacing unfortunately
-     * doesn't work on <select>. */
-    font-family: var(--icon-font-family);
-    font-size: 12px;
   }
   #max-plays-input {
     margin: 0 4px;
@@ -121,15 +117,17 @@ const template = createTemplate(`
   #results-controls > button {
     min-width: 80px; /* avoid width jump when font is loaded */
   }
-  #waiting {
+  #spinner {
     display: none;
-    font-size: 14px;
+    fill: var(--text-color);
+    height: 16px;
     opacity: 0.9;
     position: fixed;
     right: var(--margin);
     top: var(--margin);
+    width: 16px;
   }
-  #waiting.shown {
+  #spinner.shown {
     display: block;
   }
 </style>
@@ -138,14 +136,14 @@ const template = createTemplate(`
   <div class="heading">Search</div>
   <div class="row">
     <input id="keywords-input" type="text" placeholder="Keywords" />
-    <span id="keywords-clear" class="x-icon" title="Clear text"></span>
+    <svg id="keywords-clear" title="Clear text"></svg>
   </div>
 
   <div id="tags-input-div" class="row">
     <tag-suggester id="tags-suggester" tab-advances-focus>
       <input id="tags-input" slot="text" type="text" placeholder="Tags" />
     </tag-suggester>
-    <span id="tags-clear" class="x-icon" title="Clear text"></span>
+    <svg id="tags-clear" title="Clear text"></svg>
   </div>
 
   <div class="row">
@@ -198,7 +196,7 @@ const template = createTemplate(`
 
   <div class="row">
     <label for="first-played-select">
-      <span class="label-col">First played</span>
+      <span class="label-col">First played </span>
       <span class="select-wrapper">
         <select id="first-played-select">
           <option value="0"></option>
@@ -211,13 +209,13 @@ const template = createTemplate(`
           <option value="94608000">three years</option>
           <option value="157680000">five years</option>
         </select></span
-      >or less ago
+      > or less ago
     </label>
   </div>
 
   <div class="row">
     <label for="last-played-select">
-      <span class="label-col">Last played</span>
+      <span class="label-col">Last played </span>
       <span class="select-wrapper">
         <select id="last-played-select">
           <option value="0"></option>
@@ -230,7 +228,7 @@ const template = createTemplate(`
           <option value="94608000">three years</option>
           <option value="157680000">five years</option>
         </select></span
-      >or longer ago
+      > or longer ago
     </label>
   </div>
 
@@ -265,7 +263,7 @@ const template = createTemplate(`
 
 <song-table id="results-table" use-checkboxes></song-table>
 
-<div id="waiting" class="spinner"></div>
+<svg id="spinner"></svg>
 `);
 
 // <search-view> displays a form for sending queries to the server and
@@ -301,7 +299,7 @@ export class SearchView extends HTMLElement {
   #presetSelect = this.#getSelect('preset-select');
 
   #resultsTable = $('results-table', this.#shadow) as SongTable;
-  #waitingDiv = $('waiting', this.#shadow);
+  #spinner = $('spinner', this.#shadow);
   #presets: SearchPreset[] = [];
   #resultsShuffled = false;
 
@@ -311,16 +309,18 @@ export class SearchView extends HTMLElement {
     this.#shadow.adoptedStyleSheets = [commonStyles];
 
     this.#keywordsInput.addEventListener('keydown', this.#onFormKeyDown);
-    $('keywords-clear', this.#shadow).addEventListener(
+    setIcon($('keywords-clear', this.#shadow), xIcon).addEventListener(
       'click',
       () => (this.#keywordsInput.value = '')
     );
 
     this.#tagsInput.addEventListener('keydown', this.#onFormKeyDown);
-    $('tags-clear', this.#shadow).addEventListener(
+    setIcon($('tags-clear', this.#shadow), xIcon).addEventListener(
       'click',
       () => (this.#tagsInput.value = '')
     );
+
+    this.#spinner = setIcon(this.#spinner, spinnerIcon);
 
     this.#shuffleCheckbox.addEventListener('keydown', this.#onFormKeyDown);
     this.#firstTrackCheckbox.addEventListener('keydown', this.#onFormKeyDown);
@@ -503,7 +503,7 @@ export class SearchView extends HTMLElement {
     this.#fetchController = new AbortController();
     const signal = this.#fetchController.signal;
 
-    this.#waitingDiv.classList.add('shown');
+    this.#spinner?.classList.add('shown');
 
     fetch(url, { method: 'GET', signal })
       .then((res) => handleFetchError(res))
@@ -525,7 +525,7 @@ export class SearchView extends HTMLElement {
         showMessageDialog('Search Failed', err.toString());
       })
       .finally(() => {
-        this.#waitingDiv.classList.remove('shown');
+        this.#spinner?.classList.remove('shown');
       });
   }
 

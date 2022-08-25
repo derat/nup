@@ -17,7 +17,10 @@ import {
   getSongUrl,
   moveItem,
   preloadImage,
+  setIcon,
   smallCoverSize,
+  spinnerIcon,
+  starIcon,
   updateTitleAttributeForTruncation,
 } from './common.js';
 import { getConfig, GainType, Pref } from './config.js';
@@ -78,30 +81,36 @@ const template = createTemplate(`
      * image will still be clickable even if the cover is missing. */
     opacity: 0;
   }
-  #loading-overlay {
-    color: #fff;
+
+  #spinner {
     display: none;
-    font-size: 12px;
+    fill: #fff;
+    filter: drop-shadow(0 0 8px #000);
+    height: 14px;
     left: 62px;
     opacity: 0.8;
     position: absolute;
-    text-shadow: 0 0 8px #000;
     top: 15px;
+    width: 14px;
   }
-  #loading-overlay.visible {
+  #spinner.visible {
     display: block;
   }
+
   #rating-overlay {
-    color: #fff;
-    font-family: var(--icon-font-family);
-    font-size: 12px;
-    left: calc(var(--margin) + 2px);
-    letter-spacing: 2px;
+    display: flex;
+    filter: drop-shadow(0 0 8px #000);
+    left: calc(var(--margin) + 1px);
     pointer-events: none;
     position: absolute;
-    text-shadow: 0 0 8px #000;
-    top: calc(var(--margin) + 55px);
+    top: calc(var(--margin) + 54px);
     user-select: none;
+  }
+  #rating-overlay svg {
+    fill: #fff;
+    height: 15px;
+    margin-right: -2px;
+    width: 15px;
   }
 
   #details {
@@ -130,12 +139,19 @@ const template = createTemplate(`
     white-space: nowrap;
   }
   #controls button {
-    font-family: var(--icon-font-family);
-    font-size: 10px;
     width: 44px;
   }
   #controls > *:not(:first-child) {
     margin-left: var(--button-spacing);
+  }
+  #play-pause svg:first-child {
+    display: none;
+  }
+  #play-pause.playing svg:first-child {
+    display: inline;
+  }
+  #play-pause.playing svg:last-child {
+    display: none;
   }
 </style>
 
@@ -148,7 +164,7 @@ const template = createTemplate(`
 <div id="song-info">
   <div id="cover-div">
     <img id="cover-img" />
-    <div id="loading-overlay" class="spinner"></div>
+    <svg id="spinner"></svg>
     <div id="rating-overlay"></div>
   </div>
   <div id="details">
@@ -159,10 +175,30 @@ const template = createTemplate(`
   </div>
 </div>
 
+<!-- prettier-ignore -->
 <div id="controls">
-  <button id="prev" disabled title="Previous song (Alt+P)">⏮</button>
-  <button id="play-pause" disabled title="Pause (Space)">⏸</button>
-  <button id="next" disabled title="Next song (Alt+N)">⏭</button>
+  <button id="prev" disabled title="Previous song (Alt+P)">
+    <!-- "icon-step_backward" from MFG Labs -->
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1696.9295 2545.2094" width="14" height="14">
+      <path d="M0 1906V606q0-50 35.5-85.5T121 485h239q50 0 85 35.5t35 85.5v557l1057-655q60-39 102.5-14t42.5 100v1323q0 76-42.5 101t-102.5-15L480 1349v557q0 50-35.5 85.5T360 2027H121q-49 0-85-36t-36-85z"/>
+    </svg>
+  </button>
+  <button id="play-pause" disabled title="Pause (Space)">
+    <!-- "icon-pause" from MFG Labs -->
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1632.1216 2545.2094" width="14" height="14">
+      <path d="M0 1963q0 55 38 94t93 39h260q55 0 93-39t38-94V547q0-55-38-93t-93-38H131q-55 0-93 38T0 547v1416zm983 0q0 55 38.5 94t92.5 39h261q54 0 92.5-39t38.5-94V547q0-55-38.5-93t-92.5-38h-261q-54 0-92.5 38T983 547v1416z"/>
+    </svg>
+    <!-- "icon-play" from MFG Labs -->
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1350 2545.2094" width="14" height="14">
+      <path d="M0 1950V562q0-79 45.5-105.5T153 472l1156 715q41 29 41 69 0 18-10 35.5t-20 25.5l-11 8-1156 716q-62 41-107.5 14.5T0 1950z"/>
+    </svg>
+  </button>
+  <button id="next" disabled title="Next song (Alt+N)">
+    <!-- "icon-step_forward" from MFG Labs -->
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1795 2545.2094" width="14" height="14">
+      <path d="M0 1921V531q0-84 43-94.5T174 473l1100 695V531q0-43 36.5-80t79.5-37h232q81 0 127 35t46 82v1390q0 47-46 82t-127 35h-232q-43 0-79.5-37t-36.5-80v-579L174 2038q-88 40-131 7.5T0 1921z"/>
+    </svg>
+  </button>
 </div>
 
 <song-table id="playlist"></song-table>
@@ -214,7 +250,7 @@ export class PlayView extends HTMLElement {
 
   #coverDiv = $('cover-div', this.#shadow);
   #coverImage = $('cover-img', this.#shadow) as HTMLImageElement;
-  #loadingOverlay = $('loading-overlay', this.#shadow);
+  #spinner = $('spinner', this.#shadow);
   #ratingOverlay = $('rating-overlay', this.#shadow);
   #artistDiv = $('artist', this.#shadow);
   #titleDiv = $('title', this.#shadow);
@@ -238,6 +274,8 @@ export class PlayView extends HTMLElement {
         this.#updateGain();
       }
     });
+
+    this.#spinner = setIcon(this.#spinner, spinnerIcon);
 
     const menuButton = $('menu-button', this.#shadow);
     menuButton.addEventListener('click', () => {
@@ -685,10 +723,14 @@ export class PlayView extends HTMLElement {
   }
 
   #updateRatingOverlay() {
-    const song = this.#currentSong;
-    this.#ratingOverlay.innerText = song
-      ? getRatingString(song.rating, '★', '', '', '')
-      : '';
+    const stars = this.#currentSong?.rating ?? 0;
+    const overlay = this.#ratingOverlay;
+    while (overlay.children.length > stars) {
+      overlay.removeChild(overlay.lastChild!);
+    }
+    while (this.#ratingOverlay.children.length < stars) {
+      overlay.appendChild(starIcon.content.firstElementChild!.cloneNode(true));
+    }
   }
 
   #updateMediaSessionMetadata(imageLoaded: boolean) {
@@ -774,7 +816,7 @@ export class PlayView extends HTMLElement {
     if (!this.#currentSong) return;
 
     this.#cancelPlayTimeout();
-    this.#showLoadingOverlay(); // hidden in #onPlaying and #onError
+    this.#showSpinner(); // hidden in #onPlaying and #onError
 
     if (delay) {
       console.log(`Playing in ${this.#playDelayMs} ms`);
@@ -797,7 +839,7 @@ export class PlayView extends HTMLElement {
   #playInternal() {
     const song = this.#currentSong;
     if (!song) {
-      this.#hideLoadingOverlay();
+      this.#hideSpinner();
       return;
     }
 
@@ -863,18 +905,18 @@ export class PlayView extends HTMLElement {
 
   #onPause = () => {
     this.#updatePosition();
-    this.#playPauseButton.innerText = '▶';
+    this.#playPauseButton.classList.remove('playing');
     this.#playPauseButton.title = 'Play (Space)';
   };
 
   #onPlay = () => {
     this.#updatePosition();
-    this.#playPauseButton.innerText = '⏸';
+    this.#playPauseButton.classList.add('playing');
     this.#playPauseButton.title = 'Pause (Space)';
   };
 
   #onPlaying = () => {
-    this.#hideLoadingOverlay();
+    this.#hideSpinner();
   };
 
   #onTimeUpdate = () => {
@@ -885,7 +927,7 @@ export class PlayView extends HTMLElement {
   };
 
   #onError = () => {
-    this.#hideLoadingOverlay();
+    this.#hideSpinner();
     this.#cycleTrack(1);
   };
 
@@ -944,8 +986,8 @@ export class PlayView extends HTMLElement {
     this.#updatePositionTimeoutId = null;
   }
 
-  #showLoadingOverlay = () => this.#loadingOverlay.classList.add('visible');
-  #hideLoadingOverlay = () => this.#loadingOverlay.classList.remove('visible');
+  #showSpinner = () => this.#spinner.classList.add('visible');
+  #hideSpinner = () => this.#spinner.classList.remove('visible');
 
   #showUpdateDialog() {
     const song = this.#currentSong;

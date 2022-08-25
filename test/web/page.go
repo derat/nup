@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -785,11 +786,19 @@ func (p *page) checkSong(s db.Song, checks ...songCheck) {
 	var got songInfo
 	if err := waitFull(func() error {
 		imgTitle := p.getAttrOrFail(p.getOrFail(coverImage), "title", false)
-		rating := p.getTextOrFail(p.getOrFail(ratingOverlayDiv), false)
 		time := p.getTextOrFail(p.getOrFail(timeDiv), false)
 		au := p.getOrFail(audio)
 		paused := p.getAttrOrFail(au, "paused", true) != ""
 		ended := p.getAttrOrFail(au, "ended", true) != ""
+
+		// Count the rating overlay's children to find the displayed rating.
+		var rating string
+		stars := p.getAttrOrFail(p.getOrFail(ratingOverlayDiv), "childElementCount", false)
+		if n, err := strconv.Atoi(stars); err != nil {
+			return fmt.Errorf("stars: %v", err)
+		} else {
+			rating = strings.Repeat(oneStar, n)
+		}
 
 		var filename string
 		src := p.getAttrOrFail(au, "src", true)
