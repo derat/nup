@@ -121,7 +121,7 @@ func readFrameInfo(f *os.File, start int64) (*frameInfo, error) {
 		return (header << startBit) >> (32 - numBits)
 	}
 	if v := getBits(0, 11); v != 0x7ff {
-		return nil, fmt.Errorf("missing sync (got %#x instead of 0x7ff)", v)
+		return nil, errors.New("no 0x7ff sync")
 	}
 	if v := getBits(11, 2); v != 0x3 {
 		return nil, fmt.Errorf("unsupported MPEG Audio version (got %#x instead of 0x3)", v)
@@ -220,6 +220,7 @@ type debugInfo struct {
 	emptyFrame   int           // first empty frame at end of file
 	emptyOffset  int64         // offset of emptyFrame from start of file
 	emptyTime    time.Duration // time of emptyFrame
+	skipped      [][2]int64    // [offset, size]
 }
 
 // getSongDebugInfo returns debug information about the MP3 file at p.
@@ -255,13 +256,22 @@ func getSongDebugInfo(p string) (*debugInfo, error) {
 
 	// Read all of the frames in the file.
 	off := info.header
-	for i := 0; off < info.size-info.footer; i++ {
+	var skipped int64
+	for off < info.size-info.footer {
 		finfo, err := readFrameInfo(f, off)
 		if err != nil {
-			return &info, fmt.Errorf("frame %d at %d: %v", i, off, err)
+			off++
+			skipped++
+			continue
 		}
 
-		if i == 0 {
+		if skipped > 0 {
+			info.skipped = append(info.skipped, [2]int64{off - skipped, skipped})
+			skipped = 0
+		}
+
+		// Get the bitrate and sample rate from the first frame we find.
+		if info.actualFrames == 0 {
 			info.kbitRate = finfo.kbitRate
 			info.sampleRate = finfo.sampleRate
 		}
@@ -269,7 +279,7 @@ func getSongDebugInfo(p string) (*debugInfo, error) {
 		// Check for empty frames at the end of the file.
 		if finfo.empty() {
 			if info.emptyFrame < 0 {
-				info.emptyFrame = i
+				info.emptyFrame = info.actualFrames
 				info.emptyOffset = off
 			}
 		} else {
@@ -278,6 +288,9 @@ func getSongDebugInfo(p string) (*debugInfo, error) {
 		info.actualFrames++
 		info.actualBytes += finfo.size()
 		off += finfo.size()
+	}
+	if skipped > 0 {
+		info.skipped = append(info.skipped, [2]int64{off - skipped, skipped})
 	}
 
 	// The Xing header apparently doesn't include itself in the frame count
@@ -295,6 +308,9 @@ func getSongDebugInfo(p string) (*debugInfo, error) {
 	// Compute durations. The sample rate is fixed and there's a constant number
 	// of samples per frame, so we just need the number of frames.
 	computeDur := func(frames int) time.Duration {
+		if info.sampleRate == 0 {
+			return 0
+		}
 		return time.Duration(samplesPerFrame*frames) * time.Second /
 			time.Duration(info.sampleRate)
 	}

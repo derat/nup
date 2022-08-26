@@ -259,11 +259,15 @@ func (cmd *Command) doDebugSongFile() subcommands.ExitStatus {
 		return subcommands.ExitFailure
 	}
 
+	fmt.Printf("%d bytes: %d header, %d data, %d footer (%v)\n",
+		info.size, info.header, info.size-info.header-info.footer, info.footer, info.sha1)
+	for _, s := range info.skipped {
+		fmt.Printf("  skipped %d-%d (%d)\n", s[0], s[0]+s[1]-1, s[1])
+	}
+
 	format := func(d time.Duration) string {
 		return fmt.Sprintf("%d:%06.3f", int(d.Minutes()), (d % time.Minute).Seconds())
 	}
-	fmt.Printf("%d bytes: %d header, %d data, %d footer (%v)\n",
-		info.size, info.header, info.size-info.header-info.footer, info.footer, info.sha1)
 	fmt.Printf("Xing:   %s (%d frames, %d data)\n",
 		format(info.xingDur), info.xingFrames, info.xingBytes)
 	fmt.Printf("Actual: %s (%d frames, %d data)\n",
