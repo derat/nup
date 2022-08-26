@@ -139,17 +139,28 @@ func readFrameInfo(f *os.File, start int64) (*frameInfo, error) {
 	}, nil
 }
 
+// I've seen some files that seemed to have a bunch of junk (or at least not an MPEG header
+// starting with sync bits) after the header offset identified by taglib-go. Look over this
+// many bytes to try to find something that looks like a proper header.
+const maxFrameSearchBytes = 8192
+
 // computeAudioDuration reads Xing data from the frame at headerLen in f to return the audio length.
 // If no Xing header is present, it assumes that the file has a constant bitrate.
 // Only supports MPEG Audio 1, Layer 3.
 func computeAudioDuration(f *os.File, fi os.FileInfo, headerLen, footerLen int64) (
 	dur time.Duration, xingFrames int, xingBytes int64, err error) {
-	finfo, err := readFrameInfo(f, headerLen)
+	var finfo *frameInfo
+	fstart := headerLen
+	for ; fstart < headerLen+maxFrameSearchBytes; fstart++ {
+		if finfo, err = readFrameInfo(f, fstart); err == nil {
+			break
+		}
+	}
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("failed reading header at %#x: %v", headerLen, err)
+		return 0, 0, 0, fmt.Errorf("didn't find header after %#x", headerLen)
 	}
 
-	xingStart := headerLen + 4
+	xingStart := fstart + 4
 	if finfo.channelMode == 0x3 { // mono
 		xingStart += 17
 	} else {
@@ -166,7 +177,7 @@ func computeAudioDuration(f *os.File, fi os.FileInfo, headerLen, footerLen int64
 	if s := string(b[:4]); s != "Xing" && s != "Info" {
 		// Okay, no Xing VBR header. Assume that the file has a fixed bitrate.
 		// (The other alternative is to read the whole file to count the number of frames.)
-		ms := (fi.Size() - headerLen - footerLen) / int64(finfo.kbitRate) * 8
+		ms := (fi.Size() - fstart - footerLen) / int64(finfo.kbitRate) * 8
 		return time.Duration(ms) * time.Millisecond, 0, 0, nil
 	}
 
