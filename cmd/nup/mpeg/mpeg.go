@@ -20,32 +20,34 @@ import (
 
 // ReadID3v1Footer reads a 128-byte ID3v1 footer from the end of f.
 // ID3v1 is a terrible format.
-func ReadID3v1Footer(f *os.File, fi os.FileInfo) (length int64, artist, title, album string, err error) {
+func ReadID3v1Footer(f *os.File, fi os.FileInfo) (
+	length int64, artist, title, album, year string, err error) {
 	const (
 		footerLen   = 128
 		footerMagic = "TAG"
 		titleLen    = 30
 		artistLen   = 30
 		albumLen    = 30
-		// TODO: Add year (4 bytes), comment (30), and genre (1) if I ever care about them.
+		yearLen     = 4
 	)
 
 	// Check for an ID3v1 footer.
 	buf := make([]byte, footerLen)
 	if _, err := f.ReadAt(buf, fi.Size()-int64(len(buf))); err != nil {
-		return 0, "", "", "", err
+		return 0, "", "", "", "", err
 	}
 
 	b := bytes.NewBuffer(buf)
 	if string(b.Next(len(footerMagic))) != footerMagic {
-		return 0, "", "", "", nil
+		return 0, "", "", "", "", err
 	}
 
 	clean := func(b []byte) string { return string(bytes.TrimSpace(bytes.TrimRight(b, "\x00"))) }
 	title = clean(b.Next(titleLen))
 	artist = clean(b.Next(artistLen))
 	album = clean(b.Next(albumLen))
-	return footerLen, artist, title, album, nil
+	year = clean(b.Next(yearLen))
+	return footerLen, artist, title, album, year, nil
 }
 
 // GetID3v2TextFrame returns the first ID3v2 text frame with the supplied ID from gen.

@@ -5,6 +5,7 @@ package db
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -26,7 +27,7 @@ const (
 
 // Song represents an audio file and holds metadata and user-generated data.
 //
-// When adding fields, the Update method must be updated.
+// When adding fields, the MetadataEquals and Update methods must be updated.
 type Song struct {
 	// SHA1 is a hash of the audio portion of the file.
 	SHA1 string `datastore:"Sha1" json:"sha1,omitempty"`
@@ -85,6 +86,12 @@ type Song struct {
 	// Disc is the song's disc number, or 0 if unset.
 	Disc int `json:"disc"`
 
+	// Date is the date on which this song was recorded or released in UTC.
+	// It is used when listing songs or albums in chronological order.
+	// This is vaguely defined because the ID3v2 fields related to it are a mess:
+	// https://github.com/derat/nup/issues/42
+	Date time.Time `json:"date,omitempty"`
+
 	// Length is the song's duration in seconds.
 	Length float64 `json:"length"`
 
@@ -130,6 +137,22 @@ type Song struct {
 	LastModifiedTime time.Time `json:"-"`
 }
 
+// MarshalJSON uses a disgusting hack from https://stackoverflow.com/a/60567000 to
+// omit "Date" fields that have the zero value.
+func (s Song) MarshalJSON() ([]byte, error) {
+	type Alias Song
+	if s.Date.IsZero() {
+		return json.Marshal(&struct {
+			Date string `json:"date,omitempty"`
+			*Alias
+		}{
+			Date:  "",
+			Alias: (*Alias)(&s),
+		})
+	}
+	return json.Marshal(&struct{ *Alias }{Alias: (*Alias)(&s)})
+}
+
 // MetadataEquals returns true if s and o have identical metadata.
 // User data (ratings, plays, tags) and server-managed fields are not checked.
 func (s *Song) MetadataEquals(o *Song) bool {
@@ -143,6 +166,7 @@ func (s *Song) MetadataEquals(o *Song) bool {
 		s.AlbumID == o.AlbumID &&
 		s.Track == o.Track &&
 		s.Disc == o.Disc &&
+		s.Date.Equal(o.Date) &&
 		s.Length == o.Length &&
 		s.TrackGain == o.TrackGain &&
 		s.AlbumGain == o.AlbumGain &&
@@ -167,6 +191,7 @@ func (dst *Song) Update(src *Song, copyUserData bool) error {
 	dst.AlbumID = src.AlbumID
 	dst.Track = src.Track
 	dst.Disc = src.Disc
+	dst.Date = src.Date
 	dst.Length = src.Length
 	dst.TrackGain = src.TrackGain
 	dst.AlbumGain = src.AlbumGain

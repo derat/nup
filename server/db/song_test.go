@@ -4,10 +4,41 @@
 package db
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
 )
+
+func TestSong_MarshalJSON(t *testing.T) {
+	src := Song{Artist: "The Artist", Date: time.Date(2022, 4, 10, 13, 24, 45, 0, time.UTC)}
+	var dst Song
+	if b, err := json.Marshal(src); err != nil {
+		t.Errorf("Marshaling %v failed: %v", src, err)
+	} else if err := json.Unmarshal(b, &dst); err != nil {
+		t.Errorf("Unmarshaling %q failed: %v", b, err)
+	} else if !reflect.DeepEqual(dst, src) {
+		t.Errorf("Round-trip failed: got %v, want %v", dst, src)
+	}
+
+	src.Date = time.Time{}
+	dst = Song{}
+	if b, err := json.Marshal(src); err != nil {
+		t.Errorf("Marshaling %v failed: %v", src, err)
+	} else if err := json.Unmarshal(b, &dst); err != nil {
+		t.Errorf("Unmarshaling %q to song failed: %v", b, err)
+	} else if !reflect.DeepEqual(dst, src) {
+		t.Errorf("Round-trip failed: got %v, want %v", dst, src)
+	} else {
+		// Check that the JSON object doesn't include a "date" property.
+		var obj map[string]interface{}
+		if err := json.Unmarshal(b, &obj); err != nil {
+			t.Errorf("Unmarshaling %q to map failed: %v", b, err)
+		} else if _, ok := obj["date"]; ok {
+			t.Errorf("Zero date is included in %q", b)
+		}
+	}
+}
 
 func TestSong_Update(t *testing.T) {
 	t1 := time.Unix(1, 0)
@@ -26,6 +57,7 @@ func TestSong_Update(t *testing.T) {
 		AlbumID:        "album-id",
 		Track:          13,
 		Disc:           2,
+		Date:           time.Date(2022, 4, 10, 13, 24, 45, 0, time.UTC),
 		Length:         154.3,
 		TrackGain:      -5.6,
 		AlbumGain:      -7.2,

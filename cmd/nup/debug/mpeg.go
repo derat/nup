@@ -46,7 +46,7 @@ func getMPEGInfo(p string) (*mpegInfo, error) {
 	}
 
 	info := mpegInfo{size: fi.Size(), emptyFrame: -1}
-	if n, _, _, _, err := mpeg.ReadID3v1Footer(f, fi); err == nil {
+	if n, _, _, _, _, err := mpeg.ReadID3v1Footer(f, fi); err == nil {
 		info.footer = n
 	}
 	if tag, err := taglib.Decode(f, fi.Size()); err == nil {
