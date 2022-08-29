@@ -123,6 +123,8 @@ command line.
 debug [flags] <song-path>:
 	Print information about a song file.
 
+  -id3
+    	Print all ID3v2 text frames
   -mpeg
     	Read MPEG frames and print size/duration info
 ```
