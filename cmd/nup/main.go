@@ -14,6 +14,7 @@ import (
 	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/cmd/nup/config"
 	"github.com/derat/nup/cmd/nup/covers"
+	"github.com/derat/nup/cmd/nup/debug"
 	"github.com/derat/nup/cmd/nup/dump"
 	"github.com/derat/nup/cmd/nup/storage"
 	"github.com/derat/nup/cmd/nup/update"
@@ -37,6 +38,7 @@ func main() {
 	subcommands.Register(&check.Command{Cfg: &cfg}, "")
 	subcommands.Register(&config.Command{Cfg: &cfg}, "")
 	subcommands.Register(&covers.Command{Cfg: &cfg}, "")
+	subcommands.Register(&debug.Command{Cfg: &cfg}, "")
 	subcommands.Register(&dump.Command{Cfg: &cfg}, "")
 	subcommands.Register(&projectidCommand{cfg: &cfg}, "")
 	subcommands.Register(&storage.Command{Cfg: &cfg}, "")

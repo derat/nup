@@ -5,10 +5,7 @@ package update
 
 import (
 	"bufio"
-	"crypto/sha1"
-	"encoding/hex"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,6 +14,7 @@ import (
 	"time"
 
 	"github.com/derat/nup/cmd/nup/client"
+	"github.com/derat/nup/cmd/nup/mpeg"
 	"github.com/derat/nup/server/db"
 	"github.com/derat/taglib-go/taglib"
 )
@@ -38,18 +36,6 @@ const (
 	logProgressInterval = 100
 )
 
-// computeAudioSHA1 returns a SHA1 hash of the audio (i.e. non-metadata) portion of f.
-func computeAudioSHA1(f *os.File, fi os.FileInfo, headerLen, footerLen int64) (string, error) {
-	if _, err := f.Seek(headerLen, 0); err != nil {
-		return "", err
-	}
-	hasher := sha1.New()
-	if _, err := io.CopyN(hasher, f, fi.Size()-headerLen-footerLen); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(hasher.Sum(nil)), nil
-}
-
 // readSong creates a Song for the file at the supplied path.
 // If onlyTags is true, only fields derived from the file's MP3 tags will be filled.
 func readSong(path, relPath string, fi os.FileInfo, onlyTags bool,
@@ -62,7 +48,7 @@ func readSong(path, relPath string, fi os.FileInfo, onlyTags bool,
 
 	s := db.Song{Filename: relPath}
 	var footerLen int64
-	footerLen, s.Artist, s.Title, s.Album, err = readID3v1Footer(f, fi)
+	footerLen, s.Artist, s.Title, s.Album, err = mpeg.ReadID3v1Footer(f, fi)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +71,7 @@ func readSong(path, relPath string, fi os.FileInfo, onlyTags bool,
 		headerLen = int64(tag.TagSize())
 
 		// Only save the album artist if it's different from the track artist.
-		if aa, err := getID3v2TextFrame(tag, albumArtistTag); err != nil {
+		if aa, err := mpeg.GetID3v2TextFrame(tag, albumArtistTag); err != nil {
 			return nil, err
 		} else if aa != s.Artist {
 			s.AlbumArtist = aa
@@ -107,11 +93,11 @@ func readSong(path, relPath string, fi os.FileInfo, onlyTags bool,
 		s.Artist = repl
 	}
 
-	s.SHA1, err = computeAudioSHA1(f, fi, headerLen, footerLen)
+	s.SHA1, err = mpeg.ComputeAudioSHA1(f, fi, headerLen, footerLen)
 	if err != nil {
 		return nil, err
 	}
-	dur, _, _, err := computeAudioDuration(f, fi, headerLen, footerLen)
+	dur, _, _, err := mpeg.ComputeAudioDuration(f, fi, headerLen, footerLen)
 	if err != nil {
 		return nil, err
 	}

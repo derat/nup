@@ -14,6 +14,7 @@ Subcommands:
 	commands         list all command names
 	config           manage server configuration
 	covers           manages album art
+	debug            print information about a song file
 	dump             dump songs from the server
 	flags            describe all known top-level flags
 	help             describe subcommands and their syntax
@@ -113,6 +114,19 @@ covers [flags]:
     	Maximum number of parallel HTTP requests for -download (default 2)
 ```
 
+## `debug` command
+
+The `debug` command prints information about a song file specified in the
+command line.
+
+```
+debug [flags] <song-path>:
+	Print information about a song file.
+
+  -mpeg
+    	Read MPEG frames and print size/duration info
+```
+
 ## `dump` command
 
 The `dump` command downloads all song metadata and user data from the [App
@@ -194,8 +208,6 @@ update [flags]:
 
   -compare-dump-file string
     	Path to JSON file with songs to compare updates against
-  -debug-song-file string
-    	Path to song file to print debug info about
   -delete-after-merge
     	Delete source song if -merge-songs is true
   -delete-song int

@@ -24,7 +24,6 @@ type Command struct {
 	Cfg *client.Config
 
 	compareDumpFile  string // path of file with song dumps to compare against
-	debugSongFile    string // path of song file to print debug info about
 	deleteAfterMerge bool   // delete source song if mergeSongIDs is true
 	deleteSongID     int64  // ID of song to delete
 	dryRun           bool   // print actions instead of doing anything
@@ -53,7 +52,6 @@ func (*Command) Usage() string {
 
 func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&cmd.compareDumpFile, "compare-dump-file", "", "Path to JSON file with songs to compare updates against")
-	f.StringVar(&cmd.debugSongFile, "debug-song-file", "", "Path to song file to print debug info about")
 	f.BoolVar(&cmd.deleteAfterMerge, "delete-after-merge", false, "Delete source song if -merge-songs is true")
 	f.Int64Var(&cmd.deleteSongID, "delete-song", 0, "Delete song with given ID")
 	f.BoolVar(&cmd.dryRun, "dry-run", false, "Only print what would be updated")
@@ -81,17 +79,15 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 }
 
 func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
-	if countBools(cmd.debugSongFile != "", cmd.deleteSongID > 0, cmd.importJSONFile != "",
-		cmd.mergeSongIDs != "", cmd.printCoverID != "", cmd.reindexSongs, cmd.songPathsFile != "") > 1 {
-		fmt.Fprintln(os.Stderr, "-debug-song-file, -delete-song, -import-json-file, -merge-songs, "+
-			"-print-cover-id, -reindex-songs, and -song-paths-file are mutually exclusive")
+	if countBools(cmd.deleteSongID > 0, cmd.importJSONFile != "", cmd.mergeSongIDs != "",
+		cmd.printCoverID != "", cmd.reindexSongs, cmd.songPathsFile != "") > 1 {
+		fmt.Fprintln(os.Stderr, "-delete-song, -import-json-file, -merge-songs, -print-cover-id, "+
+			"-reindex-songs, and -song-paths-file are mutually exclusive")
 		return subcommands.ExitUsageError
 	}
 
 	// Handle flags that don't use the normal update process.
 	switch {
-	case cmd.debugSongFile != "":
-		return cmd.doDebugSongFile()
 	case cmd.deleteSongID > 0:
 		return cmd.doDeleteSong()
 	case cmd.mergeSongIDs != "":
@@ -248,33 +244,6 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 			fmt.Fprintln(os.Stderr, "Failed saving update info:", err)
 			return subcommands.ExitFailure
 		}
-	}
-	return subcommands.ExitSuccess
-}
-
-func (cmd *Command) doDebugSongFile() subcommands.ExitStatus {
-	info, err := getSongDebugInfo(cmd.debugSongFile)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed reading file info:", err)
-		return subcommands.ExitFailure
-	}
-
-	fmt.Printf("%d bytes: %d header, %d data, %d footer (%v)\n",
-		info.size, info.header, info.size-info.header-info.footer, info.footer, info.sha1)
-	for _, s := range info.skipped {
-		fmt.Printf("  skipped %d-%d (%d)\n", s[0], s[0]+s[1]-1, s[1])
-	}
-
-	format := func(d time.Duration) string {
-		return fmt.Sprintf("%d:%06.3f", int(d.Minutes()), (d % time.Minute).Seconds())
-	}
-	fmt.Printf("Xing:   %s (%d frames, %d data)\n",
-		format(info.xingDur), info.xingFrames, info.xingBytes)
-	fmt.Printf("Actual: %s (%d frames, %d data)\n",
-		format(info.actualDur), info.actualFrames, info.actualBytes)
-	if info.emptyFrame >= 0 {
-		fmt.Printf("Audio:  %s (%d frames, then empty starting at offset %d)\n",
-			format(info.emptyTime), info.emptyFrame, info.emptyOffset)
 	}
 	return subcommands.ExitSuccess
 }
