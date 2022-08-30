@@ -11,12 +11,16 @@ import (
 	"github.com/derat/taglib-go/taglib/id3"
 )
 
-type id3TextFrame struct {
+// Maximum ID3v2 frame content size. Longer frames (e.g. image data) are not decoded.
+const maxID3FrameSize = 256
+
+type id3Frame struct {
 	id     string
+	size   int // bytes
 	fields []string
 }
 
-func readID3Frames(p string) ([]id3TextFrame, error) {
+func readID3Frames(p string) ([]id3Frame, error) {
 	f, err := os.Open(p)
 	if err != nil {
 		return nil, err
@@ -33,22 +37,26 @@ func readID3Frames(p string) ([]id3TextFrame, error) {
 		return nil, err
 	}
 
-	var ret []id3TextFrame
+	var ret []id3Frame
 	switch tag := gen.(type) {
 	case *id3.Id3v23Tag:
 		for id, frames := range tag.Frames {
 			for _, frame := range frames {
-				if fields, err := id3.GetId3v23TextIdentificationFrame(frame); err == nil {
-					ret = append(ret, id3TextFrame{id: id, fields: append([]string(nil), fields...)})
+				info := id3Frame{id: id, size: len(frame.Content)}
+				if info.size <= maxID3FrameSize {
+					info.fields, _ = id3.GetId3v23TextIdentificationFrame(frame)
 				}
+				ret = append(ret, info)
 			}
 		}
 	case *id3.Id3v24Tag:
 		for id, frames := range tag.Frames {
 			for _, frame := range frames {
-				if fields, err := id3.GetId3v24TextIdentificationFrame(frame); err == nil {
-					ret = append(ret, id3TextFrame{id: id, fields: append([]string(nil), fields...)})
+				info := id3Frame{id: id, size: len(frame.Content)}
+				if info.size <= maxID3FrameSize {
+					info.fields, _ = id3.GetId3v24TextIdentificationFrame(frame)
 				}
+				ret = append(ret, info)
 			}
 		}
 	default:

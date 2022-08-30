@@ -51,11 +51,17 @@ func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, args ...inter
 			return subcommands.ExitFailure
 		}
 		for _, frame := range frames {
-			quoted := make([]string, len(frame.fields))
-			for i, s := range frame.fields {
-				quoted[i] = fmt.Sprintf("%q", s)
+			var val string
+			if len(frame.fields) == 0 {
+				val = fmt.Sprintf("[%d bytes]", frame.size)
+			} else {
+				quoted := make([]string, len(frame.fields))
+				for i, s := range frame.fields {
+					quoted[i] = fmt.Sprintf("%q", s)
+				}
+				val = strings.Join(quoted, " ")
 			}
-			fmt.Println(frame.id + " " + strings.Join(quoted, " "))
+			fmt.Println(frame.id + " " + val)
 		}
 		return subcommands.ExitSuccess
 
@@ -88,5 +94,4 @@ func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, args ...inter
 
 	fmt.Fprintln(os.Stderr, "No action requested via flags")
 	return subcommands.ExitUsageError
-
 }
