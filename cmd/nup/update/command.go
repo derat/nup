@@ -212,6 +212,13 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 				continue
 			}
 
+			// Don't send user data to the server if it would just throw it away.
+			if !replaceUserData {
+				s.Rating = 0
+				s.Tags = nil
+				s.Plays = nil
+			}
+
 			log.Print("Sending ", s.Filename)
 			updateChan <- s
 		}
