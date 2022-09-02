@@ -43,6 +43,7 @@ func newSong(artist, title, album string, fields ...songField) db.Song {
 // songField describes a field that should be set by newSong.
 type songField func(*db.Song)
 
+func withDate(t time.Time) songField  { return func(s *db.Song) { s.Date = t } }
 func withDisc(d int) songField        { return func(s *db.Song) { s.Disc = d } }
 func withFilename(f string) songField { return func(s *db.Song) { s.Filename = f } }
 func withLength(l float64) songField  { return func(s *db.Song) { s.Length = l } }

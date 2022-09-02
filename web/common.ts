@@ -239,6 +239,7 @@ commonStyles.replaceSync(`
   --button-color: #aaa;
   --button-hover-color: #666;
   --button-disabled-color: #ddd;
+  --chart-bar-color: #42a5f5; /* material blue 400 */
   --control-color: #ddd;
   --control-active-color: #999; /* checked checkbox */
   --cover-missing-color: #f5f5f5;
@@ -264,6 +265,7 @@ commonStyles.replaceSync(`
   --button-color: #888;
   --button-hover-color: #aaa;
   --button-disabled-color: #555;
+  --chart-bar-color: #42a5f5; /* material blue 400 */
   --control-color: #555;
   --control-active-color: #888;
   --cover-missing-color: #333;

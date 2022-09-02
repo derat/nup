@@ -1119,28 +1119,50 @@ func TestStats(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
 
+	t2001 := time.Date(2001, 4, 1, 0, 0, 0, 0, time.UTC)
+	t2014 := time.Date(2014, 5, 3, 0, 0, 0, 0, time.UTC)
+	t2015 := time.Date(2015, 10, 31, 0, 0, 0, 0, time.UTC)
+
 	song1 := newSong("artist", "track1", "album1", withRating(3), withLength(7200),
-		withPlays(time.Unix(86400, 0)))
-	song2 := newSong("artist", "track2", "album1", withRating(5), withLength(201))
-	importSongs(song1, song2)
+		withDate(t2001), withPlays(t2001, t2014, t2015))
+	song2 := newSong("artist", "track2", "album1", withRating(5), withLength(201),
+		withDate(t2014), withPlays(t2015))
+	song3 := newSong("artist", "track3", "album2", withRating(0), withLength(45),
+		withDate(t2001), withPlays(t2014))
+	importSongs(song1, song2, song3)
 	tester.UpdateStats()
 
 	page.click(menuButton)
 	page.click(menuStats)
-	for _, tc := range []struct{ name, val string }{
-		{"Songs", "2"},
-		{"★★★★★", "1"},
-		{"★★★★", "0"},
-		{"★★★", "1"},
-		{"★★", "0"},
-		{"★", "0"},
-		{"Unrated", "0"},
-		{"Albums", "1"},
-		{"Duration", "0.1 days"},
-		{"1970", "1"},
+
+	for _, fields := range [][]string{
+		{"Songs:", "3"},
+		{"Albums:", "2"},
+		{"Duration:", "0.1 days"},
+		// Table columns are year, first plays, last plays, plays, playtime.
+		{"2001", "1", "0", "1", "0.1 days"},
+		{"2014", "1", "1", "2", "0.1 days"},
+		{"2015", "1", "2", "2", "0.1 days"},
 	} {
-		page.checkText(statsDialog, fmt.Sprintf(`\s+%s\s+%s\s+`, tc.name, tc.val))
+		quoted := make([]string, len(fields))
+		for i, s := range fields {
+			quoted[i] = regexp.QuoteMeta(s)
+		}
+		page.checkText(statsDialog, `(^|\s+)`+strings.Join(quoted, `\s+`)+`($|\s+)`)
 	}
+
+	page.checkStatsChart(statsDecadesChart, []statsChartBar{
+		{67, "2000s - 2 songs"},
+		{33, "2010s - 1 song"},
+	})
+	page.checkStatsChart(statsRatingsChart, []statsChartBar{
+		{33, "Unrated - 1 song"},
+		{0, "★ - 0 songs"},
+		{0, "★★ - 0 songs"},
+		{33, "★★★ - 1 song"},
+		{0, "★★★★ - 0 songs"},
+		{33, "★★★★★ - 1 song"},
+	})
 }
 
 func TestUnit(t *testing.T) {

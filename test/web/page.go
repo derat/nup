@@ -6,7 +6,9 @@ package web
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -68,7 +70,9 @@ var (
 	infoTags          = joinLocs(infoDialog, loc{selenium.ByID, "tags"})
 	infoDismissButton = joinLocs(infoDialog, loc{selenium.ByID, "dismiss-button"})
 
-	statsDialog = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.stats > span"})
+	statsDialog       = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.stats > span"})
+	statsDecadesChart = joinLocs(statsDialog, loc{selenium.ByID, "decades-chart"})
+	statsRatingsChart = joinLocs(statsDialog, loc{selenium.ByID, "ratings-chart"})
 
 	menu           = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.menu > span"})
 	menuFullscreen = joinLocs(menu, loc{selenium.ByID, "fullscreen"})
@@ -826,5 +830,42 @@ func (p *page) checkSong(s db.Song, checks ...songCheck) {
 		msg += "Want: " + want.String() + "\n"
 		msg += "Got:  " + got.String()
 		p.t.Fatal(msg)
+	}
+}
+
+// Describes a bar within a chart in the stats dialog.
+type statsChartBar struct {
+	pct   int // rounded within [0, 100]
+	title string
+}
+
+// Matches e.g. "55.3" from the stats bar style attribute "opacity: 0.55; width: 55.3%".
+var statsPctRegexp = regexp.MustCompile(`width:\s*([^%]+)%`)
+
+// checkStatsChart verifies that the stats dialog chart at locs contains want.
+func (p *page) checkStatsChart(locs []loc, want []statsChartBar) {
+	chart := p.getOrFail(locs)
+	if err := wait(func() error {
+		els, err := chart.FindElements(selenium.ByTagName, "span")
+		if err != nil {
+			return err
+		}
+		got := make([]statsChartBar, len(els))
+		for i, el := range els {
+			var bar statsChartBar
+			bar.title, _ = el.GetAttribute("title")
+			style, _ := el.GetAttribute("style")
+			if ms := statsPctRegexp.FindStringSubmatch(style); ms != nil {
+				val, _ := strconv.ParseFloat(ms[1], 64)
+				bar.pct = int(math.Round(val))
+			}
+			got[i] = bar
+		}
+		if !reflect.DeepEqual(got, want) {
+			return fmt.Errorf("got %v; want %v", got, want)
+		}
+		return nil
+	}); err != nil {
+		p.t.Fatalf("Bad %v chart at %v: %v", locs, p.desc(), err)
 	}
 }

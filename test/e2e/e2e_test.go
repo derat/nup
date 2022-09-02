@@ -38,6 +38,7 @@ var (
 	Song0sUpdated = test.Song0sUpdated
 	Song1s        = test.Song1s
 	Song5s        = test.Song5s
+	Song10s       = test.Song10s
 	LegacySong1   = test.LegacySong1
 	LegacySong2   = test.LegacySong2
 
@@ -967,7 +968,8 @@ func TestStats(tt *testing.T) {
 		db.NewPlay(time.Unix(1379210718, 0), "127.0.0.1"),
 		db.NewPlay(time.Unix(1410746718, 0), "127.0.0.1"),
 	}
-	t.PostSongs([]db.Song{s1, s2}, true, 0)
+	s3 := Song10s
+	t.PostSongs([]db.Song{s1, s2, s3}, true, 0)
 
 	log.Print("Updating stats")
 	t.UpdateStats()
@@ -978,14 +980,15 @@ func TestStats(tt *testing.T) {
 		tt.Error("Stats update time is zero")
 	}
 	want := db.Stats{
-		Songs:    2,
-		Albums:   2,
-		TotalSec: s1.Length + s2.Length,
-		Ratings:  map[string]int{"4": 1, "5": 1},
-		Tags:     map[string]int{"guitar": 2, "instrumental": 1, "vocals": 1},
+		Songs:       3,
+		Albums:      3,
+		TotalSec:    s1.Length + s2.Length + s3.Length,
+		Ratings:     map[int]int{0: 1, 4: 1, 5: 1},
+		SongDecades: map[int]int{0: 1, 2000: 1, 2010: 1},
+		Tags:        map[string]int{"guitar": 2, "instrumental": 1, "vocals": 1},
 		Years: map[int]db.PlayStats{
-			2013: {Plays: 1, TotalSec: s2.Length},
-			2014: {Plays: 2, TotalSec: s1.Length + s2.Length},
+			2013: {Plays: 1, TotalSec: s2.Length, FirstPlays: 1},
+			2014: {Plays: 2, TotalSec: s1.Length + s2.Length, FirstPlays: 1, LastPlays: 2},
 		},
 		UpdateTime: got.UpdateTime, // checked for non-zero earlier
 	}

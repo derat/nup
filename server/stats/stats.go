@@ -6,7 +6,6 @@ package stats
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/derat/nup/server/cache"
@@ -64,6 +63,8 @@ func Update(ctx context.Context) error {
 	stats.UpdateTime = time.Now()
 
 	songLengths := make(map[int64]float64) // keys are song IDs
+	firstPlays := make(map[int]int)        // keys are years
+	lastPlays := make(map[int]int)         // keys are years
 
 	// Datastore doesn't seem to return any results when trying to project all of these properties
 	// at once (probably because Tags is array-valued), and including multiple properties also
@@ -74,16 +75,29 @@ func Update(ctx context.Context) error {
 		distinct bool
 		fn       songFunc
 	}{
+		{"AlbumId", true, func(id int64, s *db.Song) {
+			stats.Albums++
+		}},
+		{"Date", false, func(id int64, s *db.Song) {
+			stats.SongDecades[s.Date.Year()/10*10]++
+		}},
+		{"FirstStartTime", false, func(id int64, s *db.Song) {
+			if !s.FirstStartTime.IsZero() {
+				firstPlays[s.FirstStartTime.Local().Year()]++
+			}
+		}},
+		{"LastStartTime", false, func(id int64, s *db.Song) {
+			if !s.LastStartTime.IsZero() {
+				lastPlays[s.LastStartTime.Local().Year()]++
+			}
+		}},
 		{"Length", false, func(id int64, s *db.Song) {
 			stats.Songs++
 			stats.TotalSec += s.Length
 			songLengths[id] = s.Length
 		}},
-		{"AlbumId", true, func(id int64, s *db.Song) {
-			stats.Albums++
-		}},
 		{"Rating", false, func(id int64, s *db.Song) {
-			stats.Ratings[strconv.Itoa(s.Rating)]++
+			stats.Ratings[s.Rating]++
 		}},
 		{"Tags", false, func(id int64, s *db.Song) {
 			for _, t := range s.Tags {
@@ -135,6 +149,28 @@ func Update(ctx context.Context) error {
 		if err := <-ch; err != nil {
 			return err
 		}
+	}
+
+	// So annoying that Go doesn't let you assign to struct fields in map values.
+	for year, plays := range firstPlays {
+		yearStats := stats.Years[year]
+		yearStats.FirstPlays = plays
+		stats.Years[year] = yearStats
+	}
+	for year, plays := range lastPlays {
+		yearStats := stats.Years[year]
+		yearStats.LastPlays = plays
+		stats.Years[year] = yearStats
+	}
+
+	// Hack: old Song entities that don't have Date properties apparently aren't counted
+	// in the projection query on Song.Date, so manually add them to the 0 bucket.
+	var decadesCnt int
+	for _, cnt := range stats.SongDecades {
+		decadesCnt += cnt
+	}
+	if missing := stats.Songs - decadesCnt; missing > 0 {
+		stats.SongDecades[0] += missing
 	}
 
 	// Read Play.StartTime after the Song.Length query is done, since we need to

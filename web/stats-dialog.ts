@@ -19,30 +19,42 @@ const template = createTemplate(`
     margin-bottom: var(--margin);
   }
 
-  #top-div {
-    align-items: flex-start;
-    display: flex;
-    gap: 30px;
-    visibility: hidden;
-  }
-  #top-div.ready {
-    visibility: visible;
-  }
-
-  table {
-    border-collapse: collapse;
+  #stats-div {
+    display: none;
     width: 100%;
   }
+  #stats-div.ready {
+    display: block;
+  }
 
-  #main-table {
-    line-height: 1.4em;
+  #summary-div {
+    display: flex;
+    justify-content: space-between;
     margin-bottom: var(--margin);
   }
-  #main-table td:first-child {
+  #songs,
+  #albums,
+  #duration {
     font-weight: bold;
   }
-  #main-table td:not(:first-child) {
-    text-align: right;
+
+  .chart-wrapper {
+    display: flex;
+    margin-bottom: var(--margin);
+  }
+  .chart-wrapper .label {
+    min-width: 5em;
+  }
+  .chart {
+    border-radius: 4px;
+    display: flex;
+    height: 16px;
+    outline: solid 1px var(--border-color);
+    overflow: hidden;
+    width: 100%;
+  }
+  .chart span {
+    background-color: var(--chart-bar-color);
   }
 
   #years-div {
@@ -50,6 +62,10 @@ const template = createTemplate(`
     margin-bottom: var(--margin);
     max-height: 180px;
     overflow: scroll;
+    width: 100%;
+  }
+  #years-table {
+    border-spacing: 0;
     width: 100%;
   }
   #years-table th {
@@ -62,6 +78,7 @@ const template = createTemplate(`
    * border from scrolling along with table contents. */
   #years-table th:after {
     border-bottom: solid 1px var(--border-color);
+    border-collapse: collapse;
     bottom: 0;
     content: '';
     position: absolute;
@@ -82,25 +99,30 @@ const template = createTemplate(`
 <div class="title">Stats</div>
 <hr class="title" />
 
-<div id="top-div">
-  <!-- prettier-ignore -->
-  <table id="main-table">
-    <tr><td>Songs</td><td id="songs"></td></tr>
-    <tr><td>★★★★★</td><td id="rating-5"></td></tr>
-    <tr><td>★★★★</td><td id="rating-4"></td></tr>
-    <tr><td>★★★</td><td id="rating-3"></td></tr>
-    <tr><td>★★</td><td id="rating-2"></td></tr>
-    <tr><td>★</td><td id="rating-1"></td></tr>
-    <tr><td>Unrated</td><td id="rating-0"></td></tr>
-    <tr><td>Albums</td><td id="albums"></td></tr>
-    <tr><td>Duration</td><td id="duration"></td></tr>
-  </table>
+<div id="stats-div">
+  <div id="summary-div">
+    <span>Songs: <span id="songs"></span></span>
+    <span>Albums: <span id="albums"></span></span>
+    <span>Duration: <span id="duration"></span></span>
+  </div>
+
+  <div class="chart-wrapper">
+    <span class="label">Decades:</span>
+    <div id="decades-chart" class="chart"></div>
+  </div>
+
+  <div class="chart-wrapper">
+    <span class="label">Ratings:</span>
+    <div id="ratings-chart" class="chart"></div>
+  </div>
 
   <div id="years-div">
     <table id="years-table">
       <thead>
         <tr>
           <th>Year</th>
+          <th>First plays</th>
+          <th>Last plays</th>
           <th>Plays</th>
           <th>Playtime</th>
         </tr>
@@ -131,18 +153,41 @@ export function showStatsDialog() {
     .then((stats: Stats) => {
       // This corresponds to the Stats struct in server/db/stats.go.
       $('songs', shadow).innerText = stats.songs.toLocaleString();
-      for (const rating of ['0', '1', '2', '3', '4', '5']) {
-        const td = $(`rating-${rating}`, shadow);
-        const songs = stats.ratings[rating];
-        td.innerText = songs ? songs.toLocaleString() : '0';
-      }
       $('albums', shadow).innerText = stats.albums.toLocaleString();
       $('duration', shadow).innerText = formatDays(stats.totalSec);
+
+      const decades = Object.entries(stats.songDecades).sort();
+      fillChart(
+        $('decades-chart', shadow),
+        decades.map(([_, c]) => c),
+        stats.songs,
+        decades.map(
+          ([d, c]) =>
+            `${d === '0' ? 'Unset' : d + 's'} - ` +
+            `${c} ${c !== 1 ? 'songs' : 'song'}`
+        )
+      );
+
+      const ratingCounts = [...Array(6).keys()].map(
+        (i) => stats.ratings[i] ?? 0
+      );
+      fillChart(
+        $('ratings-chart', shadow),
+        ratingCounts,
+        stats.songs,
+        ratingCounts.map(
+          (c, i) =>
+            `${i === 0 ? 'Unrated' : '★'.repeat(i)} - ` +
+            `${c} ${c !== 1 ? 'songs' : 'song'}`
+        )
+      );
 
       const tbody = shadow.querySelector('#years-table tbody') as HTMLElement;
       for (const [year, ystats] of Object.entries(stats.years).sort()) {
         const row = createElement('tr', null, tbody);
         createElement('td', null, row, year);
+        createElement('td', null, row, ystats.firstPlays.toLocaleString());
+        createElement('td', null, row, ystats.lastPlays.toLocaleString());
         createElement('td', null, row, ystats.plays.toLocaleString());
         createElement('td', null, row, formatDays(ystats.totalSec));
       }
@@ -152,7 +197,7 @@ export function showStatsDialog() {
       );
       $('updated-div', shadow).innerText = `Updated ${updateTime}`;
 
-      $('top-div', shadow).classList.add('ready');
+      $('stats-div', shadow).classList.add('ready');
     })
     .catch((err) => {
       $('updated-div', shadow).innerText = err.toString();
@@ -164,6 +209,7 @@ interface Stats {
   albums: number;
   totalSec: number;
   ratings: Record<string, number>;
+  songDecades: Record<string, number>;
   tags: Record<string, number>;
   years: Record<string, PlayStats>;
   updateTime: string;
@@ -172,6 +218,26 @@ interface Stats {
 interface PlayStats {
   plays: number;
   totalSec: number;
+  firstPlays: number;
+  lastPlays: number;
 }
 
 const formatDays = (sec: number) => `${(sec / 86400).toFixed(1)} days`;
+
+// Adds spans within div corresponding to vals and titles.
+function fillChart(
+  div: HTMLElement,
+  vals: number[],
+  total: number,
+  titles: string[]
+) {
+  if (total <= 0) return;
+  for (let i = 0; i < vals.length; i++) {
+    const el = createElement('span', null, div);
+    if (i < vals.length - 1) {
+      el.style.opacity = `${(i / (vals.length - 1)) ** 2}`;
+    }
+    el.style.width = `${(100 * vals[i]) / total}%`;
+    el.title = titles[i];
+  }
+}
