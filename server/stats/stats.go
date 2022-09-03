@@ -60,14 +60,14 @@ func Update(ctx context.Context) error {
 
 	songLengths := make(map[int64]float64) // keys are song IDs
 
-	// Datastore doesn't seem to return any results when trying to project all three of these
-	// properties at once (probably because Tags is array-valued), and including multiple properties
-	// also requires additional indexes.
+	// Datastore doesn't seem to return any results when trying to project all of these properties
+	// at once (probably because Tags is array-valued), and including multiple properties also
+	// requires additional indexes.
 	type songFunc func(int64, *db.Song)
-	queries := []struct {
+	songQueries := []struct {
 		prop     string
 		distinct bool
-		fn       func(int64, *db.Song)
+		fn       songFunc
 	}{
 		{"Length", false, func(id int64, s *db.Song) {
 			stats.Songs++
@@ -86,9 +86,9 @@ func Update(ctx context.Context) error {
 			}
 		}},
 	}
-	ch := make(chan error, len(queries))
-	for _, query := range queries {
-		func(prop string, distinct bool, fn songFunc) {
+	ch := make(chan error, len(songQueries))
+	for _, query := range songQueries {
+		go func(prop string, distinct bool, fn songFunc) {
 			start := time.Now()
 			q := datastore.NewQuery(db.SongKind).Project(prop)
 			if distinct {
@@ -111,12 +111,14 @@ func Update(ctx context.Context) error {
 			ch <- nil
 		}(query.prop, query.distinct, query.fn)
 	}
-	for range queries {
+	for range songQueries {
 		if err := <-ch; err != nil {
 			return err
 		}
 	}
 
+	// Read Play.StartTime after the Song.Length query is done, since we need to
+	// have the length of each song to compute playtimes.
 	start := time.Now()
 	it := datastore.NewQuery(db.PlayKind).Project("StartTime").Run(ctx)
 	for {
