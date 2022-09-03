@@ -85,7 +85,7 @@ const template = createTemplate(`
   #spinner {
     display: none;
     fill: #fff;
-    filter: drop-shadow(0 0 8px #000);
+    filter: drop-shadow(0 0 4px #000);
     height: 14px;
     left: 62px;
     opacity: 0.8;
@@ -99,7 +99,7 @@ const template = createTemplate(`
 
   #rating-overlay {
     display: flex;
-    filter: drop-shadow(0 0 8px #000);
+    filter: drop-shadow(0 0 4px #000);
     left: calc(var(--margin) + 1px);
     pointer-events: none;
     position: absolute;
