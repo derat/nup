@@ -16,6 +16,11 @@ import (
 	"google.golang.org/appengine/v2/log"
 )
 
+// Datastore queries seem to time out after about a minute:
+// https://github.com/derat/nup/issues/43
+// https://stackoverflow.com/q/31332757
+const maxQueryTime = 30 * time.Second
+
 // statsKey returns the key for the db.Stats singleton entity in datastore.
 func statsKey(ctx context.Context) *datastore.Key {
 	return datastore.NewKey(ctx, db.StatsKind, db.StatsKeyName, 0, nil)
@@ -86,6 +91,7 @@ func Update(ctx context.Context) error {
 			}
 		}},
 	}
+
 	ch := make(chan error, len(songQueries))
 	for _, query := range songQueries {
 		go func(prop string, distinct bool, fn songFunc) {
@@ -94,6 +100,8 @@ func Update(ctx context.Context) error {
 			if distinct {
 				q = q.Distinct()
 			}
+
+			qstart := time.Now()
 			it := q.Run(ctx)
 			for {
 				var s db.Song
@@ -105,6 +113,18 @@ func Update(ctx context.Context) error {
 					return
 				}
 				fn(k.IntID(), &s)
+
+				// Use a cursor to start a new query to avoid datastore query timeouts.
+				if elapsed := time.Now().Sub(qstart); elapsed > maxQueryTime {
+					log.Debugf(ctx, "Starting new Song.%v query after %d ms", prop, elapsed.Milliseconds())
+					cursor, err := it.Cursor()
+					if err != nil {
+						ch <- err
+						return
+					}
+					qstart = time.Now()
+					it = q.Start(cursor).Run(ctx)
+				}
 			}
 			log.Debugf(ctx, "Computing Song.%v stats took %v ms",
 				prop, time.Now().Sub(start).Milliseconds())
@@ -120,7 +140,9 @@ func Update(ctx context.Context) error {
 	// Read Play.StartTime after the Song.Length query is done, since we need to
 	// have the length of each song to compute playtimes.
 	start := time.Now()
-	it := datastore.NewQuery(db.PlayKind).Project("StartTime").Run(ctx)
+	q := datastore.NewQuery(db.PlayKind).Project("StartTime")
+	qstart := time.Now()
+	it := q.Run(ctx)
 	for {
 		var play db.Play
 		key, err := it.Next(&play)
@@ -147,6 +169,17 @@ func Update(ctx context.Context) error {
 		}
 
 		stats.Years[year] = yearStats
+
+		// Use a cursor to start a new query to avoid datastore query timeouts.
+		if elapsed := time.Now().Sub(qstart); elapsed > maxQueryTime {
+			log.Debugf(ctx, "Starting new Play query after %d ms", elapsed.Milliseconds())
+			cursor, err := it.Cursor()
+			if err != nil {
+				return err
+			}
+			qstart = time.Now()
+			it = q.Start(cursor).Run(ctx)
+		}
 	}
 	log.Debugf(ctx, "Computing Play stats took %v ms", time.Now().Sub(start).Milliseconds())
 
