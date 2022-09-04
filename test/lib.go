@@ -33,7 +33,7 @@ func CopySongs(dir string, filenames ...string) error {
 	if err != nil {
 		return err
 	}
-	musicDir := filepath.Join(libDir, "data/music")
+	musicDir := filepath.Join(libDir, "data/songs")
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
