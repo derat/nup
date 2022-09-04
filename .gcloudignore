@@ -21,3 +21,4 @@ cmd/
 example/
 test/
 web/*.d.ts
+web/fontello-config.json
