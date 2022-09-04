@@ -74,7 +74,7 @@ func run() (int, error) {
 	cfg := &config.Config{
 		GoogleUsers:    []string{*email},
 		BasicAuthUsers: []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
-		SongBaseURL:    fileSrv.URL + "/songs/",
+		SongBaseURL:    fileSrv.URL + "/music/",
 		CoverBaseURL:   fileSrv.URL + "/covers/",
 		Presets:        presets,
 		Minify:         minify,
