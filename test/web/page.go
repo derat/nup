@@ -145,12 +145,12 @@ var (
 )
 
 const (
-	// Text for minRatingSelect options and ratingOverlayDiv.
+	// Text for minRatingSelect option. Note hacky U+2009 (THIN SPACE) characters.
 	oneStar    = "★"
-	twoStars   = "★★"
-	threeStars = "★★★"
-	fourStars  = "★★★★"
-	fiveStars  = "★★★★★"
+	twoStars   = "★ ★"
+	threeStars = "★ ★ ★"
+	fourStars  = "★ ★ ★ ★"
+	fiveStars  = "★ ★ ★ ★ ★"
 
 	// Text for firstPlayedSelect and lastPlayedSelect options.
 	unsetTime   = ""
@@ -797,12 +797,11 @@ func (p *page) checkSong(s db.Song, checks ...songCheck) {
 		ended := p.getAttrOrFail(au, "ended", true) != ""
 
 		// Count the rating overlay's children to find the displayed rating.
-		var rating string
+		var rating int
+		var err error
 		stars := p.getAttrOrFail(p.getOrFail(ratingOverlayDiv), "childElementCount", false)
-		if n, err := strconv.Atoi(stars); err != nil {
+		if rating, err = strconv.Atoi(stars); err != nil {
 			return fmt.Errorf("stars: %v", err)
-		} else {
-			rating = strings.Repeat(oneStar, n)
 		}
 
 		var filename string
@@ -812,15 +811,15 @@ func (p *page) checkSong(s db.Song, checks ...songCheck) {
 		}
 
 		got = songInfo{
-			artist:    p.getTextOrFail(p.getOrFail(artistDiv), false),
-			title:     p.getTextOrFail(p.getOrFail(titleDiv), false),
-			album:     p.getTextOrFail(p.getOrFail(albumDiv), false),
-			paused:    &paused,
-			ended:     &ended,
-			filename:  &filename,
-			ratingStr: &rating,
-			imgTitle:  &imgTitle,
-			timeStr:   &time,
+			artist:   p.getTextOrFail(p.getOrFail(artistDiv), false),
+			title:    p.getTextOrFail(p.getOrFail(titleDiv), false),
+			album:    p.getTextOrFail(p.getOrFail(albumDiv), false),
+			paused:   &paused,
+			ended:    &ended,
+			filename: &filename,
+			rating:   &rating,
+			imgTitle: &imgTitle,
+			timeStr:  &time,
 		}
 		if !songInfosEqual(want, got) {
 			return errors.New("songs don't match")

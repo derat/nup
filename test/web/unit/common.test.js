@@ -92,10 +92,6 @@ suite('common', () => {
       [[3], '★★★☆☆'],
       [[4], '★★★★☆'],
       [[5], '★★★★★'],
-      [[3, '*', ''], '***'],
-      [[0, '★', '☆', ''], ''],
-      [[2, '*', '', 'Unrated', 'Rated: '], 'Rated: **'],
-      [[0, '*', '', 'Unrated', 'Rated: '], 'Unrated'],
     ]) {
       const got = getRatingString.apply(null, args);
       if (got !== want) {

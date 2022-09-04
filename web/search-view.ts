@@ -166,12 +166,14 @@ const template = createTemplate(`
       Min rating
       <span class="select-wrapper">
         <select id="min-rating-select">
+          <!-- Put U+2009 (THIN SPACE) between characters since the star icons
+               in the Fontello font are crammed together otherwise. -->
           <option value=""></option>
           <option value="1">★</option>
-          <option value="2">★★</option>
-          <option value="3">★★★</option>
-          <option value="4">★★★★</option>
-          <option value="5">★★★★★</option>
+          <option value="2">★ ★</option>
+          <option value="3">★ ★ ★</option>
+          <option value="4">★ ★ ★ ★</option>
+          <option value="5">★ ★ ★ ★ ★</option>
         </select></span
       >
     </label>

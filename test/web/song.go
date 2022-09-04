@@ -89,10 +89,10 @@ type songInfo struct {
 	paused  *bool // audio element is paused
 	ended   *bool // audio element is ended
 
-	filename  *string // filename from audio element src attribute
-	ratingStr *string // rating string from cover image, e.g. "★★★"
-	imgTitle  *string // cover image title attr, e.g. "Rating: ★★★☆☆\nTags: guitar rock"
-	timeStr   *string // displayed time, e.g. "0:00 / 0:05"
+	rating   *int    // rating from the cover image in [0, 5]
+	filename *string // filename from audio element src attribute
+	imgTitle *string // cover image title attr, e.g. "Rating: ★★★☆☆\nTags: guitar rock"
+	timeStr  *string // displayed time, e.g. "0:00 / 0:05"
 
 	srvRating *int           // server rating in [1, 5] or 0 for unrated
 	srvTags   []string       // server tags in ascending order
@@ -143,7 +143,6 @@ func (s *songInfo) String() string {
 		val  *string
 	}{
 		{"filename", s.filename},
-		{"rating", s.ratingStr},
 		{"time", s.timeStr},
 		{"title", s.imgTitle},
 	} {
@@ -157,7 +156,8 @@ func (s *songInfo) String() string {
 		name string
 		val  *int
 	}{
-		{"rating", s.srvRating},
+		{"rating", s.rating},
+		{"srvRating", s.srvRating},
 	} {
 		if f.val != nil {
 			str += fmt.Sprintf(" %s=%d", f.name, *f.val)
@@ -199,8 +199,8 @@ type songCheck func(*songInfo)
 func isPaused(p bool) songCheck        { return func(i *songInfo) { i.paused = &p } }
 func isEnded(e bool) songCheck         { return func(i *songInfo) { i.ended = &e } }
 func hasFilename(f string) songCheck   { return func(i *songInfo) { i.filename = &f } }
-func hasRatingStr(r string) songCheck  { return func(i *songInfo) { i.ratingStr = &r } }
 func hasImgTitle(t string) songCheck   { return func(i *songInfo) { i.imgTitle = &t } }
+func hasRating(r int) songCheck        { return func(i *songInfo) { i.rating = &r } }
 func hasTimeStr(s string) songCheck    { return func(i *songInfo) { i.timeStr = &s } }
 func hasSrvRating(r int) songCheck     { return func(i *songInfo) { i.srvRating = &r } }
 func hasSrvTags(t ...string) songCheck { return func(i *songInfo) { i.srvTags = t } }
@@ -245,7 +245,6 @@ func songInfosEqual(want, got songInfo) bool {
 		{&want.album, &got.album},
 		{want.filename, got.filename},
 		{want.imgTitle, got.imgTitle},
-		{want.ratingStr, got.ratingStr},
 		{want.timeStr, got.timeStr},
 	} {
 		if t.want != nil && (t.got == nil || *t.got != *t.want) {
@@ -257,6 +256,7 @@ func songInfosEqual(want, got songInfo) bool {
 	for _, t := range []struct {
 		want, got *int
 	}{
+		{want.rating, got.rating},
 		{want.srvRating, got.srvRating},
 	} {
 		if t.want != nil && (t.got == nil || *t.got != *t.want) {

@@ -715,7 +715,8 @@ export class PlayView extends HTMLElement {
     }
 
     this.#coverImage.title =
-      getRatingString(song.rating, '★', '☆', 'Unrated', 'Rating: ') +
+      (song.rating ? 'Rating: ' : '') +
+      getRatingString(song.rating) +
       '\n' +
       (song.tags.length
         ? 'Tags: ' + song.tags.sort().join(' ')

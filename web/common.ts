@@ -131,20 +131,12 @@ export function handleFetchError(response: Response) {
   return response;
 }
 
-// Converts a rating in the range [1, 5] (or 0 for unrated) to a string.
-export function getRatingString(
-  rating: number,
-  filledStar = '★',
-  emptyStar = '☆',
-  unrated = 'Unrated',
-  ratedPrefix = ''
-) {
+// Converts a rating in the range [0, 5] (0 for unrated) to a string.
+export function getRatingString(rating: number) {
   rating = clamp(Math.round(rating), 0, 5);
-  if (rating === 0 || isNaN(rating)) return unrated;
-
-  let str = ratedPrefix;
-  for (let i = 1; i <= 5; ++i) str += i <= rating ? filledStar : emptyStar;
-  return str;
+  return rating === 0 || isNaN(rating)
+    ? 'Unrated'
+    : '★'.repeat(rating) + '☆'.repeat(5 - rating);
 }
 
 // Moves the item at index |from| in |array| to index |to|.
@@ -207,17 +199,28 @@ commonStyles.replaceSync(`
  * extra round trip for CSS before font files can be fetched. So, self-host:
  * https://google-webfonts-helper.herokuapp.com/fonts/roboto?subsets=latin */
 @font-face {
+  font-display: swap;
   font-family: 'Roboto';
   font-style: normal;
   font-weight: 400;
   /* prettier-ignore */
-  src: local(''),
+  src: local('Roboto'),
     url('roboto-v30-latin-regular.woff2') format('woff2'), /* Chrome 26+, Opera 23+, Firefox 39+ */
     url('roboto-v30-latin-regular.woff') format('woff'); /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
 }
+@font-face {
+  font-display: swap;
+  font-family: 'Fontello';
+  font-style: normal;
+  font-weight: 400;
+  /* prettier-ignore */
+  src: local(''),
+    url('fontello-v1.woff2') format('woff2'),
+    url('fontello-v1.woff') format('woff');
+}
 
 :root {
-  --font-family: 'Roboto', sans-serif;
+  --font-family: 'Roboto', 'Fontello', sans-serif;
   --font-size: 13.3333px;
 
   --control-border: 1px solid var(--control-color);

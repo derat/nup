@@ -48,6 +48,9 @@ const template = createTemplate(`
     user-select: none;
     width: 4em;
   }
+  #rating {
+    letter-spacing: 3px;
+  }
 </style>
 
 <div class="title">Song info</div>

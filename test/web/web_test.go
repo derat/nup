@@ -778,21 +778,18 @@ func TestRateAndTag(t *testing.T) {
 	page.click(luckyButton)
 	page.checkSong(song, isPaused(false))
 	page.click(playPauseButton)
-	page.checkSong(song, isPaused(true), hasRatingStr(threeStars),
-		hasImgTitle("Rating: ★★★☆☆\nTags: guitar rock"))
+	page.checkSong(song, isPaused(true), hasRating(3), hasImgTitle("Rating: ★★★☆☆\nTags: guitar rock"))
 
 	page.click(coverImage)
 	page.click(updateFourStars)
 	page.click(updateCloseImage)
-	page.checkSong(song, hasRatingStr(fourStars),
-		hasImgTitle("Rating: ★★★★☆\nTags: guitar rock"))
+	page.checkSong(song, hasRating(4), hasImgTitle("Rating: ★★★★☆\nTags: guitar rock"))
 	checkServerSong(t, song, hasSrvRating(4), hasSrvTags("guitar", "rock"))
 
 	page.click(coverImage)
 	page.sendKeys(updateTagsTextarea, " +metal", false)
 	page.click(updateCloseImage)
-	page.checkSong(song, hasRatingStr(fourStars),
-		hasImgTitle("Rating: ★★★★☆\nTags: guitar metal rock"))
+	page.checkSong(song, hasRating(4), hasImgTitle("Rating: ★★★★☆\nTags: guitar metal rock"))
 	checkServerSong(t, song, hasSrvRating(4), hasSrvTags("guitar", "metal", "rock"))
 }
 
