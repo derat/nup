@@ -998,6 +998,7 @@ func TestSongInfo(t *testing.T) {
 	defer done()
 
 	song1 := newSong("a", "t1", "al1", withTrack(1), withLength(123),
+		withDate(time.Date(2015, 4, 3, 12, 13, 14, 0, time.UTC)),
 		withRating(5), withTags("guitar", "instrumental"))
 	song2 := newSong("a", "t2", "al2", withTrack(5), withLength(52))
 	importSongs(song1, song2)
@@ -1013,6 +1014,7 @@ func TestSongInfo(t *testing.T) {
 	page.checkText(infoTitle, song1.Title)
 	page.checkText(infoAlbum, song1.Album)
 	page.checkText(infoTrack, strconv.Itoa(song1.Track))
+	page.checkText(infoDate, "2015-04-03")
 	page.checkText(infoLength, "2:03")
 	page.checkText(infoRating, "★★★★★")
 	page.checkText(infoTags, strings.Join(song1.Tags, " "))
@@ -1025,6 +1027,7 @@ func TestSongInfo(t *testing.T) {
 	page.checkText(infoTitle, song2.Title)
 	page.checkText(infoAlbum, song2.Album)
 	page.checkText(infoTrack, strconv.Itoa(song2.Track))
+	page.checkText(infoDate, "")
 	page.checkText(infoLength, "0:52")
 	page.checkText(infoRating, "Unrated")
 	page.checkText(infoTags, "")

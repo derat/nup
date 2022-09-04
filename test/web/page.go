@@ -65,6 +65,7 @@ var (
 	infoTitle         = joinLocs(infoDialog, loc{selenium.ByID, "title"})
 	infoAlbum         = joinLocs(infoDialog, loc{selenium.ByID, "album"})
 	infoTrack         = joinLocs(infoDialog, loc{selenium.ByID, "track"})
+	infoDate          = joinLocs(infoDialog, loc{selenium.ByID, "date"})
 	infoLength        = joinLocs(infoDialog, loc{selenium.ByID, "length"})
 	infoRating        = joinLocs(infoDialog, loc{selenium.ByID, "rating"})
 	infoTags          = joinLocs(infoDialog, loc{selenium.ByID, "tags"})

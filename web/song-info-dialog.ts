@@ -61,6 +61,7 @@ const template = createTemplate(`
   <tr><td>Title</td><td id="title"></td></tr>
   <tr><td>Album</td><td id="album"></td></tr>
   <tr><td>Track</td><td id="track"></td></tr>
+  <tr><td>Date</td><td id="date"></td></tr>
   <tr><td>Length</td><td id="length"></td></tr>
   <tr><td>Rating</td><td id="rating"></td></tr>
   <tr><td>Tags</td><td id="tags"></td></tr>
@@ -93,8 +94,9 @@ export function showSongInfoDialog(song: Song) {
   $('album', shadow).innerText = song.album;
   $('track', shadow).innerText =
     song.track + (song.disc > 1 ? ` (Disc ${song.disc})` : '');
+  $('date', shadow).innerText = song.date?.substring(0, 10) ?? '';
   $('length', shadow).innerText = formatDuration(song.length);
   $('rating', shadow).innerText = getRatingString(song.rating);
-  $('tags', shadow).innerText = song.tags ? song.tags.join(' ') : '';
+  $('tags', shadow).innerText = song.tags?.join(' ') ?? '';
   $('dismiss-button', shadow).addEventListener('click', () => dialog.close());
 }

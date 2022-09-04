@@ -14,6 +14,7 @@ declare interface Song {
   albumId?: string;
   track: number;
   disc: number;
+  date?: string;
   length: number;
   trackGain: number;
   albumGain: number;
