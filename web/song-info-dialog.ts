@@ -48,7 +48,7 @@ const template = createTemplate(`
     user-select: none;
     width: 4em;
   }
-  #rating {
+  #rating.rated {
     letter-spacing: 3px;
   }
 </style>
@@ -100,6 +100,7 @@ export function showSongInfoDialog(song: Song) {
   $('date', shadow).innerText = song.date?.substring(0, 10) ?? '';
   $('length', shadow).innerText = formatDuration(song.length);
   $('rating', shadow).innerText = getRatingString(song.rating);
+  if (song.rating) $('rating', shadow).classList.add('rated');
   $('tags', shadow).innerText = song.tags?.join(' ') ?? '';
   $('dismiss-button', shadow).addEventListener('click', () => dialog.close());
 }
