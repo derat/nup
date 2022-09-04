@@ -241,7 +241,7 @@ commonStyles.replaceSync(`
   --border-color: #ddd; /* between frames */
   --button-color: #aaa;
   --button-hover-color: #666;
-  --button-disabled-color: #ddd;
+  --button-text-color: #fff;
   --chart-bar-color: #42a5f5; /* material blue 400 */
   --control-color: #ddd;
   --control-active-color: #999; /* checked checkbox */
@@ -267,7 +267,7 @@ commonStyles.replaceSync(`
   --border-color: #555;
   --button-color: #888;
   --button-hover-color: #aaa;
-  --button-disabled-color: #555;
+  --button-text-color: #000;
   --chart-bar-color: #42a5f5; /* material blue 400 */
   --control-color: #555;
   --control-active-color: #888;
@@ -315,7 +315,7 @@ button {
   background-color: var(--button-color);
   border: none;
   border-radius: var(--control-border-radius);
-  color: var(--bg-color);
+  color: var(--button-text-color);
   cursor: pointer;
   display: inline-block;
   font-family: var(--font-family);
@@ -332,12 +332,12 @@ button:hover {
   background-color: var(--button-hover-color);
 }
 button:disabled {
-  background-color: var(--button-disabled-color);
   box-shadow: none;
   cursor: default;
+  opacity: 0.4;
 }
 button svg {
-  fill: var(--bg-color);
+  fill: var(--button-text-color);
   vertical-align: middle;
 }
 

@@ -136,7 +136,9 @@ const template = createTemplate(`
 <table>
   <thead>
     <tr>
-      <th class="checkbox"><input type="checkbox" class="small" /></th>
+      <th class="checkbox">
+        <input type="checkbox" class="small" title="Toggle all" />
+      </th>
       <th class="artist">Artist</th>
       <th class="title">Title</th>
       <th class="album">Album</th>

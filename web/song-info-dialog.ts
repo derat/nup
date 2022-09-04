@@ -56,7 +56,7 @@ const template = createTemplate(`
 <div class="title">Song info</div>
 <hr class="title" />
 
-<a id="cover-link"><img id="cover-img" /></a>
+<a id="cover-link"><img id="cover-img" alt="" /></a>
 
 <!-- prettier-ignore -->
 <table class="info-table">
