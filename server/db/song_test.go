@@ -41,10 +41,10 @@ func TestSong_MarshalJSON(t *testing.T) {
 }
 
 func TestSong_Update(t *testing.T) {
-	t1 := time.Unix(1, 0)
-	t2 := time.Unix(2, 0)
-	t3 := time.Unix(3, 0)
-	t4 := time.Unix(4, 0)
+	t1 := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	t2 := t1.Add(1 * time.Second)
+	t3 := t1.Add(2 * time.Second)
+	t4 := t1.Add(3 * time.Second)
 
 	src := Song{
 		SHA1:           "deadbeef",
@@ -119,9 +119,9 @@ func TestSong_Update(t *testing.T) {
 }
 
 func TestSong_Clean(t *testing.T) {
-	p1 := NewPlay(time.Unix(1, 0), "a")
-	p2 := NewPlay(time.Unix(1, 0), "b")
-	p3 := NewPlay(time.Unix(2, 0), "a")
+	p1 := NewPlay(time.Date(2022, 6, 5, 10, 15, 0, 0, time.UTC), "a")
+	p2 := NewPlay(time.Date(2022, 6, 5, 10, 15, 0, 0, time.UTC), "b")
+	p3 := NewPlay(time.Date(2022, 7, 13, 12, 10, 59, 450, time.UTC), "a")
 
 	s := Song{
 		Keywords: []string{"a", "d", "b", "a", "d", "a"},

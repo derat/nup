@@ -92,8 +92,8 @@ Records a single play of a song in Datastore. Also saves the reporter's IP
 address.
 
 *   `songId` - Integer ID from [Song]'s `SongID` field.
-*   `startTime` - Float seconds since the Unix epoch specifying when playback
-    of the song started.
+*   `startTime` - RFC 3339 string specifying when playback of the song started.
+    Float seconds since the Unix epoch are also accepted.
 
 ### /presets (GET)
 
@@ -116,14 +116,16 @@ Queries Datastore and returns a JSON-marshaled array of [Song]s.
     fallback mode at all. Used by tests.
 *   `firstTrack` (optional) - If `1`, only returns songs that are the first
     tracks of first discs.
-*   `minFirstPlayed` (optional) - Float seconds since the Unix epoch specifying
-    the minimum time at which songs were first played (used to select
-    recently-added music).
-*   `minRating` (optional) - Integer minimum song rating in the range `[1, 5]`.
-*   `maxLastPlayed` (optional) - Float seconds since the Unix epoch specifying
-    the maximmum time at which songs were last played (used to select music that
-    hasn't been played recently).
+*   `maxDate` (optional) - RFC 3339 string containing maximum song date.
+*   `maxLastPlayed` (optional) - RFC 3339 string specifying the maximum time at
+    which songs were last played (to select music that hasn't been played
+    recently). Float seconds since the Unix epoch are also accepted.
 *   `maxPlays` (optional) - Integer maximum number of plays.
+*   `minDate` (optional) - RFC 3339 string containing minimum song date.
+*   `minFirstPlayed` (optional) - RFC 3339 string specifying the minimum time at
+    which songs were first played (to select recently-added music). Float
+    seconds since the Unix epoch are also accepted.
+*   `minRating` (optional) - Integer minimum song rating in the range `[1, 5]`.
 *   `orderByLastPlayed` (optional) - If `1`, return songs that were last played
     the longest ago.
 *   `shuffle` (optional) - If `1`, shuffle the order of returned songs.

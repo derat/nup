@@ -11,7 +11,6 @@ import {
   emptyImg,
   formatDuration,
   getCoverUrl,
-  getCurrentTimeSec,
   getDumpSongUrl,
   getRatingString,
   getSongUrl,
@@ -229,7 +228,7 @@ export class PlayView extends HTMLElement {
   #songs: Song[] = []; // playlist
   #tags: string[] = []; // available tags loaded from server
   #currentIndex = -1; // index into #songs of current track
-  #startTime: number | null = null; // seconds since epoch for current track
+  #startTime: Date | null = null; // time at which current track started playing
   #reportedCurrentTrack = false; // already reported current as played?
   #reachedEndOfSongs = false; // did we hit end of last song?
   #updateDialog: UpdateDialog | null = null; // edit rating and tags
@@ -852,7 +851,7 @@ export class PlayView extends HTMLElement {
       this.#audio.src = url;
       this.#audio.currentTime = 0;
 
-      this.#startTime = getCurrentTimeSec();
+      this.#startTime = new Date();
       this.#reportedCurrentTrack = false;
       this.#reachedEndOfSongs = false;
       this.#lastUpdatePosition = 0;

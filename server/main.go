@@ -383,12 +383,10 @@ func handlePlayed(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 	if !ok {
 		return
 	}
-
-	startTimeFloat, ok := parseFloatParam(ctx, w, r, "startTime")
+	startTime, ok := parseDateParam(ctx, w, r, "startTime")
 	if !ok {
 		return
 	}
-	startTime := secondsToTime(startTimeFloat)
 
 	if forceUpdateFailures && appengine.IsDevAppServer() {
 		http.Error(w, "Returning an error, as requested", http.StatusInternalServerError)
@@ -458,18 +456,17 @@ func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 		}
 	}
 
-	if len(r.FormValue("minFirstPlayed")) > 0 {
-		if s, ok := parseFloatParam(ctx, w, r, "minFirstPlayed"); !ok {
-			return
-		} else {
-			q.MinFirstStartTime = secondsToTime(s)
-		}
-	}
-	if len(r.FormValue("maxLastPlayed")) > 0 {
-		if s, ok := parseFloatParam(ctx, w, r, "maxLastPlayed"); !ok {
-			return
-		} else {
-			q.MaxLastStartTime = secondsToTime(s)
+	for name, dst := range map[string]*time.Time{
+		"minDate":        &q.MinDate,
+		"maxDate":        &q.MaxDate,
+		"minFirstPlayed": &q.MinFirstStartTime,
+		"maxLastPlayed":  &q.MaxLastStartTime,
+	} {
+		if len(r.FormValue(name)) > 0 {
+			var ok bool
+			if *dst, ok = parseDateParam(ctx, w, r, name); !ok {
+				return
+			}
 		}
 	}
 
@@ -678,9 +675,4 @@ func handleTags(ctx context.Context, cfg *config.Config, w http.ResponseWriter, 
 		return
 	}
 	writeJSONResponse(w, tags)
-}
-
-// secondsToTime converts fractional seconds since the Unix epoch to a time.Time.
-func secondsToTime(s float64) time.Time {
-	return time.Unix(0, int64(s*float64(time.Second/time.Nanosecond)))
 }

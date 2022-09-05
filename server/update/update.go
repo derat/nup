@@ -40,7 +40,7 @@ func AddPlay(ctx context.Context, id int64, startTime time.Time, ip string) erro
 
 		newKey := datastore.NewIncompleteKey(ctx, db.PlayKind, songKey)
 		if _, err = datastore.Put(ctx, newKey, &db.Play{ // must pass pointer
-			StartTime: startTime,
+			StartTime: startTime.UTC(),
 			IPAddress: ip,
 		}); err != nil {
 			return fmt.Errorf("putting play failed: %v", err)

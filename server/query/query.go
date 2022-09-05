@@ -50,6 +50,9 @@ type SongQuery struct {
 	Track int64 // Song.Track
 	Disc  int64 // Song.Disc
 
+	MinDate time.Time // Song.Date
+	MaxDate time.Time // Song.Date
+
 	Tags    []string // present in Song.Tags
 	NotTags []string // not present in Song.Tags
 
@@ -406,6 +409,19 @@ func runQuery(ctx context.Context, query *SongQuery, fallback bool) ([]int64, er
 		iq = eq
 	}
 
+	if !query.MinDate.IsZero() || !query.MaxDate.IsZero() {
+		dq := iq
+		if !query.MinDate.IsZero() {
+			dq = dq.Filter("Date >=", query.MinDate)
+		}
+		if !query.MaxDate.IsZero() {
+			dq = dq.Filter("Date <=", query.MaxDate)
+			if query.MinDate.IsZero() {
+				dq = dq.Filter("Date >", time.Time{}) // exclude unset dates
+			}
+		}
+		qs = append(qs, dq)
+	}
 	if query.MaxPlays >= 1 {
 		qs = append(qs, iq.Filter("NumPlays <=", query.MaxPlays))
 	}

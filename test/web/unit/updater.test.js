@@ -9,6 +9,10 @@ suite('updater', () => {
   let w = null;
   let updater = null;
 
+  const t1 = new Date('2021-04-05T23:12:05.234Z');
+  const t2 = new Date('2021-04-06T12:05:03Z');
+  const t3 = new Date('2021-04-07T13:45:12.5Z');
+
   beforeEach(() => {
     w = new MockWindow();
   });
@@ -23,7 +27,10 @@ suite('updater', () => {
     updater = new Updater();
   }
   function playedUrl(songId, startTime) {
-    return `played?songId=${songId}&startTime=${startTime}`;
+    return (
+      `played?songId=${encodeURIComponent(songId)}` +
+      `&startTime=${encodeURIComponent(startTime.toISOString())}`
+    );
   }
   function rateAndTagUrl(songId, rating, tags) {
     let url = `rate_and_tag?songId=${songId}`;
@@ -34,8 +41,8 @@ suite('updater', () => {
 
   test('reportPlay (success)', async () => {
     initUpdater();
-    w.expectFetch(playedUrl('123', 456.5), 'POST', 'ok');
-    await updater.reportPlay('123', 456.5);
+    w.expectFetch(playedUrl('123', t1), 'POST', 'ok');
+    await updater.reportPlay('123', t1);
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
 
@@ -44,13 +51,11 @@ suite('updater', () => {
 
     // Report a play and have the server return a 500 error.
     const id1 = '123';
-    const t1 = 100123.5;
     w.expectFetch(playedUrl(id1, t1), 'POST', 'whoops', 500);
     await updater.reportPlay(id1, t1);
 
     // Report a second play and have it also fail.
     const id2 = '456';
-    const t2 = 100456.8;
     w.expectFetch(playedUrl(id2, t2), 'POST', 'whoops', 500);
     await updater.reportPlay(id2, t2);
 
@@ -68,32 +73,32 @@ suite('updater', () => {
   test('reportPlay (backoff)', async () => {
     // Make the initial attempt fail.
     initUpdater();
-    w.expectFetch(playedUrl('1', 2), 'POST', 'whoops', 500);
-    await updater.reportPlay('1', 2);
+    w.expectFetch(playedUrl('1', t1), 'POST', 'whoops', 500);
+    await updater.reportPlay('1', t1);
 
     // The retry time should double up to 5 minutes.
     for (const ms of [
       500, 1_000, 2_000, 4_000, 8_000, 16_000, 32_000, 64_000, 128_000, 256_000,
       300_000, 300_000, 300_000,
     ]) {
-      w.expectFetch(playedUrl('1', 2), 'POST', 'fail', 500);
+      w.expectFetch(playedUrl('1', t1), 'POST', 'fail', 500);
       await w.runTimeouts(ms);
     }
 
     // Try to report a second play and check that it doesn't reset the delay.
-    w.expectFetch(playedUrl('1', 4), 'POST', 'fail', 500);
-    await updater.reportPlay('1', 4);
+    w.expectFetch(playedUrl('1', t2), 'POST', 'fail', 500);
+    await updater.reportPlay('1', t2);
     expectEq(w.numUnsatisfiedFetches, 0, 'Unsatisfied fetches');
     await w.runTimeouts(299_000);
 
     // Wait the final second and let the next attempt succeed.
-    w.expectFetch(playedUrl('1', 2), 'POST', 'ok');
-    w.expectFetch(playedUrl('1', 4), 'POST', 'ok');
+    w.expectFetch(playedUrl('1', t1), 'POST', 'ok');
+    w.expectFetch(playedUrl('1', t2), 'POST', 'ok');
     await w.runTimeouts(1_000);
 
     // Report another play and check that it's sent immediately.
-    w.expectFetch(playedUrl('1', 6), 'POST', 'ok');
-    await updater.reportPlay('1', 6);
+    w.expectFetch(playedUrl('1', t3), 'POST', 'ok');
+    await updater.reportPlay('1', t3);
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
 
@@ -101,31 +106,31 @@ suite('updater', () => {
     // Make a playback report fail.
     const id = '1';
     initUpdater();
-    w.expectFetch(playedUrl(id, 1), 'POST', 'fail', 500);
-    await updater.reportPlay(id, 1);
+    w.expectFetch(playedUrl(id, t1), 'POST', 'fail', 500);
+    await updater.reportPlay(id, t1);
 
     // Report a second playback, but leave the fetch() hanging. This should
     // leave the playback in the "in-progress" list in localStorage.
-    w.expectFetchDeferred(playedUrl(id, 2), 'POST', 'fail', 500);
-    updater.reportPlay(id, 2);
+    w.expectFetchDeferred(playedUrl(id, t2), 'POST', 'fail', 500);
+    updater.reportPlay(id, t2);
 
     // Clear timeouts to make sure the old updater isn't doing anything and
     // create a new updater. It should pick up both old reports from
     // localStorage and try to send the first one again, which again fails (and
     // gets moved to the end of the queue this time).
     w.clearTimeouts();
-    w.expectFetch(playedUrl(id, 1), 'POST', 'fail', 500);
+    w.expectFetch(playedUrl(id, t1), 'POST', 'fail', 500);
     initUpdater();
     await updater.initialRetryDoneForTest;
 
     // After creating another updater, it should send the second report first
     // and then the first one.
     w.clearTimeouts();
-    w.expectFetch(playedUrl(id, 2), 'POST', 'ok');
+    w.expectFetch(playedUrl(id, t2), 'POST', 'ok');
     initUpdater();
     await updater.initialRetryDoneForTest;
 
-    w.expectFetch(playedUrl(id, 1), 'POST', 'ok');
+    w.expectFetch(playedUrl(id, t1), 'POST', 'ok');
     await w.runTimeouts(0);
     expectEq(w.numTimeouts, 0, 'numTimeouts');
 
@@ -139,12 +144,12 @@ suite('updater', () => {
     // Report a play, but leave the fetch() call hanging.
     const id = '1';
     initUpdater();
-    const finishFetch = w.expectFetchDeferred(playedUrl(id, 1), 'POST', 'ok');
-    const reportDone = updater.reportPlay(id, 1);
+    const finishFetch = w.expectFetchDeferred(playedUrl(id, t1), 'POST', 'ok');
+    const reportDone = updater.reportPlay(id, t1);
 
     // Successfully report a second play in the meantime.
-    w.expectFetch(playedUrl(id, 2), 'POST', 'ok');
-    await updater.reportPlay(id, 2);
+    w.expectFetch(playedUrl(id, t2), 'POST', 'ok');
+    await updater.reportPlay(id, t2);
 
     // Let the first fetch() finish.
     finishFetch();
@@ -161,18 +166,18 @@ suite('updater', () => {
     // Make the initial attempt file.
     const id = '1';
     initUpdater();
-    w.expectFetch(playedUrl(id, 1), 'POST', 'fail', 500);
-    await updater.reportPlay(id, 1);
+    w.expectFetch(playedUrl(id, t1), 'POST', 'fail', 500);
+    await updater.reportPlay(id, t1);
 
     // If we're offline when the retry happens, another retry shouldn't be
     // scheduled.
     w.online = false;
-    w.expectFetch(playedUrl(id, 1), 'POST', 'fail', 500);
+    w.expectFetch(playedUrl(id, t1), 'POST', 'fail', 500);
     await w.runTimeouts(500);
     expectEq(w.numTimeouts, 0, 'numTimeouts');
 
     // As soon as we come back online, an immediate retry should be scheduled.
-    w.expectFetch(playedUrl(id, 1), 'POST');
+    w.expectFetch(playedUrl(id, t1), 'POST');
     w.online = true;
     await w.runTimeouts(0);
   });

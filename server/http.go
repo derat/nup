@@ -142,19 +142,23 @@ func parseIntParam(ctx context.Context, w http.ResponseWriter, r *http.Request,
 	return v, true
 }
 
-// parseFloatParam parses and returns the float64 form parameter from r.
+// parseDateParam parses and returns the named form parameter from r.
+// The paramater is parsed as an RFC 3339 date before falling back to float Unix time.
 // If the parameter is missing or unparseable, a bad request error is written
 // to w, an error is logged, and the ok return value is false.
-func parseFloatParam(ctx context.Context, w http.ResponseWriter, r *http.Request,
-	name string) (v float64, ok bool) {
+func parseDateParam(ctx context.Context, w http.ResponseWriter, r *http.Request,
+	name string) (t time.Time, ok bool) {
 	s := r.FormValue(name)
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t, true
+	}
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {
 		log.Errorf(ctx, "Unable to parse %v param %q", name, s)
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return v, false
+		return time.Time{}, false
 	}
-	return v, true
+	return time.Unix(0, int64(v*float64(time.Second/time.Nanosecond))), true
 }
 
 // addLongCacheHeaders adds headers to w such that it will be cached for a long time.

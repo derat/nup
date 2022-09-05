@@ -128,8 +128,8 @@ var LegacySong1 = db.Song{
 	PeakAmp:   PeakAmp,
 	Rating:    4,
 	Plays: []db.Play{
-		db.NewPlay(time.Unix(1276057170, 0).UTC(), "127.0.0.1"),
-		db.NewPlay(time.Unix(1297316913, 0).UTC(), "1.2.3.4"),
+		db.NewPlay(time.Date(2010, 6, 9, 4, 19, 30, 0, time.UTC), "127.0.0.1"),
+		db.NewPlay(time.Date(2011, 2, 10, 5, 48, 33, 0, time.UTC), "1.2.3.4"),
 	},
 	Tags: []string{"electronic", "instrumental"},
 }
@@ -147,6 +147,6 @@ var LegacySong2 = db.Song{
 	AlbumGain: AlbumGain,
 	PeakAmp:   PeakAmp,
 	Rating:    3,
-	Plays:     []db.Play{db.NewPlay(time.Unix(1394773930, 0).UTC(), "8.8.8.8")},
+	Plays:     []db.Play{db.NewPlay(time.Date(2014, 3, 14, 5, 12, 10, 0, time.UTC), "8.8.8.8")},
 	Tags:      []string{"instrumental", "rock"},
 }

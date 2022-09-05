@@ -418,7 +418,15 @@ func (t *Tester) RateAndTag(songID string, rating int, tags []string) {
 
 // ReportPlayed sends a playback report to the server.
 func (t *Tester) ReportPlayed(songID string, startTime time.Time) {
-	t.doPost(fmt.Sprintf("played?songId=%v&startTime=%v", songID, startTime.Unix()), nil)
+	t.doPost(fmt.Sprintf("played?songId=%v&startTime=%v",
+		url.QueryEscape(songID), url.QueryEscape(startTime.Format(time.RFC3339))), nil)
+}
+
+// ReportPlayedUnix is like ReportPlayed, but sends the time as fractional
+// seconds since the Unix epoch instead.
+func (t *Tester) ReportPlayedUnix(songID string, startTime time.Time) {
+	sec := float64(startTime.UnixMilli()) / 1000
+	t.doPost(fmt.Sprintf("played?songId=%v&startTime=%.3f", url.QueryEscape(songID), sec), nil)
 }
 
 // GetNowFromServer queries the server for the current time.

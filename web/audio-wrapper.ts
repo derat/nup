@@ -1,12 +1,7 @@
 // Copyright 2022 Daniel Erat.
 // All rights reserved.
 
-import {
-  clamp,
-  createShadow,
-  createTemplate,
-  getCurrentTimeSec,
-} from './common.js';
+import { clamp, createShadow, createTemplate } from './common.js';
 
 const template = createTemplate(`
 <audio type="audio/mpeg" preload="auto">
@@ -126,7 +121,7 @@ export class AudioWrapper extends HTMLElement {
     // offline: https://github.com/derat/nup/issues/17
     if (this.#pausedForOfflineTime !== null) {
       console.log('Back online');
-      const elapsed = getCurrentTimeSec() - this.#pausedForOfflineTime;
+      const elapsed = nowSec() - this.#pausedForOfflineTime;
       const resume = elapsed <= RESUME_WHEN_ONLINE_SEC;
       this.#pausedForOfflineTime = null;
       this.#reloadAudio();
@@ -158,7 +153,7 @@ export class AudioWrapper extends HTMLElement {
         if (!navigator.onLine) {
           console.log('Offline; pausing');
           this.#audio.pause();
-          this.#pausedForOfflineTime = getCurrentTimeSec();
+          this.#pausedForOfflineTime = nowSec();
         } else if (this.#numErrors <= MAX_RETRIES) {
           console.log(`Retrying from position ${this.#lastUpdatePos}`);
           this.#reloadAudio();
@@ -177,7 +172,7 @@ export class AudioWrapper extends HTMLElement {
   };
 
   #onPlay = (e: Event) => {
-    this.#lastUpdateTime = getCurrentTimeSec();
+    this.#lastUpdateTime = nowSec();
     this.#resendAudioEvent(e);
   };
 
@@ -187,7 +182,7 @@ export class AudioWrapper extends HTMLElement {
     const pos = this.#audio.currentTime;
     if (pos === this.#lastUpdatePos) return;
 
-    const now = getCurrentTimeSec();
+    const now = nowSec();
     if (this.#lastUpdateTime !== null) {
       // Playback can hang if the network is flaky, so make sure that we don't
       // incorrectly increment the playtime by the wall time if the position
@@ -350,3 +345,6 @@ export class AudioWrapper extends HTMLElement {
 }
 
 customElements.define('audio-wrapper', AudioWrapper);
+
+// Returns the number of fractional milliseconds since the Unix epoch.
+const nowSec = () => Date.now() / 1000;

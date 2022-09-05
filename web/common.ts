@@ -45,9 +45,6 @@ export function formatRelativeTime(sec: number) {
   return fmt(sec, 'second');
 }
 
-// Returns the number of fractional milliseconds since the Unix epoch.
-export const getCurrentTimeSec = () => Date.now() / 1000;
-
 // Sets |element|'s 'title' attribute to |text| if the row's content overflows
 // its area or removes it otherwise.
 //

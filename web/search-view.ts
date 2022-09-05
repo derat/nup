@@ -8,7 +8,6 @@ import {
   createShadow,
   createTemplate,
   getCoverUrl,
-  getCurrentTimeSec,
   getDumpSongUrl,
   handleFetchError,
   setIcon,
@@ -480,15 +479,13 @@ export class SearchView extends HTMLElement {
     }
     const firstPlayed = parseInt(this.#firstPlayedSelect.value);
     if (firstPlayed !== 0) {
-      terms.push(
-        `minFirstPlayed=${Math.round(getCurrentTimeSec()) - firstPlayed}`
-      );
+      const date = new Date(Date.now() - firstPlayed * 1000);
+      terms.push(`minFirstPlayed=${encodeURIComponent(date.toISOString())}`);
     }
     const lastPlayed = parseInt(this.#lastPlayedSelect.value);
     if (lastPlayed !== 0) {
-      terms.push(
-        `maxLastPlayed=${Math.round(getCurrentTimeSec()) - lastPlayed}`
-      );
+      const date = new Date(Date.now() - lastPlayed * 1000);
+      terms.push(`maxLastPlayed=${encodeURIComponent(date.toISOString())}`);
     }
 
     if (!terms.length) {

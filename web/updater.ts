@@ -64,9 +64,9 @@ export default class Updater {
   }
 
   // Asynchronously notifies the server that song |songId| was played starting
-  // at |startTime| seconds since the Unix expoch. Returns a promise that is
-  // resolved once the reporting attempt is completed (possibly unsuccessfully).
-  reportPlay(songId: string, startTime: number): Promise<void> {
+  // at |startTime|. Returns a promise that is resolved once the reporting
+  // attempt is completed (possibly unsuccessfully).
+  reportPlay(songId: string, startTime: Date): Promise<void> {
     // Move from queued (if present) to in-progress.
     removePlayReport(this.#queuedPlayReports, songId, startTime);
     addPlayReport(this.#inProgressPlayReports, songId, startTime);
@@ -74,7 +74,7 @@ export default class Updater {
 
     const url =
       `played?songId=${encodeURIComponent(songId)}` +
-      `&startTime=${encodeURIComponent(startTime)}`;
+      `&startTime=${encodeURIComponent(startTime.toISOString())}`;
     console.log(`Reporting play: ${url}`);
 
     return fetch(url, { method: 'POST' })
@@ -232,7 +232,7 @@ export default class Updater {
 
     if (this.#queuedPlayReports.length) {
       const entry = this.#queuedPlayReports[0];
-      return this.reportPlay(entry.songId, entry.startTime);
+      return this.reportPlay(entry.songId, new Date(entry.startTime));
     }
 
     return Promise.resolve();
@@ -241,7 +241,7 @@ export default class Updater {
 
 interface PlayReport {
   songId: string;
-  startTime: number;
+  startTime: string; // ISO 8601
 }
 
 interface SongUpdate {
@@ -259,18 +259,15 @@ function readObject(key: string, defaultObject: Object) {
 }
 
 // Appends a play report to |list|.
-function addPlayReport(list: PlayReport[], songId: string, startTime: number) {
-  list.push({ songId, startTime });
+function addPlayReport(list: PlayReport[], songId: string, startTime: Date) {
+  list.push({ songId, startTime: startTime.toISOString() });
 }
 
 // Removes the specified play report from |list|.
-function removePlayReport(
-  list: PlayReport[],
-  songId: string,
-  startTime: number
-) {
+function removePlayReport(list: PlayReport[], songId: string, startTime: Date) {
+  const isoTime = startTime.toISOString();
   for (let i = 0; i < list.length; i++) {
-    if (list[i].songId === songId && list[i].startTime === startTime) {
+    if (list[i].songId === songId && list[i].startTime === isoTime) {
       list.splice(i, 1);
       return;
     }

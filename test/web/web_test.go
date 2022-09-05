@@ -416,7 +416,9 @@ func TestFirstTrackQuery(t *testing.T) {
 func TestOrderByLastPlayedQuery(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
-	t1, t2, t3 := time.Unix(1, 0), time.Unix(2, 0), time.Unix(3, 0)
+	t1 := time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC)
+	t2 := t1.Add(1 * time.Second)
+	t3 := t1.Add(2 * time.Second)
 	song1 := newSong("ar1", "ti1", "al1", withPlays(t2, t3))
 	song2 := newSong("ar2", "ti2", "al2", withPlays(t1))
 	song3 := newSong("ar3", "ti3", "al3", withPlays(t1, t2))
@@ -430,7 +432,9 @@ func TestOrderByLastPlayedQuery(t *testing.T) {
 func TestMaxPlaysQuery(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
-	t1, t2, t3 := time.Unix(1, 0), time.Unix(2, 0), time.Unix(3, 0)
+	t1 := time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC)
+	t2 := t1.Add(1 * time.Second)
+	t3 := t1.Add(2 * time.Second)
 	song1 := newSong("ar1", "ti1", "al1", withPlays(t1, t2))
 	song2 := newSong("ar2", "ti2", "al2", withPlays(t1, t2, t3))
 	song3 := newSong("ar3", "ti3", "al3")

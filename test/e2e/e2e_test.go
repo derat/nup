@@ -218,12 +218,16 @@ func TestUserData(tt *testing.T) {
 
 	log.Print("Reporting play")
 	s.Plays = []db.Play{
-		db.NewPlay(time.Unix(1410746718, 0), "127.0.0.1"),
-		db.NewPlay(time.Unix(1410746923, 0), "127.0.0.1"),
-		db.NewPlay(time.Unix(1410747184, 0), "127.0.0.1"),
+		db.NewPlay(time.Date(2014, 9, 15, 2, 5, 18, 0, time.UTC), "127.0.0.1"),
+		db.NewPlay(time.Date(2014, 9, 15, 2, 8, 43, 0, time.UTC), "127.0.0.1"),
+		db.NewPlay(time.Date(2014, 9, 15, 2, 13, 4, 0, time.UTC), "127.0.0.1"),
 	}
-	for _, p := range s.Plays {
-		t.ReportPlayed(id, p.StartTime)
+	for i, p := range s.Plays {
+		if i < len(s.Plays)-1 {
+			t.ReportPlayed(id, p.StartTime) // RFC 3339
+		} else {
+			t.ReportPlayedUnix(id, p.StartTime) // seconds since epoch
+		}
 	}
 	if err := test.CompareSongs([]db.Song{s}, t.DumpSongs(test.StripIDs), test.IgnoreOrder); err != nil {
 		tt.Fatal("Bad songs after reporting play: ", err)
@@ -265,23 +269,23 @@ func TestUserData(tt *testing.T) {
 	sort.Sort(db.PlayArray(plays))
 
 	log.Print("Checking first-played queries")
-	firstPlaySec := timeToSeconds(plays[0].StartTime)
-	query := fmt.Sprintf("minFirstPlayed=%.1f", firstPlaySec-10)
+	firstPlay := plays[0].StartTime
+	query := "minFirstPlayed=" + firstPlay.Add(-10*time.Second).Format(time.RFC3339)
 	if err := compareQueryResults([]db.Song{us}, t.QuerySongs(query), test.IgnoreOrder); err != nil {
 		tt.Errorf("Bad results for %q: %v", query, err)
 	}
-	query = fmt.Sprintf("minFirstPlayed=%.1f", firstPlaySec+10)
+	query = "minFirstPlayed=" + firstPlay.Add(10*time.Second).Format(time.RFC3339)
 	if err := compareQueryResults([]db.Song{}, t.QuerySongs(query), test.IgnoreOrder); err != nil {
 		tt.Errorf("Bad results for %q: %v", query, err)
 	}
 
 	log.Print("Checking last-played queries")
-	lastPlaySec := timeToSeconds(plays[len(plays)-1].StartTime)
-	query = fmt.Sprintf("maxLastPlayed=%.1f", lastPlaySec-10)
+	lastPlay := plays[len(plays)-1].StartTime
+	query = "maxLastPlayed=" + lastPlay.Add(-10*time.Second).Format(time.RFC3339)
 	if err := compareQueryResults([]db.Song{}, t.QuerySongs(query), test.IgnoreOrder); err != nil {
 		tt.Errorf("Bad results for %q: %v", query, err)
 	}
-	query = fmt.Sprintf("maxLastPlayed=%.1f", lastPlaySec+10)
+	query = "maxLastPlayed=" + lastPlay.Add(10*time.Second).Format(time.RFC3339)
 	if err := compareQueryResults([]db.Song{us}, t.QuerySongs(query), test.IgnoreOrder); err != nil {
 		tt.Errorf("Bad results for %q: %v", query, err)
 	}
@@ -431,6 +435,9 @@ func TestQueries(tt *testing.T) {
 		{"title=manana", 0, []db.Song{s10s}},
 		{"title=" + url.QueryEscape("mánanä"), 0, []db.Song{s10s}},
 		{"album=two2", 0, []db.Song{s10s}},
+		{"minDate=2000-01-01T00:00:00Z", 0, []db.Song{Song5s, Song1s}},
+		{"maxDate=2000-01-01T00:00:00Z", 0, []db.Song{Song0s}},
+		{"minDate=2000-01-01T00:00:00Z&maxDate=2010-01-01T00:00:00Z", 0, []db.Song{Song1s}},
 		// Ensure that Datastore indexes exist to satisfy various queries (or if not, that the
 		// server's fallback mode is still able to handle them).
 		{"tags=-bogus&minRating=5&shuffle=1&orderByLastPlayed=1", 0, []db.Song{}},
@@ -439,11 +446,11 @@ func TestQueries(tt *testing.T) {
 		{"minRating=4&shuffle=1&orderByLastPlayed=1", 0, []db.Song{LegacySong1}}, // old songs
 		{"minRating=4&maxPlays=1&shuffle=1", 0, []db.Song{}},
 		{"minRating=2&orderByLastPlayed=1", noIndex, []db.Song{LegacySong1, LegacySong2}},
-		{"tags=instrumental&minRating=4&shuffle=1&maxLastPlayed=1649256074", 0, []db.Song{LegacySong1}},
+		{"tags=instrumental&minRating=4&shuffle=1&maxLastPlayed=2022-04-06T14:41:14Z", 0, []db.Song{LegacySong1}},
 		{"tags=instrumental&minRating=4&shuffle=1&maxPlays=1", noIndex, []db.Song{}},
-		{"tags=instrumental&maxLastPlayed=1649256074", noIndex, []db.Song{LegacySong2, LegacySong1}},
-		{"firstTrack=1&minFirstPlayed=1276057170", 0, []db.Song{LegacySong1}}, // new albums
-		{"firstTrack=1&minFirstPlayed=1276057170&maxPlays=1", noIndex, []db.Song{}},
+		{"tags=instrumental&maxLastPlayed=2022-04-06T14:41:14Z", noIndex, []db.Song{LegacySong2, LegacySong1}},
+		{"firstTrack=1&minFirstPlayed=2010-06-09T04:19:30Z", 0, []db.Song{LegacySong1}}, // new albums
+		{"firstTrack=1&minFirstPlayed=2010-06-09T04:19:30Z&maxPlays=1", noIndex, []db.Song{}},
 		{"keywords=arovane&minRating=4", 0, []db.Song{LegacySong1}},
 		{"keywords=arovane&minRating=4&maxPlays=1", noIndex, []db.Song{}},
 		{"keywords=arovane&firstTrack=1", 0, []db.Song{LegacySong1}},
@@ -451,8 +458,12 @@ func TestQueries(tt *testing.T) {
 		{"artist=arovane&firstTrack=1", 0, []db.Song{LegacySong1}},
 		{"artist=arovane&minRating=4", 0, []db.Song{LegacySong1}},
 		{"artist=arovane&minRating=4&maxPlays=1", noIndex, []db.Song{}},
-		{"orderByLastPlayed=1&minFirstPlayed=1276057160&maxLastPlayed=1649256074", noIndex, []db.Song{LegacySong1, LegacySong2}},
-		{"orderByLastPlayed=1&maxPlays=1&minFirstPlayed=1276057160&maxLastPlayed=1649256074", noIndex, []db.Song{LegacySong2}},
+		{"orderByLastPlayed=1&minFirstPlayed=2010-06-09T04:19:30Z&maxLastPlayed=2022-04-06T14:41:14Z",
+			noIndex, []db.Song{LegacySong1, LegacySong2}},
+		{"orderByLastPlayed=1&maxPlays=1&minFirstPlayed=2010-06-09T04:19:30Z&maxLastPlayed=2022-04-06T14:41:14Z",
+			noIndex, []db.Song{LegacySong2}},
+		{"orderByLastPlayed=1&maxPlays=1&minFirstPlayed=1276057160&maxLastPlayed=1649256074",
+			noIndex, []db.Song{LegacySong2}}, // pass Unix timestamps
 	} {
 		suffixes := []string{""}
 		if tc.flags&noIndex == 0 {
@@ -501,7 +512,7 @@ func TestCaching(tt *testing.T) {
 	}
 
 	log.Print("Checking that time-based queries aren't cached")
-	timeParam := fmt.Sprintf("maxLastPlayed=%d", s1.Plays[1].StartTime.Unix()+1)
+	timeParam := "maxLastPlayed=" + s1.Plays[1].StartTime.Add(time.Second).Format(time.RFC3339)
 	if err := compareQueryResults([]db.Song{s1}, t.QuerySongs(timeParam), test.IgnoreOrder); err != nil {
 		tt.Errorf("Bad results for %q without cache: %v", timeParam, err)
 	}
@@ -580,7 +591,7 @@ func TestAndroid(tt *testing.T) {
 
 	// Reporting a play shouldn't update the song's last-modified time.
 	log.Print("Reporting play")
-	p := db.NewPlay(time.Unix(1410746718, 0), "127.0.0.1")
+	p := db.NewPlay(time.Date(2014, 9, 15, 2, 5, 18, 0, time.UTC), "127.0.0.1")
 	updatedLegacySong1.Plays = append(updatedLegacySong1.Plays, p)
 	now = t.GetNowFromServer()
 	t.ReportPlayed(id, p.StartTime)
@@ -717,7 +728,7 @@ func TestJSONImport(tt *testing.T) {
 
 	log.Print("Reporting play")
 	id := t.SongID(us.SHA1)
-	st := time.Unix(1410746718, 0)
+	st := time.Date(2014, 9, 15, 2, 5, 18, 0, time.UTC)
 	t.ReportPlayed(id, st)
 	us.Plays = append(us.Plays, db.NewPlay(st, "127.0.0.1"))
 	if err := test.CompareSongs([]db.Song{us, LegacySong2},
@@ -896,14 +907,14 @@ func TestMergeSongs(tt *testing.T) {
 	s1.Rating = 4
 	s1.Tags = []string{"guitar", "instrumental"}
 	s1.Plays = []db.Play{
-		db.NewPlay(time.Unix(1410746718, 0), "127.0.0.1"),
+		db.NewPlay(time.Date(2014, 9, 15, 2, 5, 18, 0, time.UTC), "127.0.0.1"),
 	}
 	s2 := Song1s
 	s2.Rating = 2
 	s2.Tags = []string{"drums", "guitar", "rock"}
 	s2.Plays = []db.Play{
-		db.NewPlay(time.Unix(1410746923, 0), "127.0.0.1"),
-		db.NewPlay(time.Unix(1410747184, 0), "127.0.0.1"),
+		db.NewPlay(time.Date(2014, 9, 15, 2, 8, 43, 0, time.UTC), "127.0.0.1"),
+		db.NewPlay(time.Date(2014, 9, 15, 2, 13, 4, 0, time.UTC), "127.0.0.1"),
 	}
 	t.PostSongs([]db.Song{s1, s2}, true, 0)
 
@@ -937,7 +948,7 @@ func TestReindexSongs(tt *testing.T) {
 	s.Rating = 4
 	s.Tags = []string{"guitar", "instrumental"}
 	s.Plays = []db.Play{
-		db.NewPlay(time.Unix(1410746718, 0), "127.0.0.1"),
+		db.NewPlay(time.Date(2014, 9, 15, 2, 5, 18, 0, time.UTC), "127.0.0.1"),
 	}
 	t.PostSongs([]db.Song{s}, true, 0)
 
@@ -960,13 +971,13 @@ func TestStats(tt *testing.T) {
 	s1 := Song1s
 	s1.Rating = 4
 	s1.Tags = []string{"guitar", "instrumental"}
-	s1.Plays = []db.Play{db.NewPlay(time.Unix(1410746718, 0), "127.0.0.1")}
+	s1.Plays = []db.Play{db.NewPlay(time.Date(2014, 9, 15, 2, 5, 18, 0, time.UTC), "127.0.0.1")}
 	s2 := Song5s
 	s2.Rating = 5
 	s2.Tags = []string{"guitar", "vocals"}
 	s2.Plays = []db.Play{
-		db.NewPlay(time.Unix(1379210718, 0), "127.0.0.1"),
-		db.NewPlay(time.Unix(1410746718, 0), "127.0.0.1"),
+		db.NewPlay(time.Date(2013, 9, 15, 2, 5, 18, 0, time.UTC), "127.0.0.1"),
+		db.NewPlay(time.Date(2014, 9, 15, 2, 5, 18, 0, time.UTC), "127.0.0.1"),
 	}
 	s3 := Song10s
 	t.PostSongs([]db.Song{s1, s2, s3}, true, 0)
