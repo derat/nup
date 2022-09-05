@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"syscall"
-	"time"
 
 	"github.com/derat/nup/server/config"
 	"github.com/derat/nup/server/db"
@@ -163,7 +162,7 @@ var songs = []db.Song{
 		AlbumID:  "400-400",
 		Track:    1,
 		Disc:     1,
-		Date:     time.Date(2015, 3, 4, 0, 0, 0, 0, time.UTC),
+		Date:     test.Date(2015, 3, 4),
 		Length:   1,
 		Rating:   5,
 		Tags:     []string{"electronic", "instrumental", "drum-and-bass"},
@@ -178,7 +177,7 @@ var songs = []db.Song{
 		AlbumID:  "800-800",
 		Track:    1,
 		Disc:     1,
-		Date:     time.Date(2012, 1, 23, 0, 0, 0, 0, time.UTC),
+		Date:     test.Date(2012, 1, 23),
 		Length:   1,
 		Rating:   4,
 		Tags:     []string{"drums", "guitar", "rock", "vocals"},
@@ -193,7 +192,7 @@ var songs = []db.Song{
 		AlbumID:  "40-40",
 		Track:    1,
 		Disc:     1,
-		Date:     time.Date(1995, 12, 25, 0, 0, 0, 0, time.UTC),
+		Date:     test.Date(1995, 12, 25),
 		Length:   1,
 		Rating:   3,
 		Tags:     []string{"electronic", "vocals"},
@@ -208,7 +207,7 @@ var songs = []db.Song{
 		AlbumID:  "360-400",
 		Track:    1,
 		Disc:     1,
-		Date:     time.Date(1984, 4, 1, 0, 0, 0, 0, time.UTC),
+		Date:     test.Date(1984, 4, 1),
 		Length:   1,
 		Rating:   2,
 		Tags:     []string{"annoying", "pop", "vocals"},

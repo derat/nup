@@ -4,8 +4,6 @@
 package test
 
 import (
-	"time"
-
 	"github.com/derat/nup/server/db"
 )
 
@@ -28,7 +26,7 @@ var Song0s = db.Song{
 	RecordingID: "392cea06-94c2-416b-80aa-f5b1e7d0fb1c",
 	Track:       1,
 	Disc:        1, // 0 in file, but automatically set to 1
-	Date:        time.Date(1992, 1, 1, 0, 0, 0, 0, time.UTC),
+	Date:        Date(1992, 1, 1),
 	Length:      0.026,
 	TrackGain:   TrackGain,
 	AlbumGain:   AlbumGain,
@@ -45,7 +43,7 @@ var Song0sUpdated = db.Song{
 	RecordingID: "271a81af-6c2d-44cf-a0b8-a25ad74c82f9",
 	Track:       Song0s.Track,
 	Disc:        Song0s.Disc,
-	Date:        time.Date(1995, 4, 3, 13, 17, 59, 0, time.UTC),
+	Date:        Date(1995, 4, 3, 13, 17, 59),
 	Length:      Song0s.Length,
 	TrackGain:   TrackGain,
 	AlbumGain:   AlbumGain,
@@ -63,7 +61,7 @@ var Song1s = db.Song{
 	RecordingID: "5d7e41b2-ec4b-44dd-b25a-a576d7a08adb",
 	Track:       2,
 	Disc:        1, // 0 in file, but automatically set to 1
-	Date:        time.Date(2004, 1, 1, 0, 0, 0, 0, time.UTC),
+	Date:        Date(2004, 1, 1),
 	Length:      1.071,
 	TrackGain:   TrackGain,
 	AlbumGain:   AlbumGain,
@@ -80,7 +78,7 @@ var Song5s = db.Song{
 	AlbumID:     "a1d2405b-afe0-4e28-a935-b5b256f68131",
 	Track:       1,
 	Disc:        2,
-	Date:        time.Date(2014, 1, 1, 0, 0, 0, 0, time.UTC),
+	Date:        Date(2014, 1, 1),
 	Length:      5.041,
 	TrackGain:   TrackGain,
 	AlbumGain:   AlbumGain,
@@ -107,7 +105,7 @@ var ID3V1Song = db.Song{
 	Album:     "UTF-8, Who Needs It?",
 	Track:     0,
 	Disc:      0,
-	Date:      time.Date(1992, 1, 1, 0, 0, 0, 0, time.UTC),
+	Date:      Date(1992, 1, 1),
 	Length:    0.026,
 	TrackGain: TrackGain,
 	AlbumGain: AlbumGain,
@@ -128,8 +126,8 @@ var LegacySong1 = db.Song{
 	PeakAmp:   PeakAmp,
 	Rating:    4,
 	Plays: []db.Play{
-		db.NewPlay(time.Date(2010, 6, 9, 4, 19, 30, 0, time.UTC), "127.0.0.1"),
-		db.NewPlay(time.Date(2011, 2, 10, 5, 48, 33, 0, time.UTC), "1.2.3.4"),
+		db.NewPlay(Date(2010, 6, 9, 4, 19, 30), "127.0.0.1"),
+		db.NewPlay(Date(2011, 2, 10, 5, 48, 33), "1.2.3.4"),
 	},
 	Tags: []string{"electronic", "instrumental"},
 }
@@ -147,6 +145,6 @@ var LegacySong2 = db.Song{
 	AlbumGain: AlbumGain,
 	PeakAmp:   PeakAmp,
 	Rating:    3,
-	Plays:     []db.Play{db.NewPlay(time.Date(2014, 3, 14, 5, 12, 10, 0, time.UTC), "8.8.8.8")},
+	Plays:     []db.Play{db.NewPlay(Date(2014, 3, 14, 5, 12, 10), "8.8.8.8")},
 	Tags:      []string{"instrumental", "rock"},
 }

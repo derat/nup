@@ -10,7 +10,6 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/server/db"
@@ -55,8 +54,8 @@ func TestUpdate(t *testing.T) {
 		Length:   449,
 		Rating:   4,
 		Plays: []db.Play{
-			db.NewPlay(time.Date(2010, 6, 9, 4, 19, 30, 0, time.UTC), "127.0.0.1"),
-			db.NewPlay(time.Date(2011, 2, 10, 5, 48, 33, 0, time.UTC), "1.2.3.4"),
+			db.NewPlay(test.Date(2010, 6, 9, 4, 19, 30), "127.0.0.1"),
+			db.NewPlay(test.Date(2011, 2, 10, 5, 48, 33), "1.2.3.4"),
 		},
 		Tags: []string{"electronic", "instrumental"},
 	}
@@ -70,7 +69,7 @@ func TestUpdate(t *testing.T) {
 		Disc:     1,
 		Length:   182,
 		Rating:   3,
-		Plays:    []db.Play{db.NewPlay(time.Date(2014, 3, 14, 5, 12, 10, 0, time.UTC), "8.8.8.8")},
+		Plays:    []db.Play{db.NewPlay(test.Date(2014, 3, 14, 5, 12, 10), "8.8.8.8")},
 		Tags:     []string{"instrumental", "rock"},
 	}
 	go func() {

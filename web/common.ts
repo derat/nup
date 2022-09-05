@@ -325,7 +325,7 @@ button {
   text-transform: uppercase;
   user-select: none;
 }
-button:hover {
+button:hover:not(:disabled) {
   background-color: var(--button-hover-color);
 }
 button:disabled {

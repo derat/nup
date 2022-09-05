@@ -123,6 +123,8 @@ var (
 	searchView                = joinLocs(loc{selenium.ByTagName, "search-view"})
 	keywordsInput             = joinLocs(searchView, loc{selenium.ByID, "keywords-input"})
 	tagsInput                 = joinLocs(searchView, loc{selenium.ByID, "tags-input"})
+	minDateInput              = joinLocs(searchView, loc{selenium.ByID, "min-date-input"})
+	maxDateInput              = joinLocs(searchView, loc{selenium.ByID, "max-date-input"})
 	firstTrackCheckbox        = joinLocs(searchView, loc{selenium.ByID, "first-track-checkbox"})
 	unratedCheckbox           = joinLocs(searchView, loc{selenium.ByID, "unrated-checkbox"})
 	minRatingSelect           = joinLocs(searchView, loc{selenium.ByID, "min-rating-select"})

@@ -353,6 +353,40 @@ func TestTagQuery(t *testing.T) {
 	}
 }
 
+func TestDateQuery(t *testing.T) {
+	page, done := initWebTest(t)
+	defer done()
+	song1 := newSong("a", "1985-01-01", "al", withTrack(1), withDate(test.Date(1985, 1, 1)))
+	song2 := newSong("a", "1991-12-31", "al", withTrack(2), withDate(test.Date(1991, 12, 31)))
+	song3 := newSong("a", "2005-07-08", "al", withTrack(3), withDate(test.Date(2005, 7, 8)))
+	song4 := newSong("a", "unset", "al", withTrack(4))
+	importSongs(joinSongs(song1, song2, song3, song4))
+
+	for _, tc := range []struct {
+		min, max string
+		want     []db.Song
+	}{
+		{"1970", "1979", joinSongs()},
+		{"2010", "2019", joinSongs()},
+		{"1988", "1989", joinSongs()},
+		{"1980", "1989", joinSongs(song1)},
+		{"1985", "1985", joinSongs(song1)},
+		{"1991", "1991", joinSongs(song2)},
+		{"2005-07-07", "2005-07-09", joinSongs(song3)},
+		{"2005-07-09", "2005-07-10", joinSongs()},
+		{"1985", "1991", joinSongs(song1, song2)},
+		{"1985", "2005", joinSongs(song1, song2, song3)},
+		{"1990", "", joinSongs(song2, song3)},
+		{"", "2000", joinSongs(song1, song2)},
+	} {
+		page.setStage(tc.min + "/" + tc.max)
+		page.setText(minDateInput, tc.min)
+		page.setText(maxDateInput, tc.max)
+		page.click(searchButton)
+		page.checkSearchResults(tc.want)
+	}
+}
+
 func TestRatingQuery(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
@@ -416,7 +450,7 @@ func TestFirstTrackQuery(t *testing.T) {
 func TestOrderByLastPlayedQuery(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
-	t1 := time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC)
+	t1 := test.Date(2020, 4, 1)
 	t2 := t1.Add(1 * time.Second)
 	t3 := t1.Add(2 * time.Second)
 	song1 := newSong("ar1", "ti1", "al1", withPlays(t2, t3))
@@ -432,7 +466,7 @@ func TestOrderByLastPlayedQuery(t *testing.T) {
 func TestMaxPlaysQuery(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
-	t1 := time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC)
+	t1 := test.Date(2020, 4, 1)
 	t2 := t1.Add(1 * time.Second)
 	t3 := t1.Add(2 * time.Second)
 	song1 := newSong("ar1", "ti1", "al1", withPlays(t1, t2))
@@ -999,7 +1033,7 @@ func TestSongInfo(t *testing.T) {
 	defer done()
 
 	song1 := newSong("a", "t1", "al1", withTrack(1), withLength(123),
-		withDate(time.Date(2015, 4, 3, 12, 13, 14, 0, time.UTC)),
+		withDate(test.Date(2015, 4, 3, 12, 13, 14)),
 		withRating(5), withTags("guitar", "instrumental"))
 	song2 := newSong("a", "t2", "al2", withTrack(5), withLength(52))
 	importSongs(song1, song2)
@@ -1123,9 +1157,9 @@ func TestStats(t *testing.T) {
 	page, done := initWebTest(t)
 	defer done()
 
-	t2001 := time.Date(2001, 4, 1, 0, 0, 0, 0, time.UTC)
-	t2014 := time.Date(2014, 5, 3, 0, 0, 0, 0, time.UTC)
-	t2015 := time.Date(2015, 10, 31, 0, 0, 0, 0, time.UTC)
+	t2001 := test.Date(2001, 4, 1)
+	t2014 := test.Date(2014, 5, 3)
+	t2015 := test.Date(2015, 10, 31)
 
 	song1 := newSong("artist", "track1", "album1", withRating(3), withLength(7200),
 		withDate(t2001), withPlays(t2001, t2014, t2015))

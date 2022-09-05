@@ -218,9 +218,9 @@ func TestUserData(tt *testing.T) {
 
 	log.Print("Reporting play")
 	s.Plays = []db.Play{
-		db.NewPlay(time.Date(2014, 9, 15, 2, 5, 18, 0, time.UTC), "127.0.0.1"),
-		db.NewPlay(time.Date(2014, 9, 15, 2, 8, 43, 0, time.UTC), "127.0.0.1"),
-		db.NewPlay(time.Date(2014, 9, 15, 2, 13, 4, 0, time.UTC), "127.0.0.1"),
+		db.NewPlay(test.Date(2014, 9, 15, 2, 5, 18), "127.0.0.1"),
+		db.NewPlay(test.Date(2014, 9, 15, 2, 8, 43), "127.0.0.1"),
+		db.NewPlay(test.Date(2014, 9, 15, 2, 13, 4), "127.0.0.1"),
 	}
 	for i, p := range s.Plays {
 		if i < len(s.Plays)-1 {
@@ -591,7 +591,7 @@ func TestAndroid(tt *testing.T) {
 
 	// Reporting a play shouldn't update the song's last-modified time.
 	log.Print("Reporting play")
-	p := db.NewPlay(time.Date(2014, 9, 15, 2, 5, 18, 0, time.UTC), "127.0.0.1")
+	p := db.NewPlay(test.Date(2014, 9, 15, 2, 5, 18), "127.0.0.1")
 	updatedLegacySong1.Plays = append(updatedLegacySong1.Plays, p)
 	now = t.GetNowFromServer()
 	t.ReportPlayed(id, p.StartTime)
@@ -728,7 +728,7 @@ func TestJSONImport(tt *testing.T) {
 
 	log.Print("Reporting play")
 	id := t.SongID(us.SHA1)
-	st := time.Date(2014, 9, 15, 2, 5, 18, 0, time.UTC)
+	st := test.Date(2014, 9, 15, 2, 5, 18)
 	t.ReportPlayed(id, st)
 	us.Plays = append(us.Plays, db.NewPlay(st, "127.0.0.1"))
 	if err := test.CompareSongs([]db.Song{us, LegacySong2},
@@ -907,14 +907,14 @@ func TestMergeSongs(tt *testing.T) {
 	s1.Rating = 4
 	s1.Tags = []string{"guitar", "instrumental"}
 	s1.Plays = []db.Play{
-		db.NewPlay(time.Date(2014, 9, 15, 2, 5, 18, 0, time.UTC), "127.0.0.1"),
+		db.NewPlay(test.Date(2014, 9, 15, 2, 5, 18), "127.0.0.1"),
 	}
 	s2 := Song1s
 	s2.Rating = 2
 	s2.Tags = []string{"drums", "guitar", "rock"}
 	s2.Plays = []db.Play{
-		db.NewPlay(time.Date(2014, 9, 15, 2, 8, 43, 0, time.UTC), "127.0.0.1"),
-		db.NewPlay(time.Date(2014, 9, 15, 2, 13, 4, 0, time.UTC), "127.0.0.1"),
+		db.NewPlay(test.Date(2014, 9, 15, 2, 8, 43), "127.0.0.1"),
+		db.NewPlay(test.Date(2014, 9, 15, 2, 13, 4), "127.0.0.1"),
 	}
 	t.PostSongs([]db.Song{s1, s2}, true, 0)
 
@@ -948,7 +948,7 @@ func TestReindexSongs(tt *testing.T) {
 	s.Rating = 4
 	s.Tags = []string{"guitar", "instrumental"}
 	s.Plays = []db.Play{
-		db.NewPlay(time.Date(2014, 9, 15, 2, 5, 18, 0, time.UTC), "127.0.0.1"),
+		db.NewPlay(test.Date(2014, 9, 15, 2, 5, 18), "127.0.0.1"),
 	}
 	t.PostSongs([]db.Song{s}, true, 0)
 
@@ -971,13 +971,13 @@ func TestStats(tt *testing.T) {
 	s1 := Song1s
 	s1.Rating = 4
 	s1.Tags = []string{"guitar", "instrumental"}
-	s1.Plays = []db.Play{db.NewPlay(time.Date(2014, 9, 15, 2, 5, 18, 0, time.UTC), "127.0.0.1")}
+	s1.Plays = []db.Play{db.NewPlay(test.Date(2014, 9, 15, 2, 5, 18), "127.0.0.1")}
 	s2 := Song5s
 	s2.Rating = 5
 	s2.Tags = []string{"guitar", "vocals"}
 	s2.Plays = []db.Play{
-		db.NewPlay(time.Date(2013, 9, 15, 2, 5, 18, 0, time.UTC), "127.0.0.1"),
-		db.NewPlay(time.Date(2014, 9, 15, 2, 5, 18, 0, time.UTC), "127.0.0.1"),
+		db.NewPlay(test.Date(2013, 9, 15, 2, 5, 18), "127.0.0.1"),
+		db.NewPlay(test.Date(2014, 9, 15, 2, 5, 18), "127.0.0.1"),
 	}
 	s3 := Song10s
 	t.PostSongs([]db.Song{s1, s2, s3}, true, 0)

@@ -51,10 +51,7 @@ const template = createTemplate(`
     margin-bottom: 0;
   }
   #search-form .row .checkbox-col {
-    width: 7em;
-  }
-  #search-form .row .label-col {
-    width: 6em;
+    width: 6.5em;
   }
   #search-form label {
     user-select: none;
@@ -80,6 +77,14 @@ const template = createTemplate(`
     margin: auto 0;
     padding: 6px 8px;
     position: relative;
+  }
+  #min-date-input,
+  #max-date-input {
+    margin: 0 6px;
+    width: 70px;
+  }
+  #first-track-checkbox {
+    margin-left: var(--margin);
   }
   #max-plays-input {
     margin: 0 4px;
@@ -134,34 +139,82 @@ const template = createTemplate(`
 <form id="search-form" autocomplete="off">
   <div class="heading">Search</div>
   <div class="row">
-    <input id="keywords-input" type="text" placeholder="Keywords" />
+    <input
+      id="keywords-input"
+      type="text"
+      placeholder="Keywords"
+      title="Space-separated words from artists, titles, and albums"
+    />
     <svg id="keywords-clear" title="Clear text"></svg>
   </div>
 
   <div id="tags-input-div" class="row">
     <tag-suggester id="tags-suggester" tab-advances-focus>
-      <input id="tags-input" slot="text" type="text" placeholder="Tags" />
+      <input
+        id="tags-input"
+        slot="text"
+        type="text"
+        placeholder="Tags"
+        title="Space-separated user-assigned tags ('-' to exclude)"
+      />
     </tag-suggester>
     <svg id="tags-clear" title="Clear text"></svg>
   </div>
 
   <div class="row">
-    <label for="shuffle-checkbox" class="checkbox-col">
+    Between
+    <input
+      id="min-date-input"
+      type="text"
+      placeholder="min date"
+      title="Minimum song date (YYYY-MM-DD or YYYY)"
+    />
+    and
+    <input
+      id="max-date-input"
+      type="text"
+      placeholder="max date"
+      title="Maximum song date (YYYY-MM-DD or YYYY)"
+    />
+  </div>
+
+  <div class="row">
+    <label for="shuffle-checkbox" class="checkbox-col" title="Shuffle results">
       <input id="shuffle-checkbox" type="checkbox" value="shuffle" />
       Shuffle
     </label>
-    <label for="first-track-checkbox">
+    <label
+      for="order-by-last-played-checkbox"
+      class="checkbox-col"
+      title="Order results by last-played time"
+    >
+      <input
+        id="order-by-last-played-checkbox"
+        type="checkbox"
+        value="orderByLastPlayed"
+      />
+      Oldest
+    </label>
+    <label
+      for="first-track-checkbox"
+      class="checkbox-col"
+      title="Only first tracks from albums"
+    >
       <input id="first-track-checkbox" type="checkbox" value="firstTrack" />
       First track
     </label>
   </div>
 
   <div class="row">
-    <label for="unrated-checkbox" class="checkbox-col">
+    <label
+      for="unrated-checkbox"
+      class="checkbox-col"
+      title="Only unrated songs"
+    >
       <input id="unrated-checkbox" type="checkbox" value="unrated" />
       Unrated
     </label>
-    <label for="min-rating-select">
+    <label for="min-rating-select" title="Only songs with at least this rating">
       Min rating
       <span class="select-wrapper">
         <select id="min-rating-select">
@@ -179,25 +232,17 @@ const template = createTemplate(`
   </div>
 
   <div class="row">
-    <label for="order-by-last-played-checkbox" class="checkbox-col">
-      <input
-        id="order-by-last-played-checkbox"
-        type="checkbox"
-        value="orderByLastPlayed"
-      />
-      Order by last played
-    </label>
-  </div>
-
-  <div class="row">
-    <label for="max-plays-input">
+    <label
+      for="max-plays-input"
+      title="Maximum number of times songs have been played"
+    >
       Played <input id="max-plays-input" type="text" /> or fewer times
     </label>
   </div>
 
   <div class="row">
     <label for="first-played-select">
-      <span class="label-col">First played </span>
+      <span>First played </span>
       <span class="select-wrapper">
         <select id="first-played-select">
           <option value="0"></option>
@@ -217,7 +262,7 @@ const template = createTemplate(`
 
   <div class="row">
     <label for="last-played-select">
-      <span class="label-col">Last played </span>
+      <span>Last played </span>
       <span class="select-wrapper">
         <select id="last-played-select">
           <option value="0"></option>
@@ -237,7 +282,7 @@ const template = createTemplate(`
 
   <div class="row">
     <label for="preset-select">
-      <span class="label-col">Preset</span>
+      <span>Preset</span>
       <span class="select-wrapper">
         <select id="preset-select">
           <option value=""></option></select
@@ -250,18 +295,34 @@ const template = createTemplate(`
       <!-- A "button" type is needed to prevent these from submitting the
            form by default, which seems really dumb.
            https://stackoverflow.com/q/932653 -->
-      <button id="search-button" type="button">Search</button>
-      <button id="reset-button" type="button">Reset</button>
-      <button id="lucky-button" type="button">I'm Feeling Lucky</button>
+      <button id="search-button" type="button" title="Perform search">
+        Search
+      </button>
+      <button id="reset-button" type="button" title="Clear search form">
+        Reset
+      </button>
+      <button
+        id="lucky-button"
+        type="button"
+        title="Perform search and replace playlist with results"
+      >
+        I'm Feeling Lucky
+      </button>
     </div>
   </div>
 </form>
 
 <div id="results-controls">
   <span class="heading">Results</span>
-  <button id="append-button" disabled>Append</button>
-  <button id="insert-button" disabled>Insert</button>
-  <button id="replace-button" disabled>Replace</button>
+  <button id="append-button" disabled title="Append results to playlist">
+    Append
+  </button>
+  <button id="insert-button" disabled title="Insert results after current song">
+    Insert
+  </button>
+  <button id="replace-button" disabled title="Replace playlist with results">
+    Replace
+  </button>
 </div>
 
 <song-table id="results-table" use-checkboxes></song-table>
@@ -291,6 +352,8 @@ export class SearchView extends HTMLElement {
   #keywordsInput = this.#getInput('keywords-input');
   #tagSuggester = $('tags-suggester', this.#shadow) as TagSuggester;
   #tagsInput = this.#getInput('tags-input');
+  #minDateInput = this.#getInput('min-date-input');
+  #maxDateInput = this.#getInput('max-date-input');
   #shuffleCheckbox = this.#getInput('shuffle-checkbox');
   #firstTrackCheckbox = this.#getInput('first-track-checkbox');
   #unratedCheckbox = this.#getInput('unrated-checkbox');
@@ -322,6 +385,9 @@ export class SearchView extends HTMLElement {
       'click',
       () => (this.#tagsInput.value = '')
     );
+
+    this.#minDateInput.addEventListener('keydown', this.#onFormKeyDown);
+    this.#maxDateInput.addEventListener('keydown', this.#onFormKeyDown);
 
     this.#spinner = setIcon(this.#spinner, spinnerIcon);
 
@@ -465,6 +531,20 @@ export class SearchView extends HTMLElement {
     if (this.#tagsInput.value.trim()) {
       terms.push('tags=' + encodeURIComponent(this.#tagsInput.value.trim()));
     }
+    if (this.#minDateInput.value.trim()) {
+      let s = this.#minDateInput.value.trim();
+      if (s.match(/^\d{4}$/)) s += '-01-01';
+      if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
+        terms.push('minDate=' + encodeURIComponent(new Date(s).toISOString()));
+      }
+    }
+    if (this.#maxDateInput.value.trim()) {
+      let s = this.#maxDateInput.value.trim();
+      if (s.match(/^\d{4}$/)) s += '-12-31T23:59:59.999Z';
+      if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
+        terms.push('maxDate=' + encodeURIComponent(new Date(s).toISOString()));
+      }
+    }
     if (!this.#minRatingSelect.disabled && this.#minRatingSelect.value !== '') {
       terms.push('minRating=' + this.#minRatingSelect.value);
     }
@@ -480,12 +560,12 @@ export class SearchView extends HTMLElement {
     const firstPlayed = parseInt(this.#firstPlayedSelect.value);
     if (firstPlayed !== 0) {
       const date = new Date(Date.now() - firstPlayed * 1000);
-      terms.push(`minFirstPlayed=${encodeURIComponent(date.toISOString())}`);
+      terms.push('minFirstPlayed=' + encodeURIComponent(date.toISOString()));
     }
     const lastPlayed = parseInt(this.#lastPlayedSelect.value);
     if (lastPlayed !== 0) {
       const date = new Date(Date.now() - lastPlayed * 1000);
-      terms.push(`maxLastPlayed=${encodeURIComponent(date.toISOString())}`);
+      terms.push('maxLastPlayed=' + encodeURIComponent(date.toISOString()));
     }
 
     if (!terms.length) {
@@ -568,6 +648,8 @@ export class SearchView extends HTMLElement {
 
     this.#keywordsInput.value = keywords.join(' ');
     this.#tagsInput.value = '';
+    this.#minDateInput.value = '';
+    this.#maxDateInput.value = '';
     this.#shuffleCheckbox.checked = false;
     this.#firstTrackCheckbox.checked = false;
     this.#unratedCheckbox.checked = false;

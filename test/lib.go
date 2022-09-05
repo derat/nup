@@ -168,3 +168,15 @@ func CompareSongs(expected, actual []db.Song, order OrderPolicy) error {
 	}
 	return nil
 }
+
+// Date is a convenience wrapper around time.Date that constructs a time.Time in UTC.
+// Hour, minute, second, and nanosecond values are taken from tm if present.
+func Date(year int, month time.Month, day int, tm ...int) time.Time {
+	get := func(idx int) int {
+		if idx < len(tm) {
+			return tm[idx]
+		}
+		return 0
+	}
+	return time.Date(year, month, day, get(0), get(1), get(2), get(3), time.UTC)
+}
