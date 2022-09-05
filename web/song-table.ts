@@ -84,10 +84,12 @@ const template = createTemplate(`
     white-space: nowrap;
   }
 
-  td.artist, td.album {
+  td.artist,
+  td.album {
     cursor: pointer;
   }
-  td.artist:hover, td.album:hover {
+  td.artist:hover,
+  td.album:hover {
     color: var(--link-color);
     text-decoration: underline;
   }
