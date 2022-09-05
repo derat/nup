@@ -46,6 +46,8 @@ const template = createTemplate(`
     align-items: baseline;
     display: flex;
     margin-bottom: 6px;
+    position: relative;
+    width: 260px;
   }
   #search-form .row:last-child {
     margin-bottom: 0;
@@ -58,33 +60,40 @@ const template = createTemplate(`
   }
   #keywords-input,
   #tags-input {
+    flex-grow: 1;
     padding-right: 24px;
     width: 230px;
   }
-  #tags-input-div {
-    position: relative;
-  }
   #tags-suggester {
-    position: absolute;
     left: 4px;
-    top: 26px;
-    max-width: 210px;
     max-height: 26px;
+    max-width: 210px;
+    position: absolute;
+    top: 26px;
   }
   #keywords-clear,
   #tags-clear {
-    left: -28px;
-    margin: auto 0;
-    padding: 6px 8px;
-    position: relative;
+    padding: 8px 8px;
+    position: absolute;
+    right: 0;
   }
   #min-date-input,
   #max-date-input {
-    margin: 0 6px;
+    flex-grow: 1;
+    margin-left: 6px;
     width: 70px;
+  }
+  #min-date-input {
+    margin-right: 6px;
   }
   #first-track-checkbox {
     margin-left: var(--margin);
+  }
+  #min-rating-select {
+    flex-grow: 1;
+  }
+  #min-rating-select-wrapper {
+    margin-right: 0;
   }
   #max-plays-input {
     margin: 0 4px;
@@ -148,7 +157,7 @@ const template = createTemplate(`
     <svg id="keywords-clear" title="Clear text"></svg>
   </div>
 
-  <div id="tags-input-div" class="row">
+  <div class="row">
     <tag-suggester id="tags-suggester" tab-advances-focus>
       <input
         id="tags-input"
@@ -216,7 +225,7 @@ const template = createTemplate(`
     </label>
     <label for="min-rating-select" title="Only songs with at least this rating">
       Min rating
-      <span class="select-wrapper">
+      <span id="min-rating-select-wrapper" class="select-wrapper">
         <select id="min-rating-select">
           <!-- Put U+2009 (THIN SPACE) between characters since the star icons
                in the Fontello font are crammed together otherwise. -->
