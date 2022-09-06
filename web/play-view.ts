@@ -44,11 +44,12 @@ const template = createTemplate(`
 
   #menu-button {
     cursor: pointer;
-    font-size: 22px;
-    padding: 0 var(--margin);
+    font-size: 32px;
+    padding: var(--margin);
+    padding-bottom: calc(var(--margin) / 2);
     position: absolute;
     right: 0;
-    top: 0;
+    top: -24px;
     user-select: none;
   }
 
@@ -156,7 +157,7 @@ const template = createTemplate(`
 
 <fullscreen-overlay></fullscreen-overlay>
 
-<div id="menu-button">⋯</div>
+<div id="menu-button">…</div>
 
 <audio-wrapper></audio-wrapper>
 
