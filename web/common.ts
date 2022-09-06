@@ -239,7 +239,8 @@ commonStyles.replaceSync(`
   --button-color: #aaa;
   --button-hover-color: #666;
   --button-text-color: #fff;
-  --chart-bar-color: #42a5f5; /* material blue 400 */
+  --chart-bar-rgb: 66, 165, 245; /* #42a5f5, material blue 400 */
+  --chart-text-color: #fff;
   --control-color: #ddd;
   --control-active-color: #999; /* checked checkbox */
   --cover-missing-color: #f5f5f5;
@@ -265,7 +266,8 @@ commonStyles.replaceSync(`
   --button-color: #888;
   --button-hover-color: #aaa;
   --button-text-color: #000;
-  --chart-bar-color: #42a5f5; /* material blue 400 */
+  --chart-bar-rgb: 66, 165, 245; /* #42a5f5, material blue 400 */
+  --chart-text-color: #fff;
   --control-color: #555;
   --control-active-color: #888;
   --cover-missing-color: #333;
@@ -319,7 +321,7 @@ button {
   font-size: 12px;
   font-weight: bold;
   height: 28px;
-  letter-spacing: 0.0892857143em;
+  letter-spacing: 0.09em;
   overflow: hidden; /* prevent icon from extending focus ring */
   padding: 1px 12px 0 12px;
   text-transform: uppercase;

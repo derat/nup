@@ -14,8 +14,7 @@ import { createDialog } from './dialog.js';
 const template = createTemplate(`
 <style>
   :host {
-    min-width: 15em;
-    max-width: 25em;
+    width: 256px;
   }
   hr.title {
     margin-bottom: var(--margin);
@@ -26,11 +25,11 @@ const template = createTemplate(`
   }
   #cover-img {
     cursor: pointer;
-    height: 192px;
+    height: 256px;
     margin-bottom: var(--margin);
     object-fit: cover;
     outline: solid 1px var(--border-color);
-    width: 192px;
+    width: 256px;
   }
   #cover-img.hidden {
     display: none;

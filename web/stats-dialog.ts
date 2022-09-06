@@ -13,7 +13,7 @@ import { createDialog } from './dialog.js';
 const template = createTemplate(`
 <style>
   :host {
-    width: 25em;
+    width: 400px;
   }
   hr.title {
     margin-bottom: var(--margin);
@@ -54,7 +54,13 @@ const template = createTemplate(`
     width: 100%;
   }
   .chart span {
-    background-color: var(--chart-bar-color);
+    color: var(--chart-text-color);
+    font-size: 10px;
+    overflow: hidden;
+    padding-top: 2.5px;
+    text-align: center;
+    text-overflow: ellipsis;
+    text-shadow: 0 0 4px black;
   }
 
   #years-div {
@@ -161,6 +167,7 @@ export function showStatsDialog() {
         $('decades-chart', shadow),
         decades.map(([_, c]) => c),
         stats.songs,
+        decades.map(([d, _]) => (d === '0' ? '-' : d.slice(2) + 's')),
         decades.map(
           ([d, c]) =>
             `${d === '0' ? 'Unset' : d + 's'} - ` +
@@ -175,6 +182,7 @@ export function showStatsDialog() {
         $('ratings-chart', shadow),
         ratingCounts,
         stats.songs,
+        ratingCounts.map((_, i) => (i === 0 ? '-' : `${i}`)),
         ratingCounts.map(
           (c, i) =>
             `${i === 0 ? 'Unrated' : '★'.repeat(i)} - ` +
@@ -229,15 +237,19 @@ function fillChart(
   div: HTMLElement,
   vals: number[],
   total: number,
+  labels: string[],
   titles: string[]
 ) {
   if (total <= 0) return;
   for (let i = 0; i < vals.length; i++) {
-    const el = createElement('span', null, div);
-    if (i < vals.length - 1) {
-      el.style.opacity = `${(i / (vals.length - 1)) ** 2}`;
-    }
-    el.style.width = `${(100 * vals[i]) / total}%`;
+    const pct = vals[i] / total;
+    // Omit labels in tiny spans.
+    const el = createElement('span', null, div, pct >= 0.04 ? labels[i] : null);
+    el.style.width = `${100 * pct}%`;
+    // Add slop to the final span to deal with rounding errors.
+    if (i === vals.length - 1) el.style.width = `calc(${el.style.width} + 2px)`;
+    const opacity = (i / (vals.length - 1)) ** 2;
+    el.style.backgroundColor = `rgba(var(--chart-bar-rgb), ${opacity})`;
     el.title = titles[i];
   }
 }

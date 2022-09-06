@@ -20,12 +20,12 @@ const template = createTemplate(`
     width: 8em;
   }
   #pre-amp-range {
-    margin-right: 6px;
+    margin-right: var(--margin);
     vertical-align: middle;
   }
   #pre-amp-span {
     display: inline-block;
-    width: 3em;
+    width: 3em; /* large enough to hold e.g. "-10 dB" */
   }
 </style>
 

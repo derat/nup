@@ -842,7 +842,7 @@ type statsChartBar struct {
 }
 
 // Matches e.g. "55.3" from the stats bar style attribute "opacity: 0.55; width: 55.3%".
-var statsPctRegexp = regexp.MustCompile(`width:\s*([^%]+)%`)
+var statsPctRegexp = regexp.MustCompile(`width:\s*(?:calc\()?([^%]+)%`)
 
 // checkStatsChart verifies that the stats dialog chart at locs contains want.
 func (p *page) checkStatsChart(locs []loc, want []statsChartBar) {
