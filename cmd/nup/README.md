@@ -120,8 +120,8 @@ The `debug` command prints information about a song file specified in the
 command line.
 
 ```
-debug [flags] <song-path>:
-	Print information about a song file.
+debug [flags] <song-path>...:
+	Print information about one or more song files.
 
   -id3
     	Print all ID3v2 text frames

@@ -25,8 +25,8 @@ type Command struct {
 func (*Command) Name() string     { return "debug" }
 func (*Command) Synopsis() string { return "print information about a song file" }
 func (*Command) Usage() string {
-	return `debug [flags] <song-path>:
-	Print information about a song file.
+	return `debug [flags] <song-path>...:
+	Print information about one or more song files.
 
 `
 }
@@ -37,61 +37,85 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 }
 
 func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
-	if fs.NArg() != 1 {
+	if fs.NArg() < 1 {
 		fmt.Fprintln(os.Stderr, cmd.Usage())
 		return subcommands.ExitUsageError
 	}
-	p := fs.Arg(0)
-
-	switch {
-	case cmd.id3:
-		frames, err := readID3Frames(p)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Failed reading frames:", err)
-			return subcommands.ExitFailure
-		}
-		for _, frame := range frames {
-			var val string
-			if len(frame.fields) == 0 {
-				val = fmt.Sprintf("[%d bytes]", frame.size)
-			} else {
-				quoted := make([]string, len(frame.fields))
-				for i, s := range frame.fields {
-					quoted[i] = fmt.Sprintf("%q", s)
-				}
-				val = strings.Join(quoted, " ")
-			}
-			fmt.Println(frame.id + " " + val)
-		}
-		return subcommands.ExitSuccess
-
-	case cmd.mpeg:
-		info, err := getMPEGInfo(p)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Failed reading file info:", err)
-			return subcommands.ExitFailure
-		}
-
-		fmt.Printf("%d bytes: %d header, %d data, %d footer (%v)\n",
-			info.size, info.header, info.size-info.header-info.footer, info.footer, info.sha1)
-		for _, s := range info.skipped {
-			fmt.Printf("  skipped %d-%d (%d)\n", s[0], s[0]+s[1]-1, s[1])
-		}
-
-		format := func(d time.Duration) string {
-			return fmt.Sprintf("%d:%06.3f", int(d.Minutes()), (d % time.Minute).Seconds())
-		}
-		fmt.Printf("Xing:   %s (%d frames, %d data)\n",
-			format(info.xingDur), info.xingFrames, info.xingBytes)
-		fmt.Printf("Actual: %s (%d frames, %d data)\n",
-			format(info.actualDur), info.actualFrames, info.actualBytes)
-		if info.emptyFrame >= 0 {
-			fmt.Printf("Audio:  %s (%d frames, then empty starting at offset %d)\n",
-				format(info.emptyTime), info.emptyFrame, info.emptyOffset)
-		}
-		return subcommands.ExitSuccess
+	if !cmd.id3 && !cmd.mpeg {
+		fmt.Fprintln(os.Stderr, "No action requested via flags")
+		return subcommands.ExitUsageError
 	}
 
-	fmt.Fprintln(os.Stderr, "No action requested via flags")
-	return subcommands.ExitUsageError
+	var failed bool
+	for i, p := range fs.Args() {
+		if len(fs.Args()) > 1 {
+			if i > 0 {
+				fmt.Println()
+			}
+			fmt.Println(p)
+		}
+		if cmd.id3 {
+			if err := cmd.doID3(p); err != nil {
+				fmt.Fprintln(os.Stderr, "Failed reading ID3 tag:", err)
+				failed = true
+			}
+		}
+		if cmd.mpeg {
+			if err := cmd.doMPEG(p); err != nil {
+				fmt.Fprintln(os.Stderr, "Failed reading MPEG frames:", err)
+				failed = true
+			}
+		}
+	}
+	if failed {
+		return subcommands.ExitFailure
+	}
+	return subcommands.ExitSuccess
+}
+
+func (cmd *Command) doID3(p string) error {
+	frames, err := readID3Frames(p)
+	if err != nil {
+		return err
+	}
+	for _, frame := range frames {
+		var val string
+		if len(frame.fields) == 0 {
+			val = fmt.Sprintf("[%d bytes]", frame.size)
+		} else {
+			quoted := make([]string, len(frame.fields))
+			for i, s := range frame.fields {
+				quoted[i] = fmt.Sprintf("%q", s)
+			}
+			val = strings.Join(quoted, " ")
+		}
+		fmt.Println(frame.id + " " + val)
+	}
+	return nil
+}
+
+func (cmd *Command) doMPEG(p string) error {
+	info, err := getMPEGInfo(p)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%d bytes: %d header, %d data, %d footer (%v)\n",
+		info.size, info.header, info.size-info.header-info.footer, info.footer, info.sha1)
+	for _, s := range info.skipped {
+		fmt.Printf("  skipped %d-%d (%d)\n", s[0], s[0]+s[1]-1, s[1])
+	}
+
+	format := func(d time.Duration) string {
+		return fmt.Sprintf("%d:%06.3f", int(d.Minutes()), (d % time.Minute).Seconds())
+	}
+	fmt.Printf("Xing:   %s (%d frames, %d data)\n",
+		format(info.xingDur), info.xingFrames, info.xingBytes)
+	fmt.Printf("Actual: %s (%d frames, %d data)\n",
+		format(info.actualDur), info.actualFrames, info.actualBytes)
+	if info.emptyFrame >= 0 {
+		fmt.Printf("Audio:  %s (%d frames, then empty starting at offset %d)\n",
+			format(info.emptyTime), info.emptyFrame, info.emptyOffset)
+	}
+	return nil
 }
