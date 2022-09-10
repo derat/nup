@@ -200,7 +200,9 @@ export function showStatsDialog() {
         createElement('td', null, row, ystats.plays.toLocaleString());
         createElement('td', null, row, formatDays(ystats.totalSec));
       }
-      tbody.lastElementChild?.scrollIntoView(false /* alignToTop */);
+      window.setTimeout(() =>
+        tbody.lastElementChild?.scrollIntoView(false /* alignToTop */)
+      );
 
       const updateTime = formatRelativeTime(
         (Date.parse(stats.updateTime) - Date.now()) / 1000
