@@ -7,6 +7,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -106,13 +107,20 @@ func (cmd *Command) doMPEG(p string) error {
 		fmt.Printf("  skipped %d-%d (%d)\n", s[0], s[0]+s[1]-1, s[1])
 	}
 
+	var actualBitrate string
+	if info.vbr {
+		actualBitrate = fmt.Sprintf("%0.1f kb/s VBR", info.avgKbitRate)
+	} else {
+		actualBitrate = fmt.Sprintf("%0.0f kb/s CBR", math.Round(info.avgKbitRate))
+	}
+
 	format := func(d time.Duration) string {
 		return fmt.Sprintf("%d:%06.3f", int(d.Minutes()), (d % time.Minute).Seconds())
 	}
 	fmt.Printf("Xing:   %s (%d frames, %d data)\n",
 		format(info.xingDur), info.xingFrames, info.xingBytes)
-	fmt.Printf("Actual: %s (%d frames, %d data)\n",
-		format(info.actualDur), info.actualFrames, info.actualBytes)
+	fmt.Printf("Actual: %s (%d frames, %d data, %s)\n",
+		format(info.actualDur), info.actualFrames, info.actualBytes, actualBitrate)
 	if info.emptyFrame >= 0 {
 		fmt.Printf("Audio:  %s (%d frames, then empty starting at offset %d)\n",
 			format(info.emptyTime), info.emptyFrame, info.emptyOffset)

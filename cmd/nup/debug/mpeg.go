@@ -18,7 +18,8 @@ type mpegInfo struct {
 	header       int64         // ID3v2 header size
 	footer       int64         // ID3v1 footer size
 	sha1         string        // SHA1 of data between header and footer
-	kbitRate     int           // from first audio frame
+	vbr          bool          // bitrate is variable (as opposed to constant)
+	avgKbitRate  float64       // averaged across audio frames
 	sampleRate   int           // from first audio frame
 	xingFrames   int           // number of frames from Xing header
 	xingBytes    int64         // audio data size from Xing header
@@ -65,7 +66,8 @@ func getMPEGInfo(p string) (*mpegInfo, error) {
 
 	// Read all of the frames in the file.
 	off := info.header
-	var skipped int64
+	var skipped, kbitRateSum int64
+	var lastKbitRate int
 	for off < info.size-info.footer {
 		finfo, err := mpeg.ReadFrameInfo(f, off)
 		if err != nil {
@@ -79,10 +81,21 @@ func getMPEGInfo(p string) (*mpegInfo, error) {
 			skipped = 0
 		}
 
-		// Get the bitrate and sample rate from the first frame we find.
-		if info.actualFrames == 0 {
-			info.kbitRate = finfo.KbitRate
-			info.sampleRate = finfo.SampleRate
+		// Skip the Xing frame for bitrate calculations since its bitrate sometimes differs from the
+		// audio frames in CBR files.
+		if isXing := info.xingBytes != 0 && info.actualFrames == 0; !isXing {
+			if lastKbitRate > 0 && finfo.KbitRate != lastKbitRate {
+				info.vbr = true
+			}
+			lastKbitRate = finfo.KbitRate
+			kbitRateSum += int64(finfo.KbitRate)
+
+			// Get the sample rate from the first non-Xing frame we find. Getting it from the Xing
+			// frame seemed to work as well, but it feels a bit safer to skip it since I've seen
+			// different bitrates there.
+			if info.sampleRate == 0 {
+				info.sampleRate = finfo.SampleRate
+			}
 		}
 
 		// Check for empty frames at the end of the file.
@@ -112,6 +125,11 @@ func getMPEGInfo(p string) (*mpegInfo, error) {
 		if info.emptyFrame > 0 {
 			info.emptyFrame--
 		}
+	}
+
+	// Do this after the above decrement since we excluded the Xing frame from kbitRateSum.
+	if info.actualFrames > 0 {
+		info.avgKbitRate = float64(kbitRateSum) / float64(info.actualFrames)
 	}
 
 	// Compute durations. The sample rate is fixed and there's a constant number
