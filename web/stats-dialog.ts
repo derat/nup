@@ -61,6 +61,7 @@ const template = createTemplate(`
     text-align: center;
     text-overflow: ellipsis;
     text-shadow: 0 0 4px black;
+    user-select: none;
   }
 
   #years-div {
@@ -199,6 +200,7 @@ export function showStatsDialog() {
         createElement('td', null, row, ystats.plays.toLocaleString());
         createElement('td', null, row, formatDays(ystats.totalSec));
       }
+      tbody.lastElementChild?.scrollIntoView(false /* alignToTop */);
 
       const updateTime = formatRelativeTime(
         (Date.parse(stats.updateTime) - Date.now()) / 1000
