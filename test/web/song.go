@@ -4,12 +4,9 @@
 package web
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
-	"sort"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/derat/nup/server/db"
@@ -326,44 +323,4 @@ func songInfoSlicesEqual(want, got []songInfo) bool {
 		}
 	}
 	return true
-}
-
-// checkServerSong verifies that the server's data for song (identified by
-// SHA1) matches the expected. This is used to verify user data: see
-// hasSrvRating, hasSrvTags, and hasSrvPlay.
-func checkServerSong(t *testing.T, song db.Song, checks ...songCheck) {
-	want := makeSongInfo(song)
-	for _, c := range checks {
-		c(&want)
-	}
-
-	var got *songInfo
-	if err := waitFull(func() error {
-		got = nil
-		songs := tester.DumpSongs(test.KeepIDs)
-		for i := range songs {
-			s := songs[i]
-			if s.SHA1 != song.SHA1 {
-				continue
-			}
-
-			si := makeSongInfo(s)
-			si.srvRating = &s.Rating
-			si.srvTags = s.Tags
-			sort.Sort(db.PlayArray(s.Plays))
-			for _, p := range s.Plays {
-				si.srvPlays = append(si.srvPlays, [2]time.Time{p.StartTime, p.StartTime})
-			}
-			got = &si
-		}
-		if got == nil || !songInfosEqual(want, *got) {
-			return errors.New("songs don't match")
-		}
-		return nil
-	}, want.getTimeout(waitTimeout), waitSleep); err != nil {
-		msg := fmt.Sprintf("Bad server %q data at %v:\n", song.SHA1, test.Caller())
-		msg += "  Want: " + want.String() + "\n"
-		msg += "  Got:  " + got.String() + "\n"
-		t.Fatal(msg)
-	}
 }

@@ -223,8 +223,14 @@ func copyBrowserLogs() {
 }
 
 // initWebTest should be called at the beginning of each test.
-// The returned page object is used to interact with the web interface via Selenium.
-func initWebTest(t *testing.T) (p *page, done func()) {
+// The returned page object is used to interact with the web interface via Selenium,
+// and the returned server object is used to interact with the server.
+// The test should defer a call to the returned done function.
+func initWebTest(t *testing.T) (p *page, s *server, done func()) {
+	if tester.T != nil {
+		t.Fatalf("%v didn't call done", tester.T.Name())
+	}
+
 	// Huge hack: skip the test if we're only running unit tests.
 	if unitTestRegexp != "" && t.Name() != "TestUnit" {
 		t.SkipNow() // calls runtime.Goexit
@@ -236,14 +242,14 @@ func initWebTest(t *testing.T) (p *page, done func()) {
 	writeLogHeader(t.Name())
 
 	if appURL == "" {
-		return nil, func() {}
+		return nil, nil, func() {}
 	}
 
 	tester.T = t
 	tester.PingServer()
 	tester.ClearData()
 	tester.ForceUpdateFailures(false)
-	return newPage(t, webDrv, appURL), func() { tester.T = nil }
+	return newPage(t, webDrv, appURL), &server{t, tester}, func() { tester.T = nil }
 }
 
 // MaxPlays needs to be explicitly set to -1 here since these structs are
@@ -294,7 +300,7 @@ func importSongs(songs ...interface{}) {
 }
 
 func TestKeywordQuery(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	album1 := joinSongs(
 		newSong("ar1", "ti1", "al1", withTrack(1)),
@@ -330,7 +336,7 @@ func TestKeywordQuery(t *testing.T) {
 }
 
 func TestTagQuery(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	song1 := newSong("ar1", "ti1", "al1", withTags("electronic", "instrumental"))
 	song2 := newSong("ar2", "ti2", "al2", withTags("rock", "guitar"))
@@ -354,7 +360,7 @@ func TestTagQuery(t *testing.T) {
 }
 
 func TestDateQuery(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	song1 := newSong("a", "1985-01-01", "al", withTrack(1), withDate(test.Date(1985, 1, 1)))
 	song2 := newSong("a", "1991-12-31", "al", withTrack(2), withDate(test.Date(1991, 12, 31)))
@@ -388,7 +394,7 @@ func TestDateQuery(t *testing.T) {
 }
 
 func TestRatingQuery(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	song1 := newSong("a", "t", "al1", withRating(1))
 	song2 := newSong("a", "t", "al2", withRating(2))
@@ -429,7 +435,7 @@ func TestRatingQuery(t *testing.T) {
 }
 
 func TestFirstTrackQuery(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	album1 := joinSongs(
 		newSong("ar1", "ti1", "al1", withTrack(1), withDisc(1)),
@@ -448,7 +454,7 @@ func TestFirstTrackQuery(t *testing.T) {
 }
 
 func TestOrderByLastPlayedQuery(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	t1 := test.Date(2020, 4, 1)
 	t2 := t1.Add(1 * time.Second)
@@ -464,7 +470,7 @@ func TestOrderByLastPlayedQuery(t *testing.T) {
 }
 
 func TestMaxPlaysQuery(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	t1 := test.Date(2020, 4, 1)
 	t2 := t1.Add(1 * time.Second)
@@ -490,7 +496,7 @@ func TestMaxPlaysQuery(t *testing.T) {
 }
 
 func TestPlayTimeQuery(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	now := time.Now()
 	song1 := newSong("ar1", "ti1", "al1", withPlays(now.Add(-5*24*time.Hour)))
@@ -530,7 +536,7 @@ func TestPlayTimeQuery(t *testing.T) {
 }
 
 func TestSearchResultCheckboxes(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	songs := joinSongs(
 		newSong("a", "t1", "al", withTrack(1)),
@@ -586,7 +592,7 @@ func TestSearchResultCheckboxes(t *testing.T) {
 }
 
 func TestAddToPlaylist(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	song1 := newSong("a", "t1", "al1", withTrack(1))
 	song2 := newSong("a", "t2", "al1", withTrack(2))
@@ -640,7 +646,7 @@ func TestAddToPlaylist(t *testing.T) {
 }
 
 func TestPlaybackButtons(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	// Using a 10-second song here makes this test slow, but I've seen flakiness when using the
 	// 5-second song.
@@ -689,7 +695,7 @@ func TestPlaybackButtons(t *testing.T) {
 }
 
 func TestContextMenu(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	song1 := newSong("a", "t1", "al", withTrack(1))
 	song2 := newSong("a", "t2", "al", withTrack(2))
@@ -732,7 +738,7 @@ func TestContextMenu(t *testing.T) {
 }
 
 func TestDisplayTimeWhilePlaying(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	song := newSong("ar", "t", "al", withFilename(file5s))
 	importSongs(song)
@@ -750,7 +756,7 @@ func TestDisplayTimeWhilePlaying(t *testing.T) {
 }
 
 func TestReportPlayed(t *testing.T) {
-	page, done := initWebTest(t)
+	page, srv, done := initWebTest(t)
 	defer done()
 	song1 := newSong("a", "t1", "al", withTrack(1), withFilename(file5s))
 	song2 := newSong("a", "t2", "al", withTrack(2), withFilename(file1s))
@@ -767,8 +773,8 @@ func TestReportPlayed(t *testing.T) {
 	song2Upper := time.Now()
 
 	// Only the second song should've been reported.
-	checkServerSong(t, song2, hasSrvPlay(song2Lower, song2Upper))
-	checkServerSong(t, song1, hasNoSrvPlays())
+	srv.checkSong(song2, hasSrvPlay(song2Lower, song2Upper))
+	srv.checkSong(song1, hasNoSrvPlays())
 
 	// Go back to the first song but pause it immediately.
 	song1Lower := time.Now()
@@ -781,12 +787,12 @@ func TestReportPlayed(t *testing.T) {
 	// After more than half of the first song has played, it should be reported.
 	page.click(playPauseButton)
 	page.checkSong(song1, isPaused(false))
-	checkServerSong(t, song1, hasSrvPlay(song1Lower, song1Upper))
-	checkServerSong(t, song2, hasSrvPlay(song2Lower, song2Upper))
+	srv.checkSong(song1, hasSrvPlay(song1Lower, song1Upper))
+	srv.checkSong(song2, hasSrvPlay(song2Lower, song2Upper))
 }
 
 func TestReportReplay(t *testing.T) {
-	page, done := initWebTest(t)
+	page, srv, done := initWebTest(t)
 	defer done()
 	song := newSong("a", "t1", "al", withFilename(file1s))
 	importSongs(song)
@@ -802,12 +808,12 @@ func TestReportReplay(t *testing.T) {
 	page.click(playPauseButton)
 
 	// Both playbacks should be reported.
-	checkServerSong(t, song, hasSrvPlay(firstLower, secondLower),
+	srv.checkSong(song, hasSrvPlay(firstLower, secondLower),
 		hasSrvPlay(secondLower, secondLower.Add(2*time.Second)))
 }
 
 func TestRateAndTag(t *testing.T) {
-	page, done := initWebTest(t)
+	page, srv, done := initWebTest(t)
 	defer done()
 	song := newSong("ar", "t1", "al", withRating(3), withTags("rock", "guitar"))
 	importSongs(song)
@@ -822,17 +828,17 @@ func TestRateAndTag(t *testing.T) {
 	page.click(updateFourStars)
 	page.click(updateCloseImage)
 	page.checkSong(song, hasRating(4), hasImgTitle("Rating: ★★★★☆\nTags: guitar rock"))
-	checkServerSong(t, song, hasSrvRating(4), hasSrvTags("guitar", "rock"))
+	srv.checkSong(song, hasSrvRating(4), hasSrvTags("guitar", "rock"))
 
 	page.click(coverImage)
 	page.sendKeys(updateTagsTextarea, " +metal", false)
 	page.click(updateCloseImage)
 	page.checkSong(song, hasRating(4), hasImgTitle("Rating: ★★★★☆\nTags: guitar metal rock"))
-	checkServerSong(t, song, hasSrvRating(4), hasSrvTags("guitar", "metal", "rock"))
+	srv.checkSong(song, hasSrvRating(4), hasSrvTags("guitar", "metal", "rock"))
 }
 
 func TestRetryUpdates(t *testing.T) {
-	page, done := initWebTest(t)
+	page, srv, done := initWebTest(t)
 	defer done()
 	song := newSong("ar", "t1", "al", withFilename(file1s),
 		withRating(3), withTags("rock", "guitar"))
@@ -855,7 +861,7 @@ func TestRetryUpdates(t *testing.T) {
 	// Wait a bit to let the updates fail and then let them succeed.
 	time.Sleep(time.Second)
 	tester.ForceUpdateFailures(false)
-	checkServerSong(t, song, hasSrvRating(4), hasSrvTags("jazz", "mellow"),
+	srv.checkSong(song, hasSrvRating(4), hasSrvTags("jazz", "mellow"),
 		hasSrvPlay(firstLower, firstUpper))
 
 	// Queue some more failed updates.
@@ -874,7 +880,7 @@ func TestRetryUpdates(t *testing.T) {
 	// The queued updates should be sent if the page is reloaded.
 	page.reload()
 	tester.ForceUpdateFailures(false)
-	checkServerSong(t, song, hasSrvRating(2), hasSrvTags("lively", "soul"),
+	srv.checkSong(song, hasSrvRating(2), hasSrvTags("lively", "soul"),
 		hasSrvPlay(firstLower, firstUpper), hasSrvPlay(secondLower, secondUpper))
 
 	// In the case of multiple queued updates, the last one should take precedence.
@@ -890,11 +896,11 @@ func TestRetryUpdates(t *testing.T) {
 		page.checkGone(updateCloseImage)
 	}
 	tester.ForceUpdateFailures(false)
-	checkServerSong(t, song, hasSrvRating(5))
+	srv.checkSong(song, hasSrvRating(5))
 }
 
 func TestUpdateTagsAutocomplete(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	song1 := newSong("ar", "t1", "al", withTags("a0", "a1", "b"))
 	song2 := newSong("ar", "t2", "al", withTags("c0", "c1", "d", "long"))
@@ -926,7 +932,7 @@ func TestUpdateTagsAutocomplete(t *testing.T) {
 }
 
 func TestDragSongs(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 
 	s1 := newSong("a", "t1", "al", withTrack(1))
@@ -980,7 +986,7 @@ func TestDragSongs(t *testing.T) {
 }
 
 func TestOptions(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	show := func() { page.emitKeyDown("o", 79, true /* alt */) }
 
@@ -1029,7 +1035,7 @@ func TestOptions(t *testing.T) {
 }
 
 func TestSongInfo(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 
 	song1 := newSong("a", "t1", "al1", withTrack(1), withLength(123),
@@ -1071,7 +1077,7 @@ func TestSongInfo(t *testing.T) {
 }
 
 func TestPresets(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	now := time.Now()
 	now2 := now.Add(-5 * time.Minute)
@@ -1104,7 +1110,7 @@ func TestPresets(t *testing.T) {
 }
 
 func TestFullscreenOverlay(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 	show := func() { page.emitKeyDown("v", 86, true /* alt */) }
 	next := func() { page.emitKeyDown("n", 78, true /* alt */) }
@@ -1154,7 +1160,7 @@ func TestFullscreenOverlay(t *testing.T) {
 }
 
 func TestStats(t *testing.T) {
-	page, done := initWebTest(t)
+	page, _, done := initWebTest(t)
 	defer done()
 
 	t2001 := test.Date(2001, 4, 1)
@@ -1206,7 +1212,7 @@ func TestStats(t *testing.T) {
 func TestUnit(t *testing.T) {
 	// We don't care about initializing the page object, but we want to write a header
 	// to the browser log.
-	_, done := initWebTest(t)
+	_, _, done := initWebTest(t)
 	defer done()
 
 	// Transform web/*.ts into JS and write it to a temp dir.
