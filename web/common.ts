@@ -45,15 +45,31 @@ export function formatRelativeTime(sec: number) {
   return fmt(sec, 'second');
 }
 
-// Sets |element|'s 'title' attribute to |text| if the row's content overflows
-// its area or removes it otherwise.
+// Sets |element|'s 'title' attribute to |text| if its content overflows its
+// area or removes it otherwise.
 //
 // Note that this can be slow, as accessing |scrollWidth| and |offsetWidth| may
-// trigger a reflow: https://stackoverflow.com/a/70871905/6882947
+// trigger a reflow.
 export function updateTitleAttributeForTruncation(
   element: HTMLElement,
   text: string
 ) {
+  // TODO: This can fail to set the attribute when the content just barely
+  // overflows since |scrollWidth| is infuriatingly rounded to an integer:
+  // https://stackoverflow.com/q/21666892
+  //
+  // This hasn't been changed due to compat issues:
+  // https://crbug.com/360889
+  // https://groups.google.com/a/chromium.org/g/blink-dev/c/_Q7A4AQBFKY
+  //
+  // getClientBoundingRect() and getClientRects() use fractional units but only
+  // report the actual layout size, so we get the same width for all elements
+  // regardless of the content size.
+  //
+  // It sounds like it may be possible to get the actual size by setting
+  // 'width: max-content' and then calling getClientBoundingRect() as described
+  // at https://github.com/w3c/csswg-drafts/issues/4123, but that seems like it
+  // might be slow.
   if (element.scrollWidth > element.offsetWidth) element.title = text;
   else element.removeAttribute('title');
 }
