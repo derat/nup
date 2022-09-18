@@ -126,6 +126,7 @@ const template = createTemplate(`
     background-color: var(--text-color);
     display: none;
     height: 2px;
+    pointer-events: none;
     position: absolute;
     z-index: 1;
   }
@@ -275,25 +276,35 @@ export class SongTable extends HTMLElement {
   }
 
   connectedCallback() {
-    // Listen for drag-and-drop events on document.body instead of |#table| so
-    // we can still reorder songs if the user releases the button outside of
-    // the table. Only the song table that initiated the drag will process the
+    // Listen for drag-and-drop events on document.body instead of #table so we
+    // can still reorder songs if the user releases the button outside of the
+    // table. Only the song table that initiated the drag will process the
     // events.
     document.body.addEventListener('dragenter', this.#onDragEnter);
     document.body.addEventListener('dragover', this.#onDragOver);
 
     // Listen for 'dragend' since 'drop' doesn't fire when the drag was
-    // canceled. Chrome 98 also seems to always misreport the drop effect as
-    // 'none' in the 'drop' event, making it impossible to tell if the drag
-    // was canceled: https://stackoverflow.com/a/43892407
-    // Firefox 95 sets the drop effect properly.
+    // canceled. Chrome also seems to always report the drop effect as 'none' in
+    // the 'drop' event, making it impossible to tell if the drag was canceled:
+    // https://stackoverflow.com/a/43892407
+    // https://crub.com/509752
     document.body.addEventListener('dragend', this.#onDragEnd);
+
+    // TODO: Chrome 105.0.5195.134 flashes the can't-drop cursor and doesn't
+    // allow dropping whenever the pointer moves into a new element. If the
+    // element explicitly listens for and cancels the 'dragenter' event then
+    // this doesn't happen, but document.body doesn't receive the event for some
+    // (shadow-related?) reason. Listening for 'dragenter' in the table seems to
+    // at least prevent this from happening as the pointer moves between rows:
+    // https://github.com/derat/nup/issues/45
+    this.#table.addEventListener('dragenter', this.#onDragEnter);
   }
 
   disconnectedCallback() {
     document.body.removeEventListener('dragenter', this.#onDragEnter);
     document.body.removeEventListener('dragover', this.#onDragOver);
     document.body.removeEventListener('dragend', this.#onDragEnd);
+    this.#table.removeEventListener('dragenter', this.#onDragEnter);
 
     if (this.#resizeTimeoutId !== null) {
       window.clearTimeout(this.#resizeTimeoutId);
@@ -543,7 +554,6 @@ export class SongTable extends HTMLElement {
 
   #onDragEnd = (e: DragEvent) => {
     if (!this.#inDrag) return;
-    e.preventDefault();
     e.stopPropagation();
 
     const from = this.#dragFromIndex;
@@ -563,13 +573,12 @@ export class SongTable extends HTMLElement {
       );
     }
     const row = this.#songRows[from];
-    const tbody = row.parentNode!;
     if (to < from) {
-      tbody.insertBefore(row, this.#songRows[to]);
+      this.#tbody.insertBefore(row, this.#songRows[to]);
     } else if (to < this.numSongs - 1) {
-      tbody.insertBefore(row, this.#songRows[to + 1]);
+      this.#tbody.insertBefore(row, this.#songRows[to + 1]);
     } else {
-      tbody.appendChild(row);
+      this.#tbody.appendChild(row);
     }
     this.#emitEvent('reorder', { fromIndex: from, toIndex: to });
   };
