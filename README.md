@@ -157,7 +157,7 @@ Engine.
 ## Deploying
 
 To deploy the App Engine app (as defined in [app.yaml](./app.yaml)) and delete
-old, non-serving versions, run the `deploy.sh` script.
+old, non-serving versions, run the `build/deploy.sh` script.
 
 Note that App Engine often continues serving stale versions of static files for
 10 minutes or more after deploying. I think that [this has been broken for a
@@ -165,10 +165,10 @@ long time](https://issuetracker.google.com/issues/35890923). [This Stack
 Overflow question](https://stackoverflow.com/q/2783082/6882947) has more
 discussion.
 
-After changes to [index.yaml](./index.yaml), run `deploy.sh --indexes` to create
+After changes to [index.yaml](./index.yaml), run `build/deploy.sh -i` to create
 new Datastore indexes and delete old ones.
 
-You should also run `deploy.sh cron.yaml` once to deploy the daily
+You should also run `build/deploy.sh cron.yaml` once to deploy the daily
 stats-updating cron job described in [cron.yaml](./cron.yaml).
 
 ## Development and testing

@@ -1,0 +1,4 @@
+steps:
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args: ['-e', '--', 'build/deploy.sh', '-p', '$_PROJECT_ID', '-i']

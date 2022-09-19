@@ -1,19 +1,29 @@
 #!/bin/sh -e
 
-if [ "$1" = '-h' ] || [ "$1" = '--help' ]; then
-  cat <<EOF >&2
-Usage: deploy.sh [flags]... [gcloud args]...
+usage=$(cat <<EOF
+Usage: $0 [flags]... [gcloud args]...
 Deploy the App Engine app to GCP and delete old versions.
 
 Flags:
-  -i, --indexes    Update Datastore indexes rather than deploying app
+  -i  Update Datastore indexes instead of deploying app
+  -p  GCP project ID to use ("nup projectid" by default)
 EOF
-  exit 2
-fi
+)
 
-project=$(nup projectid)
+indexes=
+project=
+while getopts ip: o; do
+  case $o in
+    i) indexes=1 ;;
+    p) project="$OPTARG" ;;
+    \?) echo "$usage" >&2 && exit 2 ;;
+  esac
+done
+shift $(expr $OPTIND - 1)
 
-if [ "$1" = '-i' ] || [ "$1" = '--indexes' ]; then
+[ -n "$project" ] || project=$(nup projectid)
+
+if [ -n "$indexes" ]; then
   echo 'Creating new indexes...'
   gcloud beta datastore --project="$project" --quiet indexes create index.yaml
   echo 'Deleting old indexes...'
