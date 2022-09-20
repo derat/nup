@@ -2,3 +2,8 @@ steps:
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: bash
     args: ['-e', '--', 'build/deploy.sh', '-p', '$_PROJECT_ID']
+
+# The _BUILD_LOGS substition variable should be set to e.g. "gs://my-logs".
+logsBucket: $_BUILD_LOGS
+options:
+  logging: GCS_ONLY
