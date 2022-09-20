@@ -73,6 +73,7 @@ const template = createTemplate(`
   }
   #years-table {
     border-spacing: 0;
+    table-layout: fixed;
     width: 100%;
   }
   #years-table th {
@@ -92,9 +93,14 @@ const template = createTemplate(`
     left: 0;
     width: 100%;
   }
-  #years-table th:not(:first-child),
-  #years-div td:not(:first-child) {
+  #years-table th,
+  #years-div td {
     text-align: right;
+  }
+  #years-table th:first-child,
+  #years-div td:first-child {
+    text-align: left;
+    width: 2.5em;
   }
 
   #updated-div {
