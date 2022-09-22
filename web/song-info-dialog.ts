@@ -28,13 +28,13 @@ const template = createTemplate(`
     outline: solid 1px var(--border-color);
     width: 256px;
   }
+  #cover-div.hidden {
+    display: none;
+  }
   #cover-img {
     height: 100%;
     object-fit: cover;
     width: 100%;
-  }
-  #cover-img.hidden {
-    display: none;
   }
   .info-table {
     border-collapse: collapse;
