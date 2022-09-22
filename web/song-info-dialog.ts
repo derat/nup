@@ -8,6 +8,7 @@ import {
   getCoverUrl,
   getRatingString,
   largeCoverSize,
+  smallCoverSize,
 } from './common.js';
 import { createDialog } from './dialog.js';
 
@@ -19,17 +20,18 @@ const template = createTemplate(`
   hr.title {
     margin-bottom: var(--margin);
   }
-  #cover-link {
-    display: block;
-    text-align: center;
-  }
-  #cover-img {
+  #cover-div {
+    background-size: cover;
     cursor: pointer;
     height: 256px;
     margin-bottom: var(--margin);
-    object-fit: cover;
     outline: solid 1px var(--border-color);
     width: 256px;
+  }
+  #cover-img {
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
   }
   #cover-img.hidden {
     display: none;
@@ -55,7 +57,7 @@ const template = createTemplate(`
 <div class="title">Song info</div>
 <hr class="title" />
 
-<a id="cover-link"><img id="cover-img" alt="" /></a>
+<div id="cover-div"><a id="cover-link"><img id="cover-img" alt="" /></a></div>
 
 <!-- prettier-ignore -->
 <table class="info-table">
@@ -77,25 +79,36 @@ const template = createTemplate(`
 `);
 
 // Displays a modal dialog containing information about |song|.
-export function showSongInfoDialog(song: Song) {
+export function showSongInfoDialog(song: Song, isCurrent = false) {
   const dialog = createDialog(template, 'song-info');
   const shadow = dialog.firstElementChild!.shadowRoot!;
 
-  const cover = $('cover-img', shadow) as HTMLImageElement;
+  const coverDiv = $('cover-div', shadow);
+  const coverImg = $('cover-img', shadow) as HTMLImageElement;
   if (song.coverFilename) {
-    cover.src = getCoverUrl(song.coverFilename, largeCoverSize);
+    const small = getCoverUrl(song.coverFilename, smallCoverSize);
+    const large = getCoverUrl(song.coverFilename, largeCoverSize);
+    coverImg.src = large;
+    coverImg.srcset = `${small}, ${large} 2x`;
+
+    // Display the small image as a placeholder if we know it's cached.
+    if (isCurrent) {
+      coverDiv.style.backgroundImage = `url("${encodeURI(small)}")`;
+    }
+
     const link = $('cover-link', shadow) as HTMLAnchorElement;
     link.href = getCoverUrl(song.coverFilename);
     link.target = '_blank';
   } else {
-    cover.classList.add('hidden');
+    coverDiv.classList.add('hidden');
   }
 
   $('artist', shadow).innerText = song.artist;
   $('title', shadow).innerText = song.title;
   $('album', shadow).innerText = song.album;
   $('track', shadow).innerText =
-    song.track + (song.disc > 1 ? ` (Disc ${song.disc})` : '');
+    (song.track >= 1 ? song.track.toString() : '') +
+    (song.disc > 1 ? ` (Disc ${song.disc})` : '');
   $('date', shadow).innerText = song.date?.substring(0, 10) ?? '';
   $('length', shadow).innerText = formatDuration(song.length);
   $('rating', shadow).innerText = getRatingString(song.rating);

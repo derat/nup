@@ -17,9 +17,6 @@ Modifies server behavior. Used by tests.
 *   `forceUpdateFailures` (optional) - If `1`, report failures for all user data
     updates (ratings, tags, plays).
 
-Unmarshals a JSON-encoded [Config] struct from the request body and
-applies it. Used by tests.
-
 ### /cover (GET)
 
 Returns an album cover art image in JPEG format.

@@ -307,7 +307,7 @@ export class PlayView extends HTMLElement {
             text: 'Song info…',
             cb: () => {
               const song = this.#currentSong;
-              if (song) showSongInfoDialog(song);
+              if (song) showSongInfoDialog(song, true /* isCurrent */);
             },
             hotkey: 'Alt+I',
           },
@@ -476,7 +476,7 @@ export class PlayView extends HTMLElement {
           return true;
         } else if (e.altKey && e.key === 'i') {
           const song = this.#currentSong;
-          if (song) showSongInfoDialog(song);
+          if (song) showSongInfoDialog(song, true /* isCurrent */);
           this.#overlay.visible = false;
           return true;
         } else if (e.altKey && e.key === 'n') {
