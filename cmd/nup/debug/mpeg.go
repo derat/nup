@@ -14,23 +14,24 @@ import (
 
 // mpegInfo contains debugging info about an MP3 file.
 type mpegInfo struct {
-	size         int64         // entire file
-	header       int64         // ID3v2 header size
-	footer       int64         // ID3v1 footer size
-	sha1         string        // SHA1 of data between header and footer
-	vbr          bool          // bitrate is variable (as opposed to constant)
-	avgKbitRate  float64       // averaged across audio frames
-	sampleRate   int           // from first audio frame
-	xingFrames   int           // number of frames from Xing header
-	xingBytes    int64         // audio data size from Xing header
-	xingDur      time.Duration // audio duration from Xing header (or CBR)
-	actualFrames int           // actual frame count
-	actualBytes  int64         // actual audio data size
-	actualDur    time.Duration // actual duration
-	emptyFrame   int           // first empty frame at end of file
-	emptyOffset  int64         // offset of emptyFrame from start of file
-	emptyTime    time.Duration // time of emptyFrame
-	skipped      [][2]int64    // [offset, size]
+	size            int64         // entire file
+	header          int64         // ID3v2 header size
+	footer          int64         // ID3v1 footer size
+	sha1            string        // SHA1 of data between header and footer
+	vbr             bool          // bitrate is variable (as opposed to constant)
+	avgKbitRate     float64       // averaged across audio frames
+	sampleRate      int           // from first audio frame
+	samplesPerFrame int           // from first audio frame
+	xingFrames      int           // number of frames from Xing header
+	xingBytes       int64         // audio data size from Xing header
+	xingDur         time.Duration // audio duration from Xing header (or CBR)
+	actualFrames    int           // actual frame count
+	actualBytes     int64         // actual audio data size
+	actualDur       time.Duration // actual duration
+	emptyFrame      int           // first empty frame at end of file
+	emptyOffset     int64         // offset of emptyFrame from start of file
+	emptyTime       time.Duration // time of emptyFrame
+	skipped         [][2]int64    // [offset, size]
 }
 
 // getMPEGInfo returns debug information about the MP3 file at p.
@@ -95,6 +96,7 @@ func getMPEGInfo(p string) (*mpegInfo, error) {
 			// different bitrates there.
 			if info.sampleRate == 0 {
 				info.sampleRate = finfo.SampleRate
+				info.samplesPerFrame = finfo.SamplesPerFrame
 			}
 		}
 
@@ -138,7 +140,7 @@ func getMPEGInfo(p string) (*mpegInfo, error) {
 		if info.sampleRate == 0 {
 			return 0
 		}
-		return time.Duration(mpeg.SamplesPerFrame*frames) * time.Second /
+		return time.Duration(info.samplesPerFrame*frames) * time.Second /
 			time.Duration(info.sampleRate)
 	}
 	info.actualDur = computeDur(info.actualFrames)

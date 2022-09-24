@@ -93,18 +93,19 @@ func ComputeAudioSHA1(f *os.File, fi os.FileInfo, headerLen, footerLen int64) (s
 
 // FrameInfo contains information about an MPEG (MP3?) audio frame header.
 type FrameInfo struct {
-	KbitRate    int   // in 1000 bits per second (not 1024)
-	SampleRate  int   // in hertz
-	ChannelMode uint8 // 0x0 stereo, 0x1 joint stereo, 0x2 dual channel, 0x3 single channel
-	HasCRC      bool  // 16-bit CRC follows header
-	HasPadding  bool  // frame is padded with one extra bit
+	KbitRate        int // in 1000 bits per second (not 1024)
+	SampleRate      int // in hertz
+	SamplesPerFrame int
+	ChannelMode     uint8 // 0x0 stereo, 0x1 joint stereo, 0x2 dual channel, 0x3 single channel
+	HasCRC          bool  // 16-bit CRC follows header
+	HasPadding      bool  // frame is padded with one extra bit
 }
 
 func (fi *FrameInfo) Size() int64 {
 	// See https://www.opennet.ru/docs/formats/mpeghdr.html. Calculation may be more complicated per
 	// https://www.codeproject.com/Articles/8295/MPEG-Audio-Frame-Header, but if we're off we'll
 	// probably see a problem when reading the next frame.
-	s := (SamplesPerFrame / 8) * int64(fi.KbitRate*1000) / int64(fi.SampleRate)
+	s := int64(fi.SamplesPerFrame/8) * int64(fi.KbitRate*1000) / int64(fi.SampleRate)
 	if fi.HasPadding {
 		s++
 	}
@@ -112,17 +113,53 @@ func (fi *FrameInfo) Size() int64 {
 }
 
 func (fi *FrameInfo) Empty() bool {
+	// TODO: This seems bogus.
 	return fi.Size() == 104
 }
 
-// This constant is specific to MPEG 1, Layer 3.
-const SamplesPerFrame = 1152
+type version int
 
-// This table is specific to MPEG 1, Layer 3.
-var kbitRates = [...]int{0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0}
+const (
+	version1 version = iota
+	version2
+	version2_5 // unofficial extension of MPEG2
+	versionRes // reserved
+)
 
-// This table is specific to MPEG 1.
-var sampleRates = [...]int{44100, 48000, 32000, 0}
+type layer int
+
+const (
+	layer1 layer = iota
+	layer2
+	layer3
+	layerRes // reserved
+)
+
+var versions = [...]version{version2_5, versionRes, version2, version1}
+var layers = [...]layer{layerRes, layer3, layer2, layer1}
+
+// Specific to Layer III.
+var samplesPerFrame = map[version]int{
+	version1:   1152,
+	version2:   576,
+	version2_5: 576,
+}
+
+// Specific to Layer III. Values are multiples of 1000 bits.
+var kbitRates = map[version][]int{
+	version1:   {0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0},
+	version2:   {0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0},
+	version2_5: {0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0}, // same as version2
+}
+
+// Values are in Hertz.
+var sampleRates = map[version][]int{
+	version1:   {44100, 48000, 32000, 0},
+	version2:   {22050, 24000, 16000, 0},
+	version2_5: {11025, 12000, 8000, 0},
+}
+
+var unsupportedLayerErr = errors.New("unsupported layer")
 
 // ReadFrameInfo reads an MPEG audio frame header at the specified offset in f.
 // Format details at http://www.codeproject.com/Articles/8295/MPEG-Audio-Frame-Header.
@@ -137,22 +174,24 @@ func ReadFrameInfo(f *os.File, start int64) (*FrameInfo, error) {
 	getBits := func(startBit, numBits uint) uint32 {
 		return (header << startBit) >> (32 - numBits)
 	}
-	if v := getBits(0, 11); v != 0x7ff {
+	if sync := getBits(0, 11); sync != 0x7ff {
 		return nil, errors.New("no 0x7ff sync")
 	}
-	if v := getBits(11, 2); v != 0x3 {
-		return nil, fmt.Errorf("unsupported MPEG Audio version (got %#x instead of 0x3)", v)
+	version := versions[getBits(11, 2)]
+	if version == versionRes {
+		return nil, errors.New("reserved MPEG version")
 	}
-	if v := getBits(13, 2); v != 0x1 {
-		return nil, fmt.Errorf("unsupported layer (got %#x instead of 0x1)", v)
+	if layer := layers[getBits(13, 2)]; layer != layer3 {
+		return nil, unsupportedLayerErr
 	}
 
 	return &FrameInfo{
-		KbitRate:    kbitRates[getBits(16, 4)],
-		SampleRate:  sampleRates[getBits(20, 2)],
-		ChannelMode: uint8(getBits(24, 2)),
-		HasCRC:      getBits(15, 1) == 0x0,
-		HasPadding:  getBits(22, 1) == 0x1,
+		KbitRate:        kbitRates[version][getBits(16, 4)],
+		SampleRate:      sampleRates[version][getBits(20, 2)],
+		SamplesPerFrame: samplesPerFrame[version],
+		ChannelMode:     uint8(getBits(24, 2)),
+		HasCRC:          getBits(15, 1) == 0x0,
+		HasPadding:      getBits(22, 1) == 0x1,
 	}, nil
 }
 
@@ -171,6 +210,8 @@ func ComputeAudioDuration(f *os.File, fi os.FileInfo, headerLen, footerLen int64
 	for ; fstart < headerLen+maxFrameSearchBytes; fstart++ {
 		if finfo, err = ReadFrameInfo(f, fstart); err == nil {
 			break
+		} else if err == unsupportedLayerErr {
+			return 0, 0, 0, err
 		}
 	}
 	if err != nil {
@@ -216,6 +257,6 @@ func ComputeAudioDuration(f *os.File, fi os.FileInfo, headerLen, footerLen int64
 			return 0, 0, 0, err
 		}
 	}
-	ms := SamplesPerFrame * int64(nframes) * 1000 / int64(finfo.SampleRate)
+	ms := int64(finfo.SamplesPerFrame) * int64(nframes) * 1000 / int64(finfo.SampleRate)
 	return time.Duration(ms) * time.Millisecond, int(nframes), int64(nbytes), nil
 }
