@@ -18,36 +18,58 @@ import (
 	"github.com/derat/taglib-go/taglib/id3"
 )
 
-// ReadID3v1Footer reads a 128-byte ID3v1 footer from the end of f.
-// ID3v1 is a terrible format.
-func ReadID3v1Footer(f *os.File, fi os.FileInfo) (
-	length int64, artist, title, album, year string, err error) {
+type ID3v1Tag struct {
+	Title, Artist, Album, Year, Comment string
+	Genre, Track                        byte
+}
+
+// ID3v1Length is the length in bytes of an ID3v1 tag.
+const ID3v1Length = 128
+
+// ReadID3v1Footer reads an ID3v1 footer from the final ID3v1Length bytes of f.
+// If the tag isn't present, the returned tag and error will be nil.
+// ID3v1 is a terrible format: https://id3.org/ID3v1
+func ReadID3v1Footer(f *os.File, fi os.FileInfo) (*ID3v1Tag, error) {
 	const (
-		footerLen   = 128
 		footerMagic = "TAG"
 		titleLen    = 30
 		artistLen   = 30
 		albumLen    = 30
 		yearLen     = 4
+		commentLen  = 30
+		genreLen    = 1
 	)
 
 	// Check for an ID3v1 footer.
-	buf := make([]byte, footerLen)
+	buf := make([]byte, ID3v1Length)
 	if _, err := f.ReadAt(buf, fi.Size()-int64(len(buf))); err != nil {
-		return 0, "", "", "", "", err
+		return nil, err
 	}
-
 	b := bytes.NewBuffer(buf)
 	if string(b.Next(len(footerMagic))) != footerMagic {
-		return 0, "", "", "", "", err
+		return nil, nil
 	}
 
 	clean := func(b []byte) string { return string(bytes.TrimSpace(bytes.TrimRight(b, "\x00"))) }
-	title = clean(b.Next(titleLen))
-	artist = clean(b.Next(artistLen))
-	album = clean(b.Next(albumLen))
-	year = clean(b.Next(yearLen))
-	return footerLen, artist, title, album, year, nil
+
+	tag := &ID3v1Tag{}
+	tag.Title = clean(b.Next(titleLen))
+	tag.Artist = clean(b.Next(artistLen))
+	tag.Album = clean(b.Next(albumLen))
+	tag.Year = clean(b.Next(yearLen))
+	comment := b.Next(commentLen)
+	tag.Genre = b.Next(genreLen)[0]
+
+	// ID3v1.1 extension: if the last byte of the comment field is non-zero but the byte before it
+	// is zero, then the last byte holds the track number.
+	idx1, idx2 := len(comment)-1, len(comment)-2
+	if comment[idx1] != 0x0 && comment[idx2] == 0x0 {
+		tag.Track = comment[idx1]
+		comment[idx1] = 0x0
+	}
+	tag.Comment = clean(comment)
+
+	return tag, nil
 }
 
 // GetID3v2TextFrame returns the first ID3v2 text frame with the supplied ID from gen.

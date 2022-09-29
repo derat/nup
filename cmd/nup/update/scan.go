@@ -47,17 +47,21 @@ func readSong(path, relPath string, fi os.FileInfo, onlyTags bool,
 	defer f.Close()
 
 	s := db.Song{Filename: relPath}
-	var footerLen int64
-	var yearStr string
-	footerLen, s.Artist, s.Title, s.Album, yearStr, err = mpeg.ReadID3v1Footer(f, fi)
-	if err != nil {
+
+	var headerLen, footerLen int64
+
+	if tag, err := mpeg.ReadID3v1Footer(f, fi); err != nil {
 		return nil, err
-	}
-	if year, err := strconv.Atoi(yearStr); err == nil {
-		s.Date = time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	} else if tag != nil {
+		footerLen = mpeg.ID3v1Length
+		s.Artist = tag.Artist
+		s.Title = tag.Title
+		s.Album = tag.Album
+		if year, err := strconv.Atoi(tag.Year); err == nil {
+			s.Date = time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+		}
 	}
 
-	var headerLen int64
 	if tag, err := taglib.Decode(f, fi.Size()); err != nil {
 		// Tolerate missing ID3v2 tags if we got an artist and title from ID3v1.
 		if len(s.Artist) == 0 && len(s.Title) == 0 {
