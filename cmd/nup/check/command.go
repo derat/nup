@@ -119,6 +119,7 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 }
 
 func checkSongs(songs []*db.Song, musicDir, coverDir string, settings checkSettings) error {
+	seenFilenames := make(map[string]string, len(songs))
 	fs := [](func(s *db.Song) error){
 		func(s *db.Song) error {
 			if len(s.Filename) == 0 {
@@ -126,6 +127,10 @@ func checkSongs(songs []*db.Song, musicDir, coverDir string, settings checkSetti
 			} else if _, err := os.Stat(filepath.Join(musicDir, s.Filename)); err != nil {
 				return errors.New("missing song file")
 			}
+			if id, ok := seenFilenames[s.Filename]; ok {
+				return fmt.Errorf("song %s uses same file", id)
+			}
+			seenFilenames[s.Filename] = s.SongID
 			return nil
 		},
 	}
