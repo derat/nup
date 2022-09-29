@@ -15,18 +15,21 @@ import { createDialog } from './dialog.js';
 const template = createTemplate(`
 <style>
   :host {
-    width: 256px;
   }
   hr.title {
     margin-bottom: var(--margin);
   }
+  #container {
+    align-items: flex-start;
+    display: flex;
+  }
   #cover-div {
     background-size: cover;
     cursor: pointer;
-    height: 256px;
+    height: 192px;
     margin-bottom: var(--margin);
     outline: solid 1px var(--border-color);
-    width: 256px;
+    width: 192px;
   }
   #cover-div.hidden {
     display: none;
@@ -40,6 +43,7 @@ const template = createTemplate(`
     border-collapse: collapse;
     line-height: 1.2em;
     margin-bottom: var(--margin);
+    width: 256px;
   }
   .info-table td:first-child {
     color: var(--text-label-color);
@@ -57,19 +61,22 @@ const template = createTemplate(`
 <div class="title">Song info</div>
 <hr class="title" />
 
-<div id="cover-div"><a id="cover-link"><img id="cover-img" alt="" /></a></div>
-
-<!-- prettier-ignore -->
-<table class="info-table">
-  <tr><td>Artist</td><td id="artist"></td></tr>
-  <tr><td>Title</td><td id="title"></td></tr>
-  <tr><td>Album</td><td id="album"></td></tr>
-  <tr><td>Track</td><td id="track"></td></tr>
-  <tr><td>Date</td><td id="date"></td></tr>
-  <tr><td>Length</td><td id="length"></td></tr>
-  <tr><td>Rating</td><td id="rating"></td></tr>
-  <tr><td>Tags</td><td id="tags"></td></tr>
-</table>
+<div id="container">
+  <div id="cover-div">
+    <a id="cover-link"><img id="cover-img" alt="" /></a>
+  </div>
+  <!-- prettier-ignore -->
+  <table class="info-table">
+    <tr><td>Artist</td><td id="artist"></td></tr>
+    <tr><td>Title</td><td id="title"></td></tr>
+    <tr><td>Album</td><td id="album"></td></tr>
+    <tr><td>Track</td><td id="track"></td></tr>
+    <tr><td>Date</td><td id="date"></td></tr>
+    <tr><td>Length</td><td id="length"></td></tr>
+    <tr><td>Rating</td><td id="rating"></td></tr>
+    <tr><td>Tags</td><td id="tags"></td></tr>
+  </table>
+</div>
 
 <form method="dialog">
   <div class="button-container">
@@ -89,7 +96,8 @@ export function showSongInfoDialog(song: Song, isCurrent = false) {
     const small = getCoverUrl(song.coverFilename, smallCoverSize);
     const large = getCoverUrl(song.coverFilename, largeCoverSize);
     coverImg.src = large;
-    coverImg.srcset = `${small}, ${large} 2x`;
+    coverImg.srcset = `${small} ${smallCoverSize}w, ${large} ${largeCoverSize}w`;
+    coverImg.sizes = '192px';
 
     // Display the small image as a placeholder if we know it's cached.
     if (isCurrent) {
