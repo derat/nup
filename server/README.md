@@ -111,6 +111,7 @@ Queries Datastore and returns a JSON-marshaled array of [Song]s.
 *   `fallback` (optional) - If `force`, only uses the fallback mode that tries
     to avoid using composite indexes in Datastore. If `never`, doesn't use the
     fallback mode at all. Used by tests.
+*   `filename` (optional) - String song filename relative to music directory.
 *   `firstTrack` (optional) - If `1`, only returns songs that are the first
     tracks of first discs.
 *   `maxDate` (optional) - RFC 3339 string containing maximum song date.

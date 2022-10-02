@@ -32,10 +32,11 @@ const (
 
 // SongQuery describes a query returning a list of Songs.
 type SongQuery struct {
-	Artist  string // Song.Artist
-	Title   string // Song.Title
-	Album   string // Song.Album
-	AlbumID string // Song.AlbumID
+	Artist   string // Song.Artist
+	Title    string // Song.Title
+	Album    string // Song.Album
+	AlbumID  string // Song.AlbumID
+	Filename string // song.Filename
 
 	Keywords []string // Song.Keywords
 
@@ -358,8 +359,11 @@ func runQuery(ctx context.Context, query *SongQuery, fallback bool) ([]int64, er
 		}
 	}
 
-	if len(query.AlbumID) > 0 {
+	if query.AlbumID != "" {
 		eq = eq.Filter("AlbumId =", query.AlbumID)
+	}
+	if query.Filename != "" {
+		eq = eq.Filter("Filename =", query.Filename)
 	}
 	if query.hasMinRating() {
 		switch query.MinRating {

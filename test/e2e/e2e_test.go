@@ -435,6 +435,7 @@ func TestQueries(tt *testing.T) {
 		{"title=manana", 0, []db.Song{s10s}},
 		{"title=" + url.QueryEscape("mánanä"), 0, []db.Song{s10s}},
 		{"album=two2", 0, []db.Song{s10s}},
+		{"filename=" + url.QueryEscape(Song5s.Filename), 0, []db.Song{Song5s}},
 		{"minDate=2000-01-01T00:00:00Z", 0, []db.Song{Song5s, Song1s}},
 		{"maxDate=2000-01-01T00:00:00Z", 0, []db.Song{Song0s}},
 		{"minDate=2000-01-01T00:00:00Z&maxDate=2010-01-01T00:00:00Z", 0, []db.Song{Song1s}},
