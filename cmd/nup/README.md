@@ -13,12 +13,13 @@ Subcommands:
 	check            check for issues in songs and cover images
 	commands         list all command names
 	config           manage server configuration
-	covers           manages album art
+	covers           manage album art
 	debug            print information about a song file
 	dump             dump songs from the server
 	flags            describe all known top-level flags
 	help             describe subcommands and their syntax
 	projectid        print GCP project ID
+	query            run song queries against the server
 	storage          update song storage classes
 	update           send song updates to the server
 
@@ -156,6 +157,27 @@ projectid:
 	config's serverURL field).
 ```
 
+## `query` command
+
+The `query` command performs a query using the server and writes the resulting
+JSON-marshaled [Song] objects to stdout.
+
+```
+query [flags]:
+	Query the server and and print JSON-marshaled songs to stdout.
+
+  -filename string
+    	Song filename (relative to music dir) to query for
+  -path string
+    	Song path (resolved to music dir) to query for
+  -pretty
+    	Pretty-print JSON objects
+  -print-id
+    	Print song IDs instead of full JSON objects
+  -single
+    	Fail if exactly one song is not returned
+```
+
 ## `storage` command
 
 The `storage` command reads JSON-marshaled [Song] objects written by the `dump`
@@ -254,7 +276,7 @@ into the new file.
 2.  Use `nup dump` to produce a local text file containing JSON representations
     of all songs and find the old and new songs' `songId` properties in it.
     Alternatively, find the songs' IDs using the "Debug" menu item in the web
-    interface.
+    interface, or run `nup query -print-id -single -path <PATH>`.
 3.  Run `nup update -merge-songs=<OLDID>:<NEWID> -delete-after-merge` to merge
     the old song's user data into the new song and delete the old song from the
     server.

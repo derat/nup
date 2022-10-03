@@ -16,6 +16,7 @@ import (
 	"github.com/derat/nup/cmd/nup/covers"
 	"github.com/derat/nup/cmd/nup/debug"
 	"github.com/derat/nup/cmd/nup/dump"
+	"github.com/derat/nup/cmd/nup/query"
 	"github.com/derat/nup/cmd/nup/storage"
 	"github.com/derat/nup/cmd/nup/update"
 	"github.com/google/subcommands"
@@ -41,6 +42,7 @@ func main() {
 	subcommands.Register(&debug.Command{Cfg: &cfg}, "")
 	subcommands.Register(&dump.Command{Cfg: &cfg}, "")
 	subcommands.Register(&projectidCommand{cfg: &cfg}, "")
+	subcommands.Register(&query.Command{Cfg: &cfg}, "")
 	subcommands.Register(&storage.Command{Cfg: &cfg}, "")
 	subcommands.Register(&update.Command{Cfg: &cfg}, "")
 

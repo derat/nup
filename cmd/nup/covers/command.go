@@ -45,7 +45,7 @@ type Command struct {
 }
 
 func (*Command) Name() string     { return "covers" }
-func (*Command) Synopsis() string { return "manages album art" }
+func (*Command) Synopsis() string { return "manage album art" }
 func (*Command) Usage() string {
 	return `covers [flags]:
 	Works with album art images in a directory.
