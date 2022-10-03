@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/derat/nup/cmd/nup/client"
+	srvcover "github.com/derat/nup/server/cover"
 	"github.com/derat/nup/server/db"
 	"github.com/google/subcommands"
 )
@@ -220,15 +221,16 @@ func checkCovers(songs []*db.Song, coverDir string, settings checkSettings) erro
 		}
 	}
 
-	var fs [](func(fn string) error)
-
-	// We can only check for unused covers if the songs dump contained cover filenames.
-	fs = append(fs, func(fn string) error {
-		if _, ok := songFns[fn]; !ok {
-			return errors.New("unused cover")
-		}
-		return nil
-	})
+	fs := [](func(fn string) error){
+		func(fn string) error {
+			// Check for the original cover if this is a generated WebP image.
+			fn = srvcover.OrigFilename(fn)
+			if _, ok := songFns[fn]; !ok {
+				return errors.New("unused cover")
+			}
+			return nil
+		},
+	}
 
 	if settings&(checkCoverSize400|checkCoverSize800) != 0 {
 		min := 400
