@@ -209,6 +209,7 @@ const NOTIFICATION_SEC = 3; // duration to show song-change notification
 const PLAY_DELAY_MS = 500; // delay before playing when cycling track
 const PRELOAD_SEC = 20; // seconds before end of song to load next song
 const UPDATE_POSITION_SLOP_MS = 10; // time to wait past second boundary
+const MAX_SONG_URLS = 10; // max entries for |#songUrls|
 
 // <play-view> plays and displays information about songs. It also maintains
 // and displays a playlist. Songs can be enqueued by calling enqueueSongs().
@@ -240,6 +241,7 @@ export class PlayView extends HTMLElement {
   #lastUpdatePosition = 0; // audio position in last #updatePosition()
   #updatePositionTimeoutId: number | null = null;
   #shuffled = false; // playlist contains shuffled songs
+  #songUrls = new Map(); // cache of filename -> absolute URL
 
   #shadow = createShadow(this, template);
   #overlay = this.#shadow.querySelector(
@@ -537,6 +539,19 @@ export class PlayView extends HTMLElement {
     return this.#songs[this.#currentIndex + 1] ?? null;
   }
 
+  // Returns the absolute URL corresponding to |filename| just like
+  // getSongUrl() in common.ts, but caches results to make calls cheap.
+  #getSongUrl(filename: string) {
+    const urls = this.#songUrls;
+    let url = urls.get(filename);
+    if (url) return url;
+
+    url = getSongUrl(filename);
+    while (urls.size >= MAX_SONG_URLS) urls.delete(urls.keys().next().value);
+    urls.set(filename, url);
+    return url;
+  }
+
   resetForTest() {
     if (this.#songs.length) this.#removeSongs(0, this.#songs.length);
     this.#updateDialog?.close(false /* save */);
@@ -586,8 +601,12 @@ export class PlayView extends HTMLElement {
 
     if (!this.#songs.length) this.#shuffled = false;
 
-    // If we're keeping the current song, things are pretty simple.
+    // If the next song is getting dropped, we don't need to preload it.
     const end = start + len - 1;
+    const next = this.#currentIndex + 1;
+    if (start <= next && end >= next) this.#audio.preloadSrc = '';
+
+    // If we're keeping the current song, things are pretty simple.
     if (start > this.#currentIndex || end < this.#currentIndex) {
       // If we're removing songs before the current one, we need to update the
       // index and highlighting.
@@ -846,7 +865,7 @@ export class PlayView extends HTMLElement {
 
     // Get an absolute URL since that's what we'll get from the <audio>
     // element: https://stackoverflow.com/a/44547904
-    const url = getSongUrl(song.filename);
+    const url = this.#getSongUrl(song.filename);
     if (this.#audio.src !== url || this.#reachedEndOfSongs) {
       console.log(`Starting ${song.songId} (${url})`);
       this.#audio.src = url;
@@ -954,10 +973,12 @@ export class PlayView extends HTMLElement {
     }
 
     // Preload the next song once we're nearing the end of this one.
-    if (pos >= dur - PRELOAD_SEC && this.#nextSong && !this.#audio.preloadSrc) {
-      const url = getSongUrl(this.#nextSong.filename);
-      console.log(`Preloading ${this.#nextSong.songId} (${url})`);
-      this.#audio.preloadSrc = url;
+    if (pos >= dur - PRELOAD_SEC && this.#nextSong) {
+      const url = this.#getSongUrl(this.#nextSong.filename);
+      if (this.#audio.preloadSrc !== url) {
+        console.log(`Preloading ${this.#nextSong.songId} (${url})`);
+        this.#audio.preloadSrc = url;
+      }
     }
 
     // Only schedule the next update when we're actually making progress.
