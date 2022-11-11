@@ -14,8 +14,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/derat/mpeg"
 	"github.com/derat/nup/cmd/nup/client"
-	"github.com/derat/nup/cmd/nup/mpeg"
 	"github.com/derat/nup/server/db"
 	"github.com/derat/taglib-go/taglib"
 )
@@ -78,9 +78,7 @@ func readSong(path, relPath string, fi os.FileInfo, onlyTags bool,
 		s.Disc = int(tag.Disc())
 		headerLen = int64(tag.TagSize())
 
-		if date, err := getSongDate(func(id string) (string, error) {
-			return mpeg.GetID3v2TextFrame(tag, id)
-		}); err != nil {
+		if date, err := getSongDate(tag); err != nil {
 			return nil, err
 		} else if !date.IsZero() {
 			s.Date = date
@@ -135,68 +133,18 @@ func readSong(path, relPath string, fi os.FileInfo, onlyTags bool,
 }
 
 // getSongDate tries to extract a song's release or recording date.
-// getFrame should call mpeg.GetID3v2TextFrame; it's injected for tests.
-func getSongDate(getFrame func(id string) (string, error)) (time.Time, error) {
-	// There are a bunch of different date-related ID3 frames:
-	// https://github.com/derat/nup/issues/42
-	//
-	// ID3 v2.4:
-	//   TDOR (Original release time): timestamp describing when the original recording of the audio was released
-	//   TDRC (Recording time): timestamp describing when the audio was recorded
-	//   TDRL (Release time): timestamp describing when the audio was first released
-	//
-	// ID3 v2.3:
-	//   TYER (Year): numeric string with a year of the recording (always 4 characters)
-	//   TDAT (Date): numeric string in the DDMM format containing the date for the recording
-
-	// Look for v2.4 frames in order of descending preference.
-	for _, id := range []string{"TDOR", "TDRC", "TDRL"} {
-		val, err := getFrame(id)
-		if err != nil {
+func getSongDate(tag taglib.GenericTag) (time.Time, error) {
+	for _, tt := range []mpeg.TimeType{
+		mpeg.OriginalReleaseTime,
+		mpeg.RecordingTime,
+		mpeg.ReleaseTime,
+	} {
+		if tm, err := mpeg.GetID3v2Time(tag, tt); err != nil {
 			return time.Time{}, err
-		} else if len(val) < 4 {
-			continue
-		}
-
-		// Section 4 of https://id3.org/id3v2.4.0-structure:
-		//   The timestamp fields are based on a subset of ISO 8601. When being as precise as
-		//   possible the format of a time string is yyyy-MM-ddTHH:mm:ss (year, "-", month, "-",
-		//   day, "T", hour (out of 24), ":", minutes, ":", seconds), but the precision may be
-		//   reduced by removing as many time indicators as wanted. Hence valid timestamps are yyyy,
-		//   yyyy-MM, yyyy-MM-dd, yyyy-MM-ddTHH, yyyy-MM-ddTHH:mm and yyyy-MM-ddTHH:mm:ss. All time
-		//   stamps are UTC. For durations, use the slash character as described in 8601, and for
-		//   multiple non-contiguous dates, use multiple strings, if allowed by the frame
-		//   definition.
-		for _, layout := range []string{
-			"2006-01-02T15:04:05",
-			"2006-01-02T15:04",
-			"2006-01-02T15",
-			"2006-01-02",
-			"2006-01",
-			"2006",
-		} {
-			if t, err := time.Parse(layout, val); err == nil {
-				return t, nil
-			}
+		} else if !tm.Empty() {
+			return tm.Time(), nil
 		}
 	}
-
-	// Fall back to v2.3.
-	if y, err := getFrame("TYER"); err != nil {
-		return time.Time{}, err
-	} else if len(y) == 4 {
-		if md, err := getFrame("TDAT"); err != nil {
-			return time.Time{}, err
-		} else if len(md) == 4 {
-			if t, err := time.Parse("20060102", y+md); err == nil {
-				return t, nil
-			}
-		}
-		if t, err := time.Parse("2006", y); err == nil {
-			return t, nil
-		}
-	}
-
 	return time.Time{}, nil
 }
 

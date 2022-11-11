@@ -223,35 +223,4 @@ func TestScanAndCompareSongs_NewFiles(t *testing.T) {
 	}
 }
 
-func TestGetSongDate(t *testing.T) {
-	type fmap map[string]string // id to value
-	for _, tc := range []struct {
-		frames fmap
-		want   string
-	}{
-		{fmap{"TDRC": "2022-04-25T23:14:06"}, "2022-04-25T23:14:06"},
-		{fmap{"TDRC": "2022-04-25T23:14"}, "2022-04-25T23:14:00"},
-		{fmap{"TDRC": "2022-04-25T23"}, "2022-04-25T23:00:00"},
-		{fmap{"TDRC": "2022-04-25"}, "2022-04-25T00:00:00"},
-		{fmap{"TDRC": "2022-04"}, "2022-04-01T00:00:00"},
-		{fmap{"TDRC": "2022"}, "2022-01-01T00:00:00"},
-		{fmap{"TDOR": "1965", "TDRC": "2022-04-25"}, "1965-01-01T00:00:00"},
-		{fmap{"TDOR": "2001-01-25", "TDRC": "2001"}, "2001-01-25T00:00:00"},
-		{fmap{"TDOR": "2001-01-25", "TDRL": "2001"}, "2001-01-25T00:00:00"},
-		{fmap{"TDRL": "2021"}, "2021-01-01T00:00:00"},
-		{fmap{"TYER": "2021"}, "2021-01-01T00:00:00"},
-		{fmap{"TYER": "2021", "TDAT": "1126"}, "2021-11-26T00:00:00"},
-		{fmap{"TDAT": "1126"}, "0001-01-01T00:00:00"},
-		{fmap{}, "0001-01-01T00:00:00"},
-	} {
-		if tm, err := getSongDate(func(id string) (string, error) {
-			return tc.frames[id], nil
-		}); err != nil {
-			t.Errorf("getSongDate for %v failed: %v", tc.frames, err)
-		} else if got := tm.Format("2006-01-02T15:04:05"); got != tc.want {
-			t.Errorf("getSongDate for %v returned %q; want %q", tc.frames, got, tc.want)
-		}
-	}
-}
-
 // TODO: Test errors, skipping bogus files, etc.

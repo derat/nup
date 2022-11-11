@@ -8,7 +8,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/derat/nup/cmd/nup/mpeg"
+	"github.com/derat/mpeg"
 	"github.com/derat/taglib-go/taglib"
 	"github.com/derat/taglib-go/taglib/id3"
 )
