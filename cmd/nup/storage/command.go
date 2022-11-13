@@ -61,7 +61,7 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	f.IntVar(&cmd.ratingCutoff, "rating-cutoff", 4, "Minimum song rating for standard storage class")
 }
 
-func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
+func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	if cmd.bucketName == "" {
 		fmt.Fprintln(os.Stderr, "Must supply bucket name with -bucket")
 		return subcommands.ExitUsageError

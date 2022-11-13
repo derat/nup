@@ -37,7 +37,7 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&cmd.mpeg, "mpeg", false, "Read MPEG frames and print size/duration info")
 }
 
-func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
+func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	if fs.NArg() < 1 {
 		fmt.Fprintln(os.Stderr, cmd.Usage())
 		return subcommands.ExitUsageError

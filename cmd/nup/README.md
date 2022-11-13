@@ -104,7 +104,7 @@ covers [flags]:
   -cover-dir string
     	Directory containing cover images
   -download
-    	Download covers for dumped songs read from stdin to -cover-dir
+    	Download covers for dumped songs read from stdin or positional song files to -cover-dir
   -download-size int
     	Image size to download (250, 500, or 1200) (default 1200)
   -generate-webp

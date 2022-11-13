@@ -57,14 +57,15 @@ func (*Command) Usage() string {
 
 func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&cmd.coverDir, "cover-dir", "", "Directory containing cover images")
-	f.BoolVar(&cmd.download, "download", false, "Download covers for dumped songs read from stdin to -cover-dir")
+	f.BoolVar(&cmd.download, "download", false,
+		"Download covers for dumped songs read from stdin or positional song files to -cover-dir")
 	f.IntVar(&cmd.size, "download-size", 1200, "Image size to download (250, 500, or 1200)")
 	f.BoolVar(&cmd.generateWebP, "generate-webp", false, "Generate WebP versions of covers in -cover-dir")
 	f.IntVar(&cmd.maxSongs, "max-downloads", -1, "Maximum number of songs to inspect for -download")
 	f.IntVar(&cmd.maxRequests, "max-requests", 2, "Maximum number of parallel HTTP requests for -download")
 }
 
-func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interface{}) subcommands.ExitStatus {
+func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	if cmd.coverDir == "" {
 		fmt.Fprintln(os.Stderr, "-cover-dir must be supplied")
 		return subcommands.ExitUsageError
@@ -72,7 +73,7 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interf
 
 	switch {
 	case cmd.download:
-		if err := cmd.doDownload(args); err != nil {
+		if err := cmd.doDownload(fs.Args()); err != nil {
 			fmt.Fprintln(os.Stderr, "Failed downloading covers:", err)
 			return subcommands.ExitFailure
 		}
@@ -89,18 +90,16 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, args ...interf
 	}
 }
 
-// TODO: Document that -download also accepts song filenames via positional arguments,
-// or just delete this behavior.
-func (cmd *Command) doDownload(args []interface{}) error {
+func (cmd *Command) doDownload(paths []string) error {
 	albumIDs := make([]string, 0)
-	if len(args) > 0 {
-		ids := make(map[string]bool)
-		for _, p := range args {
-			if id, err := readSong(p.(string)); err != nil {
+	if len(paths) > 0 {
+		ids := make(map[string]struct{})
+		for _, p := range paths {
+			if id, err := readSong(p); err != nil {
 				return err
 			} else if len(id) > 0 {
 				log.Printf("%v has album ID %v", p, id)
-				ids[id] = true
+				ids[id] = struct{}{}
 			}
 		}
 		for id, _ := range ids {
