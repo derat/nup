@@ -19,7 +19,8 @@ import (
 	"strings"
 
 	"github.com/derat/nup/cmd/nup/client"
-	srvcover "github.com/derat/nup/server/cover"
+	"github.com/derat/nup/cmd/nup/client/files"
+	"github.com/derat/nup/server/cover"
 	"github.com/derat/nup/server/db"
 	"github.com/google/subcommands"
 )
@@ -154,7 +155,7 @@ func checkSongs(songs []*db.Song, musicDir, coverDir string, settings checkSetti
 				if len(s.AlbumID) == 0 {
 					return errors.New("no cover file set and no album ID")
 				}
-				fn := s.AlbumID + ".jpg"
+				fn := s.AlbumID + cover.OrigExt
 				if fileExists(fn) {
 					return fmt.Errorf("no cover file set but %v exists", fn)
 				}
@@ -183,7 +184,7 @@ func checkSongs(songs []*db.Song, musicDir, coverDir string, settings checkSetti
 			if err != nil {
 				return err
 			}
-			if !fi.Mode().IsRegular() || !client.IsMusicPath(path) {
+			if !fi.Mode().IsRegular() || !files.IsMusicPath(path) {
 				return nil
 			}
 			pre := musicDir + "/"
@@ -224,7 +225,7 @@ func checkCovers(songs []*db.Song, coverDir string, settings checkSettings) erro
 	fs := [](func(fn string) error){
 		func(fn string) error {
 			// Check for the original cover if this is a generated WebP image.
-			fn = srvcover.OrigFilename(fn)
+			fn = cover.OrigFilename(fn)
 			if _, ok := songFns[fn]; !ok {
 				return errors.New("unused cover")
 			}

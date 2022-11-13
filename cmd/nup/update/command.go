@@ -15,7 +15,9 @@ import (
 	"time"
 
 	"github.com/derat/nup/cmd/nup/client"
+	"github.com/derat/nup/cmd/nup/client/files"
 	"github.com/derat/nup/cmd/nup/mp3gain"
+	"github.com/derat/nup/server/cover"
 	"github.com/derat/nup/server/db"
 	"github.com/google/subcommands"
 )
@@ -138,15 +140,13 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 		// Not all these options will necessarily be used (e.g. readSongList doesn't need forceGlob
 		// or logProgress), but it doesn't hurt to pass them.
 		opts := scanOptions{
-			computeGain:     cmd.Cfg.ComputeGain,
 			forceGlob:       cmd.forceGlob,
 			logProgress:     true,
-			artistRewrites:  cmd.Cfg.ArtistRewrites,
 			dumpedGainsPath: cmd.dumpedGainsFile,
 		}
 
 		if len(cmd.songPathsFile) > 0 {
-			numSongs, err = readSongList(cmd.songPathsFile, cmd.Cfg.MusicDir, readChan, &opts)
+			numSongs, err = readSongList(cmd.Cfg, cmd.songPathsFile, readChan, &opts)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "Failed reading song list:", err)
 				return subcommands.ExitFailure
@@ -162,8 +162,7 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 				return subcommands.ExitFailure
 			}
 			log.Printf("Scanning for songs in %v updated since %v", cmd.Cfg.MusicDir, info.Time.Local())
-			numSongs, scannedDirs, err = scanForUpdatedSongs(
-				cmd.Cfg.MusicDir, info.Time, info.Dirs, readChan, &opts)
+			numSongs, scannedDirs, err = scanForUpdatedSongs(cmd.Cfg, info.Time, info.Dirs, readChan, &opts)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "Scanning failed:", err)
 				return subcommands.ExitFailure
@@ -320,12 +319,10 @@ func (cmd *Command) doMergeSongs() subcommands.ExitStatus {
 }
 
 func (cmd *Command) doPrintCoverID() subcommands.ExitStatus {
-	fi, err := os.Stat(cmd.printCoverID)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed stat:", err)
-		return subcommands.ExitFailure
-	}
-	s, err := readSong(cmd.printCoverID, "", fi, true /* onlyTags */, nil, nil)
+	// Just set the file's directory as the music dir so that ReadSong won't
+	// fail when computing a relative path (which we don't use anyway).
+	cmd.Cfg.MusicDir = filepath.Dir(cmd.printCoverID)
+	s, err := files.ReadSong(cmd.Cfg, cmd.printCoverID, nil, true /* onlyTags */, nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed reading song:", err)
 		return subcommands.ExitFailure
@@ -419,8 +416,7 @@ func getCoverIDs(song *db.Song) []string {
 // getCoverFilename returns the relative path under dir for song's cover image.
 func getCoverFilename(dir string, song *db.Song) string {
 	for _, id := range getCoverIDs(song) {
-		// TODO: Support other image formats, maybe (server will also need to be updated).
-		fn := id + ".jpg"
+		fn := id + cover.OrigExt
 		if _, err := os.Stat(filepath.Join(dir, fn)); err == nil {
 			return fn
 		}

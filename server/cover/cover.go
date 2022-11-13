@@ -107,6 +107,9 @@ func cacheKey(fn string, size int, it imageType) string {
 	return key + fn
 }
 
+// OrigExt is the extension for original (non-WebP) cover images.
+const OrigExt = ".jpg"
+
 // WebPSizes contains the sizes for which WebP versions of images can be requested.
 // See the package comment for the origin of these numbers.
 var WebPSizes = []int{256, 512}
@@ -115,7 +118,7 @@ var WebPSizes = []int{256, 512}
 // file fn scaled to the specified size. fn can be a full path.
 // Given fn "foo/bar.jpg" and size 256, returns "foo/bar.256.webp".
 func WebPFilename(fn string, size int) string {
-	if strings.HasSuffix(fn, ".jpg") {
+	if strings.HasSuffix(fn, OrigExt) {
 		fn = fn[:len(fn)-4]
 	}
 	return fmt.Sprintf("%s.%d.webp", fn, size)
@@ -131,7 +134,7 @@ func OrigFilename(fn string) string {
 	if ms == nil {
 		return fn
 	}
-	return ms[1] + ".jpg"
+	return ms[1] + OrigExt
 }
 
 // Scale reads the cover image at fn (corresponding to Song.CoverFilename),

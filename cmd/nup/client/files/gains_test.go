@@ -1,12 +1,13 @@
 // Copyright 2022 Daniel Erat.
 // All rights reserved.
 
-package update
+package files
 
 import (
 	"path/filepath"
 	"testing"
 
+	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/cmd/nup/mp3gain"
 	"github.com/derat/nup/test"
 )
@@ -31,9 +32,10 @@ func TestGainsCache(t *testing.T) {
 	mp3gain.SetInfoForTest(&info)
 	defer mp3gain.SetInfoForTest(nil)
 
-	gc, err := newGainsCache("", "")
+	cfg := client.Config{MusicDir: dir}
+	gc, err := NewGainsCache(&cfg, "")
 	if err != nil {
-		t.Fatal("newGainsCache failed: ", err)
+		t.Fatal("NewGainsCache failed: ", err)
 	}
 
 	// Compute adjustments for a song.

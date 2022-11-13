@@ -21,17 +21,13 @@ import (
 	"sync"
 
 	"github.com/derat/nup/cmd/nup/client"
-	srvcover "github.com/derat/nup/server/cover"
+	"github.com/derat/nup/cmd/nup/client/files"
+	"github.com/derat/nup/server/cover"
 	"github.com/derat/nup/server/db"
-	"github.com/derat/taglib-go/taglib"
 	"github.com/google/subcommands"
 )
 
-const (
-	logInterval = 100
-	albumIDTag  = "MusicBrainz Album Id"
-	coverExt    = ".jpg"
-)
+const logInterval = 100
 
 type Command struct {
 	Cfg *client.Config
@@ -95,11 +91,13 @@ func (cmd *Command) doDownload(paths []string) error {
 	if len(paths) > 0 {
 		ids := make(map[string]struct{})
 		for _, p := range paths {
-			if id, err := readSong(p); err != nil {
+			// Pass a bogus config in case p isn't within cmd.Cfg.MusicDir.
+			cfg := client.Config{MusicDir: filepath.Dir(p)}
+			if s, err := files.ReadSong(&cfg, p, nil, true /* onlyTags */, nil); err != nil {
 				return err
-			} else if len(id) > 0 {
-				log.Printf("%v has album ID %v", p, id)
-				ids[id] = struct{}{}
+			} else if s.AlbumID != "" {
+				log.Printf("%v has album ID %v", p, s.AlbumID)
+				ids[s.AlbumID] = struct{}{}
 			}
 		}
 		for id, _ := range ids {
@@ -123,14 +121,14 @@ func (cmd *Command) doGenerateWebP() error {
 		if err != nil {
 			return err
 		}
-		if !fi.Mode().IsRegular() || !strings.HasSuffix(p, coverExt) {
+		if !fi.Mode().IsRegular() || !strings.HasSuffix(p, cover.OrigExt) {
 			return nil
 		}
 
 		var width, height int
-		for _, size := range srvcover.WebPSizes {
+		for _, size := range cover.WebPSizes {
 			// Skip this size if we already have it and it's up-to-date.
-			gp := srvcover.WebPFilename(p, size)
+			gp := cover.WebPFilename(p, size)
 			if gfi, err := os.Stat(gp); err == nil && !fi.ModTime().After(gfi.ModTime()) {
 				continue
 			}
@@ -194,25 +192,6 @@ func writeWebP(srcPath string, destPath string, srcWidth, srcHeight int, destSiz
 	return err
 }
 
-// TODO: This code... isn't great. Make it share more with the update subcommand?
-func readSong(path string) (albumID string, err error) {
-	fi, err := os.Stat(path)
-	if err != nil {
-		return "", err
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	tag, err := taglib.Decode(f, fi.Size())
-	if err != nil {
-		return "", err
-	}
-	return tag.CustomFrames()[albumIDTag], nil
-}
-
 func readDumpedSongs(r io.Reader, coverDir string, maxSongs int) (albumIDs []string, err error) {
 	missingAlbumIDs := make(map[string]struct{})
 	d := json.NewDecoder(r)
@@ -240,7 +219,7 @@ func readDumpedSongs(r io.Reader, coverDir string, maxSongs int) (albumIDs []str
 		}
 
 		// Check if we already have the cover.
-		if _, err := os.Stat(filepath.Join(coverDir, s.AlbumID+coverExt)); err == nil {
+		if _, err := os.Stat(filepath.Join(coverDir, s.AlbumID+cover.OrigExt)); err == nil {
 			continue
 		}
 
@@ -276,7 +255,7 @@ func downloadCover(albumID, dir string, size int) (path string, err error) {
 	}
 	defer resp.Body.Close()
 
-	path = filepath.Join(dir, albumID+coverExt)
+	path = filepath.Join(dir, albumID+cover.OrigExt)
 	f, err := os.Create(path)
 	if err != nil {
 		return "", err

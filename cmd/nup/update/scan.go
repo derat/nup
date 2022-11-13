@@ -10,22 +10,15 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"syscall"
 	"time"
 
-	"github.com/derat/mpeg"
 	"github.com/derat/nup/cmd/nup/client"
+	"github.com/derat/nup/cmd/nup/client/files"
 	"github.com/derat/nup/server/db"
-	"github.com/derat/taglib-go/taglib"
 )
 
 const (
-	albumIDTag          = "MusicBrainz Album Id"   // usually used as cover ID
-	coverIDTag          = "nup Cover Id"           // can be set for non-MusicBrainz tracks
-	recordingIDOwner    = "http://musicbrainz.org" // UFID for Song.RecordingID
-	nonAlbumTracksValue = "[non-album tracks]"     // MusicBrainz/Picard album name
-
 	// Maximum number of songs to read at once. This needs to not be too high to avoid
 	// running out of FDs when readSong calls block on computing gain adjustments (my system
 	// has a default soft limit of 1024 per "ulimit -Sn"), but it should also be high enough
@@ -36,122 +29,11 @@ const (
 	logProgressInterval = 100
 )
 
-// readSong creates a Song for the file at the supplied path.
-// If onlyTags is true, only fields derived from the file's MP3 tags will be filled.
-func readSong(path, relPath string, fi os.FileInfo, onlyTags bool,
-	opts *scanOptions, gains *gainsCache) (*db.Song, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	s := db.Song{Filename: relPath}
-
-	var headerLen, footerLen int64
-
-	if tag, err := mpeg.ReadID3v1Footer(f, fi); err != nil {
-		return nil, err
-	} else if tag != nil {
-		footerLen = mpeg.ID3v1Length
-		s.Artist = tag.Artist
-		s.Title = tag.Title
-		s.Album = tag.Album
-		if year, err := strconv.Atoi(tag.Year); err == nil {
-			s.Date = time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-		}
-	}
-
-	if tag, err := taglib.Decode(f, fi.Size()); err != nil {
-		// Tolerate missing ID3v2 tags if we got an artist and title from ID3v1.
-		if len(s.Artist) == 0 && len(s.Title) == 0 {
-			return nil, err
-		}
-	} else {
-		s.Artist = tag.Artist()
-		s.Title = tag.Title()
-		s.Album = tag.Album()
-		s.AlbumID = tag.CustomFrames()[albumIDTag]
-		s.CoverID = tag.CustomFrames()[coverIDTag]
-		s.RecordingID = tag.UniqueFileIdentifiers()[recordingIDOwner]
-		s.Track = int(tag.Track())
-		s.Disc = int(tag.Disc())
-		headerLen = int64(tag.TagSize())
-
-		if date, err := getSongDate(tag); err != nil {
-			return nil, err
-		} else if !date.IsZero() {
-			s.Date = date
-		}
-
-		// ID3 v2.4 defines TPE2 (Band/orchestra/accompaniment) as
-		// "additional information about the performers in the recording".
-		// Only save the album artist if it's different from the track artist.
-		if aa, err := mpeg.GetID3v2TextFrame(tag, "TPE2"); err != nil {
-			return nil, err
-		} else if aa != s.Artist {
-			s.AlbumArtist = aa
-		}
-
-		// Some old files might be missing the TPOS "part of set" frame.
-		// Assume that they're from a single-disc album in that case:
-		// https://github.com/derat/nup/issues/37
-		if s.Disc == 0 && s.Track > 0 && s.Album != nonAlbumTracksValue {
-			s.Disc = 1
-		}
-	}
-
-	if onlyTags {
-		return &s, nil
-	}
-
-	if repl, ok := opts.artistRewrites[s.Artist]; ok {
-		s.Artist = repl
-	}
-
-	s.SHA1, err = mpeg.ComputeAudioSHA1(f, fi, headerLen, footerLen)
-	if err != nil {
-		return nil, err
-	}
-	dur, _, _, err := mpeg.ComputeAudioDuration(f, fi, headerLen, footerLen)
-	if err != nil {
-		return nil, err
-	}
-	s.Length = dur.Seconds()
-
-	if opts.computeGain {
-		gain, err := gains.get(path, s.Album, s.AlbumID)
-		if err != nil {
-			return nil, err
-		}
-		s.TrackGain = gain.TrackGain
-		s.AlbumGain = gain.AlbumGain
-		s.PeakAmp = gain.PeakAmp
-	}
-
-	return &s, nil
-}
-
-// getSongDate tries to extract a song's release or recording date.
-func getSongDate(tag taglib.GenericTag) (time.Time, error) {
-	for _, tt := range []mpeg.TimeType{
-		mpeg.OriginalReleaseTime,
-		mpeg.RecordingTime,
-		mpeg.ReleaseTime,
-	} {
-		if tm, err := mpeg.GetID3v2Time(tag, tt); err != nil {
-			return time.Time{}, err
-		} else if !tm.Empty() {
-			return tm.Time(), nil
-		}
-	}
-	return time.Time{}, nil
-}
-
-// readSongList reads a list of relative (to musicDir) paths from listPath
+// readSongList reads a list of relative (to cfg.MusicDir) paths from listPath
 // and asynchronously sends the resulting Song structs to ch.
 // The number of songs that will be sent to the channel is returned.
-func readSongList(listPath, musicDir string, ch chan songOrErr, opts *scanOptions) (numSongs int, err error) {
+func readSongList(cfg *client.Config, listPath string, ch chan songOrErr,
+	opts *scanOptions) (numSongs int, err error) {
 	f, err := os.Open(listPath)
 	if err != nil {
 		return 0, err
@@ -168,7 +50,7 @@ func readSongList(listPath, musicDir string, ch chan songOrErr, opts *scanOption
 		return 0, err
 	}
 
-	gains, err := newGainsCache(opts.dumpedGainsPath, musicDir)
+	gains, err := files.NewGainsCache(cfg, opts.dumpedGainsPath)
 	if err != nil {
 		return 0, err
 	}
@@ -176,13 +58,9 @@ func readSongList(listPath, musicDir string, ch chan songOrErr, opts *scanOption
 	// Now read the files asynchronously (but one at a time).
 	go func() {
 		for _, rel := range paths {
-			full := filepath.Join(musicDir, rel)
-			if fi, err := os.Stat(full); err != nil {
-				ch <- songOrErr{nil, err}
-			} else {
-				s, err := readSong(full, rel, fi, false, opts, gains)
-				ch <- songOrErr{s, err}
-			}
+			full := filepath.Join(cfg.MusicDir, rel)
+			s, err := files.ReadSong(cfg, full, nil, false, gains)
+			ch <- songOrErr{s, err}
 		}
 	}()
 
@@ -192,20 +70,18 @@ func readSongList(listPath, musicDir string, ch chan songOrErr, opts *scanOption
 // scanOptions contains options for scanForUpdatedSongs and readSongList.
 // Some of the options aren't used by readSongList.
 type scanOptions struct {
-	computeGain     bool              // use mp3gain to compute gain adjustments
-	forceGlob       string            // glob matching files to update even if unchanged
-	logProgress     bool              // periodically log progress while scanning
-	artistRewrites  map[string]string // artist names from tags to rewrite
-	dumpedGainsPath string            // file with JSON-marshaled db.Song objects
+	forceGlob       string // glob matching files to update even if unchanged
+	logProgress     bool   // periodically log progress while scanning
+	dumpedGainsPath string // file with JSON-marshaled db.Song objects
 }
 
-// scanForUpdatedSongs looks for songs under musicDir updated more recently than lastUpdateTime or
+// scanForUpdatedSongs looks for songs under cfg.MusicDir updated more recently than lastUpdateTime or
 // in directories not listed in lastUpdateDirs and asynchronously sends the resulting Song structs
 // to ch. The number of songs that will be sent to the channel and seen directories (relative to
 // musicDir) are returned.
-func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDirs []string,
+func scanForUpdatedSongs(cfg *client.Config, lastUpdateTime time.Time, lastUpdateDirs []string,
 	ch chan songOrErr, opts *scanOptions) (numUpdates int, seenDirs []string, err error) {
-	var numMP3s int // total number of songs under musicDir
+	var numSongs int // total number of songs under cfg.MusicDir
 
 	oldDirs := make(map[string]struct{}, len(lastUpdateDirs))
 	for _, d := range lastUpdateDirs {
@@ -213,27 +89,27 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDi
 	}
 	newDirs := make(map[string]struct{})
 
-	gains, err := newGainsCache(opts.dumpedGainsPath, musicDir)
+	gains, err := files.NewGainsCache(cfg, opts.dumpedGainsPath)
 	if err != nil {
 		return 0, nil, err
 	}
 
 	workers := make(chan struct{}, maxScanWorkers)
-	if err := filepath.Walk(musicDir, func(path string, fi os.FileInfo, err error) error {
+	if err := filepath.Walk(cfg.MusicDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if !fi.Mode().IsRegular() || !client.IsMusicPath(path) {
+		if !fi.Mode().IsRegular() || !files.IsMusicPath(path) {
 			return nil
 		}
-		relPath, err := filepath.Rel(musicDir, path)
+		relPath, err := filepath.Rel(cfg.MusicDir, path)
 		if err != nil {
-			return fmt.Errorf("%q isn't subpath of %q: %v", path, musicDir, err)
+			return fmt.Errorf("%q isn't subpath of %q: %v", path, cfg.MusicDir, err)
 		}
 
-		numMP3s++
-		if opts.logProgress && numMP3s%logProgressInterval == 0 {
-			log.Printf("Scanned %v files", numMP3s)
+		numSongs++
+		if opts.logProgress && numSongs%logProgressInterval == 0 {
+			log.Printf("Scanned %v files", numSongs)
 		}
 
 		relDir := filepath.Dir(relPath)
@@ -268,7 +144,7 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDi
 		go func() {
 			// Avoid having too many parallel readSong calls, as we can run out of FDs.
 			workers <- struct{}{}
-			s, err := readSong(path, relPath, fi, false, opts, gains)
+			s, err := files.ReadSong(cfg, path, fi, false, gains)
 			<-workers
 			if err != nil && s == nil {
 				s = &db.Song{Filename: relPath} // return the filename for error reporting
@@ -283,7 +159,7 @@ func scanForUpdatedSongs(musicDir string, lastUpdateTime time.Time, lastUpdateDi
 	}
 
 	if opts.logProgress {
-		log.Printf("Found %v update(s) among %v files", numUpdates, numMP3s)
+		log.Printf("Found %v update(s) among %v files", numUpdates, numSongs)
 	}
 	for d := range newDirs {
 		seenDirs = append(seenDirs, d)

@@ -1,7 +1,7 @@
 // Copyright 2022 Daniel Erat.
 // All rights reserved.
 
-package update
+package files
 
 import (
 	"encoding/json"
@@ -17,25 +17,28 @@ import (
 	"github.com/derat/nup/server/db"
 )
 
-// gainsCache computes and stores gain adjustments for MP3 files.
+// GainsCache is passed to ReadSong to compute gain adjustments for MP3 files.
 //
 // Gain adjustments need to be computed across entire albums, so adjustments are cached
 // so they won't need to be computed multiple times.
-type gainsCache struct {
+type GainsCache struct {
+	cfg    *client.Config
 	dumped map[string]mp3gain.Info // read from dumped db.Songs
 	cache  *client.TaskCache       // computes and stores gain adjustments
 }
 
-// newGainsCache returns a new gainsCache.
+// NewGainsCache returns a new GainsCache.
 //
 // If dumpPath is non-empty, db.Song objects are JSON-unmarshaled from it to initialize the cache
-// with previously-computed gain adjustments. In this case, musicDir should also contain the base
-// music directory (needed since db.Song only contains relative paths).
-func newGainsCache(dumpPath, musicDir string) (*gainsCache, error) {
+// with previously-computed gain adjustments.
+func NewGainsCache(cfg *client.Config, dumpPath string) (*GainsCache, error) {
 	// mp3gain doesn't seem to take advantage of multiple cores, so run multiple copies in parallel:
 	//  https://hydrogenaud.io/index.php?topic=72197.0
 	//  https://sound.stackexchange.com/questions/33069/multi-core-batch-volume-gain
-	gc := gainsCache{cache: client.NewTaskCache(runtime.NumCPU())}
+	gc := GainsCache{
+		cfg:   cfg,
+		cache: client.NewTaskCache(runtime.NumCPU()),
+	}
 
 	if dumpPath != "" {
 		gc.dumped = make(map[string]mp3gain.Info)
@@ -57,7 +60,7 @@ func newGainsCache(dumpPath, musicDir string) (*gainsCache, error) {
 			if s.TrackGain == 0 && s.AlbumGain == 0 && s.PeakAmp == 0 {
 				return nil, fmt.Errorf("missing gain info for %q", s.Filename)
 			}
-			gc.dumped[filepath.Join(musicDir, s.Filename)] = mp3gain.Info{
+			gc.dumped[filepath.Join(cfg.MusicDir, s.Filename)] = mp3gain.Info{
 				TrackGain: s.TrackGain,
 				AlbumGain: s.AlbumGain,
 				PeakAmp:   s.PeakAmp,
@@ -72,7 +75,7 @@ func newGainsCache(dumpPath, musicDir string) (*gainsCache, error) {
 //
 // album and albumID correspond to p and are used to process additional
 // songs from the same album in the directory.
-func (gc *gainsCache) get(p, album, albumID string) (mp3gain.Info, error) {
+func (gc *GainsCache) get(p, album, albumID string) (mp3gain.Info, error) {
 	// If we already loaded this file's adjustments from a dump, use them.
 	if info, ok := gc.dumped[p]; ok {
 		return info, nil
@@ -96,15 +99,13 @@ func (gc *gainsCache) get(p, album, albumID string) (mp3gain.Info, error) {
 	info, err := gc.cache.Get(p, key, func() (map[string]interface{}, error) {
 		var paths []string
 		if hasAlbum {
-			dirPaths, err := filepath.Glob(filepath.Join(dir, "*.[mM][pP]3")) // case-insensitive
+			entries, err := os.ReadDir(dir)
 			if err != nil {
 				return nil, err
 			}
-			for _, p := range dirPaths {
-				fi, err := os.Stat(p)
-				if err != nil {
-					return nil, err
-				} else if !fi.Mode().IsRegular() {
+			for _, entry := range entries {
+				p := filepath.Join(dir, entry.Name())
+				if !IsMusicPath(p) || !entry.Type().IsRegular() {
 					continue
 				}
 				// TODO: Consider caching tags somewhere since we're also reading them in the
@@ -113,7 +114,7 @@ func (gc *gainsCache) get(p, album, albumID string) (mp3gain.Info, error) {
 				// scheme of things.
 				// I'm ignoring errors here since it's weird if we fail to add a new song because
 				// some other song in the same directory is broken.
-				s, err := readSong(p, "", fi, true /* onlyTags */, nil, nil)
+				s, err := ReadSong(gc.cfg, p, nil, true /* onlyTags */, nil)
 				if err == nil && s.Album == album && s.AlbumID == albumID {
 					paths = append(paths, p)
 				}

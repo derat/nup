@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/test"
 )
@@ -31,13 +32,24 @@ func getSongsFromChannel(ch chan songOrErr, num int) ([]db.Song, error) {
 	return songs, nil
 }
 
+type scanTestOptions struct {
+	artistRewrites map[string]string // client.Config.ArtistRewrites
+	lastUpdateDirs []string          // scanForUpdatedSongs lastUpdateDirs param
+	forceGlob      string            // scanOptions.forceGlob
+}
+
 func scanAndCompareSongs(t *testing.T, desc, dir string, lastUpdateTime time.Time,
-	lastUpdateDirs []string, opts *scanOptions, expected []db.Song) (dirs []string) {
-	if opts == nil {
-		opts = &scanOptions{}
+	testOpts *scanTestOptions, expected []db.Song) (dirs []string) {
+	cfg := &client.Config{MusicDir: dir}
+	opts := &scanOptions{}
+	var lastUpdateDirs []string
+	if testOpts != nil {
+		cfg.ArtistRewrites = testOpts.artistRewrites
+		opts.forceGlob = testOpts.forceGlob
+		lastUpdateDirs = testOpts.lastUpdateDirs
 	}
 	ch := make(chan songOrErr)
-	num, dirs, err := scanForUpdatedSongs(dir, lastUpdateTime, lastUpdateDirs, ch, opts)
+	num, dirs, err := scanForUpdatedSongs(cfg, lastUpdateTime, lastUpdateDirs, ch, opts)
 	if err != nil {
 		t.Errorf("%v: %v", desc, err)
 		return dirs
@@ -58,11 +70,9 @@ func scanAndCompareSongs(t *testing.T, desc, dir string, lastUpdateTime time.Tim
 					return dirs
 				}
 				expected[i].Rating = 0
-				if !opts.computeGain {
-					expected[i].TrackGain = 0
-					expected[i].AlbumGain = 0
-					expected[i].PeakAmp = 0
-				}
+				expected[i].TrackGain = 0
+				expected[i].AlbumGain = 0
+				expected[i].PeakAmp = 0
 				break
 			}
 		}
@@ -80,19 +90,19 @@ func TestScanAndCompareSongs(t *testing.T) {
 	dir := t.TempDir()
 	test.Must(t, test.CopySongs(dir, test.Song0s.Filename, test.Song1s.Filename))
 	startTime := time.Now()
-	scanAndCompareSongs(t, "initial", dir, time.Time{}, nil, nil, []db.Song{test.Song0s, test.Song1s})
-	scanAndCompareSongs(t, "unchanged", dir, startTime, nil, nil, []db.Song{})
+	scanAndCompareSongs(t, "initial", dir, time.Time{}, nil, []db.Song{test.Song0s, test.Song1s})
+	scanAndCompareSongs(t, "unchanged", dir, startTime, nil, []db.Song{})
 
 	test.Must(t, test.CopySongs(dir, test.Song5s.Filename))
 	addTime := time.Now()
-	scanAndCompareSongs(t, "add", dir, startTime, nil, nil, []db.Song{test.Song5s})
+	scanAndCompareSongs(t, "add", dir, startTime, nil, []db.Song{test.Song5s})
 
 	if err := os.Remove(filepath.Join(dir, test.Song0s.Filename)); err != nil {
 		t.Fatal("Failed removing song: ", err)
 	}
 	test.Must(t, test.CopySongs(dir, test.Song0sUpdated.Filename))
 	updateTime := time.Now()
-	scanAndCompareSongs(t, "update", dir, addTime, nil, nil, []db.Song{test.Song0sUpdated})
+	scanAndCompareSongs(t, "update", dir, addTime, nil, []db.Song{test.Song0sUpdated})
 
 	subdir := filepath.Join(dir, "foo")
 	if err := os.Mkdir(subdir, 0700); err != nil {
@@ -108,16 +118,18 @@ func TestScanAndCompareSongs(t *testing.T) {
 	}
 	renamedSong1s := test.Song1s
 	renamedSong1s.Filename = filepath.Join(filepath.Base(subdir), test.Song1s.Filename)
-	scanAndCompareSongs(t, "rename", dir, updateTime, nil, nil, []db.Song{renamedSong1s})
+	scanAndCompareSongs(t, "rename", dir, updateTime, nil, []db.Song{renamedSong1s})
 
-	scanAndCompareSongs(t, "force exact", dir, updateTime, nil, &scanOptions{forceGlob: test.Song0sUpdated.Filename},
+	scanAndCompareSongs(t, "force exact", dir, updateTime,
+		&scanTestOptions{forceGlob: test.Song0sUpdated.Filename},
 		[]db.Song{test.Song0sUpdated})
-	scanAndCompareSongs(t, "force wildcard", dir, updateTime, nil, &scanOptions{forceGlob: "foo/*"},
+	scanAndCompareSongs(t, "force wildcard", dir, updateTime,
+		&scanTestOptions{forceGlob: "foo/*"},
 		[]db.Song{renamedSong1s})
 
 	updateTime = time.Now()
 	test.Must(t, test.CopySongs(dir, test.ID3V1Song.Filename))
-	scanAndCompareSongs(t, "id3v1", dir, updateTime, nil, nil, []db.Song{test.ID3V1Song})
+	scanAndCompareSongs(t, "id3v1", dir, updateTime, nil, []db.Song{test.ID3V1Song})
 }
 
 func TestScanAndCompareSongs_Rewrite(t *testing.T) {
@@ -127,9 +139,8 @@ func TestScanAndCompareSongs_Rewrite(t *testing.T) {
 	newSong1s.Artist = newArtist
 
 	test.Must(t, test.CopySongs(dir, test.Song1s.Filename, test.Song5s.Filename))
-	scanAndCompareSongs(t, "initial", dir, time.Time{}, nil,
-		&scanOptions{artistRewrites: map[string]string{test.Song1s.Artist: newSong1s.Artist}},
-		[]db.Song{newSong1s, test.Song5s})
+	opts := &scanTestOptions{artistRewrites: map[string]string{test.Song1s.Artist: newSong1s.Artist}}
+	scanAndCompareSongs(t, "initial", dir, time.Time{}, opts, []db.Song{newSong1s, test.Song5s})
 }
 
 func TestScanAndCompareSongs_NewFiles(t *testing.T) {
@@ -158,7 +169,7 @@ func TestScanAndCompareSongs_NewFiles(t *testing.T) {
 	}
 
 	startTime := time.Now()
-	origDirs := scanAndCompareSongs(t, "initial", musicDir, time.Time{}, nil, nil,
+	origDirs := scanAndCompareSongs(t, "initial", musicDir, time.Time{}, nil,
 		[]db.Song{gs(test.Song0s, filepath.Join(oldArtist, oldAlbum))})
 	if want := []string{filepath.Join(oldArtist, oldAlbum)}; !reflect.DeepEqual(origDirs, want) {
 		t.Errorf("scanAndCompareSongs(...) = %v; want %v", origDirs, want)
@@ -202,11 +213,13 @@ func TestScanAndCompareSongs_NewFiles(t *testing.T) {
 
 	// All three of the new songs should be seen.
 	updateTime := time.Now()
-	newDirs := scanAndCompareSongs(t, "updated", musicDir, startTime, origDirs, nil, []db.Song{
-		gs(test.Song1s, filepath.Join(oldArtist, oldAlbum)),
-		gs(test.Song5s, filepath.Join(oldArtist, newAlbum)),
-		gs(test.ID3V1Song, filepath.Join(newArtist, newAlbum)),
-	})
+	newDirs := scanAndCompareSongs(t, "updated", musicDir, startTime,
+		&scanTestOptions{lastUpdateDirs: origDirs},
+		[]db.Song{
+			gs(test.Song1s, filepath.Join(oldArtist, oldAlbum)),
+			gs(test.Song5s, filepath.Join(oldArtist, newAlbum)),
+			gs(test.ID3V1Song, filepath.Join(newArtist, newAlbum)),
+		})
 	allDirs := []string{
 		filepath.Join(newArtist, newAlbum),
 		filepath.Join(oldArtist, newAlbum),
@@ -217,7 +230,8 @@ func TestScanAndCompareSongs_NewFiles(t *testing.T) {
 	}
 
 	// Do one more scan and check that no songs are returned.
-	newDirs = scanAndCompareSongs(t, "rescan", musicDir, updateTime, newDirs, nil, []db.Song{})
+	newDirs = scanAndCompareSongs(t, "rescan", musicDir, updateTime,
+		&scanTestOptions{lastUpdateDirs: newDirs}, []db.Song{})
 	if !reflect.DeepEqual(newDirs, allDirs) {
 		t.Errorf("scanAndCompareSongs(...) = %v; want %v", newDirs, allDirs)
 	}
