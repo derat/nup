@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"syscall"
 
 	"github.com/derat/nup/server/config"
@@ -35,6 +36,7 @@ func run() (int, error) {
 	email := flag.String("email", "test@example.com", "Email address for login")
 	logToStderr := flag.Bool("log-to-stderr", true, "Write noisy dev_appserver output to stderr")
 	minify := flag.Bool("minify", false, "Minify HTML, JavaScript, and CSS")
+	numSongs := flag.Int("num-songs", 5, "Number of songs to insert")
 	port := flag.Int("port", 8080, "HTTP port for app")
 	flag.Parse()
 
@@ -91,7 +93,7 @@ func run() (int, error) {
 		MusicDir: filepath.Join(exampleDir, "music"),
 		CoverDir: filepath.Join(exampleDir, "covers"),
 	})
-	tester.ImportSongsFromJSONFile(songs)
+	tester.ImportSongsFromJSONFile(getSongs(*numSongs))
 	tester.UpdateStats()
 
 	// Block until we get killed.
@@ -151,7 +153,36 @@ var presets = []config.SearchPreset{
 	},
 }
 
-var songs = []db.Song{
+const (
+	songsPerArtist = 10
+	songsPerAlbum  = 5
+)
+
+// getSongs returns num songs to serve, creating fake ones if needed.
+func getSongs(num int) []db.Song {
+	songs := make([]db.Song, num)
+	copy(songs, baseSongs)
+	for i := len(baseSongs); i < num; i++ {
+		n := i - len(baseSongs)
+		artistID := n/songsPerArtist + 1
+		albumID := n/songsPerAlbum + 1
+		songs[i] = db.Song{
+			SHA1:     fmt.Sprintf("%040x", i),
+			SongID:   strconv.Itoa(i),
+			Filename: baseSongs[0].Filename,
+			Artist:   fmt.Sprintf("Artist %d", artistID),
+			Title:    fmt.Sprintf("Song %d", i),
+			Album:    fmt.Sprintf("Album %d", albumID),
+			AlbumID:  strconv.Itoa(albumID),
+			Track:    (n % songsPerAlbum) + 1,
+			Disc:     1,
+			Length:   baseSongs[0].Length,
+		}
+	}
+	return songs
+}
+
+var baseSongs = []db.Song{
 	{
 		SHA1:     "5439c23b4eae55f9dcd145fc3284cd8fa05696ff",
 		SongID:   "1",
