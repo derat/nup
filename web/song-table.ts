@@ -188,6 +188,7 @@ export class SongTable extends HTMLElement {
   #numCheckedSongs = 0;
   #shadow = createShadow(this, template);
   #table = this.#shadow.querySelector('table') as HTMLTableElement;
+  #thead = this.#table.querySelector('thead') as HTMLTableSectionElement;
   #tbody = this.#table.querySelector('tbody') as HTMLTableSectionElement;
   #rowSongs: WeakMap<HTMLTableRowElement, Song> = new WeakMap();
   #resizeTimeoutId: number | null = null;
@@ -197,6 +198,7 @@ export class SongTable extends HTMLElement {
   #dragFromIndex = -1;
   #dragToIndex = -1;
   #dragListRect: DOMRect | null = null;
+  #dragLastMouseY = -1; // clientY from last-seen mouse event while dragging
   #headingCheckbox = this.#shadow.querySelector(
     'input[type="checkbox"]'
   ) as HTMLInputElement;
@@ -248,6 +250,7 @@ export class SongTable extends HTMLElement {
       this.#dragListRect = this.#tbody.getBoundingClientRect();
       this.#moveDragTarget();
       this.#showDragTarget();
+      this.#dragLastMouseY = e.clientY;
     });
 
     // When the table is resized, update all of the rows' title attributes
@@ -263,14 +266,20 @@ export class SongTable extends HTMLElement {
     });
     this.#resizeObserver.observe(this.#table);
 
+    // TODO: It seems like the table only scrolls during a drag as long as the
+    // pointer is within this component. I'm not sure if this is a
+    // shadow-related issue, but I also haven't been able to find anything about
+    // how auto-scroll-during-drag is supposed to work.
     this.addEventListener('scroll', (e) => {
       // Show/hide the header shadow when scrolling.
       if (this.scrollTop) this.#table.classList.add('scrolled');
       else this.#table.classList.remove('scrolled');
 
       // Update the rect used to determine the target position when dragging.
+      // Also process a drag update using the last-seen mouse position.
       if (this.#inDrag) {
         this.#dragListRect = this.#tbody.getBoundingClientRect();
+        this.#handleDragUpdate(this.#dragLastMouseY);
       }
     });
   }
@@ -539,17 +548,15 @@ export class SongTable extends HTMLElement {
     e.preventDefault(); // needed to allow dropping
     e.stopPropagation();
     e.dataTransfer!.dropEffect = 'move';
+    this.#dragLastMouseY = e.clientY;
   };
 
   #onDragOver = (e: DragEvent) => {
     if (!this.#inDrag) return;
     e.preventDefault(); // needed to allow dropping
     e.stopPropagation();
-    const idx = this.#getDragEventIndex(e);
-    if (idx !== this.#dragToIndex) {
-      this.#dragToIndex = idx;
-      this.#moveDragTarget();
-    }
+    this.#handleDragUpdate(e.clientY);
+    this.#dragLastMouseY = e.clientY;
   };
 
   #onDragEnd = (e: DragEvent) => {
@@ -560,7 +567,7 @@ export class SongTable extends HTMLElement {
     const to = this.#dragToIndex;
     this.#songRows[from].classList.remove('dragged');
     this.#hideDragTarget();
-    this.#dragFromIndex = this.#dragToIndex = -1;
+    this.#dragFromIndex = this.#dragToIndex = this.#dragLastMouseY = -1;
     this.#dragListRect = null;
 
     // The browser sets the drop effect to 'none' if the drag was aborted
@@ -583,11 +590,25 @@ export class SongTable extends HTMLElement {
     this.#emitEvent('reorder', { fromIndex: from, toIndex: to });
   };
 
-  #getDragEventIndex(e: DragEvent) {
+  // Updates the drag target in response to a drag event at the supplied Y
+  // client position.
+  #handleDragUpdate(ey: number) {
+    const idx = this.#getDragEventIndex(ey);
+    if (idx === this.#dragToIndex) return;
+    this.#dragToIndex = idx;
+    this.#moveDragTarget();
+  }
+
+  // Gets the target row for a drag event at the supplied Y client position.
+  #getDragEventIndex(ey: number) {
     if (!this.#dragListRect) throw new Error('Missing drag rect');
-    const ey = e.clientY;
     const list = this.#dragListRect;
     const nsongs = this.#songRows.length;
+
+    // Clamp the event's Y position to the top of the
+    let visTop = list.top + this.scrollTop;
+    if (this.scrollTop) visTop += this.#thead.clientHeight;
+    ey = Math.max(ey, visTop);
 
     if (ey <= list.top) return 0;
     if (ey >= list.bottom) return nsongs - 1;
