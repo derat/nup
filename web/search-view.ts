@@ -533,56 +533,51 @@ export class SearchView extends HTMLElement {
   }
 
   #submitQuery(appendToQueue: boolean) {
-    let terms: String[] = [];
+    const params = new URLSearchParams();
     if (this.#keywordsInput.value.trim()) {
-      terms = terms.concat(parseQueryString(this.#keywordsInput.value));
+      parseKeywords(this.#keywordsInput.value, params);
     }
     if (this.#tagsInput.value.trim()) {
-      terms.push('tags=' + encodeURIComponent(this.#tagsInput.value.trim()));
+      params.set('tags', this.#tagsInput.value.trim());
     }
     if (this.#minDateInput.value.trim()) {
       let s = this.#minDateInput.value.trim();
       if (s.match(/^\d{4}$/)) s += '-01-01';
       if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
-        terms.push('minDate=' + encodeURIComponent(new Date(s).toISOString()));
+        params.set('minDate', new Date(s).toISOString());
       }
     }
     if (this.#maxDateInput.value.trim()) {
       let s = this.#maxDateInput.value.trim();
       if (s.match(/^\d{4}$/)) s += '-12-31T23:59:59.999Z';
       if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
-        terms.push('maxDate=' + encodeURIComponent(new Date(s).toISOString()));
+        params.set('maxDate', new Date(s).toISOString());
       }
     }
     if (!this.#minRatingSelect.disabled && this.#minRatingSelect.value !== '') {
-      terms.push('minRating=' + this.#minRatingSelect.value);
+      params.set('minRating', this.#minRatingSelect.value);
     }
-    if (this.#shuffleCheckbox.checked) terms.push('shuffle=1');
-    if (this.#firstTrackCheckbox.checked) terms.push('firstTrack=1');
-    if (this.#unratedCheckbox.checked) terms.push('unrated=1');
+    if (this.#shuffleCheckbox.checked) params.set('shuffle', '1');
+    if (this.#firstTrackCheckbox.checked) params.set('firstTrack', '1');
+    if (this.#unratedCheckbox.checked) params.set('unrated', '1');
     if (this.#orderByLastPlayedCheckbox.checked) {
-      terms.push('orderByLastPlayed=1');
+      params.set('orderByLastPlayed', '1');
     }
     if (parseInt(this.#maxPlaysInput.value) >= 0) {
-      terms.push('maxPlays=' + parseInt(this.#maxPlaysInput.value));
+      params.set('maxPlays', parseInt(this.#maxPlaysInput.value).toString());
     }
     const firstPlayed = parseInt(this.#firstPlayedSelect.value);
     if (firstPlayed !== 0) {
       const date = new Date(Date.now() - firstPlayed * 1000);
-      terms.push('minFirstPlayed=' + encodeURIComponent(date.toISOString()));
+      params.set('minFirstPlayed', date.toISOString());
     }
     const lastPlayed = parseInt(this.#lastPlayedSelect.value);
     if (lastPlayed !== 0) {
       const date = new Date(Date.now() - lastPlayed * 1000);
-      terms.push('maxLastPlayed=' + encodeURIComponent(date.toISOString()));
+      params.set('maxLastPlayed', date.toISOString());
     }
 
-    if (!terms.length) {
-      showMessageDialog('Invalid Search', 'You must supply search terms.');
-      return;
-    }
-
-    const url = 'query?' + terms.join('&');
+    const url = 'query?' + params.toString();
     console.log(`Sending query: ${url}`);
 
     // 'Order by last played' essentially shuffles the results.
@@ -605,7 +600,7 @@ export class SearchView extends HTMLElement {
         this.#resultsShuffled = shuffled;
         if (appendToQueue) {
           this.#enqueueSearchResults(true, true);
-        } else if (songs.length > 0 && songs[0].coverFilename) {
+        } else if (songs.length && songs[0].coverFilename) {
           // If we aren't automatically enqueuing the results, prefetch the
           // cover image for the first song so it'll be ready to go.
           new Image().src = getCoverUrl(songs[0].coverFilename, smallCoverSize);
@@ -750,12 +745,15 @@ export class SearchView extends HTMLElement {
 
 customElements.define('search-view', SearchView);
 
-function parseQueryString(text: string) {
-  const terms: string[] = [];
-  let keywords: string[] = [];
+// Parses a value from the keywords input field into |params|.
+// Terms prefixed with 'artist:', 'title:', 'albumId:', or 'album:'
+// are mapped to the associated parameters and remaining terms
+// are assigned to the 'keywords' parameter.
+function parseKeywords(text: string, params: URLSearchParams) {
+  const keywords: string[] = [];
 
   text = text.trim();
-  while (text.length > 0) {
+  while (text.length) {
     if (
       text.startsWith('artist:') ||
       text.startsWith('title:') ||
@@ -785,23 +783,19 @@ function parseQueryString(text: string) {
         }
       }
 
-      if (value.length > 0) terms.push(key + '=' + encodeURIComponent(value));
+      if (value.length) params.set(key, value);
       text = text.substring(index);
     } else {
       const match = text.match(/^(\S+)(.*)/);
       // The server splits on non-alphanumeric characters to make keywords.
       // Split on miscellaneous punctuation here to at least handle some of this.
-      keywords = keywords.concat(
-        match![1].split(/[-_+=~!?@#$%^&*()'".,:;]+/).filter((s) => s.length)
+      keywords.push(
+        ...match![1].split(/[-_+=~!?@#$%^&*()'".,:;]+/).filter((s) => s.length)
       );
       text = match![2];
     }
     text = text.trim();
   }
 
-  if (keywords.length > 0) {
-    terms.push('keywords=' + encodeURIComponent(keywords.join(' ')));
-  }
-
-  return terms;
+  if (keywords.length) params.set('keywords', keywords.join(' '));
 }
