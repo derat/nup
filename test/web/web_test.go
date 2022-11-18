@@ -535,6 +535,35 @@ func TestPlayTimeQuery(t *testing.T) {
 	}
 }
 
+func TestSongTableFields(t *testing.T) {
+	page, _, done := initWebTest(t)
+	defer done()
+
+	const (
+		ar1 = `Artist1 "\ Blah`
+		ar2 = `Artist2`
+		al1 = "Album1"
+		al2 = `Album2 "\ Blah`
+		al3 = "Album3"
+	)
+	song1 := newSong(ar1, "Track 1", al1, withTrack(1))
+	song2 := newSong(ar1, "Track 2", al2, withTrack(1))
+	song3 := newSong(ar1, "Track 3", al2, withTrack(2))
+	song4 := newSong(ar2, "Track 4", al3, withTrack(1))
+	importSongs(song1, song2, song3, song4)
+
+	page.click(searchButton)
+	page.checkSearchResults(joinSongs(song1, song2, song3, song4))
+
+	page.clickSongRowArtist(searchResultsTable, 0) // ar1
+	page.click(searchButton)
+	page.checkSearchResults(joinSongs(song1, song2, song3))
+
+	page.clickSongRowAlbum(searchResultsTable, 1) // al2
+	page.click(searchButton)
+	page.checkSearchResults(joinSongs(song2, song3))
+}
+
 func TestSearchResultCheckboxes(t *testing.T) {
 	page, _, done := initWebTest(t)
 	defer done()

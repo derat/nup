@@ -492,6 +492,24 @@ func (p *page) clickSongRowCheckbox(locs []loc, idx int, key string) {
 	}
 }
 
+// clickSongRowArtist clicks the artist field on the song at the specified index in the table matched by locs.
+func (p *page) clickSongRowArtist(locs []loc, idx int) { p.clickSongRowField(locs, idx, "artist") }
+
+// clickSongRowAlbum clicks the album field on the song at the specified index in the table matched by locs.
+func (p *page) clickSongRowAlbum(locs []loc, idx int) { p.clickSongRowField(locs, idx, "album") }
+
+// clickSongRowField is a helper method for clickSongRowArtist and clickSongRowAlbum.
+func (p *page) clickSongRowField(locs []loc, idx int, cls string) {
+	sel := "td." + cls
+	td, err := p.getSongRow(locs, idx).FindElement(selenium.ByCSSSelector, sel)
+	if err != nil {
+		p.t.Fatalf("Failed finding %q in song %d at %v: %v", sel, idx, p.desc(), err)
+	}
+	if err := td.Click(); err != nil {
+		p.t.Fatalf("Failed clicking %q in song %d at %v: %v", sel, idx, p.desc(), err)
+	}
+}
+
 // rightClickSongRow right-clicks on the song at the specified index in the table matched by locs.
 func (p *page) rightClickSongRow(locs []loc, idx int) {
 	row := p.getSongRow(locs, idx)

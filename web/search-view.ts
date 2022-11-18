@@ -642,7 +642,8 @@ export class SearchView extends HTMLElement {
   ) {
     const keywords = [];
     const clean = (s: string) => {
-      s = s.replace(/"/g, '\\"');
+      // Backslash-escape both backslashes and double-quotes.
+      s = s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       if (s.includes(' ')) s = '"' + s + '"';
       return s;
     };
