@@ -158,6 +158,9 @@ func (s *Song) Save() ([]datastore.Property, error) {
 	return datastore.SaveStruct(s)
 }
 
+// Assert that the interface is implemented.
+var _ datastore.PropertyLoadSaver = (*Song)(nil)
+
 // MarshalJSON uses a disgusting hack from https://stackoverflow.com/a/60567000 to
 // omit "Date" fields that have the zero value.
 func (s Song) MarshalJSON() ([]byte, error) {

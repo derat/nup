@@ -7,6 +7,7 @@ package dump
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sort"
 	"strconv"
 	"time"
@@ -17,7 +18,7 @@ import (
 
 const (
 	keyProperty         = "__key__"
-	maxPlaysForSongDump = 256
+	maxPlaysForSongDump = 1000
 )
 
 // Songs returns songs from datastore.
@@ -40,16 +41,10 @@ func Songs(ctx context.Context, max int64, cursor string, deleted bool, minLastM
 	}
 
 	songs = make([]db.Song, max)
-	songPtrs := make([]interface{}, max)
-	for i := range songs {
-		songPtrs[i] = &songs[i]
-	}
-
-	ids, _, nextCursor, err := getEntities(ctx, query, cursor, songPtrs)
+	ids, _, nextCursor, err := getEntities(ctx, query, cursor, songs)
 	if err != nil {
 		return nil, "", err
 	}
-
 	songs = songs[0:len(ids)]
 	for i, id := range ids {
 		songs[i].SongID = strconv.FormatInt(id, 10)
@@ -63,7 +58,7 @@ func Songs(ctx context.Context, max int64, cursor string, deleted bool, minLastM
 func Plays(ctx context.Context, max int64, cursor string) (
 	plays []db.PlayDump, nextCursor string, err error) {
 	plays = make([]db.PlayDump, max)
-	playPtrs := make([]interface{}, max)
+	playPtrs := make([]*db.Play, max)
 	for i := range plays {
 		playPtrs[i] = &plays[i].Play
 	}
@@ -90,24 +85,21 @@ func SingleSong(ctx context.Context, id int64) (*db.Song, error) {
 	}
 	s.SongID = strconv.FormatInt(id, 10)
 
-	plays := make([]db.PlayDump, maxPlaysForSongDump)
-	playPtrs := make([]interface{}, maxPlaysForSongDump)
-	for i := range plays {
-		playPtrs[i] = &plays[i].Play
-	}
-	pids, _, _, err := getEntities(ctx, datastore.NewQuery(db.PlayKind).Ancestor(sk), "", playPtrs)
+	s.Plays = make([]db.Play, maxPlaysForSongDump)
+	pids, _, _, err := getEntities(ctx, datastore.NewQuery(db.PlayKind).Ancestor(sk), "", s.Plays)
 	if err != nil {
 		return nil, err
 	}
-	for i := range pids {
-		s.Plays = append(s.Plays, plays[i].Play)
-	}
+	s.Plays = s.Plays[:len(pids)]
 	sort.Sort(db.PlayArray(s.Plays))
 
 	return s, nil
 }
 
-func getEntities(ctx context.Context, q *datastore.Query, cursor string, entities []interface{}) (
+// The entities arg should be a slice of structs.
+// The caller should resize it based on the size of the ids return value.
+// TODO: Make this less terrible if/when App Engine supports generics.
+func getEntities(ctx context.Context, q *datastore.Query, cursor string, entities interface{}) (
 	ids, parentIDs []int64, nextCursor string, err error) {
 	q = q.KeysOnly()
 	if len(cursor) > 0 {
@@ -119,9 +111,10 @@ func getEntities(ctx context.Context, q *datastore.Query, cursor string, entitie
 	}
 	it := q.Run(ctx)
 
-	keys := make([]*datastore.Key, 0, len(entities))
-	ids = make([]int64, 0, len(entities))
-	parentIDs = make([]int64, 0, len(entities))
+	nents := reflect.ValueOf(entities).Len()
+	keys := make([]*datastore.Key, 0, nents)
+	ids = make([]int64, 0, nents)
+	parentIDs = make([]int64, 0, nents)
 
 	for {
 		k, err := it.Next(nil)
@@ -140,7 +133,7 @@ func getEntities(ctx context.Context, q *datastore.Query, cursor string, entitie
 		}
 		parentIDs = append(parentIDs, pid)
 
-		if len(keys) == len(entities) {
+		if len(keys) == nents {
 			nc, err := it.Cursor()
 			if err != nil {
 				return nil, nil, "", fmt.Errorf("unable to get cursor: %v", err)
@@ -150,7 +143,8 @@ func getEntities(ctx context.Context, q *datastore.Query, cursor string, entitie
 		}
 	}
 
-	entities = entities[0:len(keys)]
+	// Resize entities to the number of keys.
+	entities = reflect.ValueOf(entities).Slice(0, len(keys)).Interface()
 	if len(keys) > 0 {
 		if err := datastore.GetMulti(ctx, keys, entities); err != nil {
 			return nil, nil, "", fmt.Errorf("failed to get %v entities: %v", len(keys), err)
