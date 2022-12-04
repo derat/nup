@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -141,16 +142,27 @@ type Song struct {
 // Load implements datastore.PropertyLoadSaver.
 // A custom implementation is needed to handle old DeletedSong entities.
 func (s *Song) Load(orig []datastore.Property) error {
-	updated := make([]datastore.Property, 0, len(orig))
+	props := make([]datastore.Property, 0, len(orig))
 	for _, p := range orig {
 		switch p.Name {
 		case "RatingAtLeast0", "RatingAtLeast25", "RatingAtLeast50", "RatingAtLeast75":
-			// Drop properties corresponding to fields that have been deleted.
-		default:
-			updated = append(updated, p)
+			// Skip properties corresponding to fields that have been deleted.
+			continue
+		case "Rating":
+			// Convert old float ratings to ints.
+			if v, ok := p.Value.(float64); ok {
+				// datastore.Property seems to use int64 internally for all int types:
+				// https://github.com/golang/appengine/blob/v2.0.1/v2/datastore/load.go
+				var stars int64
+				if v >= 0 {
+					stars = int64(math.Round(4*v)) + 1
+				}
+				p.Value = stars
+			}
 		}
+		props = append(props, p)
 	}
-	return datastore.LoadStruct(s, updated)
+	return datastore.LoadStruct(s, props)
 }
 
 // Save implements datastore.PropertyLoadSaver.
