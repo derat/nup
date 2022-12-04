@@ -12,6 +12,7 @@ import (
 	"time"
 	"unicode"
 
+	"cloud.google.com/go/datastore"
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
@@ -135,6 +136,26 @@ type Song struct {
 
 	// LastModifiedTime is the time that the song was modified.
 	LastModifiedTime time.Time `json:"-"`
+}
+
+// Load implements datastore.PropertyLoadSaver.
+// A custom implementation is needed to handle old DeletedSong entities.
+func (s *Song) Load(orig []datastore.Property) error {
+	updated := make([]datastore.Property, 0, len(orig))
+	for _, p := range orig {
+		switch p.Name {
+		case "RatingAtLeast0", "RatingAtLeast25", "RatingAtLeast50", "RatingAtLeast75":
+			// Drop properties corresponding to fields that have been deleted.
+		default:
+			updated = append(updated, p)
+		}
+	}
+	return datastore.LoadStruct(s, updated)
+}
+
+// Save implements datastore.PropertyLoadSaver.
+func (s *Song) Save() ([]datastore.Property, error) {
+	return datastore.SaveStruct(s)
 }
 
 // MarshalJSON uses a disgusting hack from https://stackoverflow.com/a/60567000 to
