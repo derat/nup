@@ -12,10 +12,10 @@ import (
 	"time"
 	"unicode"
 
-	"cloud.google.com/go/datastore"
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
+	"google.golang.org/appengine/v2/datastore"
 )
 
 const (
