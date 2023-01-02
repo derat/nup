@@ -252,6 +252,7 @@ func (dst *Song) Update(src *Song, copyUserData bool) error {
 	}
 
 	// Keywords are sorted and deduped in the later call to Clean.
+	dst.Keywords = nil
 	for _, str := range []string{dst.ArtistLower, dst.TitleLower, dst.AlbumLower, albumArtistNorm} {
 		for _, w := range strings.FieldsFunc(str, func(c rune) bool {
 			return !unicode.IsLetter(c) && !unicode.IsNumber(c)

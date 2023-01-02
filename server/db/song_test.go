@@ -70,6 +70,7 @@ func TestSong_Update(t *testing.T) {
 	}
 
 	dst := Song{
+		Keywords:       []string{"old", "keywords"}, // should be dropped
 		Rating:         2,
 		FirstStartTime: t3,
 		LastStartTime:  t4,
