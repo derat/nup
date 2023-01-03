@@ -386,6 +386,10 @@ func TestDateQuery(t *testing.T) {
 		{"", "2000", joinSongs(song1, song2)},
 	} {
 		page.setStage(tc.min + "/" + tc.max)
+		// TODO: I saw this fail once:
+		//  page.go:451: Failed sending keys to [{tag name search-view} {id min-date-input}] at
+		//  web_test.go:389 (1980/1989): unknown error - 60: element not interactable
+		// That's in the middle of the test cases, so I have no idea what's going on.
 		page.setText(minDateInput, tc.min)
 		page.setText(maxDateInput, tc.max)
 		page.click(searchButton)
