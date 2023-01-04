@@ -80,9 +80,9 @@ func runTests(m *testing.M) (res int, err error) {
 	defer appLog.Close()
 
 	cfg := &config.Config{
-		BasicAuthUsers: []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
-		SongBucket:     songBucket,
-		CoverBucket:    coverBucket,
+		Users:       []config.User{{Username: test.Username, Password: test.Password, Admin: true}},
+		SongBucket:  songBucket,
+		CoverBucket: coverBucket,
 	}
 	storageDir := filepath.Join(outDir, "app_storage")
 	srv, err := test.NewDevAppserver(cfg, storageDir, appLog, test.DevAppserverCreateIndexes(*createIndexes))

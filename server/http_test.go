@@ -25,18 +25,17 @@ import (
 // (4+ seconds to start dev_appserver.py) so I'm minimizing the number of places I use it.
 func TestAddHandler(t *testing.T) {
 	const (
-		email1   = "user1@example.org"
-		email2   = "user2@example.org"
-		badEmail = "bad@example.org"
+		normEmail = "normal@example.org"
+		badEmail  = "bad@example.org"
 
-		user1 = "user1"
-		pass1 = "pass1"
+		normUser = "norm"
+		normPass = "normPass"
 
-		user2 = "user2"
-		pass2 = "pass2"
+		adminUser = "admin"
+		adminPass = "adminPass"
 
-		badUser = "baduser"
-		badPass = "badpass"
+		badUser = "bad"
+		badPass = "badPass"
 	)
 
 	// Start dev_appserver.py.
@@ -48,11 +47,11 @@ func TestAddHandler(t *testing.T) {
 
 	// Save a config to Datastore.
 	origCfg := &config.Config{
-		BasicAuthUsers: []config.BasicAuthInfo{
-			{Username: user1, Password: pass1},
-			{Username: user2, Password: pass2},
+		Users: []config.User{
+			{Username: normUser, Password: normPass},
+			{Username: adminUser, Password: adminPass, Admin: true},
+			{Email: normEmail},
 		},
-		GoogleUsers: []string{email1, email2},
 		SongBucket:  "test-songs",
 		CoverBucket: "test-covers",
 	}
@@ -83,11 +82,17 @@ func TestAddHandler(t *testing.T) {
 		lastMethod = r.Method
 		lastPath = r.URL.Path
 	}
-	addHandler("/", http.MethodGet, redirectUnauth, handleReq)
-	addHandler("/get", http.MethodGet, rejectUnauth, handleReq)
-	addHandler("/post", http.MethodPost, rejectUnauth, handleReq)
-	addHandler("/cron", http.MethodGet, rejectUnauthCron, handleReq)
-	addHandler("/allow", http.MethodGet, allowUnauth, handleReq)
+
+	norm := config.NormalUser
+	admin := config.AdminUser
+	cron := config.CronUser
+
+	addHandler("/", http.MethodGet, norm|admin, redirectUnauth, handleReq)
+	addHandler("/get", http.MethodGet, norm|admin, rejectUnauth, handleReq)
+	addHandler("/post", http.MethodPost, norm|admin, rejectUnauth, handleReq)
+	addHandler("/admin", http.MethodPost, admin, rejectUnauth, handleReq)
+	addHandler("/cron", http.MethodGet, norm|admin|cron, rejectUnauth, handleReq)
+	addHandler("/allow", http.MethodGet, norm|admin, allowUnauth, handleReq)
 
 	for _, tc := range []struct {
 		method, path string
@@ -96,42 +101,50 @@ func TestAddHandler(t *testing.T) {
 		cron         bool   // set X-Appengine-Cron header
 		code         int    // expected HTTP status code
 	}{
-		{"GET", "/", email1, "", "", false, 200},
-		{"GET", "/", email2, "", "", false, 200},
-		{"GET", "/", "", user1, pass1, false, 200},
-		{"GET", "/", "", user2, pass2, false, 200},
-		{"GET", "/", email1, badUser, badPass, false, 302}, // bad basic user; don't check google
-		{"GET", "/", badEmail, "", "", false, 302},         // bad google user
-		{"GET", "/", "", badUser, badPass, false, 302},     // bad basic user
-		{"GET", "/", "", user1, pass2, false, 302},         // bad basic password
-		{"GET", "/", "", user2, "", false, 302},            // no basic password
-		{"GET", "/", "", "", "", false, 302},               // no auth
-		{"POST", "/", "", "", "", false, 302},              // no auth, wrong method
-		{"POST", "/", email1, "", "", false, 405},          // valid auth, wrong method
+		{"GET", "/", normEmail, "", "", false, 200},
+		{"GET", "/", "", normUser, normPass, false, 200},
+		{"GET", "/", "", adminUser, adminPass, false, 200},
+		{"GET", "/", normEmail, badUser, badPass, false, 302}, // bad basic user; don't check google
+		{"GET", "/", badEmail, "", "", false, 302},            // bad google user
+		{"GET", "/", "", badUser, badPass, false, 302},        // bad basic user
+		{"GET", "/", "", normUser, badPass, false, 302},       // bad basic password
+		{"GET", "/", "", normUser, "", false, 302},            // no basic password
+		{"GET", "/", "", "", "", false, 302},                  // no auth
+		{"POST", "/", "", "", "", false, 302},                 // no auth, wrong method
+		{"POST", "/", normEmail, "", "", false, 405},          // valid auth, wrong method
 
-		{"GET", "/get", email1, "", "", false, 200},
+		{"GET", "/get", normEmail, "", "", false, 200},
+		{"GET", "/get", "", adminUser, adminPass, false, 200},
 		{"GET", "/get", badEmail, "", "", false, 401},
-		{"GET", "/get", "", "", "", false, 401},      // no auth
-		{"POST", "/get", "", "", "", false, 401},     // no auth, wrong method
-		{"POST", "/get", email1, "", "", false, 405}, // valid auth, wrong method
+		{"GET", "/get", "", "", "", false, 401},         // no auth
+		{"POST", "/get", "", "", "", false, 401},        // no auth, wrong method
+		{"POST", "/get", normEmail, "", "", false, 405}, // valid auth, wrong method
 
-		{"POST", "/post", email1, "", "", false, 200},
+		{"POST", "/post", normEmail, "", "", false, 200},
+		{"POST", "/post", "", adminUser, adminPass, false, 200},
 		{"POST", "/post", badEmail, "", "", false, 401},
-		{"POST", "/post", "", "", "", false, 401},    // no auth
-		{"GET", "/post", "", "", "", false, 401},     // no auth, wrong method
-		{"GET", "/post", email1, "", "", false, 405}, // valid auth, wrong method
+		{"POST", "/post", "", "", "", false, 401},       // no auth
+		{"GET", "/post", "", "", "", false, 401},        // no auth, wrong method
+		{"GET", "/post", normEmail, "", "", false, 405}, // valid auth, wrong method
 
-		{"GET", "/cron", email1, "", "", false, 200},
-		{"GET", "/cron", "", user1, pass1, false, 200},
+		{"POST", "/admin", "", adminUser, adminPass, false, 200},
+		{"POST", "/admin", normEmail, "", "", false, 401},      // not admin
+		{"POST", "/admin", "", normUser, normPass, false, 401}, // not admin
+		{"POST", "/post", "", "", "", false, 401},              // no auth
+
+		{"GET", "/cron", normEmail, "", "", false, 200},
+		{"GET", "/cron", "", normUser, normPass, false, 200},
+		{"GET", "/cron", "", adminUser, adminPass, false, 200},
 		{"GET", "/cron", "", "", "", true, 200},
 		{"GET", "/cron", "", "", "", false, 401},       // no auth
 		{"GET", "/cron", badEmail, "", "", false, 401}, // bad google user
 		{"POST", "/cron", "", "", "", true, 405},       // wrong method
 
-		{"GET", "/allow", "", "", "", false, 200},       // no auth
-		{"GET", "/allow", email1, "", "", false, 200},   // valid user
-		{"GET", "/allow", "", user1, pass1, false, 200}, // valid auth
-		{"POST", "/allow", "", "", "", false, 405},      // wrong method
+		{"GET", "/allow", "", "", "", false, 200},               // no auth
+		{"GET", "/allow", normEmail, "", "", false, 200},        // valid user
+		{"GET", "/allow", "", normUser, normPass, false, 200},   // valid auth
+		{"GET", "/allow", "", adminUser, adminPass, false, 200}, // valid auth
+		{"POST", "/allow", "", "", "", false, 405},              // wrong method
 	} {
 		desc := tc.method + " " + tc.path
 		req, err := inst.NewRequest(tc.method, tc.path, nil)

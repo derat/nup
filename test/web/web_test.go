@@ -112,12 +112,14 @@ func runTests(m *testing.M) (res int, err error) {
 		defer appLog.Close()
 
 		cfg := &config.Config{
-			GoogleUsers:    []string{testEmail},
-			BasicAuthUsers: []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
-			SongBaseURL:    musicSrv.URL + "/",
-			CoverBaseURL:   musicSrv.URL + "/.covers/", // bogus but required
-			Presets:        presets,
-			Minify:         minify,
+			Users: []config.User{
+				{Email: testEmail},
+				{Username: test.Username, Password: test.Password, Admin: true},
+			},
+			SongBaseURL:  musicSrv.URL + "/",
+			CoverBaseURL: musicSrv.URL + "/.covers/", // bogus but required
+			Presets:      presets,
+			Minify:       minify,
 		}
 		storageDir := filepath.Join(outDir, "app_storage")
 		appSrv, err := test.NewDevAppserver(cfg, storageDir, appLog)

@@ -130,29 +130,19 @@ Create a JSON file corresponding to the `Config` struct in
 
 ```json
 {
-  "googleUsers": [
-    "example@gmail.com",
-    "example.2@gmail.com",
-  ],
-  "basicAuthUsers": [
-    {
-      "username": "tools",
-      "password": "my-tools-password"
-    },
-    {
-      "username": "android",
-      "password": "my-android-password"
-    }
+  "users": [
+    { "email": "example@gmail.com" },
+    { "email": "example.2@gmail.com" },
+    { "username": "android", "password": "my-android-password" },
+    { "username": "tools", "password": "my-tools-password", "admin": true }
   ],
   "songBucket": "my-songs",
   "coverBucket": "my-covers"
 }
 ```
 
-You can run `nup config -set /path/to/server_config.json` to save the server
-configuration to Datastore, or alternatively you can save it as `config.json` at
-the root of this repository to deploy it alongside the server code to App
-Engine.
+Run `nup config -set /path/to/server_config.json` to save the server
+configuration to Datastore.
 
 ## Deploying
 

@@ -58,30 +58,35 @@ var staticFileETags sync.Map
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
+	// Get masks for various types of users.
+	norm := config.NormalUser
+	admin := config.AdminUser
+	cron := config.CronUser
+
 	// Use a wrapper instead of calling http.HandleFunc directly to reduce the risk
 	// that a handler neglects checking that requests are authorized.
-	addHandler("/", http.MethodGet, redirectUnauth, handleStatic)
-	addHandler("/manifest.json", http.MethodGet, allowUnauth, handleStatic)
+	addHandler("/", http.MethodGet, norm, redirectUnauth, handleStatic)
+	addHandler("/manifest.json", http.MethodGet, norm, allowUnauth, handleStatic)
 
-	addHandler("/cover", http.MethodGet, rejectUnauth, handleCover)
-	addHandler("/delete_song", http.MethodPost, rejectUnauth, handleDeleteSong)
-	addHandler("/dump_song", http.MethodGet, rejectUnauth, handleDumpSong)
-	addHandler("/export", http.MethodGet, rejectUnauth, handleExport)
-	addHandler("/import", http.MethodPost, rejectUnauth, handleImport)
-	addHandler("/now", http.MethodGet, rejectUnauth, handleNow)
-	addHandler("/played", http.MethodPost, rejectUnauth, handlePlayed)
-	addHandler("/presets", http.MethodGet, rejectUnauth, handlePresets)
-	addHandler("/query", http.MethodGet, rejectUnauth, handleQuery)
-	addHandler("/rate_and_tag", http.MethodPost, rejectUnauth, handleRateAndTag)
-	addHandler("/reindex", http.MethodPost, rejectUnauth, handleReindex)
-	addHandler("/song", http.MethodGet, rejectUnauth, handleSong)
-	addHandler("/stats", http.MethodGet, rejectUnauthCron, handleStats)
-	addHandler("/tags", http.MethodGet, rejectUnauth, handleTags)
+	addHandler("/cover", http.MethodGet, norm, rejectUnauth, handleCover)
+	addHandler("/delete_song", http.MethodPost, admin, rejectUnauth, handleDeleteSong)
+	addHandler("/dump_song", http.MethodGet, norm|admin, rejectUnauth, handleDumpSong)
+	addHandler("/export", http.MethodGet, norm|admin, rejectUnauth, handleExport)
+	addHandler("/import", http.MethodPost, admin, rejectUnauth, handleImport)
+	addHandler("/now", http.MethodGet, norm|admin, rejectUnauth, handleNow)
+	addHandler("/played", http.MethodPost, norm|admin, rejectUnauth, handlePlayed)
+	addHandler("/presets", http.MethodGet, norm|admin, rejectUnauth, handlePresets)
+	addHandler("/query", http.MethodGet, norm|admin, rejectUnauth, handleQuery)
+	addHandler("/rate_and_tag", http.MethodPost, norm|admin, rejectUnauth, handleRateAndTag)
+	addHandler("/reindex", http.MethodPost, admin, rejectUnauth, handleReindex)
+	addHandler("/song", http.MethodGet, norm, rejectUnauth, handleSong)
+	addHandler("/stats", http.MethodGet, norm|admin|cron, rejectUnauth, handleStats)
+	addHandler("/tags", http.MethodGet, norm|admin, rejectUnauth, handleTags)
 
 	if appengine.IsDevAppServer() {
-		addHandler("/clear", http.MethodPost, rejectUnauth, handleClear)
-		addHandler("/config", http.MethodPost, rejectUnauth, handleConfig)
-		addHandler("/flush_cache", http.MethodPost, rejectUnauth, handleFlushCache)
+		addHandler("/clear", http.MethodPost, admin, rejectUnauth, handleClear)
+		addHandler("/config", http.MethodPost, admin, rejectUnauth, handleConfig)
+		addHandler("/flush_cache", http.MethodPost, admin, rejectUnauth, handleFlushCache)
 	}
 
 	// Generate the index file and JS bundle so we're ready to serve them.

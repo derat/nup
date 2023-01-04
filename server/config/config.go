@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 
@@ -27,11 +28,38 @@ type SavedConfig struct {
 	JSON string `datastore:"json"`
 }
 
-// BasicAuthInfo contains information used for validating HTTP basic authentication.
-type BasicAuthInfo struct {
+// User contains information about a user allowed to access the server.
+type User struct {
+	// Email contains an email address for Google authentication.
+	Email string `json:"email"`
+	// Username contains a username for HTTP basic auth.
 	Username string `json:"username"`
+	// Password contains a password for HTTP basic auth.
 	Password string `json:"password"`
+	// Admin is true if this user should have elevated permissions.
+	// This should only be set for the HTTP basic auth account used by the nup command-line executable.
+	Admin bool `json:"admin"`
 }
+
+// Type returns u's type.
+func (u *User) Type() UserType {
+	if u.Admin {
+		return AdminUser
+	}
+	return NormalUser
+}
+
+// UserType describes the level of access granted to a user.
+type UserType uint32
+
+const (
+	// NormalUser indicates a user without its Admin field set to true.
+	NormalUser UserType = 1 << iota
+	// AdminUser indicates a user with its Admin field set to true.
+	AdminUser
+	// CronUser indicates a request issued by App Engine cron jobs.
+	CronUser
+)
 
 // SearchPreset specifies a search preset to display in the web interface.
 type SearchPreset struct {
@@ -85,13 +113,8 @@ func (p *SearchPreset) UnmarshalJSON(data []byte) error {
 
 // Config holds the App Engine server's configuration.
 type Config struct {
-	// GoogleUsers contains email addresses of Google accounts allowed to access
-	// the web interface.
-	GoogleUsers []string `json:"googleUsers"`
-
-	// BasicAuthUsers contains for accounts using HTTP basic authentication
-	// (i.e. command-line tools or the Android client).
-	BasicAuthUsers []BasicAuthInfo `json:"basicAuthUsers"`
+	// Users contains information about users who can access the server.
+	Users []User `json:"users"`
 
 	// SongBucket contains the name of the Google Cloud Storage bucket holding song files.
 	SongBucket string `json:"songBucket,omitempty"`
@@ -138,6 +161,24 @@ func Parse(jsonData []byte) (*Config, error) {
 		return nil, errors.New("exactly one of CoverBucket and CoverBaseURL must be set")
 	}
 
+	var admin bool
+	for i, u := range cfg.Users {
+		switch {
+		case (u.Email != "") == (u.Username != ""):
+			return nil, fmt.Errorf("user %d has email %q and username %q; exactly one should be set", i, u.Email, u.Username)
+		case u.Email != "" && u.Password != "":
+			return nil, fmt.Errorf("user %d has email %q but non-empty password", i, u.Email)
+		case u.Username != "" && u.Password == "":
+			return nil, fmt.Errorf("user %d has username %q but empty password", i, u.Username)
+		}
+		if u.Admin {
+			admin = true
+		}
+	}
+	if !admin {
+		return nil, errors.New("no admin user")
+	}
+
 	return &cfg, nil
 }
 
@@ -164,32 +205,32 @@ func Load(ctx context.Context) (*Config, error) {
 	return Parse(b)
 }
 
-// Auth checks that r is authorized in cfg via either HTTP basic authentication or Google
-// authentication. A username or email address that can be used in logging is returned if found,
-// even if the the request is unauthorized. If allowCron is true, requests that were initiated via
-// cron are also permitted.
-func (cfg *Config) Auth(r *http.Request, allowCron bool) (ok bool, username string) {
+// Auth authenticates r using Google authentication or HTTP basic auth or checks that it was issued
+// by an App Engine cron job. If the corresponding user in cfg.Users has a type included in the
+// supplied allowed arg, true is returned; false is returned otherwise. A username or email address
+// that can be used in logging is returned if found, even if the the request is unauthorized.
+func (cfg *Config) Auth(r *http.Request, allowed UserType) (ok bool, name string) {
 	// https://cloud.google.com/appengine/docs/standard/go/scheduling-jobs-with-cron-yaml#validating_cron_requests
-	if allowCron && r.Header.Get("X-Appengine-Cron") == "true" {
-		return true, "cron"
+	if r.Header.Get("X-Appengine-Cron") == "true" {
+		return allowed&CronUser != 0, "cron"
 	}
 
 	if username, password, ok := r.BasicAuth(); ok {
-		for _, u := range cfg.BasicAuthUsers {
+		for _, u := range cfg.Users {
 			if username == u.Username && password == u.Password {
-				return true, username
+				return allowed&u.Type() != 0, username
 			}
 		}
 		return false, username
 	}
 
-	if u := user.Current(appengine.NewContext(r)); u != nil {
-		for _, e := range cfg.GoogleUsers {
-			if u.Email == e {
-				return true, u.Email
+	if gu := user.Current(appengine.NewContext(r)); gu != nil {
+		for _, u := range cfg.Users {
+			if gu.Email == u.Email {
+				return allowed&u.Type() != 0, gu.Email
 			}
 		}
-		return false, u.Email
+		return false, gu.Email
 	}
 
 	return false, ""

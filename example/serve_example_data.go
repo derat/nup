@@ -73,12 +73,14 @@ func run() (int, error) {
 		appOut = os.Stderr
 	}
 	cfg := &config.Config{
-		GoogleUsers:    []string{*email},
-		BasicAuthUsers: []config.BasicAuthInfo{{Username: test.Username, Password: test.Password}},
-		SongBaseURL:    fileSrv.URL + "/music/",
-		CoverBaseURL:   fileSrv.URL + "/covers/",
-		Presets:        presets,
-		Minify:         minify,
+		Users: []config.User{
+			{Email: *email},
+			{Username: test.Username, Password: test.Password, Admin: true},
+		},
+		SongBaseURL:  fileSrv.URL + "/music/",
+		CoverBaseURL: fileSrv.URL + "/covers/",
+		Presets:      presets,
+		Minify:       minify,
 	}
 	appSrv, err := test.NewDevAppserver(cfg, filepath.Join(tmpDir, "app_storage"), appOut,
 		test.DevAppserverPort(*port), test.DevAppserverWatchForChanges(true))

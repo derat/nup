@@ -51,14 +51,13 @@ func writeTextResponse(w http.ResponseWriter, s string) {
 	w.Write([]byte(s))
 }
 
-// handlerAuth is passed to addHandler to describe authorization requirements.
-type handlerAuth int
+// authAction is passed to addHandler to describe how unauthorized requests should be handled.
+type authAction int
 
 const (
-	rejectUnauth     handlerAuth = iota // 401 if unauthorized
-	rejectUnauthCron                    // 401 if unauthorized and not from cron
-	redirectUnauth                      // 302 to login page if unauthorized
-	allowUnauth
+	rejectUnauth   authAction = iota // 401 if unauthorized
+	redirectUnauth                   // 302 to login page if unauthorized
+	allowUnauth                      // allow unauthorized access
 )
 
 // handlerFunc handles HTTP requests to a single endpoint.
@@ -67,7 +66,7 @@ type handlerFunc func(ctx context.Context, cfg *config.Config, w http.ResponseWr
 // addHandler registers fn to handle HTTP requests to the specified path.
 // Requests are verified to meet authorization requirements and use
 // the specified HTTP method before they are passed to fn.
-func addHandler(path, method string, auth handlerAuth, fn handlerFunc) {
+func addHandler(path, method string, allowed config.UserType, action authAction, fn handlerFunc) {
 	http.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		ctx := appengine.NewContext(r)
 		cfg, err := getConfig(ctx)
@@ -77,11 +76,10 @@ func addHandler(path, method string, auth handlerAuth, fn handlerFunc) {
 			return
 		}
 
-		if auth != allowUnauth {
-			allowCron := auth == rejectUnauthCron
-			if ok, username := cfg.Auth(r, allowCron); !ok {
-				switch auth {
-				case rejectUnauth, rejectUnauthCron:
+		if action != allowUnauth {
+			if ok, username := cfg.Auth(r, allowed); !ok {
+				switch action {
+				case rejectUnauth:
 					log.Debugf(ctx, "Unauthorized request for %v from %v (user %q)",
 						r.URL.String(), r.RemoteAddr, username)
 					http.Error(w, "Request requires authorization", http.StatusUnauthorized)
@@ -95,8 +93,8 @@ func addHandler(path, method string, auth handlerAuth, fn handlerFunc) {
 						http.Redirect(w, r, u, http.StatusFound)
 					}
 				default:
-					log.Errorf(ctx, "Unhandled auth type %v", auth)
-					http.Error(w, "Unhandled auth type", http.StatusInternalServerError)
+					log.Errorf(ctx, "Unhandled auth action %v", action)
+					http.Error(w, "Unhandled auth action", http.StatusInternalServerError)
 				}
 				return
 			}

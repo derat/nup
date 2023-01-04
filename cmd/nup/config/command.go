@@ -99,10 +99,13 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 
 	// Check that the 'nup' command will still be able to access the server with the new config.
 	var foundUser bool
-	for _, ai := range cfg.BasicAuthUsers {
-		if ai.Username == cmd.Cfg.Username {
-			if ai.Password != cmd.Cfg.Password {
-				fmt.Fprintf(os.Stderr, "Password for user %q doesn't match client config\n", ai.Username)
+	for _, u := range cfg.Users {
+		if u.Username == cmd.Cfg.Username {
+			if u.Password != cmd.Cfg.Password {
+				fmt.Fprintf(os.Stderr, "Password for user %q doesn't match client config\n", u.Username)
+				return subcommands.ExitFailure
+			} else if !u.Admin {
+				fmt.Fprintf(os.Stderr, "User %q is not an admin\n", u.Username)
 				return subcommands.ExitFailure
 			}
 			foundUser = true
@@ -110,7 +113,7 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 		}
 	}
 	if !foundUser {
-		fmt.Fprintf(os.Stderr, "Config doesn't contain user %q for 'nup' command\n", cmd.Cfg.Username)
+		fmt.Fprintf(os.Stderr, "Config doesn't contain admin user %q for 'nup' command\n", cmd.Cfg.Username)
 		return subcommands.ExitFailure
 	}
 
