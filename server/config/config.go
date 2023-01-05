@@ -25,7 +25,7 @@ const (
 
 // SavedConfig is used to store a JSON-marshaled Config in Datastore.
 type SavedConfig struct {
-	JSON string `datastore:"json"`
+	JSON string `datastore:"json,noindex"`
 }
 
 // User contains information about a user allowed to access the server.
