@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -28,8 +29,11 @@ import (
 )
 
 const (
-	songBucket  = "song-bucket"
 	coverBucket = "cover-bucket"
+
+	guestUsername    = "guest"
+	guestPassword    = "guestpw"
+	maxGuestRequests = 3
 )
 
 var (
@@ -79,10 +83,24 @@ func runTests(m *testing.M) (res int, err error) {
 	}
 	defer appLog.Close()
 
+	// Serve the test/data/songs directory so the server's /song endpoint will work.
+	// This just serves the checked-in data, so it won't necessarily match the songs
+	// that a given test has imported into the server.
+	songsDir, err := test.SongsDir()
+	if err != nil {
+		return -1, err
+	}
+	songsSrv := test.ServeFiles(songsDir)
+	defer songsSrv.Close()
+
 	cfg := &config.Config{
-		Users:       []config.User{{Username: test.Username, Password: test.Password, Admin: true}},
-		SongBucket:  songBucket,
-		CoverBucket: coverBucket,
+		Users: []config.User{
+			{Username: test.Username, Password: test.Password, Admin: true},
+			{Username: guestUsername, Password: guestPassword, Guest: true},
+		},
+		SongBaseURL:                 songsSrv.URL,
+		CoverBaseURL:                songsSrv.URL, // bogus, but no tests request covers
+		MaxGuestSongRequestsPerHour: maxGuestRequests,
 	}
 	storageDir := filepath.Join(outDir, "app_storage")
 	srv, err := test.NewDevAppserver(cfg, storageDir, appLog, test.DevAppserverCreateIndexes(*createIndexes))
@@ -1039,4 +1057,64 @@ func TestUpdateError(tt *testing.T) {
 	if _, stderr, err := t.UpdateSongsRaw(); err == nil {
 		tt.Error("Repeated update attempt unexpectedly succeeded\nstderr:\n" + stderr)
 	}
+}
+
+func TestGuestUser(tt *testing.T) {
+	t, done := initTest(tt)
+	defer done()
+
+	log.Print("Posting song and updating stats")
+	t.PostSongs([]db.Song{Song0s}, false, 0)
+	t.UpdateStats()
+	songID := t.SongID(Song0s.SHA1)
+
+	send := func(method, path, user, pass string) int {
+		req := t.NewRequest(method, path, nil)
+		req.SetBasicAuth(user, pass)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			tt.Fatalf("%v request to %v from %q failed: %v", method, path, user, err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	// Normal (or admin) users should be able to call /rate_and_tag, but guest users shouldn't.
+	log.Print("Checking /rate_and_tag access")
+	ratePath := "rate_and_tag?songId=" + songID + "&rating=5"
+	if code := send("POST", ratePath, test.Username, test.Password); code != http.StatusOK {
+		tt.Fatalf("Normal request for /%v returned %v; want %v", ratePath, code, http.StatusOK)
+	}
+	if code := send("POST", ratePath, guestUsername, guestPassword); code != http.StatusForbidden {
+		tt.Fatalf("Guest request for /%v returned %v; want %v", ratePath, code, http.StatusForbidden)
+	}
+
+	// Guest users should be able to fetch /stats, but not update them via /stats?update=1.
+	log.Print("Checking /stats access")
+	if code := send("GET", "stats", guestUsername, guestPassword); code != http.StatusOK {
+		tt.Fatalf("Guest request for /stats returned %v; want %v", code, http.StatusOK)
+	}
+	if code := send("GET", "stats?update=1", guestUsername, guestPassword); code != http.StatusForbidden {
+		tt.Fatalf("Guest request for /stats?update=1 returned %v; want %v", code, http.StatusForbidden)
+	}
+
+	// Normal (or admin) users should be able to go above the guest rate limit for /song.
+	log.Print("Checking /song rate-limiting")
+	songPath := "song?filename=" + url.QueryEscape(Song0s.Filename)
+	for i := 0; i <= maxGuestRequests; i++ {
+		if code := send("GET", songPath, test.Username, test.Password); code != http.StatusOK {
+			tt.Fatalf("Normal request %v for /%v returned %v; want %v", i, songPath, code, http.StatusOK)
+		}
+	}
+	// The guest user should get an error when they exceed the limit.
+	for i := 0; i <= maxGuestRequests; i++ {
+		want := http.StatusOK
+		if i == maxGuestRequests {
+			want = http.StatusTooManyRequests
+		}
+		if code := send("GET", songPath, guestUsername, guestPassword); code != want {
+			tt.Fatalf("Guest request %v for /%v returned %v; want %v", i, songPath, code, want)
+		}
+	}
+
 }

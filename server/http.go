@@ -55,7 +55,7 @@ func writeTextResponse(w http.ResponseWriter, s string) {
 type authAction int
 
 const (
-	rejectUnauth   authAction = iota // 401 if unauthorized
+	rejectUnauth   authAction = iota // 401/403 if unauthorized
 	redirectUnauth                   // 302 to login page if unauthorized
 	allowUnauth                      // allow unauthorized access
 )
@@ -77,12 +77,16 @@ func addHandler(path, method string, allowed config.UserType, action authAction,
 		}
 
 		if action != allowUnauth {
-			if ok, username := cfg.Auth(r, allowed); !ok {
+			if username, utype := cfg.GetUser(r); allowed&utype == 0 {
 				switch action {
 				case rejectUnauth:
+					code := http.StatusUnauthorized // no creds or invalid creds
+					if utype != 0 {
+						code = http.StatusForbidden // valid creds but not enough privileges
+					}
 					log.Debugf(ctx, "Unauthorized request for %v from %v (user %q)",
 						r.URL.String(), r.RemoteAddr, username)
-					http.Error(w, "Request requires authorization", http.StatusUnauthorized)
+					http.Error(w, http.StatusText(code), code)
 				case redirectUnauth:
 					if u, err := getLoginURL(ctx); err != nil {
 						log.Errorf(ctx, "Failed generating login URL: %v", err)

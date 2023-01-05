@@ -5,10 +5,12 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"time"
 
+	"google.golang.org/appengine/v2"
 	"google.golang.org/appengine/v2/log"
 
 	"cloud.google.com/go/storage"
@@ -26,6 +28,11 @@ type ObjectReader struct {
 }
 
 func NewObjectReader(ctx context.Context, bucket, name string) (*ObjectReader, error) {
+	// Tests shouldn't be trying to access Cloud Storage.
+	if appengine.IsDevAppServer() {
+		return nil, errors.New("accessing bucket from test")
+	}
+
 	client, err := storage.NewClient(ctx)
 	if err != nil {
 		return nil, err

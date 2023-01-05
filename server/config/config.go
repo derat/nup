@@ -39,24 +39,34 @@ type User struct {
 	// Admin is true if this user should have elevated permissions.
 	// This should only be set for the HTTP basic auth account used by the nup command-line executable.
 	Admin bool `json:"admin"`
+	// Guest is true if this user should have reduced permissions.
+	// This can be set for HTTP basic auth accounts used by the Android app.
+	Guest bool `json:"guest"`
 }
 
 // Type returns u's type.
 func (u *User) Type() UserType {
-	if u.Admin {
+	switch {
+	case u.Guest:
+		return GuestUser
+	case u.Admin:
 		return AdminUser
+	default:
+		return NormalUser
 	}
-	return NormalUser
 }
 
 // UserType describes the level of access granted to a user.
+// 0 represents a non-user.
 type UserType uint32
 
 const (
-	// NormalUser indicates a user without its Admin field set to true.
+	// NormalUser indicates a non-admin, non-guest user.
 	NormalUser UserType = 1 << iota
 	// AdminUser indicates a user with its Admin field set to true.
 	AdminUser
+	// GuestUser indicates a user with its Guest field set to true.
+	GuestUser
 	// CronUser indicates a request issued by App Engine cron jobs.
 	CronUser
 )
@@ -136,6 +146,10 @@ type Config struct {
 	// Minify describes whether the server should minify JavaScript, HTML, and CSS code
 	// and bundle all JavaScript code into a single file. Defaults to true if unset.
 	Minify *bool `json:"minify"`
+
+	// MaxGuestSongRequestsPerHour contains the maximum rate at which each guest
+	// user can send requests to the /song endpoint. Unlimited if 0 or negative.
+	MaxGuestSongRequestsPerHour int `json:"maxGuestSongRequestsPerHour,omitempty"`
 }
 
 // Parse unmarshals jsonData, validates it, and returns the resulting config.
@@ -170,6 +184,8 @@ func Parse(jsonData []byte) (*Config, error) {
 			return nil, fmt.Errorf("user %d has email %q but non-empty password", i, u.Email)
 		case u.Username != "" && u.Password == "":
 			return nil, fmt.Errorf("user %d has username %q but empty password", i, u.Username)
+		case u.Admin && u.Guest:
+			return nil, fmt.Errorf("user %d is both admin and guest", i)
 		}
 		if u.Admin {
 			admin = true
@@ -205,35 +221,32 @@ func Load(ctx context.Context) (*Config, error) {
 	return Parse(b)
 }
 
-// Auth authenticates r using Google authentication or HTTP basic auth or checks that it was issued
-// by an App Engine cron job. If the corresponding user in cfg.Users has a type included in the
-// supplied allowed arg, true is returned; false is returned otherwise. A username or email address
-// that can be used in logging is returned if found, even if the the request is unauthorized.
-func (cfg *Config) Auth(r *http.Request, allowed UserType) (ok bool, name string) {
+// GetUser returns information about the user who sent r.
+// If the request was unauthenticated or the user is not listed in cfg.Users, utype is 0.
+// A username or email address that can be used in logging is returned if possible,
+// even if the the request is not from a known user.
+func (cfg *Config) GetUser(r *http.Request) (name string, utype UserType) {
 	// https://cloud.google.com/appengine/docs/standard/go/scheduling-jobs-with-cron-yaml#validating_cron_requests
 	if r.Header.Get("X-Appengine-Cron") == "true" {
-		return allowed&CronUser != 0, "cron"
+		return "cron", CronUser
 	}
-
 	if username, password, ok := r.BasicAuth(); ok {
 		for _, u := range cfg.Users {
 			if username == u.Username && password == u.Password {
-				return allowed&u.Type() != 0, username
+				return username, u.Type()
 			}
 		}
-		return false, username
+		return username, 0
 	}
-
 	if gu := user.Current(appengine.NewContext(r)); gu != nil {
 		for _, u := range cfg.Users {
 			if gu.Email == u.Email {
-				return allowed&u.Type() != 0, gu.Email
+				return gu.Email, u.Type()
 			}
 		}
-		return false, gu.Email
+		return gu.Email, 0
 	}
-
-	return false, ""
+	return "", 0
 }
 
 // cleanBaseURL appends a trailing slash to u if not already present.

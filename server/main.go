@@ -29,6 +29,7 @@ import (
 	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/server/dump"
 	"github.com/derat/nup/server/query"
+	"github.com/derat/nup/server/ratelimit"
 	"github.com/derat/nup/server/stats"
 	"github.com/derat/nup/server/update"
 
@@ -61,27 +62,28 @@ func main() {
 	// Get masks for various types of users.
 	norm := config.NormalUser
 	admin := config.AdminUser
+	guest := config.GuestUser
 	cron := config.CronUser
 
 	// Use a wrapper instead of calling http.HandleFunc directly to reduce the risk
 	// that a handler neglects checking that requests are authorized.
-	addHandler("/", http.MethodGet, norm, redirectUnauth, handleStatic)
-	addHandler("/manifest.json", http.MethodGet, norm, allowUnauth, handleStatic)
+	addHandler("/", http.MethodGet, norm|admin|guest, redirectUnauth, handleStatic)
+	addHandler("/manifest.json", http.MethodGet, norm|admin|guest, allowUnauth, handleStatic)
 
-	addHandler("/cover", http.MethodGet, norm, rejectUnauth, handleCover)
+	addHandler("/cover", http.MethodGet, norm|admin|guest, rejectUnauth, handleCover)
 	addHandler("/delete_song", http.MethodPost, admin, rejectUnauth, handleDeleteSong)
-	addHandler("/dump_song", http.MethodGet, norm|admin, rejectUnauth, handleDumpSong)
-	addHandler("/export", http.MethodGet, norm|admin, rejectUnauth, handleExport)
+	addHandler("/dump_song", http.MethodGet, norm|admin|guest, rejectUnauth, handleDumpSong)
+	addHandler("/export", http.MethodGet, norm|admin|guest, rejectUnauth, handleExport)
 	addHandler("/import", http.MethodPost, admin, rejectUnauth, handleImport)
-	addHandler("/now", http.MethodGet, norm|admin, rejectUnauth, handleNow)
-	addHandler("/played", http.MethodPost, norm|admin, rejectUnauth, handlePlayed)
-	addHandler("/presets", http.MethodGet, norm|admin, rejectUnauth, handlePresets)
-	addHandler("/query", http.MethodGet, norm|admin, rejectUnauth, handleQuery)
+	addHandler("/now", http.MethodGet, norm|admin|guest, rejectUnauth, handleNow)
+	addHandler("/played", http.MethodPost, norm|admin|guest, rejectUnauth, handlePlayed)
+	addHandler("/presets", http.MethodGet, norm|admin|guest, rejectUnauth, handlePresets)
+	addHandler("/query", http.MethodGet, norm|admin|guest, rejectUnauth, handleQuery)
 	addHandler("/rate_and_tag", http.MethodPost, norm|admin, rejectUnauth, handleRateAndTag)
 	addHandler("/reindex", http.MethodPost, admin, rejectUnauth, handleReindex)
-	addHandler("/song", http.MethodGet, norm, rejectUnauth, handleSong)
-	addHandler("/stats", http.MethodGet, norm|admin|cron, rejectUnauth, handleStats)
-	addHandler("/tags", http.MethodGet, norm|admin, rejectUnauth, handleTags)
+	addHandler("/song", http.MethodGet, norm|admin|guest, rejectUnauth, handleSong)
+	addHandler("/stats", http.MethodGet, norm|admin|guest|cron, rejectUnauth, handleStats)
+	addHandler("/tags", http.MethodGet, norm|admin|guest, rejectUnauth, handleTags)
 
 	if appengine.IsDevAppServer() {
 		addHandler("/clear", http.MethodPost, admin, rejectUnauth, handleClear)
@@ -144,6 +146,11 @@ func handleClear(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 	}
 	if err := stats.Clear(ctx); err != nil {
 		log.Errorf(ctx, "Clearing stats failed: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := ratelimit.Clear(ctx); err != nil {
+		log.Errorf(ctx, "Clearing rate-limiting info failed: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -561,28 +568,6 @@ func handleReindex(ctx context.Context, cfg *config.Config, w http.ResponseWrite
 	})
 }
 
-func handleStats(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
-	// Updates would be better suited to POST than to GET, but App Engine cron uses GET per
-	// https://cloud.google.com/appengine/docs/standard/go/scheduling-jobs-with-cron-yaml.
-	if r.FormValue("update") == "1" {
-		if err := stats.Update(ctx); err != nil {
-			log.Errorf(ctx, "Updating stats failed: %v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		writeTextResponse(w, "ok")
-		return
-	}
-
-	stats, err := stats.Get(ctx)
-	if err != nil {
-		log.Errorf(ctx, "Getting stats failed: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeJSONResponse(w, stats)
-}
-
 // The existence of this endpoint makes me extremely unhappy, but it seems necessary due to
 // bad interactions between Google Cloud Storage, the Web Audio API, and CORS:
 //
@@ -601,6 +586,18 @@ func handleStats(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 // The Web Audio part of this is particularly frustrating, as the JS doesn't actually need to look
 // at the audio data; it just need to amplify it.
 func handleSong(ctx context.Context, cfg *config.Config, w http.ResponseWriter, req *http.Request) {
+	if max := cfg.MaxGuestSongRequestsPerHour; max > 0 {
+		if user, utype := cfg.GetUser(req); utype == config.GuestUser {
+			// TODO: This should probably handle range requests differently.
+			// Maybe we should just count requests that ask for the first byte?
+			if err := ratelimit.Attempt(ctx, user, time.Now(), max, time.Hour); err != nil {
+				log.Errorf(ctx, "Song request from %q rejected: %v", user, err)
+				http.Error(w, "Guest rate limit exceeded", http.StatusTooManyRequests)
+				return
+			}
+		}
+	}
+
 	fn := req.FormValue("filename")
 	if fn == "" {
 		log.Errorf(ctx, "Missing filename in song data request")
@@ -671,6 +668,34 @@ func handleStatic(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 		//  https://github.com/GoogleChrome/web.dev/issues/3913
 		http.ServeContent(w, req, filepath.Base(p), time.Time{}, bytes.NewReader(b))
 	}
+}
+
+func handleStats(ctx context.Context, cfg *config.Config, w http.ResponseWriter, req *http.Request) {
+	// Updates would be better suited to POST than to GET, but App Engine cron uses GET per
+	// https://cloud.google.com/appengine/docs/standard/go/scheduling-jobs-with-cron-yaml.
+	if req.FormValue("update") == "1" {
+		// Don't let guest users update stats.
+		if user, utype := cfg.GetUser(req); utype == config.GuestUser {
+			log.Errorf(ctx, "Rejecting stats update from guest user %q", user)
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return
+		}
+		if err := stats.Update(ctx); err != nil {
+			log.Errorf(ctx, "Updating stats failed: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeTextResponse(w, "ok")
+		return
+	}
+
+	stats, err := stats.Get(ctx)
+	if err != nil {
+		log.Errorf(ctx, "Getting stats failed: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSONResponse(w, stats)
 }
 
 func handleTags(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {

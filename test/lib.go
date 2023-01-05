@@ -26,21 +26,29 @@ func Must(t *testing.T, err error) {
 	}
 }
 
-// CopySongs copies the provided songs (e.g. Song0s.Filename) into dir.
+// SongsDir returns the test/data/songs directory containing sample song files.
+func SongsDir() (string, error) {
+	libDir, err := CallerDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(libDir, "data/songs"), nil
+}
+
+// CopySongs copies the provided songs (e.g. Song0s.Filename) from SongsDir into dir.
 // The supplied directory is created if it doesn't already exist.
 func CopySongs(dir string, filenames ...string) error {
-	libDir, err := CallerDir()
+	srcDir, err := SongsDir()
 	if err != nil {
 		return err
 	}
-	musicDir := filepath.Join(libDir, "data/songs")
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 
 	for _, fn := range filenames {
-		sp := filepath.Join(musicDir, fn)
+		sp := filepath.Join(srcDir, fn)
 		s, err := os.Open(sp)
 		if err != nil {
 			return err

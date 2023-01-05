@@ -34,6 +34,9 @@ func TestAddHandler(t *testing.T) {
 		adminUser = "admin"
 		adminPass = "adminPass"
 
+		guestUser = "guest"
+		guestPass = "guestPass"
+
 		badUser = "bad"
 		badPass = "badPass"
 	)
@@ -50,6 +53,7 @@ func TestAddHandler(t *testing.T) {
 		Users: []config.User{
 			{Username: normUser, Password: normPass},
 			{Username: adminUser, Password: adminPass, Admin: true},
+			{Username: guestUser, Password: guestPass, Guest: true},
 			{Email: normEmail},
 		},
 		SongBucket:  "test-songs",
@@ -85,10 +89,11 @@ func TestAddHandler(t *testing.T) {
 
 	norm := config.NormalUser
 	admin := config.AdminUser
+	guest := config.GuestUser
 	cron := config.CronUser
 
-	addHandler("/", http.MethodGet, norm|admin, redirectUnauth, handleReq)
-	addHandler("/get", http.MethodGet, norm|admin, rejectUnauth, handleReq)
+	addHandler("/", http.MethodGet, norm|admin|guest, redirectUnauth, handleReq)
+	addHandler("/get", http.MethodGet, norm|admin|guest, rejectUnauth, handleReq)
 	addHandler("/post", http.MethodPost, norm|admin, rejectUnauth, handleReq)
 	addHandler("/admin", http.MethodPost, admin, rejectUnauth, handleReq)
 	addHandler("/cron", http.MethodGet, norm|admin|cron, rejectUnauth, handleReq)
@@ -104,6 +109,7 @@ func TestAddHandler(t *testing.T) {
 		{"GET", "/", normEmail, "", "", false, 200},
 		{"GET", "/", "", normUser, normPass, false, 200},
 		{"GET", "/", "", adminUser, adminPass, false, 200},
+		{"GET", "/", "", guestUser, guestPass, false, 200},
 		{"GET", "/", normEmail, badUser, badPass, false, 302}, // bad basic user; don't check google
 		{"GET", "/", badEmail, "", "", false, 302},            // bad google user
 		{"GET", "/", "", badUser, badPass, false, 302},        // bad basic user
@@ -115,6 +121,7 @@ func TestAddHandler(t *testing.T) {
 
 		{"GET", "/get", normEmail, "", "", false, 200},
 		{"GET", "/get", "", adminUser, adminPass, false, 200},
+		{"GET", "/get", "", guestUser, guestPass, false, 200},
 		{"GET", "/get", badEmail, "", "", false, 401},
 		{"GET", "/get", "", "", "", false, 401},         // no auth
 		{"POST", "/get", "", "", "", false, 401},        // no auth, wrong method
@@ -123,13 +130,14 @@ func TestAddHandler(t *testing.T) {
 		{"POST", "/post", normEmail, "", "", false, 200},
 		{"POST", "/post", "", adminUser, adminPass, false, 200},
 		{"POST", "/post", badEmail, "", "", false, 401},
-		{"POST", "/post", "", "", "", false, 401},       // no auth
-		{"GET", "/post", "", "", "", false, 401},        // no auth, wrong method
-		{"GET", "/post", normEmail, "", "", false, 405}, // valid auth, wrong method
+		{"POST", "/post", "", "", "", false, 401},               // no auth
+		{"GET", "/post", "", "", "", false, 401},                // no auth, wrong method
+		{"POST", "/post", "", guestUser, guestPass, false, 403}, // guest not allowed
+		{"GET", "/post", normEmail, "", "", false, 405},         // valid auth, wrong method
 
 		{"POST", "/admin", "", adminUser, adminPass, false, 200},
-		{"POST", "/admin", normEmail, "", "", false, 401},      // not admin
-		{"POST", "/admin", "", normUser, normPass, false, 401}, // not admin
+		{"POST", "/admin", normEmail, "", "", false, 403},      // not admin
+		{"POST", "/admin", "", normUser, normPass, false, 403}, // not admin
 		{"POST", "/post", "", "", "", false, 401},              // no auth
 
 		{"GET", "/cron", normEmail, "", "", false, 200},
@@ -144,6 +152,7 @@ func TestAddHandler(t *testing.T) {
 		{"GET", "/allow", normEmail, "", "", false, 200},        // valid user
 		{"GET", "/allow", "", normUser, normPass, false, 200},   // valid auth
 		{"GET", "/allow", "", adminUser, adminPass, false, 200}, // valid auth
+		{"GET", "/allow", "", guestUser, guestPass, false, 200}, // unlisted auth
 		{"POST", "/allow", "", "", "", false, 405},              // wrong method
 	} {
 		desc := tc.method + " " + tc.path

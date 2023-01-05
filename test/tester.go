@@ -295,7 +295,9 @@ func (t *Tester) ReindexSongs() {
 	}
 }
 
-func (t *Tester) newRequest(method, path string, body io.Reader) *http.Request {
+// NewRequest creates a new http.Request with the specified parameters.
+// Tests should generally call helper methods like PostSongs or QuerySongs instead.
+func (t *Tester) NewRequest(method, path string, body io.Reader) *http.Request {
 	req, err := http.NewRequest(method, t.serverURL+path, body)
 	if err != nil {
 		t.fatalf("Failed creating %v request to %v: %v", method, path, err)
@@ -304,6 +306,7 @@ func (t *Tester) newRequest(method, path string, body io.Reader) *http.Request {
 	return req
 }
 
+// sendRequest sends req to the server and returns the response.
 func (t *Tester) sendRequest(req *http.Request) *http.Response {
 	resp, err := t.client.Do(req)
 	if err != nil {
@@ -316,7 +319,7 @@ func (t *Tester) sendRequest(req *http.Request) *http.Response {
 }
 
 func (t *Tester) doPost(pathAndQueryParams string, body io.Reader) {
-	req := t.newRequest("POST", pathAndQueryParams, body)
+	req := t.NewRequest("POST", pathAndQueryParams, body)
 	req.Header.Set("Content-Type", "text/plain")
 	resp := t.sendRequest(req)
 	defer resp.Body.Close()
@@ -327,7 +330,7 @@ func (t *Tester) doPost(pathAndQueryParams string, body io.Reader) {
 
 // PingServer fails the test if the server isn't serving the main page.
 func (t *Tester) PingServer() {
-	resp, err := t.client.Do(t.newRequest("GET", "/", nil))
+	resp, err := t.client.Do(t.NewRequest("GET", "/", nil))
 	if err != nil && err.(*url.Error).Timeout() {
 		t.fatal("Server timed out (is the app crashing?)")
 	} else if err != nil {
@@ -357,7 +360,7 @@ func (t *Tester) PostSongs(songs []db.Song, replaceUserData bool, updateDelay ti
 
 // QuerySongs issues a query with the supplied parameters to the server.
 func (t *Tester) QuerySongs(params ...string) []db.Song {
-	resp := t.sendRequest(t.newRequest("GET", "query?"+strings.Join(params, "&"), nil))
+	resp := t.sendRequest(t.NewRequest("GET", "query?"+strings.Join(params, "&"), nil))
 	defer resp.Body.Close()
 
 	songs := make([]db.Song, 0)
@@ -391,7 +394,7 @@ func (t *Tester) GetTags(requireCache bool) string {
 	if requireCache {
 		path += "?requireCache=1"
 	}
-	resp := t.sendRequest(t.newRequest("GET", path, nil))
+	resp := t.sendRequest(t.NewRequest("GET", path, nil))
 	defer resp.Body.Close()
 
 	tags := make([]string, 0)
@@ -431,7 +434,7 @@ func (t *Tester) ReportPlayedUnix(songID string, startTime time.Time) {
 
 // GetNowFromServer queries the server for the current time.
 func (t *Tester) GetNowFromServer() time.Time {
-	resp := t.sendRequest(t.newRequest("GET", "now", nil))
+	resp := t.sendRequest(t.NewRequest("GET", "now", nil))
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
@@ -478,7 +481,7 @@ func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted DeletionP
 			path += "&cursor=" + cursor
 		}
 
-		resp := t.sendRequest(t.newRequest("GET", path, nil))
+		resp := t.sendRequest(t.NewRequest("GET", path, nil))
 		defer resp.Body.Close()
 
 		// We receive a sequence of marshaled songs optionally followed by a cursor.
@@ -512,7 +515,7 @@ func (t *Tester) GetSongsForAndroid(minLastModified time.Time, deleted DeletionP
 
 // GetStats gets current stats from the server.
 func (t *Tester) GetStats() db.Stats {
-	resp := t.sendRequest(t.newRequest("GET", "stats", nil))
+	resp := t.sendRequest(t.NewRequest("GET", "stats", nil))
 	defer resp.Body.Close()
 
 	var stats db.Stats
@@ -524,7 +527,7 @@ func (t *Tester) GetStats() db.Stats {
 
 // UpdateStats instructs the server to update stats.
 func (t *Tester) UpdateStats() {
-	resp := t.sendRequest(t.newRequest("GET", "stats?update=1", nil))
+	resp := t.sendRequest(t.NewRequest("GET", "stats?update=1", nil))
 	resp.Body.Close()
 }
 
