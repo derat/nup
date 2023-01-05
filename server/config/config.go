@@ -32,16 +32,22 @@ type SavedConfig struct {
 type User struct {
 	// Email contains an email address for Google authentication.
 	Email string `json:"email"`
+
 	// Username contains a username for HTTP basic auth.
 	Username string `json:"username"`
 	// Password contains a password for HTTP basic auth.
 	Password string `json:"password"`
+
 	// Admin is true if this user should have elevated permissions.
 	// This should only be set for the HTTP basic auth account used by the nup command-line executable.
 	Admin bool `json:"admin"`
 	// Guest is true if this user should have reduced permissions.
 	// This can be set for HTTP basic auth accounts used by the Android app.
 	Guest bool `json:"guest"`
+
+	// Presets contains custom search presets for this user.
+	// If empty, Config.Presets will be used instead.
+	Presets []SearchPreset `json:"presets"`
 }
 
 // Type returns u's type.
@@ -71,9 +77,9 @@ const (
 	CronUser
 )
 
-// SearchPreset specifies a search preset to display in the web interface.
+// SearchPreset specifies a search preset to display.
 type SearchPreset struct {
-	// Name contains a human-readable name to display in the interface.
+	// Name contains a human-readable name describing the preset.
 	Name string `json:"name"`
 	// Tags contains a space-separated tag expression, e.g. "guitar -banjo".
 	Tags string `json:"tags"`
@@ -140,7 +146,7 @@ type Config struct {
 	// Exactly one of CoverBucket and CoverBaseURL must be set.
 	CoverBaseURL string `json:"coverBaseUrl,omitempty"`
 
-	// Presets describes search presets for the web interface.
+	// Presets contains default search presets.
 	Presets []SearchPreset `json:"presets"`
 
 	// Minify describes whether the server should minify JavaScript, HTML, and CSS code
@@ -247,6 +253,26 @@ func (cfg *Config) GetUser(r *http.Request) (name string, utype UserType) {
 		return gu.Email, 0
 	}
 	return "", 0
+}
+
+// GetPresets returns search presets for the user who issued r.
+func (cfg *Config) GetPresets(r *http.Request) []SearchPreset {
+	// Make sure that this is from a known user.
+	name, utype := cfg.GetUser(r)
+	if utype&(GuestUser|NormalUser|AdminUser) == 0 {
+		return nil
+	}
+	// Check if the user has custom presets defined.
+	for _, u := range cfg.Users {
+		if u.Email == name || u.Username == name {
+			if len(u.Presets) > 0 {
+				return u.Presets
+			}
+			break
+		}
+	}
+	// Fall back to the default presets.
+	return cfg.Presets
 }
 
 // cleanBaseURL appends a trailing slash to u if not already present.

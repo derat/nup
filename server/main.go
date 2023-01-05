@@ -421,7 +421,7 @@ func handlePlayed(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 }
 
 func handlePresets(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
-	writeJSONResponse(w, cfg.Presets)
+	writeJSONResponse(w, cfg.GetPresets(r))
 }
 
 func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {

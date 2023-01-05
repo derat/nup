@@ -95,7 +95,7 @@ address.
 ### /presets (GET)
 
 Returns a JSON-marshaled array of [SearchPreset] objects describing search
-presets for the web interface.
+presets that can be used by clients.
 
 ### /query (GET)
 
