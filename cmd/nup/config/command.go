@@ -145,17 +145,17 @@ func deleteInstances(ctx context.Context, projectID, service string, creds *goog
 
 	resp, err := vsrv.List(projectID, service).Do()
 	if err != nil {
-		return err
+		return fmt.Errorf("list versions: %v", err)
 	}
 	for _, ver := range resp.Versions {
 		resp, err := isrv.List(projectID, service, ver.Id).Do()
 		if err != nil {
-			return err
+			return fmt.Errorf("list instances: %v", err)
 		}
 		for _, inst := range resp.Instances {
 			log.Println("Deleting instance", inst.Name)
 			if _, err := isrv.Delete(projectID, service, ver.Id, inst.Id).Do(); err != nil {
-				return err
+				return fmt.Errorf("delete instance: %v", err)
 			}
 		}
 	}
