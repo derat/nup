@@ -95,7 +95,9 @@ address.
 ### /presets (GET)
 
 Returns a JSON-marshaled array of [SearchPreset] objects describing search
-presets that can be used by clients.
+presets that can be used by clients. If the server's configuration specified
+custom presets for the requesting user, they are returned instead of the default
+presets.
 
 ### /query (GET)
 
@@ -173,9 +175,15 @@ Returns a JSON-marshaled array of strings containing known tags.
 
 *   `requireCache` (optional) - If `1`, only return cached data. Used by tests.
 
+### /user (GET)
+
+Returns a JSON-marshaled [User] object containing information about the
+requesting user.
+
 [Config]: ./config/config.go
 [Play]: ./db/song.go
 [Song]: ./db/song.go
 [SearchPreset]: ./config/config.go
 [Stats]: ./db/stats.go
+[User]: ./config/config.go
 [cron]: https://cloud.google.com/appengine/docs/standard/go/scheduling-jobs-with-cron-yaml

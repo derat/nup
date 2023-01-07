@@ -5,6 +5,8 @@
 package e2e
 
 import (
+	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -48,6 +50,9 @@ var (
 
 	appURL string // URL of App Engine app
 	outDir string // base directory for temp files and logs
+
+	guestExcludedTags = []string{"rock"}
+	guestPresets      = []config.SearchPreset{{Name: "custom", MinRating: 4}}
 )
 
 func TestMain(m *testing.M) {
@@ -96,7 +101,13 @@ func runTests(m *testing.M) (res int, err error) {
 	cfg := &config.Config{
 		Users: []config.User{
 			{Username: test.Username, Password: test.Password, Admin: true},
-			{Username: guestUsername, Password: guestPassword, Guest: true},
+			{
+				Username:     guestUsername,
+				Password:     guestPassword,
+				Guest:        true,
+				Presets:      guestPresets,
+				ExcludedTags: guestExcludedTags,
+			},
 		},
 		SongBaseURL:                 songsSrv.URL,
 		CoverBaseURL:                songsSrv.URL, // bogus, but no tests request covers
@@ -1068,51 +1079,88 @@ func TestGuestUser(tt *testing.T) {
 	t.UpdateStats()
 	songID := t.SongID(Song0s.SHA1)
 
-	send := func(method, path, user, pass string) int {
+	send := func(method, path, user, pass string) (int, []byte) {
 		req := t.NewRequest(method, path, nil)
 		req.SetBasicAuth(user, pass)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			tt.Fatalf("%v request to %v from %q failed: %v", method, path, user, err)
+			tt.Fatalf("%v request for %v from %q failed: %v", method, path, user, err)
 		}
-		resp.Body.Close()
-		return resp.StatusCode
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			tt.Fatalf("Failed reading body from %v request for %v from %q failed: %v", method, path, user, err)
+		}
+		return resp.StatusCode, body
 	}
 
 	// Normal (or admin) users should be able to call /rate_and_tag, but guest users shouldn't.
 	log.Print("Checking /rate_and_tag access")
-	ratePath := "rate_and_tag?songId=" + songID + "&rating=5"
-	if code := send("POST", ratePath, test.Username, test.Password); code != http.StatusOK {
+	ratePath := "rate_and_tag?songId=" + songID + "&rating=5&tags=drums+guitar+rock"
+	if code, _ := send("POST", ratePath, test.Username, test.Password); code != http.StatusOK {
 		tt.Fatalf("Normal request for /%v returned %v; want %v", ratePath, code, http.StatusOK)
 	}
-	if code := send("POST", ratePath, guestUsername, guestPassword); code != http.StatusForbidden {
+	if code, _ := send("POST", ratePath, guestUsername, guestPassword); code != http.StatusForbidden {
 		tt.Fatalf("Guest request for /%v returned %v; want %v", ratePath, code, http.StatusForbidden)
 	}
 
 	// Ditto for /played.
 	log.Print("Checking /played access")
 	playedPath := "played?songId=" + songID + "&startTime=2006-01-02T15:04:05Z"
-	if code := send("POST", playedPath, test.Username, test.Password); code != http.StatusOK {
+	if code, _ := send("POST", playedPath, test.Username, test.Password); code != http.StatusOK {
 		tt.Fatalf("Normal request for /%v returned %v; want %v", playedPath, code, http.StatusOK)
 	}
-	if code := send("POST", playedPath, guestUsername, guestPassword); code != http.StatusForbidden {
+	if code, _ := send("POST", playedPath, guestUsername, guestPassword); code != http.StatusForbidden {
 		tt.Fatalf("Guest request for /%v returned %v; want %v", playedPath, code, http.StatusForbidden)
+	}
+
+	// The /user endpoint should return information about the requesting user.
+	log.Print("Checking /user")
+	if code, got := send("GET", "user", test.Username, test.Password); code != http.StatusOK {
+		tt.Fatalf("Normal request for /user returned %v; want %v", code, http.StatusOK)
+	} else if want, err := json.Marshal(config.User{Username: test.Username, Admin: true}); err != nil {
+		tt.Fatal("Failed marshaling:", err)
+	} else if !bytes.Equal(got, want) {
+		tt.Fatalf("Normal request for /user gave %q; want %q", got, want)
+	}
+	if code, got := send("GET", "user", guestUsername, guestPassword); code != http.StatusOK {
+		tt.Fatalf("Guest request for /user returned %v; want %v", code, http.StatusOK)
+	} else if want, err := json.Marshal(
+		config.User{
+			Username:     guestUsername,
+			Guest:        true,
+			Presets:      guestPresets,
+			ExcludedTags: guestExcludedTags,
+		}); err != nil {
+		tt.Fatal("Failed marshaling:", err)
+	} else if !bytes.Equal(got, want) {
+		tt.Fatalf("Guest request for /user gave %q; want %q", got, want)
 	}
 
 	// Guest users should be able to fetch /stats, but not update them via /stats?update=1.
 	log.Print("Checking /stats access")
-	if code := send("GET", "stats", guestUsername, guestPassword); code != http.StatusOK {
+	if code, _ := send("GET", "stats", guestUsername, guestPassword); code != http.StatusOK {
 		tt.Fatalf("Guest request for /stats returned %v; want %v", code, http.StatusOK)
 	}
-	if code := send("GET", "stats?update=1", guestUsername, guestPassword); code != http.StatusForbidden {
+	if code, _ := send("GET", "stats?update=1", guestUsername, guestPassword); code != http.StatusForbidden {
 		tt.Fatalf("Guest request for /stats?update=1 returned %v; want %v", code, http.StatusForbidden)
+	}
+
+	log.Print("Checking that tags are excluded from /tags")
+	var tags []string
+	if code, body := send("GET", "tags", guestUsername, guestPassword); code != http.StatusOK {
+		tt.Fatalf("Guest request for /tags returned %v; want %v", code, http.StatusOK)
+	} else if err := json.Unmarshal(body, &tags); err != nil {
+		tt.Fatal("Failed unmarshaling:", err)
+	} else if want := []string{"drums", "guitar"}; !reflect.DeepEqual(tags, want) {
+		tt.Fatalf("Guest request for /tags returned %q; want %q", tags, want)
 	}
 
 	// Normal (or admin) users should be able to go above the guest rate limit for /song.
 	log.Print("Checking /song rate-limiting")
 	songPath := "song?filename=" + url.QueryEscape(Song0s.Filename)
 	for i := 0; i <= maxGuestRequests; i++ {
-		if code := send("GET", songPath, test.Username, test.Password); code != http.StatusOK {
+		if code, _ := send("GET", songPath, test.Username, test.Password); code != http.StatusOK {
 			tt.Fatalf("Normal request %v for /%v returned %v; want %v", i, songPath, code, http.StatusOK)
 		}
 	}
@@ -1122,9 +1170,8 @@ func TestGuestUser(tt *testing.T) {
 		if i == maxGuestRequests {
 			want = http.StatusTooManyRequests
 		}
-		if code := send("GET", songPath, guestUsername, guestPassword); code != want {
+		if code, _ := send("GET", songPath, guestUsername, guestPassword); code != want {
 			tt.Fatalf("Guest request %v for /%v returned %v; want %v", i, songPath, code, want)
 		}
 	}
-
 }

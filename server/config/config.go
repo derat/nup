@@ -15,7 +15,7 @@ import (
 
 	"google.golang.org/appengine/v2"
 	"google.golang.org/appengine/v2/datastore"
-	"google.golang.org/appengine/v2/user"
+	aeuser "google.golang.org/appengine/v2/user"
 )
 
 const (
@@ -48,6 +48,9 @@ type User struct {
 	// Presets contains custom search presets for this user.
 	// If empty, Config.Presets will be used instead.
 	Presets []SearchPreset `json:"presets"`
+
+	// ExcludedTags contains a list of tags used to filter songs.
+	ExcludedTags []string `json:"excludedTags"`
 }
 
 // Type returns u's type.
@@ -227,52 +230,56 @@ func Load(ctx context.Context) (*Config, error) {
 	return Parse(b)
 }
 
-// GetUser returns information about the user who sent r.
-// If the request was unauthenticated or the user is not listed in cfg.Users, utype is 0.
-// A username or email address that can be used in logging is returned if possible,
-// even if the the request is not from a known user.
-func (cfg *Config) GetUser(r *http.Request) (name string, utype UserType) {
-	// https://cloud.google.com/appengine/docs/standard/go/scheduling-jobs-with-cron-yaml#validating_cron_requests
-	if r.Header.Get("X-Appengine-Cron") == "true" {
-		return "cron", CronUser
-	}
-	if username, password, ok := r.BasicAuth(); ok {
+// findUser is a helper method for GetUser and GetUserType.
+// The user return value is a shallow copy from cfg.
+func (cfg *Config) findUser(req *http.Request) (user *User, name string) {
+	if username, password, ok := req.BasicAuth(); ok {
 		for _, u := range cfg.Users {
 			if username == u.Username && password == u.Password {
-				return username, u.Type()
+				return &u, username
 			}
 		}
-		return username, 0
+		return nil, username
 	}
-	if gu := user.Current(appengine.NewContext(r)); gu != nil {
+	if gu := aeuser.Current(appengine.NewContext(req)); gu != nil {
 		for _, u := range cfg.Users {
 			if gu.Email == u.Email {
-				return gu.Email, u.Type()
+				return &u, gu.Email
 			}
 		}
-		return gu.Email, 0
+		return nil, gu.Email
 	}
-	return "", 0
+	return nil, ""
 }
 
-// GetPresets returns search presets for the user who issued r.
-func (cfg *Config) GetPresets(r *http.Request) []SearchPreset {
-	// Make sure that this is from a known user.
-	name, utype := cfg.GetUser(r)
-	if utype&(GuestUser|NormalUser|AdminUser) == 0 {
-		return nil
+// GetUser attempts to find the user from cfg.Users that sent req.
+// This method does not identify cron requests; use GetUserType for that.
+// The returned User object is a shallow copy of the entry from cfg with its Password field cleared.
+// If the request was unauthenticated or the user is not listed in cfg.Users, nil is returned.
+// A username or email address that can be used in logging is returned if possible,
+// even if the the request is not from a known user.
+func (cfg *Config) GetUser(req *http.Request) (user *User, name string) {
+	if user, name = cfg.findUser(req); user == nil {
+		return nil, name
+	} else {
+		user.Password = ""
+		return user, name
 	}
-	// Check if the user has custom presets defined.
-	for _, u := range cfg.Users {
-		if u.Email == name || u.Username == name {
-			if len(u.Presets) > 0 {
-				return u.Presets
-			}
-			break
-		}
+}
+
+// GetUserType returns a UserType describing the user who sent req.
+// If the request was unauthenticated or the user is not listed in cfg.Users, 0 is returned.
+// A username or email address that can be used in logging is returned if possible,
+// even if the the request is not from a known user.
+func (cfg *Config) GetUserType(req *http.Request) (utype UserType, name string) {
+	// https://cloud.google.com/appengine/docs/standard/go/scheduling-jobs-with-cron-yaml#validating_cron_requests
+	if req.Header.Get("X-Appengine-Cron") == "true" {
+		return CronUser, "cron"
+	} else if user, name := cfg.findUser(req); user == nil {
+		return 0, name
+	} else {
+		return user.Type(), name
 	}
-	// Fall back to the default presets.
-	return cfg.Presets
 }
 
 // cleanBaseURL appends a trailing slash to u if not already present.

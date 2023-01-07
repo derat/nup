@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestGetUser(t *testing.T) {
+func TestGetUserType(t *testing.T) {
 	cfg := Config{
 		Users: []User{
 			{Username: "user", Password: "upass"},
@@ -21,49 +21,50 @@ func TestGetUser(t *testing.T) {
 	// Authentication is tested in more detail in server/http_test.go.
 	for _, tc := range []struct {
 		user, pass string
-		name       string
 		utype      UserType
+		name       string
 	}{
-		{"user", "upass", "user", NormalUser},
-		{"admin", "apass", "admin", AdminUser},
-		{"guest", "gpass", "guest", GuestUser},
-		{"user", "", "user", 0},
-		{"user", "bogus", "user", 0},
-		{"user", "apass", "user", 0},
-		{"", "upass", "", 0},
-		{"", "", "", 0},
+		{"user", "upass", NormalUser, "user"},
+		{"admin", "apass", AdminUser, "admin"},
+		{"guest", "gpass", GuestUser, "guest"},
+		{"user", "", 0, "user"},
+		{"user", "bogus", 0, "user"},
+		{"user", "apass", 0, "user"},
+		{"", "upass", 0, ""},
+		{"", "", 0, ""},
 	} {
-		if name, utype := cfg.GetUser(makeReq(t, tc.user, tc.pass)); name != tc.name || utype != tc.utype {
-			t.Errorf("GetUser for %q/%q returned %q and %v; want %q and %v",
-				tc.user, tc.pass, name, utype, tc.name, tc.utype)
+		if utype, name := cfg.GetUserType(makeReq(t, tc.user, tc.pass)); utype != tc.utype || name != tc.name {
+			t.Errorf("GetUserType for %q/%q returned %v and %q; want %v and %q",
+				tc.user, tc.pass, utype, name, tc.utype, tc.name)
 		}
 	}
 }
 
-func TestGetPresets(t *testing.T) {
-	defPresets := []SearchPreset{{Name: "default"}}
-	guestPresets := []SearchPreset{{Name: "guest"}}
+func TestGetUser(t *testing.T) {
 	cfg := Config{
 		Users: []User{
-			{Username: "user", Password: "upass"},
-			{Username: "guest", Password: "gpass", Guest: true, Presets: guestPresets},
+			{Username: "user", Password: "upass", ExcludedTags: []string{"foo"}},
+			{Username: "guest", Password: "gpass", Guest: true},
 		},
-		Presets: defPresets,
 	}
 
 	for _, tc := range []struct {
 		user, pass string
-		want       []SearchPreset
+		want       *User
 	}{
-		{"user", "upass", defPresets},
-		{"guest", "gpass", guestPresets},
+		{"user", "upass", &User{Username: "user", ExcludedTags: []string{"foo"}}},
+		{"guest", "gpass", &User{Username: "guest", Guest: true}},
 		{"user", "", nil},
 		{"", "upass", nil},
 		{"", "", nil},
 	} {
-		if got := cfg.GetPresets(makeReq(t, tc.user, tc.pass)); !reflect.DeepEqual(got, tc.want) {
-			t.Errorf("GetPresets for %q/%q returned %v; want %v", tc.user, tc.pass, got, tc.want)
+		if user, name := cfg.GetUser(makeReq(t, tc.user, tc.pass)); !reflect.DeepEqual(user, tc.want) || name != tc.user {
+			t.Errorf("GetUser for %q/%q returned %v and %q; want %v and %q", tc.user, tc.pass, user, name, tc.want, tc.user)
 		}
+	}
+
+	if cfg.Users[0].Password != "upass" || cfg.Users[1].Password != "gpass" {
+		t.Error("Original passwords were modified")
 	}
 }
 

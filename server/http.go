@@ -77,7 +77,7 @@ func addHandler(path, method string, allowed config.UserType, action authAction,
 		}
 
 		if action != allowUnauth {
-			if username, utype := cfg.GetUser(r); allowed&utype == 0 {
+			if utype, username := cfg.GetUserType(r); allowed&utype == 0 {
 				switch action {
 				case rejectUnauth:
 					code := http.StatusUnauthorized // no creds or invalid creds

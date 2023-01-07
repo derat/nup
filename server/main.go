@@ -84,6 +84,7 @@ func main() {
 	addHandler("/song", http.MethodGet, norm|admin|guest, rejectUnauth, handleSong)
 	addHandler("/stats", http.MethodGet, norm|admin|guest|cron, rejectUnauth, handleStats)
 	addHandler("/tags", http.MethodGet, norm|admin|guest, rejectUnauth, handleTags)
+	addHandler("/user", http.MethodGet, norm|admin|guest, rejectUnauth, handleUser)
 
 	if appengine.IsDevAppServer() {
 		addHandler("/clear", http.MethodPost, admin, rejectUnauth, handleClear)
@@ -253,21 +254,20 @@ func handleExport(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 
 	switch r.FormValue("type") {
 	case "song":
-		var minLastModified time.Time
+		var lastMod time.Time
 		if len(r.FormValue("minLastModifiedNsec")) > 0 {
-			ns, ok := parseIntParam(ctx, w, r, "minLastModifiedNsec")
-			if !ok {
+			if ns, ok := parseIntParam(ctx, w, r, "minLastModifiedNsec"); !ok {
 				return
-			}
-			if ns > 0 {
-				minLastModified = time.Unix(0, ns)
+			} else if ns > 0 {
+				lastMod = time.Unix(0, ns)
 			}
 		}
 
+		cursor := r.FormValue("cursor")
+		deleted := r.FormValue("deleted") == "1"
+
 		var songs []db.Song
-		songs, nextCursor, err = dump.Songs(ctx, max, r.FormValue("cursor"),
-			r.FormValue("deleted") == "1", minLastModified)
-		if err != nil {
+		if songs, nextCursor, err = dump.Songs(ctx, max, cursor, deleted, lastMod); err != nil {
 			log.Errorf(ctx, "Dumping songs failed: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -421,7 +421,11 @@ func handlePlayed(ctx context.Context, cfg *config.Config, w http.ResponseWriter
 }
 
 func handlePresets(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
-	writeJSONResponse(w, cfg.GetPresets(r))
+	presets := cfg.Presets
+	if user, _ := cfg.GetUser(r); user != nil && len(user.Presets) > 0 {
+		presets = user.Presets
+	}
+	writeJSONResponse(w, presets)
 }
 
 func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
@@ -587,7 +591,7 @@ func handleReindex(ctx context.Context, cfg *config.Config, w http.ResponseWrite
 // at the audio data; it just need to amplify it.
 func handleSong(ctx context.Context, cfg *config.Config, w http.ResponseWriter, req *http.Request) {
 	if max := cfg.MaxGuestSongRequestsPerHour; max > 0 {
-		if user, utype := cfg.GetUser(req); utype == config.GuestUser {
+		if utype, user := cfg.GetUserType(req); utype == config.GuestUser {
 			// TODO: This should probably handle range requests differently.
 			// Maybe we should just count requests that ask for the first byte?
 			if err := ratelimit.Attempt(ctx, user, time.Now(), max, time.Hour); err != nil {
@@ -675,7 +679,7 @@ func handleStats(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 	// https://cloud.google.com/appengine/docs/standard/go/scheduling-jobs-with-cron-yaml.
 	if req.FormValue("update") == "1" {
 		// Don't let guest users update stats.
-		if user, utype := cfg.GetUser(req); utype == config.GuestUser {
+		if utype, user := cfg.GetUserType(req); utype == config.GuestUser {
 			log.Errorf(ctx, "Rejecting stats update from guest user %q", user)
 			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 			return
@@ -698,12 +702,38 @@ func handleStats(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 	writeJSONResponse(w, stats)
 }
 
-func handleTags(ctx context.Context, cfg *config.Config, w http.ResponseWriter, r *http.Request) {
-	tags, err := query.Tags(ctx, r.FormValue("requireCache") == "1")
+func handleTags(ctx context.Context, cfg *config.Config, w http.ResponseWriter, req *http.Request) {
+	tags, err := query.Tags(ctx, req.FormValue("requireCache") == "1")
 	if err != nil {
 		log.Errorf(ctx, "Querying tags failed: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// Filter out excluded tags.
+	if user, _ := cfg.GetUser(req); user != nil && len(user.ExcludedTags) > 0 {
+		excluded := make(map[string]struct{}, len(user.ExcludedTags))
+		for _, tag := range user.ExcludedTags {
+			excluded[tag] = struct{}{}
+		}
+		var num int
+		for _, tag := range tags {
+			if _, ok := excluded[tag]; !ok {
+				tags[num] = tag
+				num++
+			}
+		}
+		tags = tags[:num]
+	}
 	writeJSONResponse(w, tags)
+}
+
+func handleUser(ctx context.Context, cfg *config.Config, w http.ResponseWriter, req *http.Request) {
+	user, name := cfg.GetUser(req)
+	if user == nil {
+		// This handler shouldn't have been called if the request wasn't from a valid user.
+		log.Errorf(ctx, "Invalid user %q", name)
+		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return
+	}
+	writeJSONResponse(w, user)
 }
