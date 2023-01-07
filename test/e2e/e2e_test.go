@@ -1089,6 +1089,16 @@ func TestGuestUser(tt *testing.T) {
 		tt.Fatalf("Guest request for /%v returned %v; want %v", ratePath, code, http.StatusForbidden)
 	}
 
+	// Ditto for /played.
+	log.Print("Checking /played access")
+	playedPath := "played?songId=" + songID + "&startTime=2006-01-02T15:04:05Z"
+	if code := send("POST", playedPath, test.Username, test.Password); code != http.StatusOK {
+		tt.Fatalf("Normal request for /%v returned %v; want %v", playedPath, code, http.StatusOK)
+	}
+	if code := send("POST", playedPath, guestUsername, guestPassword); code != http.StatusForbidden {
+		tt.Fatalf("Guest request for /%v returned %v; want %v", playedPath, code, http.StatusForbidden)
+	}
+
 	// Guest users should be able to fetch /stats, but not update them via /stats?update=1.
 	log.Print("Checking /stats access")
 	if code := send("GET", "stats", guestUsername, guestPassword); code != http.StatusOK {

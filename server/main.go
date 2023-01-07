@@ -76,7 +76,7 @@ func main() {
 	addHandler("/export", http.MethodGet, norm|admin|guest, rejectUnauth, handleExport)
 	addHandler("/import", http.MethodPost, admin, rejectUnauth, handleImport)
 	addHandler("/now", http.MethodGet, norm|admin|guest, rejectUnauth, handleNow)
-	addHandler("/played", http.MethodPost, norm|admin|guest, rejectUnauth, handlePlayed)
+	addHandler("/played", http.MethodPost, norm|admin, rejectUnauth, handlePlayed)
 	addHandler("/presets", http.MethodGet, norm|admin|guest, rejectUnauth, handlePresets)
 	addHandler("/query", http.MethodGet, norm|admin|guest, rejectUnauth, handleQuery)
 	addHandler("/rate_and_tag", http.MethodPost, norm|admin, rejectUnauth, handleRateAndTag)
