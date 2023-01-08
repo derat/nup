@@ -3,10 +3,10 @@
 
 import { handleFetchError } from './common.js';
 
-const QUEUED_PLAY_REPORTS_KEY = 'queued_play_reports';
-const IN_PROGRESS_PLAY_REPORTS_KEY = 'in_progress_play_reports';
-const QUEUED_RATINGS_AND_TAGS_KEY = 'queued_ratings_and_tags';
-const IN_PROGRESS_RATINGS_AND_TAGS_KEY = 'in_progress_ratings_and_tags';
+const QUEUED_PLAYS_KEY = 'queued_plays';
+const ACTIVE_PLAYS_KEY = 'active_plays';
+const QUEUED_UPDATES_KEY = 'queued_updates';
+const ACTIVE_UPDATES_KEY = 'active_updates';
 const MIN_RETRY_DELAY_MS = 500;
 const MAX_RETRY_DELAY_MS = 300 * 1000;
 
@@ -14,31 +14,24 @@ export default class Updater {
   #retryTimeoutId: number | null = null; // for #doRetry()
   #lastRetryDelayMs = 0; // used by #scheduleRetry()
 
-  #queuedPlayReports = readObject(QUEUED_PLAY_REPORTS_KEY, []) as PlayReport[];
+  #queuedPlays = readObject(QUEUED_PLAYS_KEY, []) as PlayReport[];
+  #queuedUpdates = readObject(QUEUED_UPDATES_KEY, {}) as SongUpdateMap;
 
-  #queuedRatingsAndTags = readObject(
-    QUEUED_RATINGS_AND_TAGS_KEY,
-    {}
-  ) as SongUpdateMap;
-
-  #inProgressPlayReports: PlayReport[] = [];
-  #inProgressRatingsAndTags: SongUpdateMap = {};
+  #activePlays: PlayReport[] = [];
+  #activeUpdates: SongUpdateMap = {};
 
   #initialRetryDone: Promise<void>;
 
   constructor() {
-    // Move updates that were in-progress during the last run into the queue.
-    for (const play of readObject(
-      IN_PROGRESS_PLAY_REPORTS_KEY,
-      []
-    ) as PlayReport[]) {
-      this.#queuedPlayReports.push(play);
+    // Move updates that were active during the last run into the queue.
+    for (const play of readObject(ACTIVE_PLAYS_KEY, []) as PlayReport[]) {
+      this.#queuedPlays.push(play);
     }
 
     for (const [songId, data] of Object.entries(
-      readObject(IN_PROGRESS_RATINGS_AND_TAGS_KEY, {}) as SongUpdateMap
+      readObject(ACTIVE_UPDATES_KEY, {}) as SongUpdateMap
     )) {
-      this.#queuedRatingsAndTags[songId] = data;
+      this.#queuedUpdates[songId] = data;
     }
 
     this.#writeState();
@@ -67,9 +60,9 @@ export default class Updater {
   // at |startTime|. Returns a promise that is resolved once the reporting
   // attempt is completed (possibly unsuccessfully).
   reportPlay(songId: string, startTime: Date): Promise<void> {
-    // Move from queued (if present) to in-progress.
-    removePlayReport(this.#queuedPlayReports, songId, startTime);
-    addPlayReport(this.#inProgressPlayReports, songId, startTime);
+    // Move from queued (if present) to active.
+    removePlayReport(this.#queuedPlays, songId, startTime);
+    addPlayReport(this.#activePlays, songId, startTime);
     this.#writeState();
 
     const url =
@@ -80,14 +73,14 @@ export default class Updater {
     return fetch(url, { method: 'POST' })
       .then((res) => handleFetchError(res))
       .then(() => {
-        removePlayReport(this.#inProgressPlayReports, songId, startTime);
+        removePlayReport(this.#activePlays, songId, startTime);
         this.#writeState();
         this.#scheduleRetry(true /* immediate */);
       })
       .catch((err) => {
         console.error(`Reporting to ${url} failed: ${err}`);
-        removePlayReport(this.#inProgressPlayReports, songId, startTime);
-        addPlayReport(this.#queuedPlayReports, songId, startTime);
+        removePlayReport(this.#activePlays, songId, startTime);
+        addPlayReport(this.#queuedPlays, songId, startTime);
         this.#writeState();
         this.#scheduleRetry(false /* immediate */);
       });
@@ -106,19 +99,19 @@ export default class Updater {
 
     // Handle the case where there's a queued rating and we're only updating
     // tags, or queued tags and we're only updating the rating.
-    const queued = this.#queuedRatingsAndTags[songId];
+    const queued = this.#queuedUpdates[songId];
     if (queued) {
       if (rating === null && queued.rating !== null) rating = queued.rating;
       if (tags === null && queued.tags !== null) tags = queued.tags;
-      delete this.#queuedRatingsAndTags[songId];
+      delete this.#queuedUpdates[songId];
     }
 
-    if (this.#inProgressRatingsAndTags.hasOwnProperty(songId)) {
-      addRatingAndTags(this.#queuedRatingsAndTags, songId, rating, tags);
+    if (this.#activeUpdates.hasOwnProperty(songId)) {
+      addRatingAndTags(this.#queuedUpdates, songId, rating, tags);
       return Promise.resolve();
     }
 
-    addRatingAndTags(this.#inProgressRatingsAndTags, songId, rating, tags);
+    addRatingAndTags(this.#activeUpdates, songId, rating, tags);
     this.#writeState();
 
     let url = `rate_and_tag?songId=${encodeURIComponent(songId)}`;
@@ -129,21 +122,21 @@ export default class Updater {
     return fetch(url, { method: 'POST' })
       .then((res) => handleFetchError(res))
       .then(() => {
-        delete this.#inProgressRatingsAndTags[songId];
+        delete this.#activeUpdates[songId];
         this.#writeState();
         this.#scheduleRetry(true /* immediate */);
       })
       .catch((err) => {
         console.log(`Rating/tagging to ${url} failed: ${err}`);
-        delete this.#inProgressRatingsAndTags[songId];
+        delete this.#activeUpdates[songId];
 
         // If another update was queued in the meantime, don't overwrite it.
-        const queued = this.#queuedRatingsAndTags[songId];
+        const queued = this.#queuedUpdates[songId];
         if (queued) {
           if (queued.rating === null && rating !== null) queued.rating = rating;
           if (queued.tags === null && tags !== null) queued.tags = tags;
         } else {
-          addRatingAndTags(this.#queuedRatingsAndTags, songId, rating, tags);
+          addRatingAndTags(this.#queuedUpdates, songId, rating, tags);
         }
 
         this.#writeState();
@@ -158,21 +151,15 @@ export default class Updater {
 
   // Persists the current state to local storage.
   #writeState() {
+    localStorage.setItem(QUEUED_PLAYS_KEY, JSON.stringify(this.#queuedPlays));
     localStorage.setItem(
-      QUEUED_PLAY_REPORTS_KEY,
-      JSON.stringify(this.#queuedPlayReports)
+      QUEUED_UPDATES_KEY,
+      JSON.stringify(this.#queuedUpdates)
     );
+    localStorage.setItem(ACTIVE_PLAYS_KEY, JSON.stringify(this.#activePlays));
     localStorage.setItem(
-      QUEUED_RATINGS_AND_TAGS_KEY,
-      JSON.stringify(this.#queuedRatingsAndTags)
-    );
-    localStorage.setItem(
-      IN_PROGRESS_PLAY_REPORTS_KEY,
-      JSON.stringify(this.#inProgressPlayReports)
-    );
-    localStorage.setItem(
-      IN_PROGRESS_RATINGS_AND_TAGS_KEY,
-      JSON.stringify(this.#inProgressRatingsAndTags)
+      ACTIVE_UPDATES_KEY,
+      JSON.stringify(this.#activeUpdates)
     );
   }
 
@@ -190,10 +177,7 @@ export default class Updater {
     }
 
     // Nothing to do.
-    if (
-      !this.#queuedPlayReports.length &&
-      !Object.keys(this.#queuedRatingsAndTags).length
-    ) {
+    if (!this.#queuedPlays.length && !Object.keys(this.#queuedUpdates).length) {
       return;
     }
 
@@ -212,26 +196,23 @@ export default class Updater {
     this.#lastRetryDelayMs = delayMs;
   }
 
-  // Sends queued plays and ratings/tags to the server.
+  // Sends queued plays and updates to the server.
   #doRetry() {
-    // Already have an in-progress update; try again in a bit.
-    if (
-      this.#inProgressPlayReports.length ||
-      Object.keys(this.#inProgressRatingsAndTags).length
-    ) {
+    // Already have an active update; try again in a bit.
+    if (this.#activePlays.length || Object.keys(this.#activeUpdates).length) {
       this.#lastRetryDelayMs = 0; // use min retry delay
       this.#scheduleRetry(false);
       return Promise.resolve();
     }
 
-    if (Object.keys(this.#queuedRatingsAndTags).length) {
-      const songId = Object.keys(this.#queuedRatingsAndTags)[0];
-      const entry = this.#queuedRatingsAndTags[songId];
+    if (Object.keys(this.#queuedUpdates).length) {
+      const songId = Object.keys(this.#queuedUpdates)[0];
+      const entry = this.#queuedUpdates[songId];
       return this.rateAndTag(songId, entry.rating, entry.tags);
     }
 
-    if (this.#queuedPlayReports.length) {
-      const entry = this.#queuedPlayReports[0];
+    if (this.#queuedPlays.length) {
+      const entry = this.#queuedPlays[0];
       return this.reportPlay(entry.songId, new Date(entry.startTime));
     }
 

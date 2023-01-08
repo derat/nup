@@ -109,8 +109,8 @@ suite('updater', () => {
     w.expectFetch(playedUrl(id, t1), 'POST', 'fail', 500);
     await updater.reportPlay(id, t1);
 
-    // Report a second playback, but leave the fetch() hanging. This should
-    // leave the playback in the "in-progress" list in localStorage.
+    // Report a second playback, but leave the fetch() hanging.
+    // This should leave the playback in the "active" list in localStorage.
     w.expectFetchDeferred(playedUrl(id, t2), 'POST', 'fail', 500);
     updater.reportPlay(id, t2);
 
@@ -221,8 +221,8 @@ suite('updater', () => {
     w.expectFetch(rateAndTagUrl('123', 5, ['tag']), 'POST', 'bad', 500);
     await updater.rateAndTag('123', 5, ['tag']);
 
-    // Send a second request, but leave the fetch() hanging. This should leave
-    // the update in the "in-progress" list in localStorage.
+    // Send a second request, but leave the fetch() hanging.
+    // This should leave the update in the "active" list in localStorage.
     w.expectFetchDeferred(rateAndTagUrl('456', 1, ['a']), 'POST', 'fail', 500);
     updater.rateAndTag('456', 1, ['a']);
 
