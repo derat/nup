@@ -1156,6 +1156,13 @@ func TestGuestUser(tt *testing.T) {
 		tt.Fatalf("Guest request for /tags returned %q; want %q", tags, want)
 	}
 
+	log.Print("Checking that excluded tags are added to /query")
+	if code, got := send("GET", "query", guestUsername, guestPassword); code != http.StatusOK {
+		tt.Fatalf("Guest request for /query returned %v; want %v", code, http.StatusOK)
+	} else if want := "[]"; string(got) != want {
+		tt.Fatalf("Guest request for /query returned %q; want %q", got, want)
+	}
+
 	// Normal (or admin) users should be able to go above the guest rate limit for /song.
 	log.Print("Checking /song rate-limiting")
 	songPath := "song?filename=" + url.QueryEscape(Song0s.Filename)

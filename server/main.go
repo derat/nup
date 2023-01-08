@@ -494,6 +494,9 @@ func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 			q.Tags = append(q.Tags, t)
 		}
 	}
+	if user, _ := cfg.GetUser(r); user != nil && len(user.ExcludedTags) > 0 {
+		q.NotTags = append(q.NotTags, user.ExcludedTags...)
+	}
 
 	songs, err := query.Songs(ctx, &q, flags)
 	if err != nil {

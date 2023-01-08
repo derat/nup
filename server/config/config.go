@@ -30,10 +30,10 @@ type SavedConfig struct {
 
 // User contains information about a user allowed to access the server.
 type User struct {
-	// Email contains an email address for Google authentication.
+	// Email contains an email address for Google authentication, used for the web interface.
 	Email string `json:"email"`
 
-	// Username contains a username for HTTP basic auth.
+	// Username contains a username for HTTP basic auth, used by the Android client and the nup command-line executable.
 	Username string `json:"username"`
 	// Password contains a password for HTTP basic auth.
 	Password string `json:"password"`
@@ -42,7 +42,9 @@ type User struct {
 	// This should only be set for the HTTP basic auth account used by the nup command-line executable.
 	Admin bool `json:"admin"`
 	// Guest is true if this user should have reduced permissions.
+	// Guest users are not allowed to rate/tag songs or report plays.
 	// This can be set for HTTP basic auth accounts used by the Android app.
+	// Guest mode is not supported for email accounts (i.e. the web interface).
 	Guest bool `json:"guest"`
 
 	// Presets contains custom search presets for this user.
@@ -51,6 +53,14 @@ type User struct {
 
 	// ExcludedTags contains a list of tags used to filter songs.
 	ExcludedTags []string `json:"excludedTags"`
+}
+
+// Name returns a human-readable string identifying u.
+func (u *User) Name() string {
+	if u.Email != "" {
+		return u.Email
+	}
+	return u.Username
 }
 
 // Type returns u's type.
@@ -66,7 +76,8 @@ func (u *User) Type() UserType {
 }
 
 // UserType describes the level of access granted to a user.
-// 0 represents a non-user.
+// A given user will have a single type, but UserType values can be masked
+// together to make it easier to check permissions. 0 represents a non-user.
 type UserType uint32
 
 const (
@@ -190,11 +201,13 @@ func Parse(jsonData []byte) (*Config, error) {
 		case (u.Email != "") == (u.Username != ""):
 			return nil, fmt.Errorf("user %d has email %q and username %q; exactly one should be set", i, u.Email, u.Username)
 		case u.Email != "" && u.Password != "":
-			return nil, fmt.Errorf("user %d has email %q but non-empty password", i, u.Email)
+			return nil, fmt.Errorf("user %q is email-based but has password", u.Email)
 		case u.Username != "" && u.Password == "":
-			return nil, fmt.Errorf("user %d has username %q but empty password", i, u.Username)
+			return nil, fmt.Errorf("user %q has empty password", u.Username)
 		case u.Admin && u.Guest:
-			return nil, fmt.Errorf("user %d is both admin and guest", i)
+			return nil, fmt.Errorf("user %q is both admin and guest", u.Name())
+		case u.Email != "" && u.Guest:
+			return nil, fmt.Errorf("user %q is guest (unsupported for email accounts)", u.Email)
 		}
 		if u.Admin {
 			admin = true
@@ -236,7 +249,7 @@ func (cfg *Config) findUser(req *http.Request) (user *User, name string) {
 	if username, password, ok := req.BasicAuth(); ok {
 		for _, u := range cfg.Users {
 			if username == u.Username && password == u.Password {
-				return &u, username
+				return &u, u.Name()
 			}
 		}
 		return nil, username
@@ -244,7 +257,7 @@ func (cfg *Config) findUser(req *http.Request) (user *User, name string) {
 	if gu := aeuser.Current(appengine.NewContext(req)); gu != nil {
 		for _, u := range cfg.Users {
 			if gu.Email == u.Email {
-				return &u, gu.Email
+				return &u, u.Name()
 			}
 		}
 		return nil, gu.Email
