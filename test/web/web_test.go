@@ -229,7 +229,7 @@ func copyBrowserLogs() {
 // and the returned server object is used to interact with the server.
 // The test should defer a call to the returned done function.
 func initWebTest(t *testing.T) (p *page, s *server, done func()) {
-	if tester.T != nil {
+	if tester != nil && tester.T != nil {
 		t.Fatalf("%v didn't call done", tester.T.Name())
 	}
 
@@ -243,6 +243,7 @@ func initWebTest(t *testing.T) (p *page, s *server, done func()) {
 	io.WriteString(browserLog, "\n")
 	writeLogHeader(t.Name())
 
+	// Bail out if we don't need the app.
 	if appURL == "" {
 		return nil, nil, func() {}
 	}
