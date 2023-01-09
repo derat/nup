@@ -215,7 +215,7 @@ suite('updater', () => {
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
 
-  test('rateAndTag (send at startup)', async () => {
+  test('rateAndTag (retry at startup)', async () => {
     // Make the initial attempt fail.
     initUpdater();
     w.expectFetch(rateAndTagUrl('123', 5, ['tag']), 'POST', 'bad', 500);

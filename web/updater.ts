@@ -1,7 +1,7 @@
 // Copyright 2015 Daniel Erat.
 // All rights reserved.
 
-import { handleFetchError } from './common.js';
+import { handleFetchError, underTest } from './common.js';
 
 // localStorage prefixes.
 const QUEUED_PLAYS = 'queued_plays';
@@ -15,10 +15,15 @@ const MAX_SEND_DELAY_MS = 300 * 1000;
 
 // Updater sends play reports and rating and tag updates to the server.
 export default class Updater {
+  #suffix = '.' + Math.random().toString().slice(2, 10).toString();
   #sendTimeoutId: number | null = null; // for #doSend()
   #lastSendDelayMs = 0; // used by #scheduleSend()
   #initialSendDone: Promise<void>;
-  #suffix = '.' + Math.random().toString().slice(2, 10).toString();
+
+  // Adopt records regardless of their age when running in tests.
+  // This behavior is hard to inject since the play-view component creates an
+  // Updater as soon as it's connected to the DOM.
+  #minAdoptAgeMs = underTest() ? 0 : MAX_SEND_DELAY_MS;
 
   constructor() {
     this.#adoptOldRecords();
@@ -120,6 +125,9 @@ export default class Updater {
 
   #onOnline = () => {
     // Automatically try to send queued updates when we come back online.
+    // TODO: What happens if two instances both wake up at the same time after
+    // we come back online? Will they fight over each others' queued records?
+    // Should there be a random delay here?
     this.#scheduleSend(true);
   };
 
@@ -188,18 +196,19 @@ export default class Updater {
   // Incorporates old plays and updates from localStorage into QUEUED_PLAYS and
   // QUEUED_UPDATES.
   #adoptOldRecords() {
-    for (const [key, val] of Object.entries(localStorage)) {
+    for (const [key, iso] of Object.entries(localStorage)) {
       if (!key.startsWith(LAST_ACTIVE) || key.endsWith(this.#suffix)) continue;
 
+      // Don't adopt the records if they're too recent.
       const suffix = key.slice(LAST_ACTIVE.length);
-      const ts = val;
-      // TODO: Pass |val| to Date.parse() and check that the records are old.
+      const ageMs = new Date().getTime() - Date.parse(iso);
+      if (ageMs < this.#minAdoptAgeMs) continue;
 
       for (const prefix of [QUEUED_PLAYS, ACTIVE_PLAYS]) {
         const key = prefix + suffix;
         const plays = this.#readPlays(prefix, suffix);
         if (plays.length) {
-          console.log(`Adopting ${plays.length} play(s) from ${key} (${ts})`);
+          console.log(`Adopting ${plays.length} play(s) from ${key} (${iso})`);
           this.#addPlays(QUEUED_PLAYS, plays);
         }
         localStorage.removeItem(key);
@@ -210,7 +219,7 @@ export default class Updater {
         const updates = this.#readUpdates(prefix, suffix);
         const count = Object.keys(updates).length;
         if (count) {
-          console.log(`Adopting ${count} updates(s) from ${key} (${ts})`);
+          console.log(`Adopting ${count} updates(s) from ${key} (${iso})`);
           this.#addUpdates(QUEUED_UPDATES, updates, false);
         }
         localStorage.removeItem(key);

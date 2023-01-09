@@ -36,7 +36,10 @@ export default class MockWindow {
     });
 
     this.#replace('localStorage', createStorage());
-    this.#replace('navigator', { onLine: true });
+
+    // Set a |unitTest| property so that code with hard-to-inject dependencies
+    // can change its behavior for testing.
+    this.#replace('navigator', { onLine: true, unitTest: true });
   }
 
   // Restores the window object's original properties and verifies that

@@ -173,6 +173,12 @@ export function moveItem<T>(
   return idx;
 }
 
+// Returns true if the code is currently being tested.
+// navigator.webdriver is set by Chrome when running under Selenium, while
+// navigator.unitTest is injected by the unit test code's fake implementation.
+export const underTest = () =>
+  !!(navigator as any).webdriver || !!(navigator as any).unitTest;
+
 // "icon-cross_mark" from MFG Labs.
 export const xIcon = createTemplate(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1480.6939 2545.2094" class="x-icon" width="32" height="32"><path d="M0 1788q0-73 53-126l400-400L53 861Q0 809 0 736t53-125 125.5-52T303 611l401 401 400-401q52-52 125-52t125 52 52 125-52 125l-400 401 400 400q52 53 52 126t-52 125q-51 52-125 52t-125-52l-400-400-401 400q-51 52-125 52t-125-52q-53-52-53-125z"/></svg>
