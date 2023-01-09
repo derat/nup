@@ -23,10 +23,7 @@ export default class MockWindow {
       this.#timeouts[id] = { func, delay: Math.max(delay, 0) };
       return id;
     });
-
-    this.#replace('clearTimeout', (id) => {
-      delete this.#timeouts[id];
-    });
+    this.#replace('clearTimeout', (id) => delete this.#timeouts[id]);
 
     this.#replace('fetch', (resource, init) => {
       const method = (init && init.method) || 'GET';
@@ -38,17 +35,8 @@ export default class MockWindow {
       return promise;
     });
 
-    this.#replace('localStorage', {
-      getItem: (key) =>
-        this.#localStorage.hasOwnProperty(key) ? this.#localStorage[key] : null,
-      setItem: (key, value) => (this.#localStorage[key] = value),
-      removeItem: (key) => delete this.#localStorage[key],
-      clear: () => (this.#localStorage = {}),
-    });
-
-    this.#replace('navigator', {
-      onLine: true,
-    });
+    this.#replace('localStorage', createStorage());
+    this.#replace('navigator', { onLine: true });
   }
 
   // Restores the window object's original properties and verifies that
@@ -175,4 +163,23 @@ export default class MockWindow {
 
 function fetchKey(resource, method) {
   return `${method} ${resource}`;
+}
+
+function createStorage() {
+  const storage = {};
+  const def = (name, value) =>
+    Object.defineProperty(storage, name, {
+      value,
+      enumerable: false,
+      writable: false,
+    });
+  def('getItem', (key) =>
+    Object.getOwnPropertyDescriptor(storage, key)?.enumerable
+      ? storage[key]
+      : null
+  );
+  def('setItem', (key, value) => (storage[key] = value));
+  def('removeItem', (key) => delete storage[key]);
+  def('clear', () => storage.forEach((key) => storage.removeItem(key)));
+  return storage;
 }
