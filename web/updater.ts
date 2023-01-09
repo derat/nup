@@ -3,57 +3,49 @@
 
 import { handleFetchError } from './common.js';
 
-const QUEUED_PLAYS_KEY = 'queued_plays';
-const ACTIVE_PLAYS_KEY = 'active_plays';
-const QUEUED_UPDATES_KEY = 'queued_updates';
-const ACTIVE_UPDATES_KEY = 'active_updates';
-const MIN_RETRY_DELAY_MS = 500;
-const MAX_RETRY_DELAY_MS = 300 * 1000;
+// localStorage keys.
+const QUEUED_PLAYS = 'queued_plays';
+const ACTIVE_PLAYS = 'active_plays';
+const QUEUED_UPDATES = 'queued_updates';
+const ACTIVE_UPDATES = 'active_updates';
+
+const MIN_SEND_DELAY_MS = 500;
+const MAX_SEND_DELAY_MS = 300 * 1000;
 
 export default class Updater {
-  #retryTimeoutId: number | null = null; // for #doRetry()
-  #lastRetryDelayMs = 0; // used by #scheduleRetry()
-
-  #queuedPlays = readObject(QUEUED_PLAYS_KEY, []) as PlayReport[];
-  #queuedUpdates = readObject(QUEUED_UPDATES_KEY, {}) as SongUpdateMap;
-
-  #activePlays: PlayReport[] = [];
-  #activeUpdates: SongUpdateMap = {};
-
-  #initialRetryDone: Promise<void>;
+  #sendTimeoutId: number | null = null; // for #doSend()
+  #lastSendDelayMs = 0; // used by #scheduleSend()
+  #initialSendDone: Promise<void>;
 
   constructor() {
     // Move updates that were active during the last run into the queue.
-    for (const play of readObject(ACTIVE_PLAYS_KEY, []) as PlayReport[]) {
-      this.#queuedPlays.push(play);
+    // TODO: Only do this if the old objects haven't been touched recently.
+    // TODO: Is doing this one element at a time excessively slow?
+    for (const play of readPlays(ACTIVE_PLAYS)) {
+      addPlay(QUEUED_PLAYS, play.songId, play.startTime);
+      removePlay(ACTIVE_PLAYS, play.songId, play.startTime);
     }
-
-    for (const [songId, data] of Object.entries(
-      readObject(ACTIVE_UPDATES_KEY, {}) as SongUpdateMap
-    )) {
-      this.#queuedUpdates[songId] = data;
+    for (const [songId, data] of Object.entries(readUpdates(ACTIVE_UPDATES))) {
+      addUpdate(QUEUED_UPDATES, songId, data.rating, data.tags, false);
+      removeUpdate(ACTIVE_UPDATES, songId);
     }
-
-    this.#writeState();
 
     // Start sending queued updates.
-    this.#initialRetryDone = this.#doRetry();
-
+    this.#initialSendDone = this.#doSend();
     window.addEventListener('online', this.#onOnline);
   }
 
   // Releases resources. Should be called if destroying the object.
   destroy() {
-    if (this.#retryTimeoutId) window.clearTimeout(this.#retryTimeoutId);
-    this.#retryTimeoutId = null;
-
+    if (this.#sendTimeoutId) window.clearTimeout(this.#sendTimeoutId);
+    this.#sendTimeoutId = null;
     window.removeEventListener('online', this.#onOnline);
   }
 
-  // Returns a promise that is resolved once the initial retry attempt in the
+  // Returns a promise that is resolved once the initial send attempt in the
   // constructor is completed.
-  get initialRetryDoneForTest() {
-    return this.#initialRetryDone;
+  get initialSendDoneForTest() {
+    return this.#initialSendDone;
   }
 
   // Asynchronously notifies the server that song |songId| was played starting
@@ -61,9 +53,8 @@ export default class Updater {
   // attempt is completed (possibly unsuccessfully).
   reportPlay(songId: string, startTime: Date): Promise<void> {
     // Move from queued (if present) to active.
-    removePlayReport(this.#queuedPlays, songId, startTime);
-    addPlayReport(this.#activePlays, songId, startTime);
-    this.#writeState();
+    addPlay(ACTIVE_PLAYS, songId, startTime);
+    removePlay(QUEUED_PLAYS, songId, startTime);
 
     const url =
       `played?songId=${encodeURIComponent(songId)}` +
@@ -73,16 +64,16 @@ export default class Updater {
     return fetch(url, { method: 'POST' })
       .then((res) => handleFetchError(res))
       .then(() => {
-        removePlayReport(this.#activePlays, songId, startTime);
-        this.#writeState();
-        this.#scheduleRetry(true /* immediate */);
+        // Success: remove it from active and try to send more.
+        removePlay(ACTIVE_PLAYS, songId, startTime);
+        this.#scheduleSend(true /* immediate */);
       })
       .catch((err) => {
+        // Failed: move it from active to queued and schedule a retry.
         console.error(`Reporting to ${url} failed: ${err}`);
-        removePlayReport(this.#activePlays, songId, startTime);
-        addPlayReport(this.#queuedPlays, songId, startTime);
-        this.#writeState();
-        this.#scheduleRetry(false /* immediate */);
+        addPlay(QUEUED_PLAYS, songId, startTime);
+        removePlay(ACTIVE_PLAYS, songId, startTime);
+        this.#scheduleSend(false /* immediate */);
       });
   }
 
@@ -97,170 +88,183 @@ export default class Updater {
   ): Promise<void> {
     if (rating === null && tags === null) return Promise.resolve();
 
-    // Handle the case where there's a queued rating and we're only updating
-    // tags, or queued tags and we're only updating the rating.
-    const queued = this.#queuedUpdates[songId];
+    // If there's a queued update for the same song, incorporate its data
+    // and remove it from the queued map.
+    const queued = readUpdates(QUEUED_UPDATES)[songId];
     if (queued) {
       if (rating === null && queued.rating !== null) rating = queued.rating;
       if (tags === null && queued.tags !== null) tags = queued.tags;
-      delete this.#queuedUpdates[songId];
+      removeUpdate(QUEUED_UPDATES, songId);
     }
 
-    if (this.#activeUpdates.hasOwnProperty(songId)) {
-      addRatingAndTags(this.#queuedUpdates, songId, rating, tags);
+    // If there's an active update for the song, queue this update.
+    if (readUpdates(ACTIVE_UPDATES)[songId]) {
+      addUpdate(QUEUED_UPDATES, songId, rating, tags, true /* overwrite */);
       return Promise.resolve();
     }
 
-    addRatingAndTags(this.#activeUpdates, songId, rating, tags);
-    this.#writeState();
-
+    addUpdate(ACTIVE_UPDATES, songId, rating, tags, true /* overwrite */);
     let url = `rate_and_tag?songId=${encodeURIComponent(songId)}`;
     if (rating !== null) url += `&rating=${rating}`;
     if (tags !== null) url += `&tags=${encodeURIComponent(tags.join(' '))}`;
     console.log(`Rating/tagging song: ${url}`);
-
     return fetch(url, { method: 'POST' })
       .then((res) => handleFetchError(res))
       .then(() => {
-        delete this.#activeUpdates[songId];
-        this.#writeState();
-        this.#scheduleRetry(true /* immediate */);
+        // Success: remove the update from the active map and immediately look
+        // for more stuff to send.
+        removeUpdate(ACTIVE_UPDATES, songId);
+        this.#scheduleSend(true /* immediate */);
       })
       .catch((err) => {
+        // Failure: queue the update and retry. If another update was queued in
+        // the meantime, merge our data into it.
         console.log(`Rating/tagging to ${url} failed: ${err}`);
-        delete this.#activeUpdates[songId];
-
-        // If another update was queued in the meantime, don't overwrite it.
-        const queued = this.#queuedUpdates[songId];
-        if (queued) {
-          if (queued.rating === null && rating !== null) queued.rating = rating;
-          if (queued.tags === null && tags !== null) queued.tags = tags;
-        } else {
-          addRatingAndTags(this.#queuedUpdates, songId, rating, tags);
-        }
-
-        this.#writeState();
-        this.#scheduleRetry(false /* immediate */);
+        addUpdate(QUEUED_UPDATES, songId, rating, tags, false /* overwrite */);
+        removeUpdate(ACTIVE_UPDATES, songId);
+        this.#scheduleSend(false /* immediate */);
       });
   }
 
   #onOnline = () => {
     // Automatically try to send queued updates when we come back online.
-    this.#scheduleRetry(true);
+    this.#scheduleSend(true);
   };
 
-  // Persists the current state to local storage.
-  #writeState() {
-    localStorage.setItem(QUEUED_PLAYS_KEY, JSON.stringify(this.#queuedPlays));
-    localStorage.setItem(
-      QUEUED_UPDATES_KEY,
-      JSON.stringify(this.#queuedUpdates)
-    );
-    localStorage.setItem(ACTIVE_PLAYS_KEY, JSON.stringify(this.#activePlays));
-    localStorage.setItem(
-      ACTIVE_UPDATES_KEY,
-      JSON.stringify(this.#activeUpdates)
-    );
-  }
-
-  // Schedules a #doRetry() call if needed.
-  #scheduleRetry(immediate: boolean) {
+  // Schedules a #doSend() call if needed.
+  #scheduleSend(immediate: boolean) {
     // If we're not online, don't bother trying.
     // We'll be called again when the system comes back online.
     if (navigator.onLine === false) return;
 
     // Already scheduled.
-    if (this.#retryTimeoutId) {
+    if (this.#sendTimeoutId) {
       if (!immediate) return;
-      window.clearTimeout(this.#retryTimeoutId);
-      this.#retryTimeoutId = null;
+      window.clearTimeout(this.#sendTimeoutId);
+      this.#sendTimeoutId = null;
     }
 
     // Nothing to do.
-    if (!this.#queuedPlays.length && !Object.keys(this.#queuedUpdates).length) {
+    if (
+      !readPlays(QUEUED_PLAYS).length &&
+      !Object.keys(readUpdates(QUEUED_UPDATES)).length
+    ) {
       return;
     }
 
     let delayMs = immediate
       ? 0
-      : this.#lastRetryDelayMs > 0
-      ? this.#lastRetryDelayMs * 2
-      : MIN_RETRY_DELAY_MS;
-    delayMs = Math.min(delayMs, MAX_RETRY_DELAY_MS);
+      : this.#lastSendDelayMs > 0
+      ? this.#lastSendDelayMs * 2
+      : MIN_SEND_DELAY_MS;
+    delayMs = Math.min(delayMs, MAX_SEND_DELAY_MS);
 
-    console.log(`Scheduling retry in ${delayMs} ms`);
-    this.#retryTimeoutId = window.setTimeout(() => {
-      this.#retryTimeoutId = null;
-      return this.#doRetry();
+    console.log(`Scheduling send in ${delayMs} ms`);
+    this.#sendTimeoutId = window.setTimeout(() => {
+      this.#sendTimeoutId = null;
+      return this.#doSend();
     }, delayMs);
-    this.#lastRetryDelayMs = delayMs;
+    this.#lastSendDelayMs = delayMs;
   }
 
   // Sends queued plays and updates to the server.
-  #doRetry() {
+  #doSend() {
     // Already have an active update; try again in a bit.
-    if (this.#activePlays.length || Object.keys(this.#activeUpdates).length) {
-      this.#lastRetryDelayMs = 0; // use min retry delay
-      this.#scheduleRetry(false);
+    if (
+      readPlays(ACTIVE_PLAYS).length ||
+      Object.keys(readUpdates(ACTIVE_UPDATES)).length
+    ) {
+      this.#lastSendDelayMs = 0; // use min retry delay
+      this.#scheduleSend(false);
       return Promise.resolve();
     }
 
-    if (Object.keys(this.#queuedUpdates).length) {
-      const songId = Object.keys(this.#queuedUpdates)[0];
-      const entry = this.#queuedUpdates[songId];
-      return this.rateAndTag(songId, entry.rating, entry.tags);
+    const update = Object.entries(readUpdates(QUEUED_UPDATES))[0] ?? null;
+    if (update) {
+      return this.rateAndTag(update[0], update[1].rating, update[1].tags);
     }
 
-    if (this.#queuedPlays.length) {
-      const entry = this.#queuedPlays[0];
-      return this.reportPlay(entry.songId, new Date(entry.startTime));
-    }
+    const play = readPlays(QUEUED_PLAYS)[0] ?? null;
+    if (play) return this.reportPlay(play.songId, new Date(play.startTime));
 
     return Promise.resolve();
   }
 }
 
+// PlayReport represents a song being played at a specific time.
 interface PlayReport {
   songId: string;
   startTime: string; // ISO 8601
 }
 
+// SongUpdate contains an update to a song's rating and/or tags.
 interface SongUpdate {
-  rating: number | null;
+  rating: number | null; // int in [1, 5] or 0 for unrated
   tags: string[] | null;
 }
 
+// SongUpdateMap holds multiple song updates keyed by song ID.
 type SongUpdateMap = Record<string, SongUpdate>;
 
-// Reads |key| from local storage and parses it as JSON.
-// |defaultObject| is returned if the key is unset.
-function readObject(key: string, defaultObject: Object) {
+// Reads the array of PlayReports at |key| in localStorage.
+function readPlays(key: string): PlayReport[] {
   const value = localStorage.getItem(key);
-  return value !== null ? JSON.parse(value) : defaultObject;
+  return value !== null ? JSON.parse(value) : [];
 }
 
-// Appends a play report to |list|.
-function addPlayReport(list: PlayReport[], songId: string, startTime: Date) {
-  list.push({ songId, startTime: startTime.toISOString() });
+// Reads the SongUpdateMap at |key| in localStorage.
+function readUpdates(key: string): SongUpdateMap {
+  const value = localStorage.getItem(key);
+  return value !== null ? JSON.parse(value) : {};
 }
 
-// Removes the specified play report from |list|.
-function removePlayReport(list: PlayReport[], songId: string, startTime: Date) {
-  const isoTime = startTime.toISOString();
-  for (let i = 0; i < list.length; i++) {
-    if (list[i].songId === songId && list[i].startTime === isoTime) {
-      list.splice(i, 1);
-      return;
-    }
-  }
+// Appends a play report to the array at |key| in localStorage.
+function addPlay(key: string, songId: string, startTime: Date | string) {
+  const isoTime = getIsoTime(startTime);
+  const plays = readPlays(key);
+  plays.push({ songId, startTime: isoTime });
+  localStorage.setItem(key, JSON.stringify(plays));
 }
 
-// Sets |songId|'s rating and tags within |map|.
-function addRatingAndTags(
-  map: SongUpdateMap,
+// Removes the specified play report from the array at |key| in localStorage.
+function removePlay(key: string, songId: string, startTime: Date | string) {
+  const isoTime = getIsoTime(startTime);
+  const plays = readPlays(key).filter(
+    (p) => p.songId !== songId || p.startTime !== isoTime
+  );
+  localStorage.setItem(key, JSON.stringify(plays));
+}
+
+// Converts |time| to an ISO 8601 string if it isn't already a string.
+function getIsoTime(time: Date | string): string {
+  return typeof time === 'string' ? time : time.toISOString();
+}
+
+// Sets |songId|'s rating and tags in the map at |key| in localStorage.
+// If |overwrite| is true, the new values are preferred if the song already has
+// an entry; otherwise the existing entries are preferred.
+function addUpdate(
+  key: string,
   songId: string,
   rating: number | null,
-  tags: string[] | null
+  tags: string[] | null,
+  overwrite: boolean
 ) {
-  map[songId] = { rating: rating, tags: tags };
+  const updates = readUpdates(key);
+  const update = (updates[songId] ||= { rating: null, tags: null });
+  if (overwrite) {
+    update.rating = rating ?? update.rating;
+    update.tags = tags ?? update.tags;
+  } else {
+    update.rating = update.rating ?? rating;
+    update.tags = update.tags ?? tags;
+  }
+  localStorage.setItem(key, JSON.stringify(updates));
+}
+
+// Removes |songId| from the map identified by |key| in localStorage.
+function removeUpdate(key: string, songId: string) {
+  const updates = readUpdates(key);
+  delete updates[songId];
+  localStorage.setItem(key, JSON.stringify(updates));
 }

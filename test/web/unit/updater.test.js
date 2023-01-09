@@ -121,14 +121,14 @@ suite('updater', () => {
     w.clearTimeouts();
     w.expectFetch(playedUrl(id, t1), 'POST', 'fail', 500);
     initUpdater();
-    await updater.initialRetryDoneForTest;
+    await updater.initialSendDoneForTest;
 
     // After creating another updater, it should send the second report first
     // and then the first one.
     w.clearTimeouts();
     w.expectFetch(playedUrl(id, t2), 'POST', 'ok');
     initUpdater();
-    await updater.initialRetryDoneForTest;
+    await updater.initialSendDoneForTest;
 
     w.expectFetch(playedUrl(id, t1), 'POST', 'ok');
     await w.runTimeouts(0);
@@ -136,7 +136,7 @@ suite('updater', () => {
 
     // If we create a new updater again, nothing should be sent.
     initUpdater();
-    await updater.initialRetryDoneForTest;
+    await updater.initialSendDoneForTest;
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
 
@@ -158,7 +158,7 @@ suite('updater', () => {
 
     // If we create a new updater, nothing should be sent.
     initUpdater();
-    await updater.initialRetryDoneForTest;
+    await updater.initialSendDoneForTest;
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
 
@@ -215,7 +215,7 @@ suite('updater', () => {
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
 
-  test('rateAndTag (retry at startup)', async () => {
+  test('rateAndTag (send at startup)', async () => {
     // Make the initial attempt fail.
     initUpdater();
     w.expectFetch(rateAndTagUrl('123', 5, ['tag']), 'POST', 'bad', 500);
@@ -230,20 +230,20 @@ suite('updater', () => {
     w.clearTimeouts();
     w.expectFetch(rateAndTagUrl('123', 5, ['tag']), 'POST', 'bad', 500);
     initUpdater();
-    await updater.initialRetryDoneForTest;
+    await updater.initialSendDoneForTest;
 
     // Create another updater and let both updates get sent successfully.
     w.clearTimeouts();
     w.expectFetch(rateAndTagUrl('123', 5, ['tag']), 'POST', 'ok');
     w.expectFetch(rateAndTagUrl('456', 1, ['a']), 'POST', 'ok');
     initUpdater();
-    await updater.initialRetryDoneForTest;
+    await updater.initialSendDoneForTest;
     await w.runTimeouts(0);
     expectEq(w.numTimeouts, 0, 'numTimeouts');
 
     // If we create a new updater again, nothing should be sent.
     initUpdater();
-    await updater.initialRetryDoneForTest;
+    await updater.initialSendDoneForTest;
     expectEq(w.numTimeouts, 0, 'numTimeouts');
   });
 });
