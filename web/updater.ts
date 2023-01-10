@@ -27,6 +27,7 @@ export default class Updater {
   #minAdoptAgeMs = underTest() ? 0 : MAX_SEND_DELAY_MS;
 
   constructor() {
+    console.log(`Starting updater with suffix ${this.#suffix}`);
     this.#adoptOldRecords();
 
     // Start sending adopted records.
@@ -241,10 +242,11 @@ export default class Updater {
     return value !== null ? JSON.parse(value) : {};
   }
 
-  // Writes |obj| to localStorage.
-  #writeObject(prefix: string, obj: PlayReport[] | SongUpdateMap) {
-    localStorage.setItem(prefix + this.#suffix, JSON.stringify(obj));
+  // Writes |obj| to localStorage. If null, the item is removed instead.
+  #writeObject(prefix: string, obj: PlayReport[] | SongUpdateMap | null) {
     localStorage.setItem(LAST_ACTIVE + this.#suffix, new Date().toISOString());
+    if (obj === null) localStorage.removeItem(prefix + this.#suffix);
+    else localStorage.setItem(prefix + this.#suffix, JSON.stringify(obj));
   }
 
   // Saves |plays| to localStorage.
@@ -266,7 +268,7 @@ export default class Updater {
     const plays = this.#readPlays(prefix).filter(
       (p) => p.songId !== songId || p.startTime !== startTime
     );
-    this.#writeObject(prefix, plays);
+    this.#writeObject(prefix, plays.length ? plays : null);
   }
 
   // Saves |updates| to localStorage.
@@ -302,7 +304,7 @@ export default class Updater {
   #removeUpdate(prefix: string, songId: string) {
     const updates = this.#readUpdates(prefix);
     delete updates[songId];
-    this.#writeObject(prefix, updates);
+    this.#writeObject(prefix, Object.keys(updates).length ? updates : null);
   }
 
   // Returns time to wait before sending when the network goes online.
