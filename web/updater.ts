@@ -12,6 +12,7 @@ const LAST_ACTIVE = 'last_active';
 
 const MIN_SEND_DELAY_MS = 500;
 const MAX_SEND_DELAY_MS = 300 * 1000;
+const ONLINE_SEND_DELAY_MS = 1000;
 
 // Updater sends play reports and rating and tag updates to the server.
 export default class Updater {
@@ -64,14 +65,14 @@ export default class Updater {
       .then(() => {
         // Success: remove it from active and try to send more.
         this.#removePlay(ACTIVE_PLAYS, songId, startTime);
-        this.#scheduleSend(true /* immediate */);
+        this.#scheduleSend(0);
       })
       .catch((err) => {
         // Failed: move it from active to queued and schedule a retry.
         console.error(`Reporting to ${url} failed: ${err}`);
         this.#addPlay(QUEUED_PLAYS, songId, startTime);
         this.#removePlay(ACTIVE_PLAYS, songId, startTime);
-        this.#scheduleSend(false /* immediate */);
+        this.#scheduleSend();
       });
   }
 
@@ -111,7 +112,7 @@ export default class Updater {
         // Success: remove the update from the active map and immediately look
         // for more stuff to send.
         this.#removeUpdate(ACTIVE_UPDATES, songId);
-        this.#scheduleSend(true /* immediate */);
+        this.#scheduleSend(0);
       })
       .catch((err) => {
         // Failure: queue the update and retry. If another update was queued in
@@ -119,27 +120,27 @@ export default class Updater {
         console.log(`Rating/tagging to ${url} failed: ${err}`);
         this.#addUpdate(QUEUED_UPDATES, songId, rating, tags, false);
         this.#removeUpdate(ACTIVE_UPDATES, songId);
-        this.#scheduleSend(false /* immediate */);
+        this.#scheduleSend();
       });
   }
 
   #onOnline = () => {
     // Automatically try to send queued updates when we come back online.
-    // TODO: What happens if two instances both wake up at the same time after
-    // we come back online? Will they fight over each others' queued records?
-    // Should there be a random delay here?
-    this.#scheduleSend(true);
+    const delayMs = underTest() ? 0 : this.#getOnlineSendDelayMs();
+    if (delayMs >= 0) this.#scheduleSend(delayMs);
+    else console.log('Online, but not scheduling send');
   };
 
   // Schedules a #doSend() call if needed.
-  #scheduleSend(immediate: boolean) {
+  // If |delayMs| is null, 2*|#lastSendDelayMs| is used.
+  #scheduleSend(delayMs: number | null = null) {
     // If we're not online, don't bother trying.
     // We'll be called again when the system comes back online.
     if (navigator.onLine === false) return;
 
     // Already scheduled.
     if (this.#sendTimeoutId) {
-      if (!immediate) return;
+      if (delayMs !== 0) return;
       window.clearTimeout(this.#sendTimeoutId);
       this.#sendTimeoutId = null;
     }
@@ -155,12 +156,10 @@ export default class Updater {
       return;
     }
 
-    let delayMs = immediate
-      ? 0
-      : this.#lastSendDelayMs > 0
-      ? this.#lastSendDelayMs * 2
-      : MIN_SEND_DELAY_MS;
-    delayMs = Math.min(delayMs, MAX_SEND_DELAY_MS);
+    delayMs ??= Math.min(
+      Math.max(this.#lastSendDelayMs * 2, MIN_SEND_DELAY_MS),
+      MAX_SEND_DELAY_MS
+    );
 
     console.log(`Scheduling send in ${delayMs} ms`);
     this.#sendTimeoutId = window.setTimeout(() => {
@@ -178,7 +177,7 @@ export default class Updater {
       Object.keys(this.#readUpdates(ACTIVE_UPDATES)).length
     ) {
       this.#lastSendDelayMs = 0; // use min retry delay
-      this.#scheduleSend(false);
+      this.#scheduleSend();
       return Promise.resolve();
     }
 
@@ -304,6 +303,20 @@ export default class Updater {
     const updates = this.#readUpdates(prefix);
     delete updates[songId];
     this.#writeObject(prefix, updates);
+  }
+
+  // Returns time to wait before sending when the network goes online.
+  // This tries to prevent different tabs from stepping on each others' toes.
+  // Returns -1 if the updater should not automatically try to send.
+  #getOnlineSendDelayMs(): number {
+    // Find all of the instances by looking for last-active keys in
+    // localStorage, and then choose an ordering by sorting.
+    const instances = Object.keys(localStorage)
+      .filter((k) => k.startsWith(LAST_ACTIVE))
+      .map((k) => k.slice(LAST_ACTIVE.length))
+      .sort();
+    const index = instances.indexOf(this.#suffix);
+    return index < 0 ? -1 : (index + 1) * ONLINE_SEND_DELAY_MS;
   }
 }
 
