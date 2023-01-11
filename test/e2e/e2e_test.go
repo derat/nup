@@ -429,9 +429,14 @@ func TestQueries(tt *testing.T) {
 	s10s.Artist = "µ-Ziq" // U+00B5 (MICRO SIGN)
 	s10s.Title = "Mañana"
 	s10s.Album = "Two²"
-	t.PostSongs([]db.Song{s10s}, false, 0)
+	s10s.Rating = 5
+	t.PostSongs([]db.Song{s10s}, true, 0)
 
-	const noIndex = 1 // flag indicating that fallback mode is allowed for query
+	const (
+		// Flags for test cases.
+		noIndex     = 1 << iota // fallback mode is allowed for query
+		ignoreOrder             // don't check result order
+	)
 
 	for _, tc := range []struct {
 		params string
@@ -447,11 +452,23 @@ func TestQueries(tt *testing.T) {
 		{"keywords=arovane+foo", 0, []db.Song{}},
 		{"keywords=second+artist", 0, []db.Song{Song1s}}, // track artist
 		{"keywords=remixer", 0, []db.Song{Song1s}},       // album artist
-		{"minRating=5", 0, []db.Song{}},
-		{"minRating=4", 0, []db.Song{LegacySong1}},
-		{"minRating=3", 0, []db.Song{LegacySong2, LegacySong1}},
-		{"minRating=1", 0, []db.Song{LegacySong2, LegacySong1}},
-		{"unrated=1", 0, []db.Song{Song5s, Song0s, Song1s, s10s}},
+		// Don't bother checking the result order when checking rating filters.
+		{"rating=1", ignoreOrder, []db.Song{}},
+		{"rating=2", ignoreOrder, []db.Song{}},
+		{"rating=3", ignoreOrder, []db.Song{LegacySong2}},
+		{"rating=4", ignoreOrder, []db.Song{LegacySong1}},
+		{"rating=5", ignoreOrder, []db.Song{s10s}},
+		{"minRating=1", ignoreOrder, []db.Song{LegacySong1, LegacySong2, s10s}},
+		{"minRating=2", ignoreOrder, []db.Song{LegacySong1, LegacySong2, s10s}},
+		{"minRating=3", ignoreOrder, []db.Song{LegacySong1, LegacySong2, s10s}},
+		{"minRating=4", ignoreOrder, []db.Song{LegacySong1, s10s}},
+		{"minRating=5", ignoreOrder, []db.Song{s10s}},
+		{"maxRating=1", ignoreOrder, []db.Song{Song0s, Song1s, Song5s}},
+		{"maxRating=2", ignoreOrder, []db.Song{Song0s, Song1s, Song5s}},
+		{"maxRating=3", ignoreOrder, []db.Song{Song0s, Song1s, Song5s, LegacySong2}},
+		{"maxRating=4", ignoreOrder, []db.Song{Song0s, Song1s, Song5s, LegacySong1, LegacySong2}},
+		{"maxRating=5", ignoreOrder, []db.Song{Song0s, Song1s, Song5s, s10s, LegacySong1, LegacySong2}},
+		{"unrated=1", 0, []db.Song{Song5s, Song0s, Song1s}},
 		{"tags=instrumental", 0, []db.Song{LegacySong2, LegacySong1}},
 		{"tags=electronic+instrumental", 0, []db.Song{LegacySong1}},
 		{"tags=-electronic+instrumental", 0, []db.Song{LegacySong2}},
@@ -470,21 +487,21 @@ func TestQueries(tt *testing.T) {
 		{"minDate=2000-01-01T00:00:00Z&maxDate=2010-01-01T00:00:00Z", 0, []db.Song{Song1s}},
 		// Ensure that Datastore indexes exist to satisfy various queries (or if not, that the
 		// server's fallback mode is still able to handle them).
-		{"tags=-bogus&minRating=5&shuffle=1&orderByLastPlayed=1", 0, []db.Song{}},
-		{"tags=instrumental&minRating=4&shuffle=1&orderByLastPlayed=1", 0, []db.Song{LegacySong1}},
-		{"tags=instrumental+-bogus&minRating=4&shuffle=1&orderByLastPlayed=1", 0, []db.Song{LegacySong1}},
-		{"minRating=4&shuffle=1&orderByLastPlayed=1", 0, []db.Song{LegacySong1}}, // old songs
-		{"minRating=4&maxPlays=1&shuffle=1", 0, []db.Song{}},
-		{"minRating=2&orderByLastPlayed=1", noIndex, []db.Song{LegacySong1, LegacySong2}},
-		{"tags=instrumental&minRating=4&shuffle=1&maxLastPlayed=2022-04-06T14:41:14Z", 0, []db.Song{LegacySong1}},
-		{"tags=instrumental&minRating=4&shuffle=1&maxPlays=1", noIndex, []db.Song{}},
+		{"tags=-bogus&minRating=5&shuffle=1&orderByLastPlayed=1", ignoreOrder, []db.Song{s10s}},
+		{"tags=instrumental&minRating=4&shuffle=1&orderByLastPlayed=1", ignoreOrder, []db.Song{LegacySong1}},
+		{"tags=instrumental+-bogus&minRating=4&shuffle=1&orderByLastPlayed=1", ignoreOrder, []db.Song{LegacySong1}},
+		{"minRating=4&shuffle=1&orderByLastPlayed=1", ignoreOrder, []db.Song{s10s, LegacySong1}}, // old songs
+		{"minRating=4&maxPlays=1&shuffle=1", ignoreOrder, []db.Song{s10s}},
+		{"minRating=2&orderByLastPlayed=1", noIndex, []db.Song{s10s, LegacySong1, LegacySong2}},
+		{"tags=instrumental&minRating=4&shuffle=1&maxLastPlayed=2022-04-06T14:41:14Z", ignoreOrder, []db.Song{LegacySong1}},
+		{"tags=instrumental&minRating=4&shuffle=1&maxPlays=1", noIndex | ignoreOrder, []db.Song{}},
 		{"tags=instrumental&maxLastPlayed=2022-04-06T14:41:14Z", noIndex, []db.Song{LegacySong2, LegacySong1}},
 		{"firstTrack=1&minFirstPlayed=2010-06-09T04:19:30Z", 0, []db.Song{LegacySong1}}, // new albums
 		{"firstTrack=1&minFirstPlayed=2010-06-09T04:19:30Z&maxPlays=1", noIndex, []db.Song{}},
 		{"keywords=arovane&minRating=4", 0, []db.Song{LegacySong1}},
 		{"keywords=arovane&minRating=4&maxPlays=1", noIndex, []db.Song{}},
 		{"keywords=arovane&firstTrack=1", 0, []db.Song{LegacySong1}},
-		{"keywords=arovane&tags=instrumental&minRating=4&shuffle=1", 0, []db.Song{LegacySong1}},
+		{"keywords=arovane&tags=instrumental&minRating=4&shuffle=1", ignoreOrder, []db.Song{LegacySong1}},
 		{"artist=arovane&firstTrack=1", 0, []db.Song{LegacySong1}},
 		{"artist=arovane&minRating=4", 0, []db.Song{LegacySong1}},
 		{"artist=arovane&minRating=4&maxPlays=1", noIndex, []db.Song{}},
@@ -495,6 +512,11 @@ func TestQueries(tt *testing.T) {
 		{"orderByLastPlayed=1&maxPlays=1&minFirstPlayed=1276057160&maxLastPlayed=1649256074",
 			noIndex, []db.Song{LegacySong2}}, // pass Unix timestamps
 	} {
+		order := test.CompareOrder
+		if tc.flags&ignoreOrder != 0 {
+			order = test.IgnoreOrder
+		}
+
 		suffixes := []string{""}
 		if tc.flags&noIndex == 0 {
 			// If we should have an index, also verify that the query works both without
@@ -504,7 +526,7 @@ func TestQueries(tt *testing.T) {
 		for _, suf := range suffixes {
 			query := tc.params + suf
 			log.Printf("Doing query %q", query)
-			if err := compareQueryResults(tc.want, t.QuerySongs(query), test.CompareOrder); err != nil {
+			if err := compareQueryResults(tc.want, t.QuerySongs(query), order); err != nil {
 				tt.Errorf("%v: %v", query, err)
 			}
 		}

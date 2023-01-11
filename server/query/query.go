@@ -40,7 +40,9 @@ type SongQuery struct {
 
 	Keywords []string // Song.Keywords
 
+	Rating    int  // Song.Rating (0 if unspecified; use Unrated for 0)
 	MinRating int  // Song.Rating (0 if unspecified)
+	MaxRating int  // Song.Rating (0 if unspecified)
 	Unrated   bool // Song.Rating is 0
 
 	MaxPlays int64 // Song.NumPlays (-1 if unspecified)
@@ -61,8 +63,7 @@ type SongQuery struct {
 	OrderByLastStartTime bool // order by Song.LastStartTime
 }
 
-func (q *SongQuery) hasMinRating() bool { return q.MinRating > 0 }
-func (q *SongQuery) hasMaxPlays() bool  { return q.MaxPlays >= 0 }
+func (q *SongQuery) hasMaxPlays() bool { return q.MaxPlays >= 0 }
 
 // hash returns a string uniquely identifying q.
 func (q *SongQuery) hash() (string, error) {
@@ -86,7 +87,7 @@ func (q *SongQuery) resultsInvalidated(ut UpdateTypes) bool {
 	if (ut & MetadataUpdate) != 0 {
 		return true
 	}
-	if (ut&RatingUpdate) != 0 && (q.hasMinRating() || q.Unrated) {
+	if (ut&RatingUpdate) != 0 && (q.Rating != 0 || q.MinRating != 0 || q.MaxRating != 0 || q.Unrated) {
 		return true
 	}
 	if (ut&TagsUpdate) != 0 && (len(q.Tags) > 0 || len(q.NotTags) > 0) {
@@ -365,7 +366,14 @@ func runQuery(ctx context.Context, query *SongQuery, fallback bool) ([]int64, er
 	if query.Filename != "" {
 		eq = eq.Filter("Filename =", query.Filename)
 	}
-	if query.hasMinRating() {
+
+	if query.Rating != 0 {
+		if query.Rating >= 1 && query.Rating <= 5 {
+			eq = eq.Filter("Rating =", query.Rating)
+		} else {
+			return nil, fmt.Errorf("rating %v not in [1, 5]", query.MaxRating)
+		}
+	} else if query.MinRating != 0 {
 		switch query.MinRating {
 		case 1:
 			eq = eq.Filter("RatingAtLeast1 =", true)
@@ -378,11 +386,27 @@ func runQuery(ctx context.Context, query *SongQuery, fallback bool) ([]int64, er
 		case 5:
 			eq = eq.Filter("Rating =", 5)
 		default:
-			return nil, fmt.Errorf("rating %v not in [1, 5]", query.MinRating)
+			return nil, fmt.Errorf("min rating %v not in [1, 5]", query.MinRating)
+		}
+	} else if query.MaxRating != 0 {
+		switch query.MaxRating {
+		case 1:
+			eq = eq.Filter("RatingAtLeast2 =", false)
+		case 2:
+			eq = eq.Filter("RatingAtLeast3 =", false)
+		case 3:
+			eq = eq.Filter("RatingAtLeast4 =", false)
+		case 4:
+			// handled later as "Rating < 5" inequality filter
+		case 5:
+			// no-op
+		default:
+			return nil, fmt.Errorf("max rating %v not in [1, 5]", query.MaxRating)
 		}
 	} else if query.Unrated {
 		eq = eq.Filter("Rating =", 0)
 	}
+
 	if query.MaxPlays == 0 {
 		eq = eq.Filter("NumPlays =", 0)
 	}
@@ -434,6 +458,9 @@ func runQuery(ctx context.Context, query *SongQuery, fallback bool) ([]int64, er
 	}
 	if !query.MaxLastStartTime.IsZero() {
 		qs = append(qs, iq.Filter("LastStartTime <=", query.MaxLastStartTime))
+	}
+	if query.MaxRating == 4 {
+		qs = append(qs, iq.Filter("Rating <", 5))
 	}
 
 	// If we don't have any queries that incorporate the equality filters and inequality filters,

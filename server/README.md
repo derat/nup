@@ -121,6 +121,8 @@ Queries Datastore and returns a JSON-marshaled array of [Song]s.
     which songs were last played (to select music that hasn't been played
     recently). Float seconds since the Unix epoch are also accepted.
 *   `maxPlays` (optional) - Integer maximum number of plays.
+*   `maxRating` (optional) - Integer maximum song rating in the range `[1, 5]`.
+    Unrated songs are included.
 *   `minDate` (optional) - RFC 3339 string containing minimum song date.
 *   `minFirstPlayed` (optional) - RFC 3339 string specifying the minimum time at
     which songs were first played (to select recently-added music). Float
@@ -128,6 +130,7 @@ Queries Datastore and returns a JSON-marshaled array of [Song]s.
 *   `minRating` (optional) - Integer minimum song rating in the range `[1, 5]`.
 *   `orderByLastPlayed` (optional) - If `1`, return songs that were last played
     the longest ago.
+*   `rating` (optional) - Integer song rating in the range `[1, 5]`.
 *   `shuffle` (optional) - If `1`, shuffle the order of returned songs.
 *   `unrated` (optional) - If `1`, return only songs that have no rating.
 *   `tags` (optional) - Space-separated tags, e.g. `electronic -vocals`. Tags

@@ -456,11 +456,23 @@ func handleQuery(ctx context.Context, cfg *config.Config, w http.ResponseWriter,
 		q.Disc = 1
 	}
 
-	if len(r.FormValue("minRating")) > 0 {
+	if r.FormValue("rating") != "" {
+		if v, ok := parseIntParam(ctx, w, r, "rating"); !ok {
+			return
+		} else {
+			q.Rating = int(v)
+		}
+	} else if r.FormValue("minRating") != "" {
 		if v, ok := parseIntParam(ctx, w, r, "minRating"); !ok {
 			return
 		} else {
 			q.MinRating = int(v)
+		}
+	} else if r.FormValue("maxRating") != "" {
+		if v, ok := parseIntParam(ctx, w, r, "maxRating"); !ok {
+			return
+		} else {
+			q.MaxRating = int(v)
 		}
 	} else if r.FormValue("unrated") == "1" {
 		q.Unrated = true
