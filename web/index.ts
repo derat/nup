@@ -89,8 +89,7 @@ searchView.addEventListener('enqueue', ((e: CustomEvent) => {
   playView.enqueueSongs(
     e.detail.songs,
     e.detail.clearFirst,
-    e.detail.afterCurrent,
-    e.detail.shuffled
+    e.detail.afterCurrent
   );
 }) as EventListenerOrEventListenerObject);
 

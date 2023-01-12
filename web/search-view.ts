@@ -360,7 +360,6 @@ const template = createTemplate(`
 // - |songs|: array of song objects
 // - |clearFirst|: true if playlist should be cleared first
 // - |afterCurrent|: true to insert songs after current song (rather than at end)
-// - |shuffled|: true if search results were shuffled
 export class SearchView extends HTMLElement {
   #fetchController: AbortController | null = null;
   #shadow = createShadow(this, template);
@@ -389,7 +388,6 @@ export class SearchView extends HTMLElement {
   #resultsTable = $('results-table', this.#shadow) as SongTable;
   #spinner = $('spinner', this.#shadow);
   #presets: SearchPreset[] = [];
-  #resultsShuffled = false;
 
   constructor() {
     super();
@@ -603,10 +601,6 @@ export class SearchView extends HTMLElement {
     const url = 'query?' + params.toString();
     console.log(`Sending query: ${url}`);
 
-    // 'Order by last played' essentially shuffles the results.
-    const shuffled =
-      this.#shuffleCheckbox.checked || this.#orderByLastPlayedCheckbox.checked;
-
     this.#fetchController?.abort();
     this.#fetchController = new AbortController();
     const signal = this.#fetchController.signal;
@@ -620,7 +614,6 @@ export class SearchView extends HTMLElement {
         console.log('Got response with ' + songs.length + ' song(s)');
         this.#resultsTable.setSongs(songs);
         this.#resultsTable.setAllCheckboxes(true);
-        this.#resultsShuffled = shuffled;
         if (appendToQueue) {
           this.#enqueueSearchResults(true, true);
         } else if (songs.length && songs[0].coverFilename) {
@@ -641,12 +634,7 @@ export class SearchView extends HTMLElement {
     const songs = this.#resultsTable.checkedSongs;
     if (!songs.length) return;
 
-    const detail = {
-      songs,
-      clearFirst,
-      afterCurrent,
-      shuffled: this.#resultsShuffled,
-    };
+    const detail = { songs, clearFirst, afterCurrent };
     this.dispatchEvent(new CustomEvent('enqueue', { detail }));
 
     if (songs.length === this.#resultsTable.numSongs) {

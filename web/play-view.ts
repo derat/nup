@@ -13,6 +13,7 @@ import {
   getCoverUrl,
   getDumpSongUrl,
   getRatingString,
+  getSongAlbumStats,
   getSongUrl,
   moveItem,
   preloadImage,
@@ -210,6 +211,7 @@ const PLAY_DELAY_MS = 500; // delay before playing when cycling track
 const PRELOAD_SEC = 20; // seconds before end of song to load next song
 const UPDATE_POSITION_SLOP_MS = 10; // time to wait past second boundary
 const MAX_SONG_URLS = 10; // max entries for |#songUrls|
+const MIN_ALBUM_GAIN_LENGTH = 20 * 60; // album threshold for GainType.AUTO
 
 // <play-view> plays and displays information about songs. It also maintains
 // and displays a playlist. Songs can be enqueued by calling enqueueSongs().
@@ -240,7 +242,7 @@ export class PlayView extends HTMLElement {
   #playTimeoutId: number | null = null; // for #playInternal()
   #lastUpdatePosition = 0; // audio position in last #updatePosition()
   #updatePositionTimeoutId: number | null = null;
-  #shuffled = false; // playlist contains shuffled songs
+  #autoGainType = GainType.ALBUM; // what to use for GainType.AUTO
   #songUrls = new Map(); // cache of filename -> absolute URL
 
   #shadow = createShadow(this, template);
@@ -562,21 +564,13 @@ export class PlayView extends HTMLElement {
   // If |clearFirst| is true, the existing playlist is cleared first.
   // If |afterCurrent| is true, |songs| are inserted immediately after the
   // current song. Otherwise, they are appended to the end of the playlist.
-  // |shuffled| is used for the 'auto' gain adjustment setting.
-  enqueueSongs(
-    songs: Song[],
-    clearFirst: boolean,
-    afterCurrent: boolean,
-    shuffled: boolean
-  ) {
+  enqueueSongs(songs: Song[], clearFirst: boolean, afterCurrent: boolean) {
     if (clearFirst) this.#removeSongs(0, this.#songs.length);
 
     let index = afterCurrent
       ? Math.min(this.#currentIndex + 1, this.#songs.length)
       : this.#songs.length;
     songs.forEach((s) => this.#songs.splice(index++, 0, s));
-
-    if (shuffled && songs.length) this.#shuffled = true;
 
     this.#playlistTable.setSongs(this.#songs);
 
@@ -591,8 +585,6 @@ export class PlayView extends HTMLElement {
 
     this.#songs.splice(start, len);
     this.#playlistTable.setSongs(this.#songs);
-
-    if (!this.#songs.length) this.#shuffled = false;
 
     // If the next song is getting dropped, we don't need to preload it.
     const end = start + len - 1;
@@ -666,7 +658,7 @@ export class PlayView extends HTMLElement {
     if (document.hidden) this.#showNotification();
   }
 
-  // Updates the UI in response to a playlist change.
+  // Updates the view in response to a playlist change.
   // |currentChanged| indicates whether |#currentSong| also changed.
   #handlePlaylistChange(currentChanged: boolean) {
     if (currentChanged) this.#updateSongDisplay();
@@ -680,6 +672,16 @@ export class PlayView extends HTMLElement {
       this.#currentSong,
       this.#songs[this.#currentIndex + 1] ?? null
     );
+
+    // Make the "auto" gain type use per-track gains if there appear to be any
+    // non-album blocks of songs in the playlist. This is a hacky heuristic
+    // that's intended to err on the side of using per-track gains:
+    // https://github.com/derat/nup/issues/54
+    this.#autoGainType = getSongAlbumStats(this.#songs).some(
+      (s) => s.length < MIN_ALBUM_GAIN_LENGTH
+    )
+      ? GainType.TRACK
+      : GainType.ALBUM;
 
     // TODO: Preload the next song if needed.
   }
@@ -1040,9 +1042,7 @@ export class PlayView extends HTMLElement {
     const song = this.#currentSong;
     if (song) {
       let gainType = this.#config.get(Pref.GAIN_TYPE);
-      if (gainType === GainType.AUTO) {
-        gainType = this.#shuffled ? GainType.TRACK : GainType.ALBUM;
-      }
+      if (gainType === GainType.AUTO) gainType = this.#autoGainType;
 
       if (gainType === GainType.ALBUM) {
         adj += song.albumGain ?? 0;

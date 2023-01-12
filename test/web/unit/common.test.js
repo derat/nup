@@ -6,11 +6,26 @@ import {
   createElement,
   formatDuration,
   formatRelativeTime,
+  getSongAlbumStats,
   getRatingString,
   moveItem,
 } from './common.js';
 
 suite('common', () => {
+  test('createElement', () => {
+    const p = createElement('p', 'foo bar', null, 'Hi there');
+    expectEq(p.nodeName, 'P', 'nodeName');
+    expectEq(p.className, 'foo bar', 'className');
+    expectEq(p.innerText, 'Hi there', 'innerText');
+    expectEq(p.parentElement, null, 'parentElement');
+
+    const br = createElement('br', null, p, null);
+    expectEq(br.nodeName, 'BR', 'nodeName');
+    expectEq(br.className, '', 'className');
+    expectEq(br.innerText, '', 'innerText');
+    expectEq(br.parentElement, p, 'parentElement');
+  });
+
   test('formatDuration', () => {
     for (const [sec, want] of [
       [0, '0:00'],
@@ -70,18 +85,33 @@ suite('common', () => {
     }
   });
 
-  test('createElement', () => {
-    const p = createElement('p', 'foo bar', null, 'Hi there');
-    expectEq(p.nodeName, 'P', 'nodeName');
-    expectEq(p.className, 'foo bar', 'className');
-    expectEq(p.innerText, 'Hi there', 'innerText');
-    expectEq(p.parentElement, null, 'parentElement');
-
-    const br = createElement('br', null, p, null);
-    expectEq(br.nodeName, 'BR', 'nodeName');
-    expectEq(br.className, '', 'className');
-    expectEq(br.innerText, '', 'innerText');
-    expectEq(br.parentElement, p, 'parentElement');
+  test('getSongAlbumStats', () => {
+    // Don't bother setting properties that won't be used.
+    const makeSong = (albumId, length) => ({ albumId, length });
+    const got = getSongAlbumStats([
+      makeSong('a', 40),
+      makeSong('a', 200),
+      makeSong('a', 5),
+      makeSong('b', 3),
+      makeSong('b', 7),
+      makeSong('a', 150),
+      makeSong(undefined, 40),
+      makeSong(undefined, 30),
+      makeSong('', 20),
+      makeSong('', 27),
+      makeSong('a', 10),
+    ]);
+    const makeStats = (albumId, songs, length) => ({ albumId, songs, length });
+    expectEq(got, [
+      makeStats('a', 3, 245),
+      makeStats('b', 2, 10),
+      makeStats('a', 1, 150),
+      makeStats('', 1, 40),
+      makeStats('', 1, 30),
+      makeStats('', 1, 20),
+      makeStats('', 1, 27),
+      makeStats('a', 1, 10),
+    ]);
   });
 
   test('getRatingString', () => {

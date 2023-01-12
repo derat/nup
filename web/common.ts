@@ -152,6 +152,29 @@ export function getRatingString(rating: number) {
     : '★'.repeat(rating) + '☆'.repeat(5 - rating);
 }
 
+// AlbumStats describes a contiguous sequence of songs from the same album.
+interface AlbumStats {
+  albumId: string;
+  songs: number;
+  length: number;
+}
+
+// Generates an ordered array of AlbumStats objects describing |songs|.
+// Songs with missing or empty |albumId| properties are treated as being from
+// different albums.
+export const getSongAlbumStats = (songs: Song[]) =>
+  songs.reduce((acc: AlbumStats[], s: Song) => {
+    const albumId = s.albumId ?? '';
+    const cur = acc.length ? acc[acc.length - 1] : null;
+    if (cur && cur.albumId === albumId && albumId !== '') {
+      cur.songs++;
+      cur.length += s.length;
+    } else {
+      acc.push({ albumId, songs: 1, length: s.length });
+    }
+    return acc;
+  }, []);
+
 // Moves the item at index |from| in |array| to index |to|.
 // If |idx| is passed, it is adjusted if needed and returned.
 export function moveItem<T>(
