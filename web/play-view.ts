@@ -357,9 +357,7 @@ export class PlayView extends HTMLElement {
         e.detail.toIndex,
         this.#currentIndex
       )!;
-      this.#updateOverlaySongs();
-      this.#updateButtonState();
-      // TODO: Preload the next song if needed.
+      this.#handlePlaylistChange(false);
     }) as EventListenerOrEventListenerObject);
     this.#playlistTable.addEventListener('menu', ((e: CustomEvent) => {
       const idx = e.detail.index;
@@ -402,7 +400,7 @@ export class PlayView extends HTMLElement {
       });
     }) as EventListenerOrEventListenerObject);
 
-    this.#updateSongDisplay();
+    this.#handlePlaylistChange(true);
   }
 
   connectedCallback() {
@@ -582,14 +580,9 @@ export class PlayView extends HTMLElement {
 
     this.#playlistTable.setSongs(this.#songs);
 
-    if (this.#currentIndex === -1) {
-      this.#selectTrack(0);
-    } else if (this.#reachedEndOfSongs) {
-      this.#cycleTrack(1);
-    } else {
-      this.#updateButtonState();
-      this.#updateOverlaySongs();
-    }
+    if (this.#currentIndex === -1) this.#selectTrack(0);
+    else if (this.#reachedEndOfSongs) this.#cycleTrack(1);
+    else this.#handlePlaylistChange(false);
   }
 
   // Removes |len| songs starting at index |start| from the playlist.
@@ -615,8 +608,7 @@ export class PlayView extends HTMLElement {
         this.#currentIndex -= len;
         this.#playlistTable.setRowActive(this.#currentIndex, true);
       }
-      this.#updateButtonState();
-      this.#updateOverlaySongs();
+      this.#handlePlaylistChange(false);
       return;
     }
 
@@ -654,9 +646,7 @@ export class PlayView extends HTMLElement {
   #selectTrack(index: number, delayPlay = false) {
     if (!this.#songs.length) {
       this.#currentIndex = -1;
-      this.#updateSongDisplay();
-      this.#updateButtonState();
-      this.#updateOverlaySongs();
+      this.#handlePlaylistChange(true);
       this.#reachedEndOfSongs = false;
       return;
     }
@@ -670,19 +660,28 @@ export class PlayView extends HTMLElement {
     this.#currentIndex = index;
     this.#audio.src = null;
 
-    this.#updateSongDisplay();
-    this.#updateOverlaySongs();
-    this.#updateButtonState();
+    this.#handlePlaylistChange(true);
     this.#play(delayPlay);
 
     if (document.hidden) this.#showNotification();
   }
 
-  #updateButtonState() {
+  // Updates the UI in response to a playlist change.
+  // |currentChanged| indicates whether |#currentSong| also changed.
+  #handlePlaylistChange(currentChanged: boolean) {
+    if (currentChanged) this.#updateSongDisplay();
+
     this.#prevButton.disabled = this.#currentIndex <= 0;
     this.#nextButton.disabled =
       this.#currentIndex < 0 || this.#currentIndex >= this.#songs.length - 1;
     this.#playPauseButton.disabled = this.#currentIndex < 0;
+
+    this.#overlay.updateSongs(
+      this.#currentSong,
+      this.#songs[this.#currentIndex + 1] ?? null
+    );
+
+    // TODO: Preload the next song if needed.
   }
 
   #updateSongDisplay() {
@@ -777,13 +776,6 @@ export class PlayView extends HTMLElement {
       album: song.album,
       artwork,
     });
-  }
-
-  #updateOverlaySongs() {
-    this.#overlay.updateSongs(
-      this.#currentSong,
-      this.#songs[this.#currentIndex + 1] ?? null
-    );
   }
 
   #showNotification() {
