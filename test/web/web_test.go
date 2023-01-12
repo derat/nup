@@ -413,23 +413,33 @@ func TestRatingQuery(t *testing.T) {
 	importSongs(allSongs)
 
 	page.setStage("unset")
-	page.setText(keywordsInput, "t") // need to set at least one search term
 	page.click(searchButton)
 	page.checkSearchResults(allSongs)
 
 	page.click(resetButton)
 	for _, tc := range []struct {
-		option string
-		want   []db.Song
+		op, stars string
+		want      []db.Song
 	}{
-		{oneStar, joinSongs(song1, song2, song3, song4, song5)},
-		{twoStars, joinSongs(song2, song3, song4, song5)},
-		{threeStars, joinSongs(song3, song4, song5)},
-		{fourStars, joinSongs(song4, song5)},
-		{fiveStars, joinSongs(song5)},
+		{atLeast, oneStar, joinSongs(song1, song2, song3, song4, song5)},
+		{atLeast, twoStars, joinSongs(song2, song3, song4, song5)},
+		{atLeast, threeStars, joinSongs(song3, song4, song5)},
+		{atLeast, fourStars, joinSongs(song4, song5)},
+		{atLeast, fiveStars, joinSongs(song5)},
+		{atMost, oneStar, joinSongs(song1, song6)},
+		{atMost, twoStars, joinSongs(song1, song2, song6)},
+		{atMost, threeStars, joinSongs(song1, song2, song3, song6)},
+		{atMost, fourStars, joinSongs(song1, song2, song3, song4, song6)},
+		{atMost, fiveStars, joinSongs(song1, song2, song3, song4, song5, song6)},
+		{exactly, oneStar, joinSongs(song1)},
+		{exactly, twoStars, joinSongs(song2)},
+		{exactly, threeStars, joinSongs(song3)},
+		{exactly, fourStars, joinSongs(song4)},
+		{exactly, fiveStars, joinSongs(song5)},
 	} {
-		page.setStage(tc.option)
-		page.clickOption(minRatingSelect, tc.option)
+		page.setStage(fmt.Sprintf("%s %s", tc.op, tc.stars))
+		page.clickOption(ratingOpSelect, tc.op)
+		page.clickOption(ratingStarsSelect, tc.stars)
 		page.click(searchButton)
 		page.checkSearchResults(tc.want)
 	}

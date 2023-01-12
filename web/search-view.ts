@@ -53,6 +53,8 @@ const template = createTemplate(`
     margin-bottom: 0;
   }
   #search-form .row .checkbox-col {
+    flex: 0 0 auto; /* infuriating: https://stackoverflow.com/a/51069379 */
+    margin-bottom: 3px;
     width: 6.5em;
   }
   #search-form label {
@@ -89,10 +91,10 @@ const template = createTemplate(`
   #first-track-checkbox {
     margin-left: var(--margin);
   }
-  #min-rating-select {
+  #rating-stars-select {
     flex-grow: 1;
   }
-  #min-rating-select-wrapper {
+  #rating-stars-select-wrapper {
     margin-right: 0;
   }
   #max-plays-input {
@@ -215,6 +217,31 @@ const template = createTemplate(`
   </div>
 
   <div class="row">
+    <label for="rating-op-select" title="Only songs with this rating">
+      Rating is
+      <span id="rating-op-select-wrapper" class="select-wrapper">
+        <select id="rating-op-select">
+          <option value="atLeast">at least</option>
+          <option value="atMost">at most</option>
+          <option value="exactly">exactly</option>
+        </select></span
+      >
+    </label>
+    <span id="rating-stars-select-wrapper" class="select-wrapper">
+      <select id="rating-stars-select">
+        <!-- Put U+2009 (THIN SPACE) between characters since the star icons
+             in the Fontello font are crammed together otherwise. -->
+        <option value=""></option>
+        <option value="1">★</option>
+        <option value="2">★ ★</option>
+        <option value="3">★ ★ ★</option>
+        <option value="4">★ ★ ★ ★</option>
+        <option value="5">★ ★ ★ ★ ★</option>
+      </select></span
+    >
+  </div>
+
+  <div class="row">
     <label
       for="unrated-checkbox"
       class="checkbox-col"
@@ -222,21 +249,6 @@ const template = createTemplate(`
     >
       <input id="unrated-checkbox" type="checkbox" value="unrated" />
       Unrated
-    </label>
-    <label for="min-rating-select" title="Only songs with at least this rating">
-      Min rating
-      <span id="min-rating-select-wrapper" class="select-wrapper">
-        <select id="min-rating-select">
-          <!-- Put U+2009 (THIN SPACE) between characters since the star icons
-               in the Fontello font are crammed together otherwise. -->
-          <option value=""></option>
-          <option value="1">★</option>
-          <option value="2">★ ★</option>
-          <option value="3">★ ★ ★</option>
-          <option value="4">★ ★ ★ ★</option>
-          <option value="5">★ ★ ★ ★ ★</option>
-        </select></span
-      >
     </label>
   </div>
 
@@ -366,7 +378,8 @@ export class SearchView extends HTMLElement {
   #shuffleCheckbox = this.#getInput('shuffle-checkbox');
   #firstTrackCheckbox = this.#getInput('first-track-checkbox');
   #unratedCheckbox = this.#getInput('unrated-checkbox');
-  #minRatingSelect = this.#getSelect('min-rating-select');
+  #ratingOpSelect = this.#getSelect('rating-op-select');
+  #ratingStarsSelect = this.#getSelect('rating-stars-select');
   #orderByLastPlayedCheckbox = this.#getInput('order-by-last-played-checkbox');
   #maxPlaysInput = this.#getInput('max-plays-input');
   #firstPlayedSelect = this.#getSelect('first-played-select');
@@ -554,8 +567,18 @@ export class SearchView extends HTMLElement {
         params.set('maxDate', new Date(s).toISOString());
       }
     }
-    if (!this.#minRatingSelect.disabled && this.#minRatingSelect.value !== '') {
-      params.set('minRating', this.#minRatingSelect.value);
+    if (
+      !this.#ratingOpSelect.disabled &&
+      !this.#ratingStarsSelect.disabled &&
+      this.#ratingStarsSelect.value !== ''
+    ) {
+      if (this.#ratingOpSelect.value == 'atLeast') {
+        params.set('minRating', this.#ratingStarsSelect.value);
+      } else if (this.#ratingOpSelect.value == 'atMost') {
+        params.set('maxRating', this.#ratingStarsSelect.value);
+      } else if (this.#ratingOpSelect.value == 'exactly') {
+        params.set('rating', this.#ratingStarsSelect.value);
+      }
     }
     if (this.#shuffleCheckbox.checked) params.set('shuffle', '1');
     if (this.#firstTrackCheckbox.checked) params.set('firstTrack', '1');
@@ -657,8 +680,9 @@ export class SearchView extends HTMLElement {
     this.#maxDateInput.value = '';
     this.#shuffleCheckbox.checked = false;
     this.#firstTrackCheckbox.checked = false;
+    this.#ratingOpSelect.selectedIndex = 0;
+    this.#ratingStarsSelect.selectedIndex = 0;
     this.#unratedCheckbox.checked = false;
-    this.#minRatingSelect.selectedIndex = 0;
     this.#orderByLastPlayedCheckbox.checked = false;
     this.#maxPlaysInput.value = '';
     this.#firstPlayedSelect.selectedIndex = 0;
@@ -679,7 +703,7 @@ export class SearchView extends HTMLElement {
       !this.#shuffleCheckbox.checked &&
       !this.#firstTrackCheckbox.checked &&
       !this.#unratedCheckbox.checked &&
-      this.#minRatingSelect.selectedIndex === 0 &&
+      this.#ratingStarsSelect.selectedIndex === 0 &&
       !this.#orderByLastPlayedCheckbox.checked &&
       !(parseInt(this.#maxPlaysInput.value) >= 0) &&
       this.#firstPlayedSelect.selectedIndex === 0 &&
@@ -687,7 +711,8 @@ export class SearchView extends HTMLElement {
     ) {
       this.#reset(null, null, null, false /* clearResults */);
       this.#shuffleCheckbox.checked = true;
-      this.#minRatingSelect.selectedIndex = 4; // 4 stars
+      this.#ratingOpSelect.selectedIndex = 0; // at least
+      this.#ratingStarsSelect.selectedIndex = 4; // 4 stars
     }
     this.#submitQuery(true);
   }
@@ -702,7 +727,8 @@ export class SearchView extends HTMLElement {
   };
 
   #updateFormDisabledState() {
-    this.#minRatingSelect.disabled = this.#unratedCheckbox.checked;
+    this.#ratingOpSelect.disabled = this.#unratedCheckbox.checked;
+    this.#ratingStarsSelect.disabled = this.#unratedCheckbox.checked;
   }
 
   #onPresetSelectChange = () => {
@@ -714,7 +740,8 @@ export class SearchView extends HTMLElement {
     this.#presetSelect.selectedIndex = index;
 
     this.#tagsInput.value = preset.tags;
-    this.#minRatingSelect.selectedIndex = clamp(preset.minRating, 0, 5);
+    this.#ratingOpSelect.selectedIndex = 0;
+    this.#ratingStarsSelect.selectedIndex = clamp(preset.minRating, 0, 5);
     this.#unratedCheckbox.checked = preset.unrated;
     this.#orderByLastPlayedCheckbox.checked = preset.orderByLastPlayed;
     this.#firstPlayedSelect.selectedIndex = preset.firstPlayed;

@@ -126,8 +126,9 @@ var (
 	minDateInput              = joinLocs(searchView, loc{selenium.ByID, "min-date-input"})
 	maxDateInput              = joinLocs(searchView, loc{selenium.ByID, "max-date-input"})
 	firstTrackCheckbox        = joinLocs(searchView, loc{selenium.ByID, "first-track-checkbox"})
+	ratingOpSelect            = joinLocs(searchView, loc{selenium.ByID, "rating-op-select"})
+	ratingStarsSelect         = joinLocs(searchView, loc{selenium.ByID, "rating-stars-select"})
 	unratedCheckbox           = joinLocs(searchView, loc{selenium.ByID, "unrated-checkbox"})
-	minRatingSelect           = joinLocs(searchView, loc{selenium.ByID, "min-rating-select"})
 	orderByLastPlayedCheckbox = joinLocs(searchView, loc{selenium.ByID, "order-by-last-played-checkbox"})
 	maxPlaysInput             = joinLocs(searchView, loc{selenium.ByID, "max-plays-input"})
 	firstPlayedSelect         = joinLocs(searchView, loc{selenium.ByID, "first-played-select"})
@@ -147,7 +148,12 @@ var (
 )
 
 const (
-	// Text for minRatingSelect option. Note hacky U+2009 (THIN SPACE) characters.
+	// Text for ratingOpSelect options.
+	atLeast = "at least"
+	atMost  = "at most"
+	exactly = "exactly"
+
+	// Text for ratingStarSelect options. Note hacky U+2009 (THIN SPACE) characters.
 	oneStar    = "★"
 	twoStars   = "★ ★"
 	threeStars = "★ ★ ★"
