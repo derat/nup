@@ -16,6 +16,15 @@ const (
 	PeakAmp   = 1.05
 )
 
+// The expected sorted order for these songs (per sortSongs in server/query) is:
+//  Song0s
+//  Song1s
+//  Song5s
+//  LegacySong2 (empty AlbumID)
+//  LegacySong1 (empty AlbumID)
+//  Song10s (empty AlbumID)
+//  ID3V1Song (empty AlbumID)
+
 var Song0s = db.Song{
 	SHA1:        "fefac74a1d5928316d7131747107c8a61b71ffe4",
 	Filename:    "0s.mp3",

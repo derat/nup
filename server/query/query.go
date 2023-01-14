@@ -582,18 +582,53 @@ func CleanSong(s *db.Song, id int64) {
 	s.Plays = s.Plays[:0]
 }
 
-// sortSongs sorts songs appropriately for the client.
+// sortSongs sorts songs for the client.
+// Songs are sorted by album artist, album release date, album name,
+// and finally by disc and track.
 func sortSongs(songs []*db.Song) {
+	albumIDArtists := make(map[string]string)
+	albumIDDates := make(map[string]string)
+	for _, s := range songs {
+		if s.AlbumID == "" {
+			continue
+		}
+		if _, ok := albumIDArtists[s.AlbumID]; !ok {
+			if s.AlbumArtist != "" {
+				albumIDArtists[s.AlbumID] = s.AlbumArtist
+			} else {
+				albumIDArtists[s.AlbumID] = s.Artist
+			}
+		}
+		if _, ok := albumIDDates[s.AlbumID]; !ok && !s.Date.IsZero() {
+			albumIDDates[s.AlbumID] = s.Date.Format("20060102")
+		}
+	}
+
+	cmp := func(a, b string) int {
+		if a != "" && (b == "" || a < b) {
+			return -1
+		} else if b != "" && (a == "" || b < a) {
+			return 1
+		}
+		return 0
+	}
+
 	sort.Slice(songs, func(i, j int) bool {
 		si, sj := songs[i], songs[j]
-		if si.AlbumLower < sj.AlbumLower {
+
+		if res := cmp(albumIDArtists[si.AlbumID], albumIDArtists[sj.AlbumID]); res < 0 {
 			return true
-		} else if si.AlbumLower > sj.AlbumLower {
+		} else if res > 0 {
 			return false
 		}
-		if si.AlbumID < sj.AlbumID {
+		if res := cmp(albumIDDates[si.AlbumID], albumIDDates[sj.AlbumID]); res < 0 {
 			return true
-		} else if si.AlbumID > sj.AlbumID {
+		} else if res > 0 {
+			return false
+		}
+		if res := cmp(si.AlbumLower, sj.AlbumLower); res < 0 {
+			return true
+		} else if res > 0 {
 			return false
 		}
 		if si.Disc < sj.Disc {

@@ -4,11 +4,15 @@
 package query
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/derat/nup/server/db"
 )
@@ -43,6 +47,73 @@ func TestSubtractSortedIDs(t *testing.T) {
 	}
 }
 
+func TestSortSongs(t *testing.T) {
+	makeSong := func(artist, album string, setAlbumID bool,
+		date string, disc, track int) *db.Song {
+		var albumID string
+		if setAlbumID {
+			sum := sha1.Sum([]byte(artist + album))
+			albumID = hex.EncodeToString(sum[:])
+		}
+		var tm time.Time
+		if date != "" {
+			var err error
+			if tm, err = time.Parse("2006", date); err != nil {
+				t.Fatalf("Failed parsing %q: %v", date, err)
+			}
+		}
+		return &db.Song{
+			AlbumID:     albumID,
+			AlbumArtist: artist,
+			AlbumLower:  album,
+			Date:        tm,
+			Disc:        disc,
+			Track:       track,
+		}
+	}
+
+	// Generate a bunch of songs in the desired order.
+	want := []*db.Song{
+		// Songs with album IDs should be sorted by artist name, then album release date,
+		// then album name, and finally disc and track number.
+		makeSong("Alphabets", "Our First Album", true, "2001", 1, 1),
+		makeSong("Alphabets", "Our First Album", true, "2001", 1, 2),
+		makeSong("Alphabets", "Number 2", true, "2002", 1, 1),
+		makeSong("Alphabets", "Drei", true, "2005", 1, 1),
+		makeSong("Alphabets", "Drei", true, "2005", 2, 1),
+		makeSong("Alphabets", "Same Year?!", true, "2005", 1, 1),
+		makeSong("Balcony", "Album", true, "1998", 1, 1),
+		makeSong("Cakewalk", "Hello", true, "2008", 1, 1),
+		// Songs without album IDs should appear at the end, sorted by album name.
+		makeSong("Aardvark", "Animals", false, "", 1, 1),
+		makeSong("Dracula", "Mansion", false, "", 1, 1),
+		makeSong("Dracula", "Mansion", false, "", 1, 2),
+		makeSong("Dracula", "Mansion", false, "", 2, 1),
+		makeSong("Bakery", "Zebra", false, "", 1, 1),
+	}
+
+	// Shuffle the songs before sorting them.
+	got := append([]*db.Song(nil), want...)
+	shuffleSongsForTest(got)
+	sortSongs(got)
+
+	if !reflect.DeepEqual(got, want) {
+		stringify := func(songs []*db.Song) string {
+			strs := make([]string, len(songs))
+			for i, s := range songs {
+				var date string
+				if !s.Date.IsZero() {
+					date = s.Date.Format("2006")
+				}
+				strs[i] = fmt.Sprintf("  [%q %q %q %d %d]",
+					s.AlbumArtist, s.AlbumLower, date, s.Disc, s.Track)
+			}
+			return strings.Join(strs, "\n")
+		}
+		t.Errorf("sortSongs produced:\n%s\nwant:\n%s", stringify(got), stringify(want))
+	}
+}
+
 func TestSpreadSongs(t *testing.T) {
 	const (
 		numArtists        = 10
@@ -57,11 +128,7 @@ func TestSpreadSongs(t *testing.T) {
 	}
 
 	// Do a regular Fisher-Yates shuffle and then spread out the songs.
-	rand.Seed(0xbeefface)
-	for i := 0; i < len(songs)-1; i++ {
-		j := i + rand.Intn(len(songs)-i)
-		songs[i], songs[j] = songs[j], songs[i]
-	}
+	shuffleSongsForTest(songs)
 	spreadSongs(songs)
 
 	// Check that the same artist doesn't appear back-to-back and that we don't play the same album
@@ -113,5 +180,13 @@ func TestSpreadSongs_AlbumArtist(t *testing.T) {
 			t.Errorf("Song %d has artist %q; last was %q", i, s.Artist, songs[i-1].Artist)
 		}
 		last = name
+	}
+}
+
+func shuffleSongsForTest(songs []*db.Song) {
+	rand.Seed(0xbeefface)
+	for i := 0; i < len(songs)-1; i++ {
+		j := i + rand.Intn(len(songs)-i)
+		songs[i], songs[j] = songs[j], songs[i]
 	}
 }

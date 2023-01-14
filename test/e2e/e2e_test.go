@@ -468,21 +468,21 @@ func TestQueries(tt *testing.T) {
 		{"maxRating=3", ignoreOrder, []db.Song{Song0s, Song1s, Song5s, LegacySong2}},
 		{"maxRating=4", ignoreOrder, []db.Song{Song0s, Song1s, Song5s, LegacySong1, LegacySong2}},
 		{"maxRating=5", ignoreOrder, []db.Song{Song0s, Song1s, Song5s, s10s, LegacySong1, LegacySong2}},
-		{"unrated=1", 0, []db.Song{Song5s, Song0s, Song1s}},
+		{"unrated=1", 0, []db.Song{Song0s, Song1s, Song5s}},
 		{"tags=instrumental", 0, []db.Song{LegacySong2, LegacySong1}},
 		{"tags=electronic+instrumental", 0, []db.Song{LegacySong1}},
 		{"tags=-electronic+instrumental", 0, []db.Song{LegacySong2}},
 		{"tags=instrumental&minRating=4", 0, []db.Song{LegacySong1}},
 		{"tags=instrumental&minRating=4&maxPlays=1", noIndex, []db.Song{}},
 		{"tags=instrumental&minRating=4&maxPlays=2", noIndex, []db.Song{LegacySong1}},
-		{"firstTrack=1", 0, []db.Song{LegacySong1, Song0s}},
+		{"firstTrack=1", 0, []db.Song{Song0s, LegacySong1}},
 		{"artist=" + url.QueryEscape("µ-Ziq"), 0, []db.Song{s10s}}, // U+00B5 (MICRO SIGN)
 		{"artist=" + url.QueryEscape("μ-Ziq"), 0, []db.Song{s10s}}, // U+03BC (GREEK SMALL LETTER MU)
 		{"title=manana", 0, []db.Song{s10s}},
 		{"title=" + url.QueryEscape("mánanä"), 0, []db.Song{s10s}},
 		{"album=two2", 0, []db.Song{s10s}},
 		{"filename=" + url.QueryEscape(Song5s.Filename), 0, []db.Song{Song5s}},
-		{"minDate=2000-01-01T00:00:00Z", 0, []db.Song{Song5s, Song1s}},
+		{"minDate=2000-01-01T00:00:00Z", 0, []db.Song{Song1s, Song5s}},
 		{"maxDate=2000-01-01T00:00:00Z", 0, []db.Song{Song0s}},
 		{"minDate=2000-01-01T00:00:00Z&maxDate=2010-01-01T00:00:00Z", 0, []db.Song{Song1s}},
 		// Ensure that Datastore indexes exist to satisfy various queries (or if not, that the
@@ -853,15 +853,16 @@ func TestSorting(tt *testing.T) {
 		Disc    int
 		Track   int
 	}{
-		// Sorting should be [Album, AlbumID, Disc, Track].
+		// Sorting should be [Artist, Date (unset), Album, Disc, Track].
+		// Sorting is tested more rigorously in the server/query package.
+		{"a", "album1", "56", 1, 1},
+		{"a", "album1", "56", 1, 2},
+		{"a", "album1", "56", 1, 3},
 		{"b", "album1", "23", 1, 1},
 		{"b", "album1", "23", 1, 2},
 		{"b", "album1", "23", 2, 1},
 		{"b", "album1", "23", 2, 2},
 		{"b", "album1", "23", 2, 3},
-		{"a", "album1", "56", 1, 1},
-		{"a", "album1", "56", 1, 2},
-		{"a", "album1", "56", 1, 3},
 		{"b", "album2", "10", 1, 1},
 	} {
 		id := fmt.Sprintf("%s-%s-%d-%d", s.Artist, s.Album, s.Disc, s.Track)
