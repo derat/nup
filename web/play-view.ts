@@ -13,7 +13,6 @@ import {
   getCoverUrl,
   getDumpSongUrl,
   getRatingString,
-  getSongAlbumStats,
   getSongUrl,
   moveItem,
   preloadImage,
@@ -211,7 +210,6 @@ const PLAY_DELAY_MS = 500; // delay before playing when cycling track
 const PRELOAD_SEC = 20; // seconds before end of song to load next song
 const UPDATE_POSITION_SLOP_MS = 10; // time to wait past second boundary
 const MAX_SONG_URLS = 10; // max entries for |#songUrls|
-const MIN_ALBUM_GAIN_LENGTH = 20 * 60; // album threshold for GainType.AUTO
 
 // <play-view> plays and displays information about songs. It also maintains
 // and displays a playlist. Songs can be enqueued by calling enqueueSongs().
@@ -242,7 +240,7 @@ export class PlayView extends HTMLElement {
   #playTimeoutId: number | null = null; // for #playInternal()
   #lastUpdatePosition = 0; // audio position in last #updatePosition()
   #updatePositionTimeoutId: number | null = null;
-  #autoGainType = GainType.ALBUM; // what to use for GainType.AUTO
+  #autoGainType = GainType.TRACK; // what to use for GainType.AUTO
   #songUrls = new Map(); // cache of filename -> absolute URL
 
   #shadow = createShadow(this, template);
@@ -535,6 +533,9 @@ export class PlayView extends HTMLElement {
   get #currentSong() {
     return this.#songs[this.#currentIndex] ?? null;
   }
+  get #prevSong() {
+    return this.#songs[this.#currentIndex - 1] ?? null;
+  }
   get #nextSong() {
     return this.#songs[this.#currentIndex + 1] ?? null;
   }
@@ -663,25 +664,22 @@ export class PlayView extends HTMLElement {
   #handlePlaylistChange(currentChanged: boolean) {
     if (currentChanged) this.#updateSongDisplay();
 
-    this.#prevButton.disabled = this.#currentIndex <= 0;
-    this.#nextButton.disabled =
-      this.#currentIndex < 0 || this.#currentIndex >= this.#songs.length - 1;
-    this.#playPauseButton.disabled = this.#currentIndex < 0;
+    this.#prevButton.disabled = !this.#prevSong;
+    this.#nextButton.disabled = !this.#nextSong;
+    this.#playPauseButton.disabled = !this.#currentSong;
 
-    this.#overlay.updateSongs(
-      this.#currentSong,
-      this.#songs[this.#currentIndex + 1] ?? null
-    );
+    this.#overlay.updateSongs(this.#currentSong, this.#nextSong);
 
-    // Make the "auto" gain type use per-track gains if there appear to be any
-    // non-album blocks of songs in the playlist. This is a hacky heuristic
-    // that's intended to err on the side of using per-track gains:
+    // Make the "auto" gain type use album-specific gain adjustments if the
+    // previous or next song is from the same album as the current song:
     // https://github.com/derat/nup/issues/54
-    this.#autoGainType = getSongAlbumStats(this.#songs).some(
-      (s) => s.length < MIN_ALBUM_GAIN_LENGTH
-    )
-      ? GainType.TRACK
-      : GainType.ALBUM;
+    const albumId = this.#currentSong?.albumId ?? '';
+    this.#autoGainType =
+      albumId !== '' &&
+      (this.#prevSong?.albumId === albumId ||
+        this.#nextSong?.albumId === albumId)
+        ? GainType.ALBUM
+        : GainType.TRACK;
 
     // TODO: Preload the next song if needed.
   }
