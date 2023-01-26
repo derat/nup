@@ -53,6 +53,9 @@ const template = createTemplate(`
     user-select: none;
     width: 4em;
   }
+  .info-table td:nth-child(2) {
+    width: 100%;
+  }
   #rating.rated {
     letter-spacing: 3px;
   }
