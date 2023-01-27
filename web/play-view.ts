@@ -29,7 +29,7 @@ import { createMenu, isMenuShown } from './menu.js';
 import { showOptionsDialog } from './options-dialog.js';
 import { showSongInfoDialog } from './song-info-dialog.js';
 import type { SongTable } from './song-table.js';
-import { showStatsDialog } from './stats-dialog.js';
+import { preloadStats, showStatsDialog } from './stats-dialog.js';
 import UpdateDialog from './update-dialog.js';
 import Updater from './updater.js';
 
@@ -401,6 +401,8 @@ export class PlayView extends HTMLElement {
     }) as EventListenerOrEventListenerObject);
 
     this.#handlePlaylistChange(true);
+
+    preloadStats();
   }
 
   connectedCallback() {

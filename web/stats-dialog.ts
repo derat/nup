@@ -160,68 +160,25 @@ export function showStatsDialog() {
   const shadow = dialog.firstElementChild!.shadowRoot!;
   $('dismiss-button', shadow).addEventListener('click', () => dialog.close());
 
-  fetch('stats', { method: 'GET' })
-    .then((res) => handleFetchError(res))
-    .then((res) => res.json())
+  if (cachedStats) updateDialog(shadow, cachedStats);
+
+  fetchStats()
     .then((stats: Stats) => {
-      // This corresponds to the Stats struct in server/db/stats.go.
-      $('songs', shadow).innerText = stats.songs.toLocaleString();
-      $('albums', shadow).innerText = stats.albums.toLocaleString();
-      $('duration', shadow).innerText = formatDays(stats.totalSec);
-
-      const decades = Object.entries(stats.songDecades).sort();
-      fillChart(
-        $('decades-chart', shadow),
-        decades.map(([_, c]) => c),
-        stats.songs,
-        decades.map(([d, _]) => (d === '0' ? '-' : d.slice(2) + 's')),
-        decades.map(
-          ([d, c]) =>
-            `${d === '0' ? 'Unset' : d + 's'} - ` +
-            `${c} ${c !== 1 ? 'songs' : 'song'}`
-        )
-      );
-
-      const ratingCounts = [...Array(6).keys()].map(
-        (i) => stats.ratings[i] ?? 0
-      );
-      fillChart(
-        $('ratings-chart', shadow),
-        ratingCounts,
-        stats.songs,
-        ratingCounts.map((_, i) => (i === 0 ? '-' : `${i}`)),
-        ratingCounts.map(
-          (c, i) =>
-            `${i === 0 ? 'Unrated' : '★'.repeat(i)} - ` +
-            `${c} ${c !== 1 ? 'songs' : 'song'}`
-        )
-      );
-
-      const tbody = shadow.querySelector('#years-table tbody') as HTMLElement;
-      for (const [year, ystats] of Object.entries(stats.years).sort()) {
-        const row = createElement('tr', null, tbody);
-        createElement('td', null, row, year);
-        createElement('td', null, row, ystats.firstPlays.toLocaleString());
-        createElement('td', null, row, ystats.lastPlays.toLocaleString());
-        createElement('td', null, row, ystats.plays.toLocaleString());
-        createElement('td', null, row, formatDays(ystats.totalSec));
-      }
-      window.setTimeout(() =>
-        tbody.lastElementChild?.scrollIntoView(false /* alignToTop */)
-      );
-
-      const updateTime = formatRelativeTime(
-        (Date.parse(stats.updateTime) - Date.now()) / 1000
-      );
-      $('updated-div', shadow).innerText = `Updated ${updateTime}`;
-
-      $('stats-div', shadow).classList.add('ready');
+      if (cachedStats && stats.updateTime === cachedStats.updateTime) return;
+      cachedStats = stats;
+      updateDialog(shadow, cachedStats);
     })
     .catch((err) => {
       $('updated-div', shadow).innerText = err.toString();
     });
 }
 
+// Preloads stats from the server so they'll be available when showStatsDialog()
+// is called.
+export const preloadStats = () =>
+  fetchStats().then((stats) => (cachedStats = stats));
+
+// This corresponds to the Stats struct in server/db/stats.go.
 interface Stats {
   songs: number;
   albums: number;
@@ -240,9 +197,71 @@ interface PlayStats {
   lastPlays: number;
 }
 
+let cachedStats: Stats | null = null;
+
 const formatDays = (sec: number) => `${(sec / 86400).toFixed(1)} days`;
 
-// Adds spans within div corresponding to vals and titles.
+// Fetches stats from the server.
+const fetchStats = () =>
+  fetch('stats', { method: 'GET' })
+    .then((res) => handleFetchError(res))
+    .then((res) => res.json());
+
+// Updates |shadow| to reflect |stats|.
+function updateDialog(shadow: ShadowRoot, stats: Stats) {
+  $('songs', shadow).innerText = stats.songs.toLocaleString();
+  $('albums', shadow).innerText = stats.albums.toLocaleString();
+  $('duration', shadow).innerText = formatDays(stats.totalSec);
+
+  const decades = Object.entries(stats.songDecades).sort();
+  fillChart(
+    $('decades-chart', shadow),
+    decades.map(([_, c]) => c),
+    stats.songs,
+    decades.map(([d, _]) => (d === '0' ? '-' : d.slice(2) + 's')),
+    decades.map(
+      ([d, c]) =>
+        `${d === '0' ? 'Unset' : d + 's'} - ` +
+        `${c} ${c !== 1 ? 'songs' : 'song'}`
+    )
+  );
+
+  const ratingCounts = [...Array(6).keys()].map((i) => stats.ratings[i] ?? 0);
+  fillChart(
+    $('ratings-chart', shadow),
+    ratingCounts,
+    stats.songs,
+    ratingCounts.map((_, i) => (i === 0 ? '-' : `${i}`)),
+    ratingCounts.map(
+      (c, i) =>
+        `${i === 0 ? 'Unrated' : '★'.repeat(i)} - ` +
+        `${c} ${c !== 1 ? 'songs' : 'song'}`
+    )
+  );
+
+  const tbody = shadow.querySelector('#years-table tbody') as HTMLElement;
+  while (tbody.lastChild) tbody.removeChild(tbody.lastChild);
+  for (const [year, ystats] of Object.entries(stats.years).sort()) {
+    const row = createElement('tr', null, tbody);
+    createElement('td', null, row, year);
+    createElement('td', null, row, ystats.firstPlays.toLocaleString());
+    createElement('td', null, row, ystats.lastPlays.toLocaleString());
+    createElement('td', null, row, ystats.plays.toLocaleString());
+    createElement('td', null, row, formatDays(ystats.totalSec));
+  }
+  window.setTimeout(() =>
+    tbody.lastElementChild?.scrollIntoView(false /* alignToTop */)
+  );
+
+  const updateTime = formatRelativeTime(
+    (Date.parse(stats.updateTime) - Date.now()) / 1000
+  );
+  $('updated-div', shadow).innerText = `Updated ${updateTime}`;
+
+  $('stats-div', shadow).classList.add('ready');
+}
+
+// Adds spans within |div| corresponding to |vals| and |titles|.
 function fillChart(
   div: HTMLElement,
   vals: number[],
@@ -250,6 +269,7 @@ function fillChart(
   labels: string[],
   titles: string[]
 ) {
+  while (div.lastChild) div.removeChild(div.lastChild);
   if (total <= 0) return;
   for (let i = 0; i < vals.length; i++) {
     const pct = vals[i] / total;
