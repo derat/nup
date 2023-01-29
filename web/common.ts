@@ -173,6 +173,38 @@ export function moveItem<T>(
   return idx;
 }
 
+// Wraps |orig| across multiple lines that are each at most |max| characters
+// (corresponding to the width of a lowercase 's') wide.
+export function wrapString(orig: string, max: number): string {
+  if (!orig.length) return '';
+
+  // TODO: If this ends up getting called a lot, cache canvas on function?
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d')!; // font defaults to '10px sans-serif'
+  const measure = (s: string) => ctx.measureText(s).width;
+  const maxWidth = max * measure('s');
+
+  const lines: string[] = [];
+  for (const ln of orig.split('\n')) {
+    let out = '';
+    for (const word of ln.trim().split(/\s+/)) {
+      if (!out.length) {
+        out += word;
+      } else {
+        const joined = out + ' ' + word;
+        if (measure(joined) <= maxWidth) {
+          out = joined;
+        } else {
+          lines.push(out);
+          out = word;
+        }
+      }
+    }
+    lines.push(out);
+  }
+  return lines.join('\n');
+}
+
 // Returns true if the code is currently being tested.
 // navigator.webdriver is set by Chrome when running under Selenium, while
 // navigator.unitTest is injected by the unit test code's fake implementation.

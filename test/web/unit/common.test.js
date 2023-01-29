@@ -8,6 +8,7 @@ import {
   formatRelativeTime,
   getRatingString,
   moveItem,
+  wrapString,
 } from './common.js';
 
 suite('common', () => {
@@ -117,6 +118,18 @@ suite('common', () => {
       const desc = `moveItem([${array.join(',')}], ${from}, ${to}, ${idx})`;
       expectEq(gotArray, wantArray, desc);
       expectEq(gotIdx, wantIdx, desc);
+    }
+  });
+
+  test('wrapString', () => {
+    for (const [orig, max, want] of [
+      ['abc def', 7, 'abc def'],
+      ['abc def', 3, 'abc\ndef'],
+      ['abc\n\ndef ghijklmno', 7, 'abc\n\ndef\nghijklmno'],
+    ]) {
+      const got = wrapString(orig, max);
+      const desc = `wrapString("${orig}", ${max})`;
+      expectEq(got, want, desc);
     }
   });
 });

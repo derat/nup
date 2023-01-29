@@ -21,6 +21,7 @@ import {
   spinnerIcon,
   starIcon,
   updateTitleAttributeForTruncation,
+  wrapString,
 } from './common.js';
 import { getConfig, GainType, Pref } from './config.js';
 import { isDialogShown } from './dialog.js';
@@ -210,6 +211,7 @@ const PLAY_DELAY_MS = 500; // delay before playing when cycling track
 const PRELOAD_SEC = 20; // seconds before end of song to load next song
 const UPDATE_POSITION_SLOP_MS = 10; // time to wait past second boundary
 const MAX_SONG_URLS = 10; // max entries for |#songUrls|
+const COVER_TOOLTIP_WIDTH = 50; // max width in chars for cover image tooltip
 
 // <play-view> plays and displays information about songs. It also maintains
 // and displays a playlist. Songs can be enqueued by calling enqueueSongs().
@@ -739,7 +741,7 @@ export class PlayView extends HTMLElement {
       getRatingString(song.rating) +
       '\n' +
       (song.tags.length
-        ? 'Tags: ' + song.tags.sort().join(' ')
+        ? wrapString('Tags: ' + song.tags.sort().join(' '), COVER_TOOLTIP_WIDTH)
         : '(Alt+R or Alt+T to edit)');
   }
 
