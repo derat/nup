@@ -34,10 +34,16 @@ type Config struct {
 	// ComputeGain indicates whether the mp3gain program should be used to compute per-song
 	// and per-album gain information so that volume can be normalized during playback.
 	ComputeGain bool `json:"computeGain"`
-	// ArtistRewrites is a map from original ID3 tag artist names to replacement names that should
+	// ArtistRewrites maps from original ID3 tag artist names to replacement names that should
 	// be used for updates. This can be used to fix incorrectly-tagged files without needing to
 	// reupload them.
 	ArtistRewrites map[string]string `json:"artistRewrites"`
+	// AlbumIDRewrites maps from original ID3 tag album IDs (i.e. MusicBrainz UUIDs) to
+	// replacement IDs that should be used for updates. If the album name ends with the suffix
+	// " (disc [number])", the suffix will be removed and the song's disc number will be set
+	// accordingly. This can be used to fix split releases without needing to retag and reupload
+	// them.
+	AlbumIDRewrites map[string]string `json:"albumIdRewrites"`
 }
 
 // LoadConfig loads a JSON-marshaled Config from the file at p and updates dst.

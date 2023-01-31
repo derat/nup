@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -108,6 +109,26 @@ func ReadSong(cfg *client.Config, p string, fi os.FileInfo, onlyTags bool,
 		s.Artist = repl
 	}
 
+	if repl, ok := cfg.AlbumIDRewrites[s.AlbumID]; ok {
+		// Look for a cover image corresponding to the original ID as well.
+		// Don't bother setting this if the rewrite didn't actually change anything
+		// (i.e. it was just defined to set the disc number).
+		if s.CoverID == "" && s.AlbumID != repl {
+			s.CoverID = s.AlbumID
+		}
+		s.AlbumID = repl
+
+		// Extract the disc number from the album name.
+		if ms := albumDiscRegexp.FindStringSubmatch(s.Album); ms != nil {
+			s.Album = s.Album[:len(s.Album)-len(ms[0])]
+			if disc, err := strconv.Atoi(ms[1]); err != nil {
+				return nil, fmt.Errorf("parsing disc from %q: %v", s.Album, err)
+			} else {
+				s.Disc = disc
+			}
+		}
+	}
+
 	if onlyTags {
 		return &s, nil
 	}
@@ -134,6 +155,9 @@ func ReadSong(cfg *client.Config, p string, fi os.FileInfo, onlyTags bool,
 
 	return &s, nil
 }
+
+// albumDiscRegexp matches pre-NGS MusicBrainz album names used for multi-disc releases.
+var albumDiscRegexp = regexp.MustCompile(` \(disc (\d+)\)$`)
 
 // getSongDate tries to extract a song's release or recording date.
 func getSongDate(tag taglib.GenericTag) (time.Time, error) {

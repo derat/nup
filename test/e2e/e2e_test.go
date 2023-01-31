@@ -446,8 +446,8 @@ func TestQueries(tt *testing.T) {
 		{"artist=AROVANE", 0, []db.Song{LegacySong1}},
 		{"title=thaem+nue", 0, []db.Song{LegacySong1}},
 		{"album=ATOL+scrap", 0, []db.Song{LegacySong1}},
-		{"albumId=1e477f68-c407-4eae-ad01-518528cedc2c", 0, []db.Song{Song0s, Song1s}},
-		{"album=Another+Album&albumId=a1d2405b-afe0-4e28-a935-b5b256f68131", 0, []db.Song{Song5s}},
+		{"albumId=" + Song0s.AlbumID, 0, []db.Song{Song0s, Song1s}},
+		{"album=" + url.QueryEscape(Song5s.Album) + "&albumId=" + Song5s.AlbumID, 0, []db.Song{Song5s}},
 		{"keywords=arovane+thaem+atol", 0, []db.Song{LegacySong1}},
 		{"keywords=arovane+foo", 0, []db.Song{}},
 		{"keywords=second+artist", 0, []db.Song{Song1s}}, // track artist

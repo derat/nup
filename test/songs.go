@@ -82,8 +82,8 @@ var Song5s = db.Song{
 	Filename:    "5s.mp3",
 	Artist:      "Third Artist",
 	Title:       "Five Seconds",
-	Album:       "Another Album",
-	AlbumArtist: "", // omitted by 'nup update' since it matches Artist
+	Album:       "Another Album (disc 3)", // intentionally differs from Disc
+	AlbumArtist: "",                       // omitted by 'nup update' since it matches Artist
 	AlbumID:     "a1d2405b-afe0-4e28-a935-b5b256f68131",
 	Track:       1,
 	Disc:        2,

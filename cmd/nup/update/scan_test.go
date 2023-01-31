@@ -33,9 +33,10 @@ func getSongsFromChannel(ch chan songOrErr, num int) ([]db.Song, error) {
 }
 
 type scanTestOptions struct {
-	artistRewrites map[string]string // client.Config.ArtistRewrites
-	lastUpdateDirs []string          // scanForUpdatedSongs lastUpdateDirs param
-	forceGlob      string            // scanOptions.forceGlob
+	artistRewrites  map[string]string // client.Config.ArtistRewrites
+	albumIDRewrites map[string]string // client.Config.AlbumIDRewrites
+	lastUpdateDirs  []string          // scanForUpdatedSongs lastUpdateDirs param
+	forceGlob       string            // scanOptions.forceGlob
 }
 
 func scanAndCompareSongs(t *testing.T, desc, dir string, lastUpdateTime time.Time,
@@ -45,6 +46,7 @@ func scanAndCompareSongs(t *testing.T, desc, dir string, lastUpdateTime time.Tim
 	var lastUpdateDirs []string
 	if testOpts != nil {
 		cfg.ArtistRewrites = testOpts.artistRewrites
+		cfg.AlbumIDRewrites = testOpts.albumIDRewrites
 		opts.forceGlob = testOpts.forceGlob
 		lastUpdateDirs = testOpts.lastUpdateDirs
 	}
@@ -134,13 +136,22 @@ func TestScanAndCompareSongs(t *testing.T) {
 
 func TestScanAndCompareSongs_Rewrite(t *testing.T) {
 	dir := t.TempDir()
-	const newArtist = "Rewritten Artist"
+
 	newSong1s := test.Song1s
-	newSong1s.Artist = newArtist
+	newSong1s.Artist = "Rewritten Artist"
+
+	newSong5s := test.Song5s
+	newSong5s.Album = "Another Album" // from "Another Album (disc 3)"
+	newSong5s.AlbumID = "bf7ff94c-2a6a-4357-a30e-71da8c117ebc"
+	newSong5s.CoverID = test.Song5s.AlbumID
+	newSong5s.Disc = 3
 
 	test.Must(t, test.CopySongs(dir, test.Song1s.Filename, test.Song5s.Filename))
-	opts := &scanTestOptions{artistRewrites: map[string]string{test.Song1s.Artist: newSong1s.Artist}}
-	scanAndCompareSongs(t, "initial", dir, time.Time{}, opts, []db.Song{newSong1s, test.Song5s})
+	opts := &scanTestOptions{
+		artistRewrites:  map[string]string{test.Song1s.Artist: newSong1s.Artist},
+		albumIDRewrites: map[string]string{test.Song5s.AlbumID: newSong5s.AlbumID},
+	}
+	scanAndCompareSongs(t, "initial", dir, time.Time{}, opts, []db.Song{newSong1s, newSong5s})
 }
 
 func TestScanAndCompareSongs_NewFiles(t *testing.T) {
