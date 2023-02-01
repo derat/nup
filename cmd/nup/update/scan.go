@@ -56,6 +56,8 @@ func readSongList(cfg *client.Config, listPath string, ch chan songOrErr,
 	}
 
 	// Now read the files asynchronously (but one at a time).
+	// TODO: Consider reading multiple songs simultaneously as in scanForUpdatedSongs
+	// so that gain calculation is parallelized.
 	go func() {
 		for _, rel := range paths {
 			full := filepath.Join(cfg.MusicDir, rel)

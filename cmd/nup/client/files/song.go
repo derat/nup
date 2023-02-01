@@ -119,13 +119,10 @@ func ReadSong(cfg *client.Config, p string, fi os.FileInfo, onlyTags bool,
 		s.AlbumID = repl
 
 		// Extract the disc number from the album name.
-		if ms := albumDiscRegexp.FindStringSubmatch(s.Album); ms != nil {
-			s.Album = s.Album[:len(s.Album)-len(ms[0])]
-			if disc, err := strconv.Atoi(ms[1]); err != nil {
-				return nil, fmt.Errorf("parsing disc from %q: %v", s.Album, err)
-			} else {
-				s.Disc = disc
-			}
+		// TODO: Save the disc/medium name (if any) somewhere?
+		if album, disc, _ := extractAlbumDisc(s.Album); disc != 0 {
+			s.Album = album
+			s.Disc = disc
 		}
 	}
 
@@ -156,8 +153,25 @@ func ReadSong(cfg *client.Config, p string, fi os.FileInfo, onlyTags bool,
 	return &s, nil
 }
 
+// extractAlbumDisc attempts to extract a disc number and optional title from an album name.
+// "Some Album (disc 2: The Second Disc)" is split into "Some Album", 2, and "The Second Disc".
+// If disc information cannot be extracted, the original album name and 0 are returned.
+func extractAlbumDisc(orig string) (album string, discNum int, discTitle string) {
+	ms := albumDiscRegexp.FindStringSubmatch(orig)
+	if ms == nil {
+		return orig, 0, ""
+	}
+	var err error
+	if discNum, err = strconv.Atoi(ms[1]); err != nil {
+		discNum = 0
+	}
+	return orig[:len(orig)-len(ms[0])], discNum, ms[2]
+}
+
 // albumDiscRegexp matches pre-NGS MusicBrainz album names used for multi-disc releases.
-var albumDiscRegexp = regexp.MustCompile(` \(disc (\d+)\)$`)
+// The first subgroup contains the disc number, while the second subgroup contains
+// the disc/medium title (if any).
+var albumDiscRegexp = regexp.MustCompile(`\s+\(disc (\d+)(?::\s+([^)]+))?\)$`)
 
 // getSongDate tries to extract a song's release or recording date.
 func getSongDate(tag taglib.GenericTag) (time.Time, error) {
