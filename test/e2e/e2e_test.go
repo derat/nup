@@ -430,6 +430,7 @@ func TestQueries(tt *testing.T) {
 	s10s.Title = "Mañana"
 	s10s.Album = "Two²"
 	s10s.Rating = 5
+	s10s.DiscSubtitle = "Just a Subtitle"
 	t.PostSongs([]db.Song{s10s}, true, 0)
 
 	const (
@@ -452,6 +453,7 @@ func TestQueries(tt *testing.T) {
 		{"keywords=arovane+foo", 0, []db.Song{}},
 		{"keywords=second+artist", 0, []db.Song{Song1s}}, // track artist
 		{"keywords=remixer", 0, []db.Song{Song1s}},       // album artist
+		{"keywords=just+subtitle", 0, []db.Song{s10s}},   // disc subtitle
 		// Don't bother checking the result order when checking rating filters.
 		{"rating=1", ignoreOrder, []db.Song{}},
 		{"rating=2", ignoreOrder, []db.Song{}},

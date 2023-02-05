@@ -54,6 +54,7 @@ func TestSong_Update(t *testing.T) {
 		Title:          "The Title",
 		Album:          "The Album",
 		AlbumArtist:    "AlbumArtist",
+		DiscSubtitle:   "First Disc",
 		AlbumID:        "album-id",
 		Track:          13,
 		Disc:           2,
@@ -84,7 +85,7 @@ func TestSong_Update(t *testing.T) {
 	want.ArtistLower = "the artist"
 	want.TitleLower = "the title"
 	want.AlbumLower = "the album"
-	want.Keywords = []string{"album", "albumartist", "artist", "the", "title"}
+	want.Keywords = []string{"album", "albumartist", "artist", "disc", "first", "the", "title"}
 
 	// User data should also be preserved.
 	want.Rating = dst.Rating

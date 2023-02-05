@@ -140,18 +140,22 @@ func TestScanAndCompareSongs_Rewrite(t *testing.T) {
 	newSong1s := test.Song1s
 	newSong1s.Artist = "Rewritten Artist"
 
+	// The album name, disc number, and disc subtitle should all be derived from
+	// the original "Another Album (disc 3: The Third Disc)" album name.
 	newSong5s := test.Song5s
-	newSong5s.Album = "Another Album" // from "Another Album (disc 3)"
+	newSong5s.Album = "Another Album"
 	newSong5s.AlbumID = "bf7ff94c-2a6a-4357-a30e-71da8c117ebc"
 	newSong5s.CoverID = test.Song5s.AlbumID
 	newSong5s.Disc = 3
+	newSong5s.DiscSubtitle = "The Third Disc"
 
-	test.Must(t, test.CopySongs(dir, test.Song1s.Filename, test.Song5s.Filename))
+	// This also verifies that Song10s's TSST frame is used to fill DiscSubtitle.
+	test.Must(t, test.CopySongs(dir, test.Song1s.Filename, test.Song5s.Filename, test.Song10s.Filename))
 	opts := &scanTestOptions{
 		artistRewrites:  map[string]string{test.Song1s.Artist: newSong1s.Artist},
 		albumIDRewrites: map[string]string{test.Song5s.AlbumID: newSong5s.AlbumID},
 	}
-	scanAndCompareSongs(t, "initial", dir, time.Time{}, opts, []db.Song{newSong1s, newSong5s})
+	scanAndCompareSongs(t, "initial", dir, time.Time{}, opts, []db.Song{newSong1s, newSong5s, test.Song10s})
 }
 
 func TestScanAndCompareSongs_NewFiles(t *testing.T) {

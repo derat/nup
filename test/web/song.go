@@ -40,13 +40,14 @@ func newSong(artist, title, album string, fields ...songField) db.Song {
 // songField describes a field that should be set by newSong.
 type songField func(*db.Song)
 
-func withDate(t time.Time) songField  { return func(s *db.Song) { s.Date = t } }
-func withDisc(d int) songField        { return func(s *db.Song) { s.Disc = d } }
-func withFilename(f string) songField { return func(s *db.Song) { s.Filename = f } }
-func withLength(l float64) songField  { return func(s *db.Song) { s.Length = l } }
-func withRating(r int) songField      { return func(s *db.Song) { s.Rating = r } }
-func withTags(t ...string) songField  { return func(s *db.Song) { s.Tags = t } }
-func withTrack(t int) songField       { return func(s *db.Song) { s.Track = t } }
+func withDate(t time.Time) songField      { return func(s *db.Song) { s.Date = t } }
+func withDisc(d int) songField            { return func(s *db.Song) { s.Disc = d } }
+func withDiscSubtitle(t string) songField { return func(s *db.Song) { s.DiscSubtitle = t } }
+func withFilename(f string) songField     { return func(s *db.Song) { s.Filename = f } }
+func withLength(l float64) songField      { return func(s *db.Song) { s.Length = l } }
+func withRating(r int) songField          { return func(s *db.Song) { s.Rating = r } }
+func withTags(t ...string) songField      { return func(s *db.Song) { s.Tags = t } }
+func withTrack(t int) songField           { return func(s *db.Song) { s.Track = t } }
 func withPlays(ts ...time.Time) songField {
 	return func(s *db.Song) {
 		for _, t := range ts {

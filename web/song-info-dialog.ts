@@ -73,6 +73,7 @@ const template = createTemplate(`
     <tr><td>Artist</td><td id="artist"></td></tr>
     <tr><td>Title</td><td id="title"></td></tr>
     <tr><td>Album</td><td id="album"></td></tr>
+    <tr><td>Disc</td><td id="disc"></td></tr>
     <tr><td>Track</td><td id="track"></td></tr>
     <tr><td>Date</td><td id="date"></td></tr>
     <tr><td>Length</td><td id="length"></td></tr>
@@ -117,9 +118,10 @@ export function showSongInfoDialog(song: Song, isCurrent = false) {
   $('artist', shadow).innerText = song.artist;
   $('title', shadow).innerText = song.title;
   $('album', shadow).innerText = song.album;
-  $('track', shadow).innerText =
-    (song.track >= 1 ? song.track.toString() : '') +
-    (song.disc > 1 ? ` (Disc ${song.disc})` : '');
+  $('disc', shadow).innerText =
+    (song.disc >= 1 ? song.disc.toString() : '') +
+    (song.discSubtitle ? ` (${song.discSubtitle})` : '');
+  $('track', shadow).innerText = song.track >= 1 ? song.track.toString() : '';
   $('date', shadow).innerText = song.date?.substring(0, 10) ?? '';
   $('length', shadow).innerText = formatDuration(song.length);
   $('rating', shadow).innerText = getRatingString(song.rating);

@@ -82,8 +82,8 @@ var Song5s = db.Song{
 	Filename:    "5s.mp3",
 	Artist:      "Third Artist",
 	Title:       "Five Seconds",
-	Album:       "Another Album (disc 3)", // intentionally differs from Disc
-	AlbumArtist: "",                       // omitted by 'nup update' since it matches Artist
+	Album:       "Another Album (disc 3: The Third Disc)", // intentionally differs from Disc
+	AlbumArtist: "",                                       // omitted by 'nup update' since it matches Artist
 	AlbumID:     "a1d2405b-afe0-4e28-a935-b5b256f68131",
 	Track:       1,
 	Disc:        2,
@@ -95,15 +95,16 @@ var Song5s = db.Song{
 }
 
 var Song10s = db.Song{
-	SHA1:      "dfc21dbdf2056184fa3bbe9688a2050f8f2c5dff",
-	Filename:  "10s.mp3",
-	Artist:    "Boring Artist",
-	Title:     "Ten Seconds",
-	Album:     "Music for Waiting Rooms",
-	Length:    10.031,
-	TrackGain: TrackGain,
-	AlbumGain: AlbumGain,
-	PeakAmp:   PeakAmp,
+	SHA1:         "dfc21dbdf2056184fa3bbe9688a2050f8f2c5dff",
+	Filename:     "10s.mp3",
+	Artist:       "Boring Artist",
+	Title:        "Ten Seconds",
+	Album:        "Music for Waiting Rooms",
+	DiscSubtitle: "The Only Disc",
+	Length:       10.031,
+	TrackGain:    TrackGain,
+	AlbumGain:    AlbumGain,
+	PeakAmp:      PeakAmp,
 }
 
 var ID3V1Song = db.Song{

@@ -65,6 +65,7 @@ var (
 	infoTitle         = joinLocs(infoDialog, loc{selenium.ByID, "title"})
 	infoAlbum         = joinLocs(infoDialog, loc{selenium.ByID, "album"})
 	infoTrack         = joinLocs(infoDialog, loc{selenium.ByID, "track"})
+	infoDisc          = joinLocs(infoDialog, loc{selenium.ByID, "disc"})
 	infoDate          = joinLocs(infoDialog, loc{selenium.ByID, "date"})
 	infoLength        = joinLocs(infoDialog, loc{selenium.ByID, "length"})
 	infoRating        = joinLocs(infoDialog, loc{selenium.ByID, "rating"})
@@ -578,14 +579,19 @@ const (
 	checkboxTransparent               // has "transparent" class
 )
 
-// checkText checks that text of the element matched by locs is matched by wantRegexp.
+// checkText checks that text of the element matched by locs equals want.
+func (p *page) checkText(locs []loc, want string) {
+	p.checkTextRegexp(locs, regexp.QuoteMeta(want))
+}
+
+// checkTextRegexp checks that text of the element matched by locs is matched by wantRegexp.
 // Spacing can be weird if the text is spread across multiple child nodes.
-func (p *page) checkText(locs []loc, wantRegexp string) {
+func (p *page) checkTextRegexp(locs []loc, wantRegexp string) {
 	el := p.getOrFail(locs)
 	want := regexp.MustCompile(wantRegexp)
 	if err := wait(func() error {
 		if got := p.getTextOrFail(el, false); !want.MatchString(got) {
-			return fmt.Errorf("got %q; want %q", got, want)
+			return fmt.Errorf("got %q; want %q (regexp)", got, want)
 		}
 		return nil
 	}); err != nil {

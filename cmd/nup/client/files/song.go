@@ -97,6 +97,12 @@ func ReadSong(cfg *client.Config, p string, fi os.FileInfo, onlyTags bool,
 			s.AlbumArtist = aa
 		}
 
+		// TSST (Set subtitle) contains the disc's subtitle.
+		// Most multi-disc albums don't have subtitles.
+		if s.DiscSubtitle, err = mpeg.GetID3v2TextFrame(tag, "TSST"); err != nil {
+			return nil, err
+		}
+
 		// Some old files might be missing the TPOS "part of set" frame.
 		// Assume that they're from a single-disc album in that case:
 		// https://github.com/derat/nup/issues/37
@@ -118,11 +124,13 @@ func ReadSong(cfg *client.Config, p string, fi os.FileInfo, onlyTags bool,
 		}
 		s.AlbumID = repl
 
-		// Extract the disc number from the album name.
-		// TODO: Save the disc/medium name (if any) somewhere?
-		if album, disc, _ := extractAlbumDisc(s.Album); disc != 0 {
+		// Extract the disc number and subtitle from the album name.
+		if album, disc, subtitle := extractAlbumDisc(s.Album); disc != 0 {
 			s.Album = album
 			s.Disc = disc
+			if s.DiscSubtitle == "" {
+				s.DiscSubtitle = subtitle
+			}
 		}
 	}
 

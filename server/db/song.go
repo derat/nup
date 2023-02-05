@@ -65,8 +65,11 @@ type Song struct {
 	// album consisting of songs remixed by a single artist.
 	AlbumArtist string `datastore:",noindex" json:"albumArtist,omitempty"`
 
+	// DiscSubtitle contains the disc's subtitle, if any.
+	DiscSubtitle string `json:"discSubtitle,omitempty"`
+
 	// Keywords contains words from ArtistLower, TitleLower, AlbumLower, and
-	// AlbumArtist (after normalization). It is used for searching.
+	// AlbumArtist and DiscSubtitle (after normalization). It is used for searching.
 	Keywords []string `json:"-"`
 
 	// AlbumID is an opaque ID uniquely identifying the album
@@ -202,6 +205,7 @@ func (s *Song) MetadataEquals(o *Song) bool {
 		s.AlbumID == o.AlbumID &&
 		s.Track == o.Track &&
 		s.Disc == o.Disc &&
+		s.DiscSubtitle == o.DiscSubtitle &&
 		s.Date.Equal(o.Date) &&
 		s.Length == o.Length &&
 		s.TrackGain == o.TrackGain &&
@@ -227,6 +231,7 @@ func (dst *Song) Update(src *Song, copyUserData bool) error {
 	dst.AlbumID = src.AlbumID
 	dst.Track = src.Track
 	dst.Disc = src.Disc
+	dst.DiscSubtitle = src.DiscSubtitle
 	dst.Date = src.Date
 	dst.Length = src.Length
 	dst.TrackGain = src.TrackGain
@@ -250,10 +255,21 @@ func (dst *Song) Update(src *Song, copyUserData bool) error {
 	if err != nil {
 		return fmt.Errorf("normalizing %q: %v", dst.AlbumArtist, err)
 	}
+	// DiscSubtitle is also included in Keywords.
+	discSubtitleNorm, err := Normalize(dst.DiscSubtitle)
+	if err != nil {
+		return fmt.Errorf("normalizing %q: %v", dst.DiscSubtitle, err)
+	}
 
 	// Keywords are sorted and deduped in the later call to Clean.
 	dst.Keywords = nil
-	for _, str := range []string{dst.ArtistLower, dst.TitleLower, dst.AlbumLower, albumArtistNorm} {
+	for _, str := range []string{
+		dst.ArtistLower,
+		dst.TitleLower,
+		dst.AlbumLower,
+		albumArtistNorm,
+		discSubtitleNorm,
+	} {
 		for _, w := range strings.FieldsFunc(str, func(c rune) bool {
 			return !unicode.IsLetter(c) && !unicode.IsNumber(c)
 		}) {

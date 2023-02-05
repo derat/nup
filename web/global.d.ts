@@ -11,6 +11,7 @@ declare interface Song {
   title: string;
   album: string;
   albumArtist?: string;
+  discSubtitle?: string;
   albumId?: string;
   track: number;
   disc: number;
