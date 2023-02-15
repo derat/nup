@@ -403,6 +403,8 @@ func runQuery(ctx context.Context, query *SongQuery, fallback bool) ([]int64, er
 		default:
 			return nil, fmt.Errorf("max rating %v not in [1, 5]", query.MaxRating)
 		}
+		// Exclude unrated songs.
+		eq = eq.Filter("RatingAtLeast1 =", true)
 	} else if query.Unrated {
 		eq = eq.Filter("Rating =", 0)
 	}

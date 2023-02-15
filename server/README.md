@@ -122,7 +122,7 @@ Queries Datastore and returns a JSON-marshaled array of [Song]s.
     recently). Float seconds since the Unix epoch are also accepted.
 *   `maxPlays` (optional) - Integer maximum number of plays.
 *   `maxRating` (optional) - Integer maximum song rating in the range `[1, 5]`.
-    Unrated songs are included.
+    Unrated songs are not returned when this parameter is supplied.
 *   `minDate` (optional) - RFC 3339 string containing minimum song date.
 *   `minFirstPlayed` (optional) - RFC 3339 string specifying the minimum time at
     which songs were first played (to select recently-added music). Float
