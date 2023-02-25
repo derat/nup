@@ -1,3 +1,6 @@
+# TODO: App Engine offers newer runtimes like go119, but dev_appserver.py (used
+# for testing) doesn't support anything beyond go115 as of 20230225. It's
+# unclear whether it'll be updated.
 runtime: go115
 
 # app.yaml is supposed to be in the same directory as go.mod.
@@ -39,7 +42,6 @@ handlers:
   - url: /.*
     script: auto
     secure: always
-
 # The skip\_files documentation is a self-contradictory mess:
 #
 # https://cloud.google.com/appengine/docs/standard/python/config/appref:
