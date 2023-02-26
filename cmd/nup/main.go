@@ -24,7 +24,7 @@ import (
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage %v: [flag]...\n"+
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %v [flag]...\n"+
 			"Interacts with the nup App Engine server.\n\n", os.Args[0])
 		flag.PrintDefaults()
 	}
