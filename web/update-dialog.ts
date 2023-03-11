@@ -21,6 +21,20 @@ const template = createTemplate(`
     right: 0;
     top: 0;
   }
+  #heading-row {
+    display: flex;
+    margin-bottom: 6px;
+    max-width: 215px;
+  }
+  #heading-dash {
+    white-space: pre;
+  }
+  #artist, #title {
+    font-weight: bold;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   #rating-row {
     align-items: center;
     display: flex;
@@ -46,7 +60,7 @@ const template = createTemplate(`
   }
   #tags-textarea {
     font-family: Arial, Helvetica, sans-serif;
-    height: 48px;
+    height: 64px;
     margin-bottom: -4px;
     margin-top: 8px;
     resize: none;
@@ -62,6 +76,11 @@ const template = createTemplate(`
 </style>
 
 <svg id="close-icon" title="Close"></svg>
+<div id="heading-row">
+  <span id="artist"></span>
+  <span id="heading-dash"> - </span>
+  <span id="title"></span>
+</div>
 <div id="rating-row">
   Rating:
   <div id="rating" tabindex="0">
@@ -98,14 +117,20 @@ export default class UpdateDialog {
     this.#callback = callback;
 
     // This sucks, but I don't want to put this styling in index.html.
-    this.#dialog.style.borderRadius = '4px';
+    const style = getComputedStyle(this.#dialog);
+    const margin = style.getPropertyValue('--margin');
+    const radius = style.getPropertyValue('--control-border-radius');
+    this.#dialog.style.borderRadius = radius;
     this.#dialog.style.margin = '0'; // needed to avoid centering
     this.#dialog.style.overflow = 'visible'; // for suggestion popup
     this.#dialog.style.padding = '8px';
-    this.#dialog.style.left = this.#dialog.style.top = getComputedStyle(
-      this.#dialog
-    ).getPropertyValue('--margin');
     this.#dialog.style.position = 'absolute';
+    // Prevent the cover image from awkwardly peeking out behind the top-left
+    // rounded corner.
+    this.#dialog.style.left = this.#dialog.style.top = `calc(${margin} - 1px)`;
+
+    $('artist', this.#shadow).innerText = song.artist;
+    $('title', this.#shadow).innerText = song.title;
 
     setIcon($('close-icon', this.#shadow), xIcon).addEventListener(
       'click',

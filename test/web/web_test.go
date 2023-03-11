@@ -871,6 +871,8 @@ func TestRateAndTag(t *testing.T) {
 	page.checkSong(song, isPaused(true), hasRating(3), hasImgTitle("Rating: ★★★☆☆\nTags: guitar rock"))
 
 	page.click(coverImage)
+	page.checkText(updateArtist, song.Artist)
+	page.checkText(updateTitle, song.Title)
 	page.click(updateFourStars)
 	page.click(updateCloseImage)
 	page.checkSong(song, hasRating(4), hasImgTitle("Rating: ★★★★☆\nTags: guitar rock"))
