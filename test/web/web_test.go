@@ -773,8 +773,7 @@ func TestContextMenu(t *testing.T) {
 	page.rightClickSongRow(playlistTable, 1)
 	page.checkPlaylist(songs, hasMenu(1))
 	page.click(menuUpdate)
-	page.checkText(updateArtist, song2.Artist)
-	page.checkText(updateTitle, song2.Title)
+	page.checkText(updateHeading, song2.Artist+" - "+song2.Title)
 	page.click(updateFourStars)
 	page.click(updateCloseImage)
 	srv.checkSong(song2, hasSrvRating(4)) // check that the correct song was updated
@@ -880,8 +879,7 @@ func TestRateAndTag(t *testing.T) {
 	page.checkSong(song, isPaused(true), hasRating(3), hasImgTitle("Rating: ★★★☆☆\nTags: guitar rock"))
 
 	page.click(coverImage)
-	page.checkText(updateArtist, song.Artist)
-	page.checkText(updateTitle, song.Title)
+	page.checkText(updateHeading, song.Artist+" - "+song.Title)
 	page.click(updateFourStars)
 	page.click(updateCloseImage)
 	page.checkSong(song, hasRating(4), hasImgTitle("Rating: ★★★★☆\nTags: guitar rock"))

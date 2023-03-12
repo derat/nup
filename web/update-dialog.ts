@@ -21,16 +21,10 @@ const template = createTemplate(`
     right: 0;
     top: 0;
   }
-  #heading-row {
-    display: flex;
-    margin-bottom: 6px;
-    max-width: 215px;
-  }
-  #heading-dash {
-    white-space: pre;
-  }
-  #artist, #title {
+  #heading {
     font-weight: bold;
+    margin-bottom: 6px;
+    max-width: 255px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -64,23 +58,19 @@ const template = createTemplate(`
     margin-bottom: -4px;
     margin-top: 8px;
     resize: none;
-    width: 220px;
+    width: 260px;
   }
   #tag-suggester {
     bottom: 52px;
     left: 4px;
     max-height: 26px;
-    max-width: 210px;
+    max-width: 250px;
     position: absolute;
   }
 </style>
 
 <svg id="close-icon" title="Close"></svg>
-<div id="heading-row">
-  <span id="artist"></span>
-  <span id="heading-dash"> - </span>
-  <span id="title"></span>
-</div>
+<div id="heading"></div>
 <div id="rating-row">
   Rating:
   <div id="rating" tabindex="0">
@@ -129,8 +119,7 @@ export default class UpdateDialog {
     // rounded corner.
     this.#dialog.style.left = this.#dialog.style.top = `calc(${margin} - 1px)`;
 
-    $('artist', this.#shadow).innerText = song.artist;
-    $('title', this.#shadow).innerText = song.title;
+    $('heading', this.#shadow).innerText = `${song.artist} - ${song.title}`;
 
     setIcon($('close-icon', this.#shadow), xIcon).addEventListener(
       'click',
