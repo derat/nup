@@ -389,6 +389,11 @@ export class PlayView extends HTMLElement {
           cb: () => showSongInfoDialog(this.#songs[idx]),
         },
         {
+          id: 'update',
+          text: 'Rate/tag…',
+          cb: () => this.#showUpdateDialog(this.#songs[idx]),
+        },
+        {
           id: 'debug',
           text: 'Debug…',
           cb: () => window.open(getDumpSongUrl(e.detail.songId), '_blank'),
@@ -1007,31 +1012,37 @@ export class PlayView extends HTMLElement {
   #showSpinner = () => this.#spinner.classList.add('visible');
   #hideSpinner = () => this.#spinner.classList.remove('visible');
 
-  #showUpdateDialog() {
-    const song = this.#currentSong;
+  #showUpdateDialog(song: Song | null = null) {
+    song ??= this.#currentSong;
     if (this.#updateDialog || !song) return;
-    this.#updateDialog = new UpdateDialog(song, this.#tags, (rating, tags) => {
-      this.#updateDialog = null;
+    this.#updateDialog = new UpdateDialog(
+      song,
+      this.#tags,
+      (song, rating, tags) => {
+        this.#updateDialog = null;
 
-      if (rating === null && tags === null) return;
+        if (rating === null && tags === null) return;
 
-      this.#updater?.rateAndTag(song.songId, rating, tags);
+        this.#updater?.rateAndTag(song.songId, rating, tags);
 
-      if (rating !== null) {
-        song.rating = rating;
-        this.#updateRatingOverlay();
-      }
-      if (tags !== null) {
-        song.tags = tags;
-        const created = tags.filter((t) => !this.#tags.includes(t));
-        if (created.length > 0) {
-          this.dispatchEvent(
-            new CustomEvent('newtags', { detail: { tags: created } })
-          );
+        const isCurrent = song === this.#currentSong;
+
+        if (rating !== null) {
+          song.rating = rating;
+          if (isCurrent) this.#updateRatingOverlay();
         }
+        if (tags !== null) {
+          song.tags = tags;
+          const created = tags.filter((t) => !this.#tags.includes(t));
+          if (created.length > 0) {
+            this.dispatchEvent(
+              new CustomEvent('newtags', { detail: { tags: created } })
+            );
+          }
+        }
+        if (isCurrent) this.#updateCoverTitleAttribute();
       }
-      this.#updateCoverTitleAttribute();
-    });
+    );
   }
 
   // Adjusts |audio|'s gain appropriately for the current song and settings.

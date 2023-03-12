@@ -192,7 +192,7 @@ export default class UpdateDialog {
       if (tags.join(' ') === this.#song.tags.sort().join(' ')) tags = null;
     }
 
-    this.#callback(rating, tags);
+    this.#callback(this.#song, rating, tags);
   }
 
   #setRating(rating: number) {
@@ -238,4 +238,8 @@ export default class UpdateDialog {
   };
 }
 
-type UpdateCallback = (rating: number | null, tags: string[] | null) => void;
+type UpdateCallback = (
+  song: Song,
+  rating: number | null,
+  tags: string[] | null
+) => void;

@@ -741,7 +741,7 @@ func TestPlaybackButtons(t *testing.T) {
 }
 
 func TestContextMenu(t *testing.T) {
-	page, _, done := initWebTest(t)
+	page, srv, done := initWebTest(t)
 	defer done()
 	song1 := newSong("a", "t1", "al", withTrack(1))
 	song2 := newSong("a", "t2", "al", withTrack(2))
@@ -769,6 +769,15 @@ func TestContextMenu(t *testing.T) {
 	page.click(playPauseButton) // make sure we don't advance mid-test
 	page.checkSong(song3, isPaused(true))
 	page.checkPlaylist(songs, hasActive(2))
+
+	page.rightClickSongRow(playlistTable, 1)
+	page.checkPlaylist(songs, hasMenu(1))
+	page.click(menuUpdate)
+	page.checkText(updateArtist, song2.Artist)
+	page.checkText(updateTitle, song2.Title)
+	page.click(updateFourStars)
+	page.click(updateCloseImage)
+	srv.checkSong(song2, hasSrvRating(4)) // check that the correct song was updated
 
 	page.rightClickSongRow(playlistTable, 0)
 	page.checkPlaylist(songs, hasMenu(0))

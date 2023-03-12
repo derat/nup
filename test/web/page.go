@@ -84,6 +84,7 @@ var (
 	menuPlay       = joinLocs(menu, loc{selenium.ByID, "play"})
 	menuRemove     = joinLocs(menu, loc{selenium.ByID, "remove"})
 	menuTruncate   = joinLocs(menu, loc{selenium.ByID, "truncate"})
+	menuUpdate     = joinLocs(menu, loc{selenium.ByID, "update"})
 
 	playView         = joinLocs(loc{selenium.ByTagName, "play-view"})
 	menuButton       = joinLocs(playView, loc{selenium.ByID, "menu-button"})
