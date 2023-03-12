@@ -21,13 +21,18 @@ const template = createTemplate(`
     right: 0;
     top: 0;
   }
-  #heading {
-    font-weight: bold;
+  #heading-row {
     margin-bottom: 6px;
     max-width: 255px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  #artist {
+    font-weight: bold;
+  }
+  #title {
+    font-style: italic;
   }
   #rating-row {
     align-items: center;
@@ -70,7 +75,9 @@ const template = createTemplate(`
 </style>
 
 <svg id="close-icon" title="Close"></svg>
-<div id="heading"></div>
+<div id="heading-row">
+  <span id="artist"></span>&nbsp;-&nbsp;<span id="title"></span>
+</div>
 <div id="rating-row">
   Rating:
   <div id="rating" tabindex="0">
@@ -119,7 +126,8 @@ export default class UpdateDialog {
     // rounded corner.
     this.#dialog.style.left = this.#dialog.style.top = `calc(${margin} - 1px)`;
 
-    $('heading', this.#shadow).innerText = `${song.artist} - ${song.title}`;
+    $('artist', this.#shadow).innerText = song.artist;
+    $('title', this.#shadow).innerText = song.title;
 
     setIcon($('close-icon', this.#shadow), xIcon).addEventListener(
       'click',

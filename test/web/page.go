@@ -105,7 +105,8 @@ var (
 		loc{selenium.ByCSSSelector, "table"})
 
 	updateDialog       = joinLocs(body, loc{selenium.ByCSSSelector, "dialog.update > span"})
-	updateHeading      = joinLocs(updateDialog, loc{selenium.ByID, "heading"})
+	updateArtist       = joinLocs(updateDialog, loc{selenium.ByID, "artist"})
+	updateTitle        = joinLocs(updateDialog, loc{selenium.ByID, "title"})
 	updateOneStar      = joinLocs(updateDialog, loc{selenium.ByCSSSelector, "#rating a:nth-child(1)"})
 	updateTwoStars     = joinLocs(updateDialog, loc{selenium.ByCSSSelector, "#rating a:nth-child(2)"})
 	updateThreeStars   = joinLocs(updateDialog, loc{selenium.ByCSSSelector, "#rating a:nth-child(3)"})
