@@ -31,9 +31,6 @@ const template = createTemplate(`
   #artist {
     font-weight: bold;
   }
-  #title {
-    font-style: italic;
-  }
   #rating-row {
     align-items: center;
     display: flex;
