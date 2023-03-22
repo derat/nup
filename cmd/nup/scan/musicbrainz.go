@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -18,6 +20,9 @@ const (
 	maxQPS         = 1
 	rateBucketSize = 1
 	userAgent      = "nup/0 ( https://github.com/derat/nup )"
+
+	maxTries   = 3
+	retryDelay = 5 * time.Second
 )
 
 // api fetches information using the MusicBrainz API.
@@ -37,26 +42,45 @@ func newAPI(srvURL string) *api {
 // send sends a GET request to the API using the supplied path (e.g. "/ws/2/...?fmt=json")
 // and unmarshals the JSON response into dst.
 func (api *api) send(ctx context.Context, path string, dst interface{}) error {
-	if err := api.limiter.Wait(ctx); err != nil {
-		return err
+	try := func() (io.ReadCloser, error) {
+		if err := api.limiter.Wait(ctx); err != nil {
+			return nil, err
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, api.srvURL+path, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", userAgent)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode != 200 {
+			err = fmt.Errorf("server returned %v: %v", resp.StatusCode, resp.Status)
+		}
+		return resp.Body, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, api.srvURL+path, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("User-Agent", userAgent)
+	var tries int
+	for {
+		body, err := try()
+		tries++
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
+		if err == nil {
+			defer body.Close()
+			return json.NewDecoder(body).Decode(dst)
+		}
 
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("server returned %v: %v", resp.StatusCode, resp.Status)
+		if body != nil {
+			body.Close()
+		}
+		if tries >= maxTries {
+			return err
+		}
+		log.Print("Sleeping %v before retrying: %v", retryDelay, err)
+		time.Sleep(retryDelay)
 	}
-	return json.NewDecoder(resp.Body).Decode(dst)
 }
 
 // getRelease fetches the release with the supplied MBID.
