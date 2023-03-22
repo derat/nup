@@ -27,7 +27,9 @@ const (
 type Command struct {
 	Cfg *client.Config
 	api *api
-	rel *release // last-fetched release
+
+	rel   *release // last-fetched release
+	relID string   // ID requested when fetching rel (differs from rel.ID if release was merged)
 }
 
 func (*Command) Name() string     { return "scan" }
@@ -102,9 +104,11 @@ func (cmd *Command) getUpdates(ctx context.Context, song *db.Song) (*db.Song, er
 
 	switch {
 	case song.AlbumID != "":
-		if cmd.rel == nil || song.AlbumID != cmd.rel.ID {
+		if cmd.rel == nil || (song.AlbumID != cmd.rel.ID && song.AlbumID != cmd.relID) {
 			var err error
+			cmd.relID = song.AlbumID
 			if cmd.rel, err = cmd.api.getRelease(ctx, song.AlbumID); err != nil {
+				cmd.relID = ""
 				return nil, err
 			}
 		}
