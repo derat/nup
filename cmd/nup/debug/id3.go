@@ -13,8 +13,12 @@ import (
 	"github.com/derat/taglib-go/taglib/id3"
 )
 
-// Maximum ID3v2 frame content size. Longer frames (e.g. image data) are not decoded.
-const maxID3FrameSize = 256
+const (
+	// Maximum ID3v2 frame content size. Longer frames (e.g. image data) are not decoded.
+	maxID3FrameSize = 256
+	// Unique file identifier frame ID.
+	ufidID = "UFID"
+)
 
 type id3Frame struct {
 	id     string
@@ -46,9 +50,16 @@ func readID3Frames(p string) ([]id3Frame, error) {
 	}
 
 	if gen, err := taglib.Decode(f, fi.Size()); err == nil {
+		for url, id := range gen.UniqueFileIdentifiers() {
+			ret = append(ret, id3Frame{id: "UFID", fields: []string{url, id}})
+		}
+
 		switch tag := gen.(type) {
 		case *id3.Id3v23Tag:
 			for id, frames := range tag.Frames {
+				if id == ufidID {
+					continue
+				}
 				for _, frame := range frames {
 					info := id3Frame{id: id, size: len(frame.Content)}
 					if info.size <= maxID3FrameSize {
@@ -59,6 +70,9 @@ func readID3Frames(p string) ([]id3Frame, error) {
 			}
 		case *id3.Id3v24Tag:
 			for id, frames := range tag.Frames {
+				if id == ufidID {
+					continue
+				}
 				for _, frame := range frames {
 					info := id3Frame{id: id, size: len(frame.Content)}
 					if info.size <= maxID3FrameSize {
