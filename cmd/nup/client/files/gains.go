@@ -85,7 +85,7 @@ func (gc *GainsCache) get(p, album, albumID string) (mp3gain.Info, error) {
 	// songs in the album in order to compute gain adjustments relative to the entire album.
 	// The task key here is arbitrary but needs to be the same for all files in the album.
 	dir := filepath.Dir(p)
-	hasAlbum := (albumID != "" || album != "") && album != nonAlbumTracksValue
+	hasAlbum := (albumID != "" || album != "") && album != NonAlbumTracksValue
 	var key string
 	if hasAlbum {
 		key = fmt.Sprintf("%q %q %q", dir, album, albumID)

@@ -20,11 +20,12 @@ Subcommands:
 	help             describe subcommands and their syntax
 	projectid        print GCP project ID
 	query            run song queries against the server
+	scan             scan songs for updated metadata
 	storage          update song storage classes
 	update           send song updates to the server
 
   -config string
-    	Path to config file (default "$HOME/.nup/config.json")
+    	Path to config file (default "/home/danerat/.nup/config.json")
 ```
 
 ## `check` command
@@ -177,6 +178,18 @@ query [flags]:
   -single
     	Fail if exactly one song is not returned
 ```
+
+## `scan` command
+
+The `scan` command scans the music directory and queries [MusicBrainz] for
+updated metadata.
+
+```
+scan [flags]:
+	Scan songs for updated metadata using MusicBrainz.
+```
+
+[MusicBrainz]: https://musicbrainz.org/
 
 ## `storage` command
 

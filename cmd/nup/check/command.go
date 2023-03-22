@@ -35,8 +35,6 @@ const (
 	checkSongCover
 )
 
-const nonAlbumTracksValue = "[non-album tracks]" // MusicBrainz/Picard album name
-
 var checkInfos = map[string]struct { // keys are values for -check flag
 	setting checkSettings
 	desc    string // description for check flag
@@ -138,7 +136,7 @@ func checkSongs(songs []*db.Song, musicDir, coverDir string, settings checkSetti
 	}
 	if settings&checkAlbumID != 0 {
 		fs = append(fs, func(s *db.Song) error {
-			if len(s.AlbumID) == 0 && s.Album != nonAlbumTracksValue {
+			if len(s.AlbumID) == 0 && s.Album != files.NonAlbumTracksValue {
 				return errors.New("missing MusicBrainz album")
 			}
 			return nil

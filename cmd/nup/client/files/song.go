@@ -20,10 +20,12 @@ import (
 )
 
 const (
-	albumIDTag          = "MusicBrainz Album Id"   // usually used as cover ID
-	coverIDTag          = "nup Cover Id"           // can be set for non-MusicBrainz tracks
-	recordingIDOwner    = "http://musicbrainz.org" // UFID for Song.RecordingID
-	nonAlbumTracksValue = "[non-album tracks]"     // used by MusicBrainz/Picard for standalone recordings
+	// NonAlbumTracksValue is used as the album name for standalone recordings by Picard.
+	NonAlbumTracksValue = "[non-album tracks]"
+
+	albumIDTag       = "MusicBrainz Album Id"   // usually used as cover ID
+	coverIDTag       = "nup Cover Id"           // can be set for non-MusicBrainz tracks
+	recordingIDOwner = "http://musicbrainz.org" // UFID for Song.RecordingID
 )
 
 // ReadSong reads the song file at p and creates a Song object.
@@ -106,7 +108,7 @@ func ReadSong(cfg *client.Config, p string, fi os.FileInfo, onlyTags bool,
 		// Some old files might be missing the TPOS "part of set" frame.
 		// Assume that they're from a single-disc album in that case:
 		// https://github.com/derat/nup/issues/37
-		if s.Disc == 0 && s.Track > 0 && s.Album != nonAlbumTracksValue {
+		if s.Disc == 0 && s.Track > 0 && s.Album != NonAlbumTracksValue {
 			s.Disc = 1
 		}
 	}
