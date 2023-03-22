@@ -82,7 +82,7 @@ func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interfac
 		orig := soe.song
 		updated, err := cmd.getUpdates(ctx, orig)
 		if err != nil {
-			log.Printf("%v: %v", soe.path, soe.err)
+			log.Printf("%v: %v", soe.path, err)
 			continue
 		}
 		if !orig.MetadataEquals(updated) {
