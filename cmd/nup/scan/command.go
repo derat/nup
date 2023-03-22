@@ -5,6 +5,7 @@ package scan
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -25,6 +26,8 @@ const (
 
 type Command struct {
 	Cfg *client.Config
+	api *api
+	rel *release // last-fetched release
 }
 
 func (*Command) Name() string     { return "scan" }
@@ -49,7 +52,7 @@ func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interfac
 		return subcommands.ExitUsageError
 	}
 
-	api := newAPI("https://musicbrainz.org")
+	cmd.api = newAPI("https://musicbrainz.org")
 
 	type songOrErr struct {
 		song *db.Song
@@ -71,54 +74,73 @@ func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interfac
 		close(ch)
 	}()
 
-	var rel *release
 	for soe := range ch {
 		if soe.err != nil {
 			log.Printf("%v: %v", soe.path, soe.err)
 			continue
 		}
-
-		song := soe.song
-		mbSong := *song
-
-		switch {
-		case song.AlbumID != "":
-			if rel == nil || song.AlbumID != rel.ID {
-				var err error
-				if rel, err = api.getRelease(ctx, song.AlbumID); err != nil {
-					log.Printf("%v: %v", soe.path, err)
-					continue
-				}
-			}
-			if err := updateSongFromRelease(&mbSong, rel); err != nil {
-				log.Printf("%v: %v", soe.path, err)
-				continue
-			}
-		case song.RecordingID != "":
-			rec, err := api.getRecording(ctx, song.RecordingID)
-			if err != nil {
-				log.Printf("%v: %v", soe.path, err)
-				continue
-			}
-			updateSongFromRecording(&mbSong, rec)
-		default:
+		orig := soe.song
+		updated, err := cmd.getUpdates(ctx, orig)
+		if err != nil {
+			log.Printf("%v: %v", soe.path, soe.err)
 			continue
 		}
-
-		if !song.MetadataEquals(&mbSong) {
-			fmt.Println(soe.path + "\n" + cmp.Diff(*song, mbSong))
+		if !orig.MetadataEquals(updated) {
+			fmt.Println(soe.path + "\n" + cmp.Diff(*orig, *updated))
 		}
 	}
 
 	return subcommands.ExitSuccess
 }
 
+// untaggedErr is returned by getUpdates if song.AlbumID and song.RecordingID are both empty.
+var untaggedErr = errors.New("song is untagged")
+
+// getUpdates fetches metadata for song from MusicBrainz and returns an updated copy.
+func (cmd *Command) getUpdates(ctx context.Context, song *db.Song) (*db.Song, error) {
+	updated := *song
+
+	switch {
+	case song.AlbumID != "":
+		if cmd.rel == nil || song.AlbumID != cmd.rel.ID {
+			var err error
+			if cmd.rel, err = cmd.api.getRelease(ctx, song.AlbumID); err != nil {
+				return nil, err
+			}
+		}
+		if !updateSongFromRelease(&updated, cmd.rel) {
+			// If we didn't find the recording in the release, it might've been
+			// merged into a different recording. Look up the recording to try
+			// to get an updated ID.
+			rec, err := cmd.api.getRecording(ctx, song.RecordingID)
+			if err != nil {
+				return nil, err
+			}
+			updated.RecordingID = rec.ID
+			if !updateSongFromRelease(&updated, cmd.rel) {
+				return nil, fmt.Errorf("recording %v not in release %v", rec.ID, cmd.rel.ID)
+			}
+		}
+		return &updated, nil
+
+	case song.RecordingID != "":
+		rec, err := cmd.api.getRecording(ctx, song.RecordingID)
+		if err != nil {
+			return nil, err
+		}
+		updateSongFromRecording(&updated, rec)
+		return &updated, nil
+	}
+
+	return nil, untaggedErr
+}
+
 // updateSongFromRelease updates fields in song using data from rel.
-// An error is returned if the recording isn't included in the release.
-func updateSongFromRelease(song *db.Song, rel *release) error {
+// false is returned if the recording isn't included in the release.
+func updateSongFromRelease(song *db.Song, rel *release) bool {
 	tr, med := rel.findTrack(song.RecordingID)
 	if tr == nil {
-		return fmt.Errorf("recording %q not found", song.RecordingID)
+		return false
 	}
 
 	song.Artist = joinArtistCredits(tr.Artists)
@@ -137,7 +159,7 @@ func updateSongFromRelease(song *db.Song, rel *release) error {
 		song.AlbumArtist = aa
 	}
 
-	return nil
+	return true
 }
 
 // updateSongFromRecording updates fields in song using data from rec.
