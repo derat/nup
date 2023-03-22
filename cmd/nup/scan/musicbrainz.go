@@ -78,7 +78,7 @@ func (api *api) send(ctx context.Context, path string, dst interface{}) error {
 		if tries >= maxTries {
 			return err
 		}
-		log.Print("Sleeping %v before retrying: %v", retryDelay, err)
+		log.Printf("Sleeping %v before retrying: %v", retryDelay, err)
 		time.Sleep(retryDelay)
 	}
 }
