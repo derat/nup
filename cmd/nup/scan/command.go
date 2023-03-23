@@ -113,7 +113,10 @@ func (cmd *Command) getUpdates(ctx context.Context, song *db.Song) (*db.Song, er
 	updated := *song
 
 	switch {
-	case song.AlbumID != "":
+	// Some old standalone recordings have their album set to "[non-album tracks]" but also have a
+	// non-empty, now-deleted album ID. I think that (pre-NGS?) MB used to have per-artist fake
+	// "[non-album tracks]" albums.
+	case song.AlbumID != "" && song.Album != files.NonAlbumTracksValue:
 		if song.RecordingID == "" {
 			return nil, errors.New("no recording ID")
 		}
@@ -187,6 +190,7 @@ func updateSongFromRecording(song *db.Song, rec *recording) {
 	song.Artist = joinArtistCredits(rec.Artists)
 	song.Title = rec.Title
 	song.Album = files.NonAlbumTracksValue
+	song.AlbumID = ""
 	song.Date = time.Time(rec.FirstReleaseDate) // always zero?
 }
 
