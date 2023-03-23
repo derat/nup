@@ -5,6 +5,7 @@
 package files
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,11 +35,17 @@ const (
 // If onlyTags is true, only fields derived from the file's MP3 tags will be filled
 // (specifically, the song's SHA1, duration, and gain adjustments will not be computed).
 // gc is only used if cfg.ComputeGains is true and onlyTags is false.
-func ReadSong(cfg *client.Config, p string, fi os.FileInfo, onlyTags bool,
-	gc *GainsCache) (*db.Song, error) {
-	relPath, err := filepath.Rel(cfg.MusicDir, p)
-	if err != nil {
-		return nil, fmt.Errorf("%q isn't subpath of %q: %v", p, cfg.MusicDir, err)
+func ReadSong(cfg *client.Config, p string, fi os.FileInfo, onlyTags bool, gc *GainsCache) (*db.Song, error) {
+	var relPath string
+	var err error
+	if cfg.MusicDir == "" {
+		return nil, errors.New("musicDir not set in config")
+	} else if abs, err := filepath.Abs(p); err != nil {
+		return nil, err
+	} else if !strings.HasPrefix(abs, cfg.MusicDir+"/") {
+		return nil, fmt.Errorf("%q isn't under %q", p, cfg.MusicDir)
+	} else if relPath, err = filepath.Rel(cfg.MusicDir, abs); err != nil {
+		return nil, err
 	}
 
 	f, err := os.Open(p)
