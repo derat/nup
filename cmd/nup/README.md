@@ -185,7 +185,7 @@ The `scan` command scans the music directory and queries [MusicBrainz] for
 updated metadata.
 
 ```
-scan [flags]:
+scan [flags] <song.mp3>...:
 	Scan songs for updated metadata using MusicBrainz.
 ```
 

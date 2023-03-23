@@ -35,7 +35,7 @@ type Command struct {
 func (*Command) Name() string     { return "scan" }
 func (*Command) Synopsis() string { return "scan songs for updated metadata" }
 func (*Command) Usage() string {
-	return `scan [flags]:
+	return `scan [flags] <song.mp3>...:
 	Scan songs for updated metadata using MusicBrainz.
 
 `
@@ -45,11 +45,7 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 }
 
 func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
-	if fs.NArg() != 0 {
-		fmt.Fprintln(os.Stderr, cmd.Usage())
-		return subcommands.ExitUsageError
-	}
-	if len(cmd.Cfg.MusicDir) == 0 {
+	if fs.NArg() == 0 && len(cmd.Cfg.MusicDir) == 0 {
 		fmt.Fprintln(os.Stderr, "musicDir not set in config")
 		return subcommands.ExitUsageError
 	}
@@ -57,21 +53,32 @@ func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interfac
 	cmd.api = newAPI("https://musicbrainz.org")
 
 	type songOrErr struct {
+		path string // relative to cmd.Cfg.MusicDir if no positional args were supplied
 		song *db.Song
-		path string // relative to cmd.Cfg.MusicDir
 		err  error
 	}
 	ch := make(chan songOrErr, songChanSize)
 
 	go func() {
-		if err := filepath.Walk(cmd.Cfg.MusicDir, func(p string, fi os.FileInfo, err error) error {
-			if fi.Mode().IsRegular() && files.IsMusicPath(p) {
-				song, err := files.ReadSong(cmd.Cfg, p, fi, true /* onlyTags */, nil /* gc */)
-				ch <- songOrErr{song, p[len(cmd.Cfg.MusicDir)+1:], err}
+		if fs.NArg() > 0 {
+			for _, p := range fs.Args() {
+				var song *db.Song
+				fi, err := os.Stat(p)
+				if err == nil {
+					song, err = files.ReadSong(cmd.Cfg, p, fi, true /* onlyTags */, nil /* gc */)
+				}
+				ch <- songOrErr{p, song, err}
 			}
-			return nil
-		}); err != nil {
-			ch <- songOrErr{nil, "", err}
+		} else {
+			if err := filepath.Walk(cmd.Cfg.MusicDir, func(p string, fi os.FileInfo, err error) error {
+				if fi.Mode().IsRegular() && files.IsMusicPath(p) {
+					song, err := files.ReadSong(cmd.Cfg, p, fi, true /* onlyTags */, nil /* gc */)
+					ch <- songOrErr{p[len(cmd.Cfg.MusicDir)+1:], song, err}
+				}
+				return nil
+			}); err != nil {
+				ch <- songOrErr{"", nil, err}
+			}
 		}
 		close(ch)
 	}()
