@@ -11,6 +11,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/derat/nup/cmd/nup/client"
@@ -95,7 +98,7 @@ func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interfac
 			continue
 		}
 		if !orig.MetadataEquals(updated) {
-			fmt.Println(soe.path + "\n" + cmp.Diff(*orig, *updated))
+			fmt.Println(soe.path + "\n" + diffSongs(orig, updated) + "\n")
 		}
 	}
 
@@ -186,3 +189,37 @@ func updateSongFromRecording(song *db.Song, rec *recording) {
 	song.Album = files.NonAlbumTracksValue
 	song.Date = time.Time(rec.FirstReleaseDate) // always zero?
 }
+
+// diffSongs diffs orig and updated and returns a multiline string describing differences.
+func diffSongs(orig, updated *db.Song) string {
+	type line struct{ op, name, val string }
+	var lines []line
+	var maxName int
+	for _, ln := range strings.Split(cmp.Diff(*orig, *updated), "\n") {
+		if ms := diffChangeRegexp.FindStringSubmatch(ln); ms != nil {
+			if n := len(ms[2]); n > maxName {
+				maxName = n
+			}
+			lines = append(lines, line{ms[1], ms[2], ms[3]})
+		}
+	}
+
+	format := "%s   %-" + strconv.Itoa(maxName+1) + "s %s"
+	strs := make([]string, len(lines))
+	for i, ln := range lines {
+		ln.val = strings.TrimRight(ln.val, ",")
+		ln.val = diffDateRegexp.ReplaceAllString(ln.val, "$1")
+		strs[i] = fmt.Sprintf(format, ln.op, ln.name+":", ln.val)
+	}
+	return strings.Join(strs, "\n")
+}
+
+// Diff inexplicably sometimes uses U+00A0 (non-breaking space) instead of spaces.
+const spaces = "[ \t\u00a0]*"
+
+var (
+	// diffChangeRegexp matches a line in cmp.Diff's output that should be preserved.
+	diffChangeRegexp = regexp.MustCompile(`^(\+|-)` + spaces + `([A-Z][^:]+):` + spaces + `(.+)`)
+	// diffDateRegexp matches the string representation of a time.Time in cmp.Diff's output.
+	diffDateRegexp = regexp.MustCompile(`s"(\d{4}-\d{2}-\d{2}) 00:00:00 \+0000 UTC"`)
+)
