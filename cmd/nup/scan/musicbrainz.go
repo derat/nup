@@ -6,6 +6,7 @@ package scan
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -39,6 +40,9 @@ func newAPI(srvURL string) *api {
 	}
 }
 
+// notFoundErr is returned by send for 404 errors.
+var notFoundErr = errors.New("not found")
+
 // send sends a GET request to the API using the supplied path (e.g. "/ws/2/...?fmt=json")
 // and unmarshals the JSON response into dst.
 func (api *api) send(ctx context.Context, path string, dst interface{}) error {
@@ -56,7 +60,9 @@ func (api *api) send(ctx context.Context, path string, dst interface{}) error {
 		if err != nil {
 			return nil, err
 		}
-		if resp.StatusCode != 200 {
+		if resp.StatusCode == 404 {
+			err = notFoundErr
+		} else if resp.StatusCode != 200 {
 			err = fmt.Errorf("server returned %v: %v", resp.StatusCode, resp.Status)
 		}
 		return resp.Body, err
@@ -75,7 +81,7 @@ func (api *api) send(ctx context.Context, path string, dst interface{}) error {
 		if body != nil {
 			body.Close()
 		}
-		if tries >= maxTries {
+		if tries >= maxTries || err == notFoundErr {
 			return err
 		}
 		log.Printf("Sleeping %v before retrying: %v", retryDelay, err)

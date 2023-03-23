@@ -111,33 +111,38 @@ func (cmd *Command) getUpdates(ctx context.Context, song *db.Song) (*db.Song, er
 
 	switch {
 	case song.AlbumID != "":
+		if song.RecordingID == "" {
+			return nil, errors.New("no recording ID")
+		}
 		if cmd.rel == nil || (song.AlbumID != cmd.rel.ID && song.AlbumID != cmd.relID) {
 			var err error
 			cmd.relID = song.AlbumID
 			if cmd.rel, err = cmd.api.getRelease(ctx, song.AlbumID); err != nil {
 				cmd.relID = ""
-				return nil, err
+				return nil, fmt.Errorf("release %v: %v", song.AlbumID, err)
 			}
 		}
+		if updateSongFromRelease(&updated, cmd.rel) {
+			return &updated, nil
+		}
+
+		// If we didn't find the recording in the release, it might've been
+		// merged into a different recording. Look up the recording to try
+		// to get an updated ID that might be in the release.
+		rec, err := cmd.api.getRecording(ctx, song.RecordingID)
+		if err != nil {
+			return nil, fmt.Errorf("recording %v: %v", song.RecordingID, err)
+		}
+		updated.RecordingID = rec.ID
 		if !updateSongFromRelease(&updated, cmd.rel) {
-			// If we didn't find the recording in the release, it might've been
-			// merged into a different recording. Look up the recording to try
-			// to get an updated ID.
-			rec, err := cmd.api.getRecording(ctx, song.RecordingID)
-			if err != nil {
-				return nil, err
-			}
-			updated.RecordingID = rec.ID
-			if !updateSongFromRelease(&updated, cmd.rel) {
-				return nil, fmt.Errorf("recording %v not in release %v", rec.ID, cmd.rel.ID)
-			}
+			return nil, fmt.Errorf("recording %v not in release %v", rec.ID, cmd.rel.ID)
 		}
 		return &updated, nil
 
 	case song.RecordingID != "":
 		rec, err := cmd.api.getRecording(ctx, song.RecordingID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("recording %v: %v", song.RecordingID, err)
 		}
 		updateSongFromRecording(&updated, rec)
 		return &updated, nil
