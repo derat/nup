@@ -319,7 +319,12 @@ func (cmd *Command) doMergeSongs() subcommands.ExitStatus {
 func (cmd *Command) doPrintCoverID() subcommands.ExitStatus {
 	// Just set the file's directory as the music dir so that ReadSong won't
 	// fail when computing a relative path (which we don't use anyway).
-	cmd.Cfg.MusicDir = filepath.Dir(cmd.printCoverID)
+	if abs, err := filepath.Abs(cmd.printCoverID); err != nil {
+		fmt.Fprintln(os.Stderr, "Couldn't get absolute path:", err)
+		return subcommands.ExitFailure
+	} else {
+		cmd.Cfg.MusicDir = filepath.Dir(abs)
+	}
 	s, err := files.ReadSong(cmd.Cfg, cmd.printCoverID, nil, true /* onlyTags */, nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed reading song:", err)
