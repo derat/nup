@@ -143,6 +143,10 @@ func ReadSong(cfg *client.Config, p string, fi os.FileInfo, onlyTags bool, gc *G
 		}
 	}
 
+	if err := applyMetadataOverride(cfg, &s); err != nil {
+		return nil, err
+	}
+
 	if onlyTags {
 		return &s, nil
 	}

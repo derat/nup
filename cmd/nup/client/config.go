@@ -27,9 +27,12 @@ type Config struct {
 	CoverDir string `json:"coverDir"`
 	// MusicDir is the base directory containing song files.
 	MusicDir string `json:"musicDir"`
+	// MetadataDir is the base directory containing JSON files that override song metadata.
+	// $HOME/.nup/metadata will be used by default.
+	MetadataDir string `json:"metadataDir"`
 	// LastUpdateInfoFile is the path to a JSON file storing info about the last update.
 	// The file will be created if it does not already exist.
-	// $HOME/nup/last_update_info.json will be used by default.
+	// $HOME/.nup/last_update_info.json will be used by default.
 	LastUpdateInfoFile string `json:"lastUpdateInfoFile"`
 	// ComputeGain indicates whether the mp3gain program should be used to compute per-song
 	// and per-album gain information so that volume can be normalized during playback.
@@ -58,11 +61,15 @@ func LoadConfig(p string, dst *Config) error {
 	if err = d.Decode(dst); err != nil {
 		return err
 	}
-	if dst.LastUpdateInfoFile == "" {
-		dst.LastUpdateInfoFile = filepath.Join(os.Getenv("HOME"), ".nup/last_update_info.json")
-	}
 	if err := dst.checkServerURL(); err != nil {
 		return err
+	}
+	dotDir := filepath.Join(os.Getenv("HOME"), ".nup")
+	if dst.MetadataDir == "" {
+		dst.MetadataDir = filepath.Join(dotDir, "metadata")
+	}
+	if dst.LastUpdateInfoFile == "" {
+		dst.LastUpdateInfoFile = filepath.Join(dotDir, "last_update_info.json")
 	}
 	return nil
 }
