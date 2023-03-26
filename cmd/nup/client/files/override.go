@@ -5,6 +5,7 @@ package files
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,21 +37,28 @@ type MetadataOverride struct {
 }
 
 // MetadataOverridePath returns the path under cfg.MetadataDir for a JSON-marshaled
-// MetadataOverride struct used to override song's metadata.
-func MetadataOverridePath(cfg *client.Config, song *db.Song) string {
+// MetadataOverride struct used to override metadata for a song with the supplied
+// Filename value.
+func MetadataOverridePath(cfg *client.Config, songFilename string) (string, error) {
+	if cfg.MetadataDir == "" {
+		return "", errors.New("metadataDir not set in config")
+	}
 	// Not using a cutesy ".jsong" extension here is killing me.
-	return filepath.Join(cfg.MetadataDir, song.Filename+".json")
+	return filepath.Join(cfg.MetadataDir, songFilename+".json"), nil
 }
 
 // applyMetadataOverride looks for MetadataOverride JSON file in cfg.MetadataDir and
 // updates specified fields in s. If no override file exists, nil is returned.
 func applyMetadataOverride(cfg *client.Config, song *db.Song) error {
-	p := MetadataOverridePath(cfg, song)
-	f, err := os.Open(p)
-	if os.IsNotExist(err) {
-		return nil
+	var p string
+	var f *os.File
+	var err error
+	if p, err = MetadataOverridePath(cfg, song.Filename); err != nil {
+		return nil // metadata dir unconfigured
+	} else if f, err = os.Open(p); os.IsNotExist(err) {
+		return nil // override file doesn't exist
 	} else if err != nil {
-		return err
+		return err // some other problem opening override file
 	}
 	defer f.Close()
 

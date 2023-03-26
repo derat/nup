@@ -46,7 +46,10 @@ func TestApplyMetadataOverride(t *testing.T) {
 	}
 
 	cfg := &client.Config{MetadataDir: t.TempDir()}
-	mp := MetadataOverridePath(cfg, &orig)
+	mp, err := MetadataOverridePath(cfg, orig.Filename)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Update all of the fields via the override file.
 	if b, err := json.Marshal(MetadataOverride{

@@ -4,16 +4,17 @@
 package update
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/derat/nup/cmd/nup/client"
+	"github.com/derat/nup/cmd/nup/client/files"
 	"github.com/derat/nup/server/db"
 	"github.com/derat/nup/test"
 )
@@ -21,7 +22,7 @@ import (
 // getSongsFromChannel reads and returns num songs from ch.
 // If an error was sent to the channel, it is returned.
 func getSongsFromChannel(ch chan songOrErr, num int) ([]db.Song, error) {
-	songs := make([]db.Song, 0)
+	var songs []db.Song
 	for i := 0; i < num; i++ {
 		s := <-ch
 		if s.err != nil {
@@ -33,6 +34,7 @@ func getSongsFromChannel(ch chan songOrErr, num int) ([]db.Song, error) {
 }
 
 type scanTestOptions struct {
+	metadataDir     string            // client.Config.MetadataDir
 	artistRewrites  map[string]string // client.Config.ArtistRewrites
 	albumIDRewrites map[string]string // client.Config.AlbumIDRewrites
 	lastUpdateDirs  []string          // scanForUpdatedSongs lastUpdateDirs param
@@ -45,6 +47,7 @@ func scanAndCompareSongs(t *testing.T, desc, dir string, lastUpdateTime time.Tim
 	opts := &scanOptions{}
 	var lastUpdateDirs []string
 	if testOpts != nil {
+		cfg.MetadataDir = testOpts.metadataDir
 		cfg.ArtistRewrites = testOpts.artistRewrites
 		cfg.AlbumIDRewrites = testOpts.albumIDRewrites
 		opts.forceGlob = testOpts.forceGlob
@@ -82,7 +85,7 @@ func scanAndCompareSongs(t *testing.T, desc, dir string, lastUpdateTime time.Tim
 			t.Errorf("%v: didn't get song %v", desc, i)
 		}
 	}
-	if err = test.CompareSongs(expected, actual, test.IgnoreOrder); err != nil {
+	if err := test.CompareSongs(expected, actual, test.IgnoreOrder); err != nil {
 		t.Errorf("%v: %v", desc, err)
 	}
 	return dirs
@@ -190,36 +193,13 @@ func TestScanAndCompareSongs_NewFiles(t *testing.T) {
 		t.Errorf("scanAndCompareSongs(...) = %v; want %v", origDirs, want)
 	}
 
-	// This is super-cheesy, but ctimes appear to get rounded, so wait to move the files
-	// until the kernel is handing out ctimes that have moved past the last-update-time
-	// that we recorded earlier. Maybe I should just subtract a second from startTime?
-	// It's nice to exercise file and directory timestamps actually being updated, though.
-	for {
-		if func() time.Time {
-			f, err := ioutil.TempFile(dir, "temp.")
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer os.Remove(f.Name())
-			defer f.Close()
-			fi, err := f.Stat()
-			if err != nil {
-				t.Fatal(err)
-			}
-			stat := fi.Sys().(*syscall.Stat_t)
-			return time.Unix(int64(stat.Ctim.Sec), int64(stat.Ctim.Nsec))
-		}().After(startTime) {
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
-
 	// Move the new files into various locations under the music dir.
 	mv := func(src, dst string) {
 		if err := os.Rename(src, dst); err != nil {
 			t.Fatal("Failed renaming file: ", err)
 		}
 	}
+	waitCtime(t, dir, startTime)
 	mv(filepath.Join(dir, test.Song1s.Filename),
 		filepath.Join(musicDir, oldArtist, oldAlbum, test.Song1s.Filename))
 	mv(filepath.Join(dir, newAlbum),
@@ -252,4 +232,76 @@ func TestScanAndCompareSongs_NewFiles(t *testing.T) {
 	}
 }
 
+func TestScanAndCompareSongs_OverrideMetadata(t *testing.T) {
+	td := t.TempDir()
+	musicDir := filepath.Join(td, "music")
+	test.Must(t, test.CopySongs(musicDir, test.Song1s.Filename))
+
+	metadataDir := filepath.Join(td, "metadata")
+	test.Must(t, os.Mkdir(metadataDir, 0755))
+	opts := &scanTestOptions{metadataDir: metadataDir}
+
+	// Perform an initial scan to pick up the song.
+	startTime := time.Now()
+	scanAndCompareSongs(t, "initial", musicDir, time.Time{}, opts, []db.Song{test.Song1s})
+
+	// Write a file to override the song's metadata.
+	mp, err := files.MetadataOverridePath(&client.Config{MetadataDir: metadataDir}, test.Song1s.Filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updated := test.Song1s
+	updated.Artist = "New Artist"
+	updated.Title = "New Title"
+
+	if b, err := json.Marshal(files.MetadataOverride{
+		Artist: &updated.Artist,
+		Title:  &updated.Title,
+	}); err != nil {
+		t.Fatal(err)
+	} else {
+		waitCtime(t, metadataDir, startTime)
+		test.Must(t, ioutil.WriteFile(mp, b, 0644))
+	}
+
+	// The next scan should pick up the new metadata even though the song file wasn't updated.
+	overrideTime := time.Now()
+	scanAndCompareSongs(t, "wrote override", musicDir, startTime, opts, []db.Song{updated})
+
+	// Clear the override file and scan again to go back to the original metadata.
+	waitCtime(t, metadataDir, overrideTime)
+	test.Must(t, ioutil.WriteFile(mp, []byte("{}"), 0644))
+	clearTime := time.Now()
+	scanAndCompareSongs(t, "cleared override", musicDir, overrideTime, opts, []db.Song{test.Song1s})
+
+	// Nothing should happen after doing a scan without any changes.
+	scanAndCompareSongs(t, "no change", musicDir, clearTime, opts, []db.Song{})
+}
+
 // TODO: Test errors, skipping bogus files, etc.
+
+// waitCtime waits until the kernel is assigning ctimes after ref to new files in dir.
+// This is super-cheesy, but ctimes (and mtimes?) appear to get rounded, so it's sometimes
+// (often) the case that a newly-created file's ctime/mtime will precede the time returned
+// by an earlier time.Now() call.
+func waitCtime(t *testing.T, dir string, ref time.Time) {
+	for {
+		if func() time.Time {
+			f, err := ioutil.TempFile(dir, "temp.")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.Remove(f.Name())
+			defer f.Close()
+			fi, err := f.Stat()
+			if err != nil {
+				t.Fatal(err)
+			}
+			return getCtime(fi)
+		}().After(ref) {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+}

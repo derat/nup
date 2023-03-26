@@ -128,9 +128,7 @@ func scanForUpdatedSongs(cfg *client.Config, lastUpdateTime time.Time, lastUpdat
 			// We need to check for new directories to handle the situation described at
 			// https://github.com/derat/nup/issues/22 where a directory containing files
 			// with old timestamps is moved into the tree.
-			stat := fi.Sys().(*syscall.Stat_t)
-			ctime := time.Unix(int64(stat.Ctim.Sec), int64(stat.Ctim.Nsec))
-			oldFile := fi.ModTime().Before(lastUpdateTime) && ctime.Before(lastUpdateTime)
+			oldFile := fi.ModTime().Before(lastUpdateTime) && getCtime(fi).Before(lastUpdateTime)
 			_, oldDir := oldDirs[relDir]
 
 			// Handle old configs that don't include previously-seen directories.
@@ -138,7 +136,24 @@ func scanForUpdatedSongs(cfg *client.Config, lastUpdateTime time.Time, lastUpdat
 				oldDir = true
 			}
 
-			if oldFile && oldDir {
+			// Also check if an updated metadata override file exists.
+			// TODO: If override files are also used to add synthetic songs for
+			// https://github.com/derat/nup/issues/32, then scanForUpdatedSongs will need to
+			// scan all of cfg.MetadataDir while also avoiding duplicate updates in the case
+			// where both the song file and the corresponding override file have been updated.
+			var newMetadata bool
+			if mp, err := files.MetadataOverridePath(cfg, relPath); err == nil {
+				if mfi, err := os.Stat(mp); err == nil {
+					// TODO: This check is somewhat incorrect since it doesn't include the oldDirs
+					// trickiness used above for song files. More worryingly, a song won't be
+					// rescanned if its override file is deleted. I guess override files should be
+					// set to "{}" instead of being deleted. The only other alternative seems to be
+					// listing all known override files within cfg.LastUpdateInfoFile.
+					newMetadata = !(mfi.ModTime().Before(lastUpdateTime) && getCtime(mfi).Before(lastUpdateTime))
+				}
+			}
+
+			if oldFile && oldDir && !newMetadata {
 				return nil
 			}
 		}
@@ -168,4 +183,10 @@ func scanForUpdatedSongs(cfg *client.Config, lastUpdateTime time.Time, lastUpdat
 	}
 	sort.Strings(seenDirs)
 	return numUpdates, seenDirs, nil
+}
+
+// getCtime returns fi's ctime (i.e. when its metadata was last changed).
+func getCtime(fi os.FileInfo) time.Time {
+	stat := fi.Sys().(*syscall.Stat_t)
+	return time.Unix(int64(stat.Ctim.Sec), int64(stat.Ctim.Nsec))
 }
