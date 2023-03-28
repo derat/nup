@@ -4,9 +4,6 @@
 package files
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"os"
 	"testing"
 	"time"
 
@@ -46,13 +43,17 @@ func TestApplyMetadataOverride(t *testing.T) {
 	}
 
 	cfg := &client.Config{MetadataDir: t.TempDir()}
-	mp, err := MetadataOverridePath(cfg, orig.Filename)
-	if err != nil {
-		t.Fatal(err)
+
+	// Nothing should happen if the override file is missing.
+	got := orig
+	if err := applyMetadataOverride(cfg, &got); err != nil {
+		t.Fatal("applyMetadataOverride with no override failed:", err)
+	} else if diff := cmp.Diff(orig, got); diff != "" {
+		t.Error("applyMetadataOverride with no override modified song:\n" + diff)
 	}
 
 	// Update all of the fields via the override file.
-	if b, err := json.Marshal(MetadataOverride{
+	if err := WriteMetadataOverride(cfg, orig.Filename, &MetadataOverride{
 		Artist:       &updated.Artist,
 		Title:        &updated.Title,
 		Album:        &updated.Album,
@@ -65,10 +66,8 @@ func TestApplyMetadataOverride(t *testing.T) {
 		Date:         &updated.Date,
 	}); err != nil {
 		t.Fatal(err)
-	} else if err := ioutil.WriteFile(mp, b, 0644); err != nil {
-		t.Fatal(err)
 	}
-	got := orig
+	got = orig
 	if err := applyMetadataOverride(cfg, &got); err != nil {
 		t.Fatal("applyMetadataOverride with full override failed:", err)
 	} else if diff := cmp.Diff(updated, got); diff != "" {
@@ -76,9 +75,7 @@ func TestApplyMetadataOverride(t *testing.T) {
 	}
 
 	// Nothing should happen if the override file contains an empty object.
-	if b, err := json.Marshal(MetadataOverride{}); err != nil {
-		t.Fatal(err)
-	} else if err := ioutil.WriteFile(mp, b, 0644); err != nil {
+	if err := WriteMetadataOverride(cfg, orig.Filename, &MetadataOverride{}); err != nil {
 		t.Fatal(err)
 	}
 	got = orig
@@ -86,14 +83,5 @@ func TestApplyMetadataOverride(t *testing.T) {
 		t.Fatal("applyMetadataOverride with empty override failed:", err)
 	} else if diff := cmp.Diff(orig, got); diff != "" {
 		t.Error("applyMetadataOverride with empty override modified song:\n" + diff)
-	}
-
-	// Nothing should happen if the override file is missing, too.
-	os.Remove(mp)
-	got = orig
-	if err := applyMetadataOverride(cfg, &got); err != nil {
-		t.Fatal("applyMetadataOverride with missing override failed:", err)
-	} else if diff := cmp.Diff(orig, got); diff != "" {
-		t.Error("applyMetadataOverride with missing override modified song:\n" + diff)
 	}
 }

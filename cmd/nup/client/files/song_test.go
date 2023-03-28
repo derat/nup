@@ -4,9 +4,6 @@
 package files
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -32,13 +29,7 @@ func TestReadSong_Override(t *testing.T) {
 
 	// Test that metadata can be overridden.
 	// The overriding logic is tested in more detail in override_test.go.
-	if mp, err := MetadataOverridePath(cfg, want.Filename); err != nil {
-		t.Fatal(err)
-	} else if err := os.MkdirAll(cfg.MetadataDir, 0755); err != nil {
-		t.Fatal(err)
-	} else if b, err := json.Marshal(MetadataOverride{Artist: &want.Artist}); err != nil {
-		t.Fatal(err)
-	} else if err := ioutil.WriteFile(mp, b, 0644); err != nil {
+	if err := WriteMetadataOverride(cfg, want.Filename, &MetadataOverride{Artist: &want.Artist}); err != nil {
 		t.Fatal(err)
 	}
 

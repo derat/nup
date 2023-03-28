@@ -4,7 +4,6 @@
 package update
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -238,7 +237,7 @@ func TestScanAndCompareSongs_OverrideMetadata(t *testing.T) {
 	test.Must(t, test.CopySongs(musicDir, test.Song1s.Filename))
 
 	metadataDir := filepath.Join(td, "metadata")
-	test.Must(t, os.Mkdir(metadataDir, 0755))
+	cfg := &client.Config{MetadataDir: metadataDir}
 	opts := &scanTestOptions{metadataDir: metadataDir}
 
 	// Perform an initial scan to pick up the song.
@@ -246,24 +245,14 @@ func TestScanAndCompareSongs_OverrideMetadata(t *testing.T) {
 	scanAndCompareSongs(t, "initial", musicDir, time.Time{}, opts, []db.Song{test.Song1s})
 
 	// Write a file to override the song's metadata.
-	mp, err := files.MetadataOverridePath(&client.Config{MetadataDir: metadataDir}, test.Song1s.Filename)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	updated := test.Song1s
 	updated.Artist = "New Artist"
 	updated.Title = "New Title"
-
-	if b, err := json.Marshal(files.MetadataOverride{
+	waitCtime(t, metadataDir, startTime)
+	test.Must(t, files.WriteMetadataOverride(cfg, updated.Filename, &files.MetadataOverride{
 		Artist: &updated.Artist,
 		Title:  &updated.Title,
-	}); err != nil {
-		t.Fatal(err)
-	} else {
-		waitCtime(t, metadataDir, startTime)
-		test.Must(t, ioutil.WriteFile(mp, b, 0644))
-	}
+	}))
 
 	// The next scan should pick up the new metadata even though the song file wasn't updated.
 	overrideTime := time.Now()
@@ -271,7 +260,7 @@ func TestScanAndCompareSongs_OverrideMetadata(t *testing.T) {
 
 	// Clear the override file and scan again to go back to the original metadata.
 	waitCtime(t, metadataDir, overrideTime)
-	test.Must(t, ioutil.WriteFile(mp, []byte("{}"), 0644))
+	test.Must(t, files.WriteMetadataOverride(cfg, updated.Filename, &files.MetadataOverride{}))
 	clearTime := time.Now()
 	scanAndCompareSongs(t, "cleared override", musicDir, overrideTime, opts, []db.Song{test.Song1s})
 
@@ -286,6 +275,9 @@ func TestScanAndCompareSongs_OverrideMetadata(t *testing.T) {
 // (often) the case that a newly-created file's ctime/mtime will precede the time returned
 // by an earlier time.Now() call.
 func waitCtime(t *testing.T, dir string, ref time.Time) {
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
 	for {
 		if func() time.Time {
 			f, err := ioutil.TempFile(dir, "temp.")
