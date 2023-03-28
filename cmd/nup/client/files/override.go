@@ -36,6 +36,40 @@ type MetadataOverride struct {
 	Date         *time.Time `json:"date,omitempty"`
 }
 
+// GenMetadataOverride creates a MetadataOverride struct containing the differences
+// between orig and updated. New values are allocated for the returned struct,
+// so it is safe to modify orig and updated after calling this function.
+func GenMetadataOverride(orig, updated *db.Song) *MetadataOverride {
+	var over MetadataOverride
+	for _, info := range []struct {
+		before, after string
+		dst           **string
+	}{
+		{orig.Artist, updated.Artist, &over.Artist},
+		{orig.Title, updated.Title, &over.Title},
+		{orig.Album, updated.Album, &over.Album},
+		{orig.AlbumArtist, updated.AlbumArtist, &over.AlbumArtist},
+		{orig.DiscSubtitle, updated.DiscSubtitle, &over.DiscSubtitle},
+		{orig.AlbumID, updated.AlbumID, &over.AlbumID},
+		{orig.RecordingID, updated.RecordingID, &over.RecordingID},
+	} {
+		if info.before != info.after {
+			*info.dst = newString(info.after)
+		}
+	}
+	if orig.Track != updated.Track {
+		over.Track = newInt(updated.Track)
+	}
+	if orig.Disc != updated.Disc {
+		over.Disc = newInt(updated.Disc)
+	}
+	if !orig.Date.Equal(updated.Date) {
+		over.Date = newTime(updated.Date)
+	}
+
+	return &over
+}
+
 // MetadataOverridePath returns the path under cfg.MetadataDir for a JSON-marshaled
 // MetadataOverride struct used to override metadata for a song with the supplied
 // Filename value.
@@ -45,31 +79,6 @@ func MetadataOverridePath(cfg *client.Config, songFilename string) (string, erro
 	}
 	// Not using a cutesy ".jsong" extension here is killing me.
 	return filepath.Join(cfg.MetadataDir, songFilename+".json"), nil
-}
-
-// ReadMetadataOverride reads the JSON-marshaled metadata override file for the song with the
-// specified Filename field. If no override exists for the song, a nil object and nil error are
-// returned.
-func ReadMetadataOverride(cfg *client.Config, songFilename string) (*MetadataOverride, error) {
-	var p string
-	var f *os.File
-	var err error
-	if p, err = MetadataOverridePath(cfg, songFilename); err != nil {
-		return nil, nil // metadata dir unconfigured
-	} else if f, err = os.Open(p); os.IsNotExist(err) {
-		return nil, nil // override file doesn't exist
-	} else if err != nil {
-		return nil, err // some other problem opening override file
-	}
-	defer f.Close()
-
-	var over MetadataOverride
-	dec := json.NewDecoder(f)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&over); err != nil {
-		return nil, fmt.Errorf("%v: %v", p, err)
-	}
-	return &over, nil
 }
 
 // WriteMetadataOverride writes a JSON file containing overridden metadata for the song with the
@@ -104,11 +113,23 @@ func WriteMetadataOverride(cfg *client.Config, songFilename string, over *Metada
 // applyMetadataOverride looks for MetadataOverride JSON file in cfg.MetadataDir and
 // updates specified fields in s. If no override file exists, nil is returned.
 func applyMetadataOverride(cfg *client.Config, song *db.Song) error {
-	over, err := ReadMetadataOverride(cfg, song.Filename)
-	if err != nil {
-		return err
-	} else if over == nil {
-		return nil
+	var p string
+	var f *os.File
+	var err error
+	if p, err = MetadataOverridePath(cfg, song.Filename); err != nil {
+		return nil // metadata dir unconfigured
+	} else if f, err = os.Open(p); os.IsNotExist(err) {
+		return nil // override file doesn't exist
+	} else if err != nil {
+		return err // some other problem opening override file
+	}
+	defer f.Close()
+
+	var over MetadataOverride
+	dec := json.NewDecoder(f)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&over); err != nil {
+		return fmt.Errorf("%v: %v", p, err)
 	}
 
 	setString(&song.Artist, over.Artist)
@@ -135,6 +156,10 @@ func applyMetadataOverride(cfg *client.Config, song *db.Song) error {
 }
 
 // TODO: Sigh, use generics if dev_appserver.py ever supports modern Go.
+func newString(v string) *string     { return &v }
+func newInt(v int) *int              { return &v }
+func newTime(v time.Time) *time.Time { return &v }
+
 func setString(dst, src *string) {
 	if src != nil {
 		*dst = *src

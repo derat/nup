@@ -53,18 +53,7 @@ func TestApplyMetadataOverride(t *testing.T) {
 	}
 
 	// Update all of the fields via the override file.
-	if err := WriteMetadataOverride(cfg, orig.Filename, &MetadataOverride{
-		Artist:       &updated.Artist,
-		Title:        &updated.Title,
-		Album:        &updated.Album,
-		AlbumArtist:  &updated.AlbumArtist,
-		DiscSubtitle: &updated.DiscSubtitle,
-		AlbumID:      &updated.AlbumID,
-		RecordingID:  &updated.RecordingID,
-		Track:        &updated.Track,
-		Disc:         &updated.Disc,
-		Date:         &updated.Date,
-	}); err != nil {
+	if err := WriteMetadataOverride(cfg, orig.Filename, GenMetadataOverride(&orig, &updated)); err != nil {
 		t.Fatal(err)
 	}
 	got = orig

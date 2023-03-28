@@ -8,13 +8,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/cmd/nup/client/files"
@@ -23,13 +21,9 @@ import (
 	"github.com/google/subcommands"
 )
 
-const (
-	songChanSize = 64
-)
-
 type Command struct {
-	Cfg *client.Config
-	api *api
+	Cfg  *client.Config
+	opts processSongOptions
 
 	rel   *release // last-fetched release
 	relID string   // ID requested when fetching rel (differs from rel.ID if release was merged)
@@ -39,12 +33,15 @@ func (*Command) Name() string     { return "scan" }
 func (*Command) Synopsis() string { return "scan songs for updated metadata" }
 func (*Command) Usage() string {
 	return `scan [flags] <song.mp3>...:
-	Scan songs for updated metadata using MusicBrainz.
+	Scan songs for updated metadata using MusicBrainz and writes override files
+	to metadataDir. Without positional arguments, scans all songs in musicDir.
 
 `
 }
 
 func (cmd *Command) SetFlags(f *flag.FlagSet) {
+	f.BoolVar(&cmd.opts.dryRun, "dry-run", false, "Don't write override files")
+	f.BoolVar(&cmd.opts.printUpdates, "print", true, "Print updates to stdout")
 }
 
 func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
@@ -53,63 +50,76 @@ func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interfac
 		return subcommands.ExitUsageError
 	}
 
-	cmd.api = newAPI("https://musicbrainz.org")
+	api := newAPI("https://musicbrainz.org")
 
-	type songOrErr struct {
-		path string // relative to cmd.Cfg.MusicDir if no positional args were supplied
-		song *db.Song
-		err  error
-	}
-	ch := make(chan songOrErr, songChanSize)
-
-	go func() {
-		if fs.NArg() > 0 {
-			for _, p := range fs.Args() {
-				var song *db.Song
-				fi, err := os.Stat(p)
-				if err == nil {
-					song, err = files.ReadSong(cmd.Cfg, p, fi, true /* onlyTags */, nil /* gc */)
-				}
-				ch <- songOrErr{p, song, err}
-			}
-		} else {
-			if err := filepath.Walk(cmd.Cfg.MusicDir, func(p string, fi os.FileInfo, err error) error {
-				if fi.Mode().IsRegular() && files.IsMusicPath(p) {
-					song, err := files.ReadSong(cmd.Cfg, p, fi, true /* onlyTags */, nil /* gc */)
-					ch <- songOrErr{p[len(cmd.Cfg.MusicDir)+1:], song, err}
-				}
-				return nil
-			}); err != nil {
-				ch <- songOrErr{"", nil, err}
+	var errMsgs []string
+	if fs.NArg() > 0 {
+		for _, p := range fs.Args() {
+			if err := processSong(ctx, cmd.Cfg, api, p, nil /* fi */, &cmd.opts); err != nil {
+				errMsgs = append(errMsgs, fmt.Sprintf("%v: %v", p, err))
 			}
 		}
-		close(ch)
-	}()
-
-	for soe := range ch {
-		if soe.err != nil {
-			log.Printf("%v: %v", soe.path, soe.err)
-			continue
-		}
-		orig := soe.song
-		updated, err := cmd.getUpdates(ctx, orig)
-		if err != nil {
-			log.Printf("%v: %v", soe.path, err)
-			continue
-		}
-		if !orig.MetadataEquals(updated) {
-			fmt.Println(soe.path + "\n" + diffSongs(orig, updated) + "\n")
+	} else {
+		if err := filepath.Walk(cmd.Cfg.MusicDir, func(p string, fi os.FileInfo, err error) error {
+			if fi.Mode().IsRegular() && files.IsMusicPath(p) {
+				if err := processSong(ctx, cmd.Cfg, api, p, fi, &cmd.opts); err != nil {
+					rel := p[len(cmd.Cfg.MusicDir)+1:]
+					errMsgs = append(errMsgs, fmt.Sprintf("%v: %v", rel, err))
+				}
+			}
+			return nil
+		}); err != nil {
+			errMsgs = append(errMsgs, fmt.Sprintf("Failed walking music dir: %v", err))
 		}
 	}
 
+	// Print the error messages last so they're easier to find.
+	if len(errMsgs) > 0 {
+		for _, msg := range errMsgs {
+			fmt.Fprintln(os.Stderr, msg)
+		}
+		return subcommands.ExitFailure
+	}
 	return subcommands.ExitSuccess
 }
 
-// untaggedErr is returned by getUpdates if song.AlbumID and song.RecordingID are both empty.
-var untaggedErr = errors.New("song is untagged")
+// processSongOptions configures processSong's behavior.
+type processSongOptions struct {
+	dryRun       bool // don't write override files
+	printUpdates bool // print song updates to stderr
+}
 
-// getUpdates fetches metadata for song from MusicBrainz and returns an updated copy.
-func (cmd *Command) getUpdates(ctx context.Context, song *db.Song) (*db.Song, error) {
+// processSong reads the song file at p, fetches updated metadata using api,
+// and writes a metadata override file if needed. p and fi are passed to files.ReadSong.
+func processSong(ctx context.Context, cfg *client.Config, api *api,
+	p string, fi os.FileInfo, opts *processSongOptions) error {
+	if opts == nil {
+		opts = &processSongOptions{}
+	}
+	orig, err := files.ReadSong(cfg, p, fi, true /* onlyTags */, nil /* gc */)
+	if err != nil {
+		return err
+	}
+	updated, err := getSongUpdates(ctx, orig, api)
+	if err != nil {
+		return err
+	}
+	if orig.MetadataEquals(updated) {
+		return nil
+	}
+
+	if opts.printUpdates {
+		fmt.Println(orig.Filename + "\n" + diffSongs(orig, updated) + "\n")
+	}
+	if opts.dryRun {
+		return nil
+	}
+	over := files.GenMetadataOverride(orig, updated)
+	return files.WriteMetadataOverride(cfg, orig.Filename, over)
+}
+
+// getSongUpdates fetches metadata for song using api and returns an updated copy.
+func getSongUpdates(ctx context.Context, song *db.Song, api *api) (*db.Song, error) {
 	updated := *song
 
 	switch {
@@ -120,33 +130,29 @@ func (cmd *Command) getUpdates(ctx context.Context, song *db.Song) (*db.Song, er
 		if song.RecordingID == "" {
 			return nil, errors.New("no recording ID")
 		}
-		if cmd.rel == nil || (song.AlbumID != cmd.rel.ID && song.AlbumID != cmd.relID) {
-			var err error
-			cmd.relID = song.AlbumID
-			if cmd.rel, err = cmd.api.getRelease(ctx, song.AlbumID); err != nil {
-				cmd.relID = ""
-				return nil, fmt.Errorf("release %v: %v", song.AlbumID, err)
-			}
+		rel, err := api.getRelease(ctx, song.AlbumID)
+		if err != nil {
+			return nil, fmt.Errorf("release %v: %v", song.AlbumID, err)
 		}
-		if updateSongFromRelease(&updated, cmd.rel) {
+		if updateSongFromRelease(&updated, rel) {
 			return &updated, nil
 		}
 
 		// If we didn't find the recording in the release, it might've been
 		// merged into a different recording. Look up the recording to try
 		// to get an updated ID that might be in the release.
-		rec, err := cmd.api.getRecording(ctx, song.RecordingID)
+		rec, err := api.getRecording(ctx, song.RecordingID)
 		if err != nil {
 			return nil, fmt.Errorf("recording %v: %v", song.RecordingID, err)
 		}
 		updated.RecordingID = rec.ID
-		if !updateSongFromRelease(&updated, cmd.rel) {
-			return nil, fmt.Errorf("recording %v not in release %v", rec.ID, cmd.rel.ID)
+		if !updateSongFromRelease(&updated, rel) {
+			return nil, fmt.Errorf("recording %v not in release %v", rec.ID, rel.ID)
 		}
 		return &updated, nil
 
 	case song.RecordingID != "":
-		rec, err := cmd.api.getRecording(ctx, song.RecordingID)
+		rec, err := api.getRecording(ctx, song.RecordingID)
 		if err != nil {
 			return nil, fmt.Errorf("recording %v: %v", song.RecordingID, err)
 		}
@@ -154,44 +160,7 @@ func (cmd *Command) getUpdates(ctx context.Context, song *db.Song) (*db.Song, er
 		return &updated, nil
 	}
 
-	return nil, untaggedErr
-}
-
-// updateSongFromRelease updates fields in song using data from rel.
-// false is returned if the recording isn't included in the release.
-func updateSongFromRelease(song *db.Song, rel *release) bool {
-	tr, med := rel.findTrack(song.RecordingID)
-	if tr == nil {
-		return false
-	}
-
-	song.Artist = joinArtistCredits(tr.Artists)
-	song.Title = tr.Title
-	song.Album = rel.Title
-	song.DiscSubtitle = med.Title
-	song.AlbumID = rel.ID
-	song.Track = tr.Position
-	song.Disc = med.Position
-	song.Date = time.Time(rel.ReleaseGroup.FirstReleaseDate)
-
-	// Only set the album artist if it differs from the song artist or if it was previously set.
-	// Otherwise we're creating needless churn, since the update command won't send it to the server
-	// if it's the same as the song artist.
-	if aa := joinArtistCredits(rel.Artists); aa != song.Artist || song.AlbumArtist != "" {
-		song.AlbumArtist = aa
-	}
-
-	return true
-}
-
-// updateSongFromRecording updates fields in song using data from rec.
-// This should only be used for standalone recordings.
-func updateSongFromRecording(song *db.Song, rec *recording) {
-	song.Artist = joinArtistCredits(rec.Artists)
-	song.Title = rec.Title
-	song.Album = files.NonAlbumTracksValue
-	song.AlbumID = ""
-	song.Date = time.Time(rec.FirstReleaseDate) // always zero?
+	return nil, errors.New("song is untagged")
 }
 
 // diffSongs diffs orig and updated and returns a multiline string describing differences.
@@ -218,7 +187,7 @@ func diffSongs(orig, updated *db.Song) string {
 	return strings.Join(strs, "\n")
 }
 
-// Diff inexplicably sometimes uses U+00A0 (non-breaking space) instead of spaces.
+// cmp.Diff inexplicably sometimes uses U+00A0 (non-breaking space) instead of spaces.
 const spaces = "[ \t\u00a0]*"
 
 var (
