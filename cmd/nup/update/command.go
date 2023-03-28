@@ -408,7 +408,18 @@ func writeLastUpdateInfo(p string, info lastUpdateInfo) error {
 // getCoverIDs returns IDs for song's cover in their preferred order.
 func getCoverIDs(song *db.Song) []string {
 	var ids []string
-	for _, id := range []string{song.CoverID, song.AlbumID, song.RecordingID} {
+	for _, id := range []string{
+		song.CoverID,
+		song.AlbumID,
+		song.RecordingID,
+		// If the song's metadata was updated by an override file, fall back to the original IDs.
+		// TODO: I'm not sure if it'll matter in practice, but there are cases that this doesn't
+		// cover. A song could have an original album ID A that's then overridden to B, with a B.jpg
+		// cover image. If the album ID is overridden a second time to C, then only A.jpg and C.jpg
+		// will be checked.
+		song.OrigAlbumID,
+		song.OrigRecordingID,
+	} {
 		if len(id) > 0 {
 			ids = append(ids, id)
 		}
