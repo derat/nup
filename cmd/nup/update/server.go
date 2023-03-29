@@ -13,12 +13,23 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/server/db"
 )
 
-const batchSize = 100 // updateSongs HTTP request batch size
+const (
+	batchSize  = 100 // updateSongs HTTP request batch size
+	tlsTimeout = time.Minute
+)
+
+// I started seeing "net/http: TLS handshake timeout" errors when trying to import songs.
+// I'm not sure if this is just App Engine flakiness or something else, but I didn't see
+// the error again after increasing the timeout.
+var httpClient = &http.Client{
+	Transport: &http.Transport{TLSHandshakeTimeout: tlsTimeout},
+}
 
 // sendRequest sends the specified request to the server and returns the response body.
 // r contains the request body and may be nil.
@@ -38,7 +49,7 @@ func sendRequest(cfg *client.Config, method, path, query string,
 		req.Header.Set("Content-Type", ctype)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
