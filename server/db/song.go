@@ -4,7 +4,6 @@
 package db
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -364,13 +363,13 @@ var normalizer = transform.Chain(norm.NFKD, runes.Remove(runes.In(unicode.Mn)))
 //
 // Characters are also de-accented and lowercased, but punctuation is preserved.
 func Normalize(s string) (string, error) {
-	b := make([]byte, len(s))
-	_, _, err := normalizer.Transform(b, []byte(s), true)
+	// Double the source string's length to hopefully have enough space for the decomposed form.
+	b := make([]byte, 2*len(s))
+	n, _, err := normalizer.Transform(b, []byte(s), true)
 	if err != nil {
 		return "", err
 	}
-	b = bytes.TrimRight(b, "\x00")
-	return strings.ToLower(string(b)), nil
+	return strings.ToLower(string(b[:n])), nil
 }
 
 // Play represents one playback of a Song.

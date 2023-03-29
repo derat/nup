@@ -166,6 +166,7 @@ func TestNormalize(t *testing.T) {
 		{"…", "..."},
 		{"Сергей Васильевич Рахманинов", "сергеи васильевич рахманинов"},
 		{"永田権太", "永田権太"},
+		{"36″ Chain", "36′′ chain"}, // DOUBLE PRIME (U+2033) mapped to PRIME (U+2032)
 	} {
 		if got, err := Normalize(tc.in); err != nil {
 			t.Errorf("Normalize(%q) failed: %v", tc.in, err)
