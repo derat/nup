@@ -38,7 +38,7 @@ type Command struct {
 func (*Command) Name() string     { return "dump" }
 func (*Command) Synopsis() string { return "dump songs from the server" }
 func (*Command) Usage() string {
-	return `dump [flags]:
+	return `dump <flags>:
 	Dump JSON-marshaled song data from the server to stdout.
 
 `

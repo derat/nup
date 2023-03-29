@@ -32,9 +32,9 @@ type Command struct {
 func (*Command) Name() string     { return "scan" }
 func (*Command) Synopsis() string { return "scan songs for updated metadata" }
 func (*Command) Usage() string {
-	return `scan [flags] <song.mp3>...:
-	Scan songs for updated metadata using MusicBrainz and writes override files
-	to metadataDir. Without positional arguments, scans all songs in musicDir.
+	return `scan <flags> <path>...:
+	Scan for updated metadata in MusicBrainz and write override files.
+	Without positional arguments, scans all songs in the music dir.
 
 `
 }

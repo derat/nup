@@ -26,7 +26,7 @@ type Command struct {
 func (*Command) Name() string     { return "debug" }
 func (*Command) Synopsis() string { return "print information about a song file" }
 func (*Command) Usage() string {
-	return `debug [flags] <song-path>...:
+	return `debug <flags> <path>...:
 	Print information about one or more song files.
 
 `

@@ -33,7 +33,7 @@ type Command struct {
 func (*Command) Name() string     { return "query" }
 func (*Command) Synopsis() string { return "run song queries against the server" }
 func (*Command) Usage() string {
-	return `query [flags]:
+	return `query <flags>:
 	Query the server and and print JSON-marshaled songs to stdout.
 
 `

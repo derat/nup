@@ -46,9 +46,9 @@ type Command struct {
 func (*Command) Name() string     { return "storage" }
 func (*Command) Synopsis() string { return "update song storage classes" }
 func (*Command) Usage() string {
-	return `storage [flags]:
+	return `storage <flags>:
 	Update song files' storage classes in Google Cloud Storage based on
-	ratings in dumped songs from stdin.
+	ratings in dumped songs read from stdin.
 
 `
 }

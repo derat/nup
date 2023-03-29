@@ -34,7 +34,7 @@ type Command struct {
 func (*Command) Name() string     { return "config" }
 func (*Command) Synopsis() string { return "manage server configuration" }
 func (*Command) Usage() string {
-	return `config [flags]:
+	return `config <flags>:
 	Manage the App Engine server's configuration in Datastore.
 	By default, prints the existing JSON-marshaled configuration.
 

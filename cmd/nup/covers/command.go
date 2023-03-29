@@ -43,8 +43,8 @@ type Command struct {
 func (*Command) Name() string     { return "covers" }
 func (*Command) Synopsis() string { return "manage album art" }
 func (*Command) Usage() string {
-	return `covers [flags]:
-	Works with album art images in a directory.
+	return `covers <flags>:
+	Manipulate album art images in a directory.
 	With -download, downloads album art from coverartarchive.org.
 	With -generate-webp, generates WebP versions of existing JPEG images.
 

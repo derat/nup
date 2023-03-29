@@ -24,11 +24,7 @@ import (
 )
 
 func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %v [flag]...\n"+
-			"Interacts with the nup App Engine server.\n\n", os.Args[0])
-		flag.PrintDefaults()
-	}
+	// The subcommands package generates the usage string.
 	configFile := flag.String("config", filepath.Join(os.Getenv("HOME"), ".nup/config.json"),
 		"Path to config file")
 

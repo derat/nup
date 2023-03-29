@@ -25,7 +25,7 @@ Subcommands:
 	update           send song updates to the server
 
   -config string
-    	Path to config file (default "/home/danerat/.nup/config.json")
+    	Path to config file (default "~/.nup/config.json")
 ```
 
 ## `check` command
@@ -36,8 +36,8 @@ the `dump` command or in cover images.
 [Song]: ../../server/db/song.go
 
 ```
-check [flags]:
-	Check for issues in dumped songs from stdin.
+check <flags>:
+	Check for issues in dumped songs read from stdin.
 
   -check string
     	Comma-separated list of checks to perform:
@@ -97,8 +97,8 @@ Storage.
 [WebP]: https://developers.google.com/speed/webp
 
 ```
-covers [flags]:
-	Works with album art images in a directory.
+covers <flags>:
+	Manipulate album art images in a directory.
 	With -download, downloads album art from coverartarchive.org.
 	With -generate-webp, generates WebP versions of existing JPEG images.
 
@@ -122,7 +122,7 @@ The `debug` command prints information about a song file specified in the
 command line.
 
 ```
-debug [flags] <song-path>...:
+debug <flags> <path>...:
 	Print information about one or more song files.
 
   -id3
@@ -137,7 +137,7 @@ The `dump` command downloads all song metadata and user data from the [App
 Engine server] and writes JSON-marshaled [Song] objects to stdout.
 
 ```
-dump [flags]:
+dump <flags>:
 	Dump JSON-marshaled song data from the server to stdout.
 
   -play-batch-size int
@@ -164,7 +164,7 @@ The `query` command performs a query using the server and writes the resulting
 JSON-marshaled [Song] objects to stdout.
 
 ```
-query [flags]:
+query <flags>:
 	Query the server and and print JSON-marshaled songs to stdout.
 
   -filename string
@@ -176,7 +176,7 @@ query [flags]:
   -print-id
     	Print song IDs instead of full JSON objects
   -single
-    	Fail if exactly one song is not returned
+    	Require exactly one song to be matched
 ```
 
 ## `scan` command
@@ -185,8 +185,14 @@ The `scan` command scans the music directory and queries [MusicBrainz] for
 updated metadata.
 
 ```
-scan [flags] <song.mp3>...:
-	Scan songs for updated metadata using MusicBrainz.
+scan <flags> <path>...:
+	Scan for updated metadata in MusicBrainz and write override files.
+	Without positional arguments, scans all songs in the music dir.
+
+  -dry-run
+    	Don't write override files
+  -print
+    	Print updates to stdout (default true)
 ```
 
 [MusicBrainz]: https://musicbrainz.org/
@@ -206,9 +212,9 @@ Coldline and use that for all songs.
 [Cloud Storage pricing]: https://cloud.google.com/storage/pricing
 
 ```
-storage [flags]:
+storage <flags>:
 	Update song files' storage classes in Google Cloud Storage based on
-	ratings in dumped songs from stdin.
+	ratings in dumped songs read from stdin.
 
   -bucket string
     	Google Cloud Storage bucket containing songs
@@ -240,7 +246,7 @@ The `-delete-song` flag can be used to delete specific songs from the server
 (e.g. after deleting them from the music dir).
 
 ```
-update [flags]:
+update <flags>:
 	Send song updates to the server.
 
   -compare-dump-file string

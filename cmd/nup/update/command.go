@@ -46,7 +46,7 @@ type Command struct {
 func (*Command) Name() string     { return "update" }
 func (*Command) Synopsis() string { return "send song updates to the server" }
 func (*Command) Usage() string {
-	return `update [flags]:
+	return `update <flags>:
 	Send song updates to the server.
 
 `

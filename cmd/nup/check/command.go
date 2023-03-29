@@ -55,8 +55,8 @@ type Command struct {
 func (*Command) Name() string     { return "check" }
 func (*Command) Synopsis() string { return "check for issues in songs and cover images" }
 func (*Command) Usage() string {
-	return `check [flags]:
-	Check for issues in dumped songs from stdin.
+	return `check <flags>:
+	Check for issues in dumped songs read from stdin.
 
 `
 }
