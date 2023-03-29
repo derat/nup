@@ -25,6 +25,7 @@ import (
 	"github.com/google/subcommands"
 )
 
+// checkSettings is a bitfield describing which checks to perform.
 type checkSettings uint32
 
 const (
@@ -32,6 +33,7 @@ const (
 	checkCoverSize400
 	checkCoverSize800
 	checkImported
+	checkMetadata
 	checkSongCover
 )
 
@@ -44,12 +46,14 @@ var checkInfos = map[string]struct { // keys are values for -check flag
 	"cover-size-400": {checkCoverSize400, "Cover images are at least 400x400", false},
 	"cover-size-800": {checkCoverSize800, "Cover images are at least 800x800", false},
 	"imported":       {checkImported, "All songs have been imported", true},
+	"metadata":       {checkMetadata, "Song metadata is the same in dumped songs and locally", false},
 	"song-cover":     {checkSongCover, "Songs have cover files", true},
 }
 
 type Command struct {
-	Cfg    *client.Config
-	checks string // comma-separated list of checks to perform
+	Cfg        *client.Config
+	checksList string // comma-separated list of checks to perform
+	checks     checkSettings
 }
 
 func (*Command) Name() string     { return "check" }
@@ -72,7 +76,7 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	}
 	sort.Strings(defaultChecks)
 	sort.Strings(checkDescs)
-	f.StringVar(&cmd.checks, "check", strings.Join(defaultChecks, ","),
+	f.StringVar(&cmd.checksList, "check", strings.Join(defaultChecks, ","),
 		"Comma-separated list of checks to perform:\n"+strings.Join(checkDescs, ""))
 }
 
@@ -82,14 +86,13 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 		return subcommands.ExitUsageError
 	}
 
-	var settings checkSettings
-	for _, s := range strings.Split(cmd.checks, ",") {
+	for _, s := range strings.Split(cmd.checksList, ",") {
 		info, ok := checkInfos[s]
 		if !ok {
 			fmt.Fprintf(os.Stderr, "Invalid -check value %q\n", s)
 			return subcommands.ExitUsageError
 		}
-		settings |= info.setting
+		cmd.checks |= info.setting
 	}
 
 	d := json.NewDecoder(os.Stdin)
@@ -107,24 +110,24 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 	log.Printf("Read %d songs", len(songs))
 	sort.Slice(songs, func(i, j int) bool { return songs[i].Filename < songs[j].Filename })
 
-	if err := checkSongs(songs, cmd.Cfg.MusicDir, cmd.Cfg.CoverDir, settings); err != nil {
+	if err := cmd.checkSongs(songs); err != nil {
 		fmt.Fprintln(os.Stderr, "Failed checking songs:", err)
 		return subcommands.ExitFailure
 	}
-	if err := checkCovers(songs, cmd.Cfg.CoverDir, settings); err != nil {
+	if err := cmd.checkCovers(songs); err != nil {
 		fmt.Fprintln(os.Stderr, "Failed checking covers:", err)
 		return subcommands.ExitFailure
 	}
 	return subcommands.ExitSuccess
 }
 
-func checkSongs(songs []*db.Song, musicDir, coverDir string, settings checkSettings) error {
+func (cmd *Command) checkSongs(songs []*db.Song) error {
 	seenFilenames := make(map[string]string, len(songs))
 	fs := [](func(s *db.Song) error){
 		func(s *db.Song) error {
 			if len(s.Filename) == 0 {
 				return errors.New("no song filename")
-			} else if _, err := os.Stat(filepath.Join(musicDir, s.Filename)); err != nil {
+			} else if _, err := os.Stat(filepath.Join(cmd.Cfg.MusicDir, s.Filename)); err != nil {
 				return errors.New("missing song file")
 			}
 			if id, ok := seenFilenames[s.Filename]; ok {
@@ -134,7 +137,8 @@ func checkSongs(songs []*db.Song, musicDir, coverDir string, settings checkSetti
 			return nil
 		},
 	}
-	if settings&checkAlbumID != 0 {
+
+	if cmd.checks&checkAlbumID != 0 {
 		fs = append(fs, func(s *db.Song) error {
 			if len(s.AlbumID) == 0 && s.Album != files.NonAlbumTracksValue {
 				return errors.New("missing MusicBrainz album")
@@ -142,11 +146,12 @@ func checkSongs(songs []*db.Song, musicDir, coverDir string, settings checkSetti
 			return nil
 		})
 	}
-	if settings&checkSongCover != 0 {
+
+	if cmd.checks&checkSongCover != 0 {
 		fs = append(fs, func(s *db.Song) error {
-			// Returns true if fn exists within coverDir.
+			// Returns true if fn exists within the cover dir.
 			fileExists := func(fn string) bool {
-				_, err := os.Stat(filepath.Join(coverDir, fn))
+				_, err := os.Stat(filepath.Join(cmd.Cfg.CoverDir, fn))
 				return err == nil
 			}
 			if len(s.CoverFilename) == 0 {
@@ -165,44 +170,79 @@ func checkSongs(songs []*db.Song, musicDir, coverDir string, settings checkSetti
 			return nil
 		})
 	}
+
+	if cmd.checks&checkMetadata != 0 {
+		fs = append(fs, func(s *db.Song) error {
+			abs := filepath.Join(cmd.Cfg.MusicDir, s.Filename)
+			local, err := files.ReadSong(cmd.Cfg, abs, nil, true /* onlyTags */, nil /* gc */)
+			if err != nil {
+				return err
+			}
+			dump := *s
+
+			// Clear fields that aren't set when reading only tags or when dumping.
+			local.CoverID = ""
+			local.RecordingID = ""
+			local.OrigAlbumID = ""
+			local.OrigRecordingID = ""
+
+			dump.SHA1 = ""
+			dump.SongID = ""
+			dump.CoverFilename = ""
+			dump.Length = 0
+			dump.TrackGain = 0
+			dump.AlbumGain = 0
+			dump.PeakAmp = 0
+			dump.Rating = 0
+			dump.Tags = nil
+			dump.Plays = nil
+
+			if diff := db.DiffSongs(&dump, local); diff != "" {
+				return errors.New("dumped and local metadata differ:\n" + diff)
+			}
+			return nil
+		})
+	}
+
 	for _, f := range fs {
 		for _, s := range songs {
 			if err := f(s); err != nil {
-				log.Printf("%s (%s): %v", s.SongID, s.Filename, err)
+				fmt.Printf("%s (%s): %v\n", s.SongID, s.Filename, err)
 			}
 		}
 	}
 
-	if settings&checkImported != 0 {
+	if cmd.checks&checkImported != 0 {
 		known := make(map[string]struct{}, len(songs))
 		for _, s := range songs {
 			known[s.Filename] = struct{}{}
 		}
-		if err := filepath.Walk(musicDir, func(path string, fi os.FileInfo, err error) error {
+		if err := filepath.Walk(cmd.Cfg.MusicDir, func(path string, fi os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
 			if !fi.Mode().IsRegular() || !files.IsMusicPath(path) {
 				return nil
 			}
-			pre := musicDir + "/"
+			pre := cmd.Cfg.MusicDir + "/"
 			if !strings.HasPrefix(path, pre) {
 				return fmt.Errorf("%v doesn't have expected prefix %v", path, pre)
 			}
 			path = path[len(pre):]
 			if _, ok := known[path]; !ok {
-				log.Printf("%v not imported", path)
+				fmt.Printf("%v not imported\n", path)
 			}
 			return nil
 		}); err != nil {
-			return fmt.Errorf("failed walking %v: %v", musicDir, err)
+			return fmt.Errorf("failed walking %v: %v", cmd.Cfg.MusicDir, err)
 		}
 	}
+
 	return nil
 }
 
-func checkCovers(songs []*db.Song, coverDir string, settings checkSettings) error {
-	dir, err := os.Open(coverDir)
+func (cmd *Command) checkCovers(songs []*db.Song) error {
+	dir, err := os.Open(cmd.Cfg.CoverDir)
 	if err != nil {
 		return err
 	}
@@ -231,13 +271,13 @@ func checkCovers(songs []*db.Song, coverDir string, settings checkSettings) erro
 		},
 	}
 
-	if settings&(checkCoverSize400|checkCoverSize800) != 0 {
+	if cmd.checks&(checkCoverSize400|checkCoverSize800) != 0 {
 		min := 400
-		if settings&checkCoverSize800 != 0 {
+		if cmd.checks&checkCoverSize800 != 0 {
 			min = 800
 		}
 		fs = append(fs, func(fn string) error {
-			p := filepath.Join(coverDir, fn)
+			p := filepath.Join(cmd.Cfg.CoverDir, fn)
 			f, err := os.Open(p)
 			if err != nil {
 				return err
@@ -263,7 +303,7 @@ func checkCovers(songs []*db.Song, coverDir string, settings checkSettings) erro
 				if s := songFns[fn]; s != "" {
 					key += " (" + s + ")"
 				}
-				log.Printf("%s: %v", key, err)
+				fmt.Printf("%s: %v\n", key, err)
 			}
 		}
 	}
