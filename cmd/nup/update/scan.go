@@ -144,12 +144,13 @@ func scanForUpdatedSongs(cfg *client.Config, lastUpdateTime time.Time, lastUpdat
 			var newMetadata bool
 			if mp, err := files.MetadataOverridePath(cfg, relPath); err == nil {
 				if mfi, err := os.Stat(mp); err == nil {
+					// Avoid checking ctime since the metastore program doesn't seem to set it.
 					// TODO: This check is somewhat incorrect since it doesn't include the oldDirs
 					// trickiness used above for song files. More worryingly, a song won't be
 					// rescanned if its override file is deleted. I guess override files should be
 					// set to "{}" instead of being deleted. The only other alternative seems to be
 					// listing all known override files within cfg.LastUpdateInfoFile.
-					newMetadata = !(mfi.ModTime().Before(lastUpdateTime) && getCtime(mfi).Before(lastUpdateTime))
+					newMetadata = !mfi.ModTime().Before(lastUpdateTime)
 				}
 			}
 
