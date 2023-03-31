@@ -18,9 +18,9 @@ Subcommands:
 	dump             dump songs from the server
 	flags            describe all known top-level flags
 	help             describe subcommands and their syntax
+	metadata         update song metadata
 	projectid        print GCP project ID
 	query            run song queries against the server
-	scan             scan songs for updated metadata
 	storage          update song storage classes
 	update           send song updates to the server
 
@@ -146,6 +146,23 @@ dump <flags>:
     	Size for each batch of entities (default 400)
 ```
 
+## `metadata` command
+
+The `metadata` command queries [MusicBrainz] for updated song metadata.
+
+```
+metadata <flags> <path>...:
+	Fetch updated metadata from MusicBrainz and write override files.
+	Without positional arguments, -scan scans all songs in the music dir.
+
+  -dry-run
+    	Don't write override files
+  -print
+    	Print updates to stdout (default true)
+  -scan
+    	Scan songs for updated metadata
+```
+
 ## `projectid` command
 
 The `projectid` command prints the GCP [project ID].
@@ -177,22 +194,6 @@ query <flags>:
     	Print song IDs instead of full JSON objects
   -single
     	Require exactly one song to be matched
-```
-
-## `scan` command
-
-The `scan` command scans the music directory and queries [MusicBrainz] for
-updated metadata.
-
-```
-scan <flags> <path>...:
-	Scan for updated metadata in MusicBrainz and write override files.
-	Without positional arguments, scans all songs in the music dir.
-
-  -dry-run
-    	Don't write override files
-  -print
-    	Print updates to stdout (default true)
 ```
 
 [MusicBrainz]: https://musicbrainz.org/

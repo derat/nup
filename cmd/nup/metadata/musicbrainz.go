@@ -1,7 +1,7 @@
 // Copyright 2023 Daniel Erat.
 // All rights reserved.
 
-package scan
+package metadata
 
 import (
 	"context"
