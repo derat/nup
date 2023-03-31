@@ -161,6 +161,8 @@ func scanForUpdatedSongs(cfg *client.Config, lastUpdateTime time.Time, lastUpdat
 
 		go func() {
 			// Avoid having too many parallel readSong calls, as we can run out of FDs.
+			// TODO: Find a better way to rate-limit this that also avoids creating so many
+			// simultaneous goroutines. Updating 10,000 songs brought my computer to its knees.
 			workers <- struct{}{}
 			s, err := files.ReadSong(cfg, path, fi, false, gains)
 			<-workers

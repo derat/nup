@@ -20,8 +20,10 @@ import (
 )
 
 const (
-	batchSize  = 100 // updateSongs HTTP request batch size
-	tlsTimeout = time.Minute
+	batchSize        = 50 // updateSongs HTTP request batch size
+	tlsTimeout       = time.Minute
+	updateTries      = 3
+	updateRetryDelay = 3 * time.Second
 )
 
 // I started seeing "net/http: TLS handshake timeout" errors when trying to import songs.
@@ -86,7 +88,15 @@ func updateSongs(cfg *client.Config, ch chan db.Song, replaceUserData, useFilena
 	query := strings.Join(args, "&")
 
 	sendFunc := func(r io.Reader) error {
-		_, err := sendRequest(cfg, "POST", "/import", query, r, "text/plain")
+		var err error
+		for try := 1; try <= updateTries; try++ {
+			if _, err = sendRequest(cfg, "POST", "/import", query, r, "text/plain"); err == nil {
+				break
+			} else if try < updateTries {
+				log.Printf("Sleeping %v before retrying after error: %v", updateRetryDelay, err)
+				time.Sleep(updateRetryDelay)
+			}
+		}
 		return err
 	}
 
