@@ -161,6 +161,8 @@ metadata <flags> <path>...:
     	Print updates to stdout (default true)
   -scan
     	Scan songs for updated metadata
+  -set-album-id string
+    	MusicBrainz release ID for songs in specified dir(s)
 ```
 
 ## `projectid` command

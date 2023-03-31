@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"time"
 
 	"github.com/derat/nup/cmd/nup/client"
 	"github.com/derat/nup/cmd/nup/client/files"
@@ -17,10 +19,15 @@ import (
 	"github.com/google/subcommands"
 )
 
+// maxSongLengthDiff is the maximum difference in length to allow between on-disk songs
+// and MusicBrainz tracks when updating album IDs.
+const maxSongLengthDiff = 5 * time.Second
+
 type Command struct {
-	Cfg  *client.Config
-	opts processSongOptions
-	scan bool // scan songs for updated metadata
+	Cfg        *client.Config
+	opts       updateOptions
+	scan       bool   // scan songs for updated metadata
+	setAlbumID string // release MBID to update songs to
 }
 
 func (*Command) Name() string     { return "metadata" }
@@ -37,6 +44,7 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&cmd.opts.dryRun, "dry-run", false, "Don't write override files")
 	f.BoolVar(&cmd.opts.printUpdates, "print", true, "Print updates to stdout")
 	f.BoolVar(&cmd.scan, "scan", false, "Scan songs for updated metadata")
+	f.StringVar(&cmd.setAlbumID, "set-album-id", "", "MusicBrainz release ID for songs in specified dir(s)")
 }
 
 func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
@@ -45,8 +53,10 @@ func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interfac
 	switch {
 	case cmd.scan:
 		return cmd.doScan(ctx, api, fs.Args())
+	case cmd.setAlbumID != "":
+		return cmd.doSetAlbumID(ctx, api, fs.Args())
 	default:
-		fmt.Fprintln(os.Stderr, "No action specified (-scan)")
+		fmt.Fprintln(os.Stderr, "No action specified (-scan, -set-album-id)")
 		return subcommands.ExitUsageError
 	}
 }
@@ -56,7 +66,7 @@ func (cmd *Command) doScan(ctx context.Context, api *api, args []string) subcomm
 	var errMsgs []string
 	if len(args) > 0 {
 		for _, p := range args {
-			if err := processSong(ctx, cmd.Cfg, api, p, nil /* fi */, &cmd.opts); err != nil {
+			if err := scanSong(ctx, cmd.Cfg, api, p, nil /* fi */, &cmd.opts); err != nil {
 				errMsgs = append(errMsgs, fmt.Sprintf("%v: %v", p, err))
 			}
 		}
@@ -67,7 +77,7 @@ func (cmd *Command) doScan(ctx context.Context, api *api, args []string) subcomm
 		}
 		if err := filepath.Walk(cmd.Cfg.MusicDir, func(p string, fi os.FileInfo, err error) error {
 			if fi.Mode().IsRegular() && files.IsMusicPath(p) {
-				if err := processSong(ctx, cmd.Cfg, api, p, fi, &cmd.opts); err != nil {
+				if err := scanSong(ctx, cmd.Cfg, api, p, fi, &cmd.opts); err != nil {
 					rel := p[len(cmd.Cfg.MusicDir)+1:]
 					errMsgs = append(errMsgs, fmt.Sprintf("%v: %v", rel, err))
 				}
@@ -88,18 +98,68 @@ func (cmd *Command) doScan(ctx context.Context, api *api, args []string) subcomm
 	return subcommands.ExitSuccess
 }
 
-// processSongOptions configures processSong's behavior.
-type processSongOptions struct {
-	dryRun       bool // don't write override files
+func (cmd *Command) doSetAlbumID(ctx context.Context, api *api, dirs []string) subcommands.ExitStatus {
+	// Read the songs from disk first.
+	var songs []*db.Song
+	cmd.Cfg.ComputeGain = false // no need to compute gains
+	for _, dir := range dirs {
+		ds, err := readSongsInDir(cmd.Cfg, dir)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed reading songs: ", err)
+			return subcommands.ExitFailure
+		}
+		songs = append(songs, ds...)
+	}
+	if len(songs) == 0 {
+		fmt.Fprintln(os.Stderr, "No songs found")
+		return subcommands.ExitUsageError
+	}
+
+	// Fetch the new release from MusicBrainz.
+	rel, err := api.getRelease(ctx, cmd.setAlbumID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed fetching release %v: %v\n", cmd.setAlbumID, err)
+		return subcommands.ExitFailure
+	}
+
+	updated, err := setAlbum(songs, rel)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed setting album:", err)
+		return subcommands.ExitFailure
+	}
+
+	for i, orig := range songs {
+		up := updated[i]
+		if orig.MetadataEquals(up) {
+			continue
+		}
+		if cmd.opts.printUpdates {
+			fmt.Println(orig.Filename + "\n" + db.DiffSongs(orig, up) + "\n")
+		}
+		if !cmd.opts.dryRun {
+			over := files.GenMetadataOverride(orig, up)
+			if err := files.WriteMetadataOverride(cmd.Cfg, orig.Filename, over); err != nil {
+				fmt.Fprintln(os.Stderr, "Failed writing override file:", err)
+				return subcommands.ExitFailure
+			}
+		}
+	}
+
+	return subcommands.ExitSuccess
+}
+
+// updateOptions configures how songs are updated.
+type updateOptions struct {
+	dryRun       bool // don't actually write override files
 	printUpdates bool // print song updates to stderr
 }
 
-// processSong reads the song file at p, fetches updated metadata using api,
+// scanSong reads the song file at p, fetches updated metadata using api,
 // and writes a metadata override file if needed. p and fi are passed to files.ReadSong.
-func processSong(ctx context.Context, cfg *client.Config, api *api,
-	p string, fi os.FileInfo, opts *processSongOptions) error {
+func scanSong(ctx context.Context, cfg *client.Config, api *api,
+	p string, fi os.FileInfo, opts *updateOptions) error {
 	if opts == nil {
-		opts = &processSongOptions{}
+		opts = &updateOptions{}
 	}
 	orig, err := files.ReadSong(cfg, p, fi, true /* onlyTags */, nil /* gc */)
 	if err != nil {
@@ -166,4 +226,97 @@ func getSongUpdates(ctx context.Context, song *db.Song, api *api) (*db.Song, err
 	}
 
 	return nil, errors.New("song is untagged")
+}
+
+// readSongsInDir reads the contents of dir and returns sorted songs.
+// The song's SHA1s and lengths are computed.
+func readSongsInDir(cfg *client.Config, dir string) ([]*db.Song, error) {
+	f, err := os.Open(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	fis, err := f.Readdir(-1)
+	if err != nil {
+		return nil, err
+	}
+
+	var albumID string
+	var songs []*db.Song
+	for _, fi := range fis {
+		p := filepath.Join(dir, fi.Name())
+		if !fi.Mode().IsRegular() || !files.IsMusicPath(p) {
+			continue
+		}
+		s, err := files.ReadSong(cfg, p, nil, false /* onlyTags */, nil /* gc */)
+		if err != nil {
+			return nil, fmt.Errorf("%v: %v", p, err)
+		}
+		if s.RecordingID == "" {
+			return nil, fmt.Errorf("%q lacks recording ID", s.Filename)
+		} else if s.AlbumID == "" {
+			return nil, fmt.Errorf("%q lacks album ID", s.Filename)
+		} else if albumID == "" {
+			albumID = s.AlbumID
+		} else if s.AlbumID != albumID {
+			return nil, fmt.Errorf("%q has album ID %v but saw %v in same dir", s.Filename, s.AlbumID, albumID)
+		}
+		songs = append(songs, s)
+	}
+
+	sort.Slice(songs, func(i, j int) bool {
+		si, sj := songs[i], songs[j]
+		if si.Disc < sj.Disc {
+			return true
+		} else if sj.Disc > si.Disc {
+			return false
+		}
+		return si.Track < sj.Track
+	})
+
+	return songs, nil
+}
+
+// setAlbum returns a shallow copy of the supplied songs with their album (and other metadata)
+// switched to rel. An error is returned if the songs can't be mapped to the new album.
+func setAlbum(songs []*db.Song, rel *release) ([]*db.Song, error) {
+	trackCountsMatch := len(songs) == rel.numTracks()
+	updated := make([]*db.Song, len(songs))
+	for i, s := range songs {
+		cp := *s
+		updated[i] = &cp
+
+		// First, try to match the song by recording ID.
+		// TODO: Is this safe, or would it be better to also compare the lengths here?
+		if updateSongFromRelease(&cp, rel) {
+			continue
+		}
+
+		// Otherwise, use the track in the same position if it's around the same length.
+		if !trackCountsMatch {
+			return nil, fmt.Errorf("%q has unmatched recording %v", s.Filename, s.RecordingID)
+		}
+		tr := rel.getTrackByIndex(i) // should succeed since track counts match
+		slen := time.Duration(s.Length * float64(time.Second))
+		tlen := time.Duration(tr.Length) * time.Millisecond
+		if d := slen - tlen; d.Abs() > maxSongLengthDiff {
+			return nil, fmt.Errorf("%q length %v is too different from track %q length %v", s.Filename, slen, tr.Title, tlen)
+		}
+		cp.RecordingID = tr.Recording.ID
+		if !updateSongFromRelease(&cp, rel) {
+			return nil, fmt.Errorf("unable to find %q (recording %v) in new release", s.Filename, s.RecordingID)
+		}
+	}
+
+	// Make sure that recordings don't get used for multiple songs.
+	recs := make(map[string]string, len(updated)) // recording ID to filename
+	for _, s := range updated {
+		if fn, ok := recs[s.RecordingID]; ok {
+			return nil, fmt.Errorf("recording %v used for both %q and %q", s.RecordingID, fn, s.Filename)
+		}
+		recs[s.RecordingID] = s.Filename
+	}
+
+	return updated, nil
 }

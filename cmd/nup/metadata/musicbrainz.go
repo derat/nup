@@ -150,6 +150,24 @@ func (rel *release) findTrack(recID string) (*track, *medium) {
 	return nil, nil
 }
 
+func (rel *release) getTrackByIndex(idx int) *track {
+	for _, m := range rel.Media {
+		if idx < len(m.Tracks) {
+			return &m.Tracks[idx]
+		}
+		idx -= len(m.Tracks)
+	}
+	return nil
+}
+
+func (rel *release) numTracks() int {
+	var n int
+	for _, m := range rel.Media {
+		n += len(m.Tracks)
+	}
+	return n
+}
+
 type releaseGroup struct {
 	Title            string         `json:"title"`
 	Artists          []artistCredit `json:"artist-credit"`
@@ -181,6 +199,7 @@ type track struct {
 	Artists   []artistCredit `json:"artist-credit"`
 	Position  int            `json:"position"`
 	ID        string         `json:"id"`
+	Length    int64          `json:"length"` // milliseconds
 	Recording recording      `json:"recording"`
 }
 
@@ -188,6 +207,7 @@ type recording struct {
 	Title            string         `json:"title"`
 	Artists          []artistCredit `json:"artist-credit"`
 	ID               string         `json:"id"`
+	Length           int64          `json:"length"` // milliseconds
 	FirstReleaseDate date           `json:"first-release-date"`
 }
 
