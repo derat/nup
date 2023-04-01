@@ -56,6 +56,15 @@ const template = createTemplate(`
   .info-table td:nth-child(2) {
     width: 100%;
   }
+  #album {
+    color: var(--text-color);
+    text-decoration: none;
+  }
+  #album[href]:active,
+  #album[href]:hover {
+    color: var(--link-color);
+    text-decoration: underline;
+  }
   #rating.rated {
     letter-spacing: 3px;
   }
@@ -72,7 +81,7 @@ const template = createTemplate(`
   <table class="info-table">
     <tr><td>Artist</td><td id="artist"></td></tr>
     <tr><td>Title</td><td id="title"></td></tr>
-    <tr><td>Album</td><td id="album"></td></tr>
+    <tr><td>Album</td><td><a id="album"></a></td></tr>
     <tr><td>Disc</td><td id="disc"></td></tr>
     <tr><td>Track</td><td id="track"></td></tr>
     <tr><td>Date</td><td id="date"></td></tr>
@@ -118,6 +127,11 @@ export function showSongInfoDialog(song: Song, isCurrent = false) {
   $('artist', shadow).innerText = song.artist;
   $('title', shadow).innerText = song.title;
   $('album', shadow).innerText = song.album;
+  if (song.albumId) {
+    const link = $('album', shadow) as HTMLAnchorElement;
+    link.href = 'https://musicbrainz.org/release/' + song.albumId;
+    link.target = '_blank';
+  }
   $('disc', shadow).innerText =
     (song.disc >= 1 ? song.disc.toString() : '') +
     (song.discSubtitle ? ` (${song.discSubtitle})` : '');
