@@ -300,7 +300,7 @@ func setAlbum(songs []*db.Song, rel *release) ([]*db.Song, error) {
 		tr := rel.getTrackByIndex(i) // should succeed since track counts match
 		slen := time.Duration(s.Length * float64(time.Second))
 		tlen := time.Duration(tr.Length) * time.Millisecond
-		if d := slen - tlen; d.Abs() > maxSongLengthDiff {
+		if absDur(slen-tlen) > maxSongLengthDiff {
 			return nil, fmt.Errorf("%q length %v is too different from track %q length %v", s.Filename, slen, tr.Title, tlen)
 		}
 		cp.RecordingID = tr.Recording.ID
@@ -319,4 +319,12 @@ func setAlbum(songs []*db.Song, rel *release) ([]*db.Song, error) {
 	}
 
 	return updated, nil
+}
+
+// TODO: Use time.Duration.Abs once I can switch to the go119 runtime.
+func absDur(d time.Duration) time.Duration {
+	if d < 0 {
+		return -d
+	}
+	return d
 }
