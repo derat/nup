@@ -173,7 +173,7 @@ func (cmd *Command) doSetAlbumID(ctx context.Context, api *api, dirs []string) s
 	for _, dir := range dirs {
 		ds, err := readSongsInDir(cmd.Cfg, dir)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Failed reading songs: ", err)
+			fmt.Fprintln(os.Stderr, "Failed reading songs:", err)
 			return subcommands.ExitFailure
 		}
 		songs = append(songs, ds...)
@@ -337,7 +337,7 @@ func readSongsInDir(cfg *client.Config, dir string) ([]*db.Song, error) {
 		si, sj := songs[i], songs[j]
 		if si.Disc < sj.Disc {
 			return true
-		} else if sj.Disc > si.Disc {
+		} else if sj.Disc < si.Disc {
 			return false
 		}
 		return si.Track < sj.Track
