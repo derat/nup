@@ -156,6 +156,7 @@ metadata <flags> <path>...:
 	-scan updates the specified songs or all songs (without positional arguments).
 	-set-album-id changes the album ID of songs in specified dir(s).
 	-print prints current on-disk metadata for the specified file(s).
+	-print-full additionally includes SHA1s and lengths.
 
   -dry-run
     	Don't write override files
@@ -163,6 +164,8 @@ metadata <flags> <path>...:
     	Log updates to stdout (default true)
   -print
     	Print metadata from specified song file(s)
+  -print-full
+    	Like -print, but include SHA1 and length (slower)
   -scan
     	Scan songs for updated metadata
   -set-album-id string

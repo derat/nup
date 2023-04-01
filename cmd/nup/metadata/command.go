@@ -28,6 +28,7 @@ type Command struct {
 	Cfg        *client.Config
 	opts       updateOptions
 	print      bool   // print song metadata
+	printFull  bool   // print song metadata with SHA1 and length
 	scan       bool   // scan songs for updated metadata
 	setAlbumID string // release MBID to update songs to
 }
@@ -40,6 +41,7 @@ func (*Command) Usage() string {
 	-scan updates the specified songs or all songs (without positional arguments).
 	-set-album-id changes the album ID of songs in specified dir(s).
 	-print prints current on-disk metadata for the specified file(s).
+	-print-full additionally includes SHA1s and lengths.
 
 `
 }
@@ -48,6 +50,7 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&cmd.opts.dryRun, "dry-run", false, "Don't write override files")
 	f.BoolVar(&cmd.opts.logUpdates, "log-updates", true, "Log updates to stdout")
 	f.BoolVar(&cmd.print, "print", false, "Print metadata from specified song file(s)")
+	f.BoolVar(&cmd.printFull, "print-full", false, "Like -print, but include SHA1 and length (slower)")
 	f.BoolVar(&cmd.scan, "scan", false, "Scan songs for updated metadata")
 	f.StringVar(&cmd.setAlbumID, "set-album-id", "", "MusicBrainz release ID for songs in specified dir(s)")
 }
@@ -56,7 +59,7 @@ func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interfac
 	api := newAPI("https://musicbrainz.org")
 
 	switch {
-	case cmd.print:
+	case cmd.print, cmd.printFull:
 		return cmd.doPrint(fs.Args())
 	case cmd.scan:
 		return cmd.doScan(ctx, api, fs.Args())
@@ -78,7 +81,8 @@ func (cmd *Command) doPrint(args []string) subcommands.ExitStatus {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	for _, p := range args {
-		s, err := files.ReadSong(cmd.Cfg, p, nil, false /* onlyTags */, nil /* gc */)
+		onlyTags := !cmd.printFull
+		s, err := files.ReadSong(cmd.Cfg, p, nil, onlyTags, nil /* gc */)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Failed reading song:", err)
 			return subcommands.ExitFailure
@@ -89,7 +93,7 @@ func (cmd *Command) doPrint(args []string) subcommands.ExitStatus {
 		}
 		// Use a custom struct instead of db.Song so we can choose which fields get printed.
 		enc.Encode(struct {
-			SHA1            string  `json:"sha1"`
+			SHA1            string  `json:"sha1,omitempty"`
 			Filename        string  `json:"filename"`
 			Artist          string  `json:"artist"`
 			Title           string  `json:"title"`
@@ -103,7 +107,7 @@ func (cmd *Command) doPrint(args []string) subcommands.ExitStatus {
 			Track           int     `json:"track"`
 			Disc            int     `json:"disc"`
 			Date            string  `json:"date"`
-			Length          float64 `json:"length"`
+			Length          float64 `json:"length,omitempty"`
 		}{
 			SHA1:            s.SHA1,
 			Filename:        s.Filename,
