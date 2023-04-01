@@ -5,6 +5,7 @@ package metadata
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -26,6 +27,7 @@ const maxSongLengthDiff = 5 * time.Second
 type Command struct {
 	Cfg        *client.Config
 	opts       updateOptions
+	print      bool   // print song metadata
 	scan       bool   // scan songs for updated metadata
 	setAlbumID string // release MBID to update songs to
 }
@@ -35,14 +37,17 @@ func (*Command) Synopsis() string { return "update song metadata" }
 func (*Command) Usage() string {
 	return `metadata <flags> <path>...:
 	Fetch updated metadata from MusicBrainz and write override files.
-	Without positional arguments, -scan scans all songs in the music dir.
+	-scan updates the specified songs or all songs (without positional arguments).
+	-set-album-id changes the album ID of songs in specified dir(s).
+	-print prints current on-disk metadata for the specified file(s).
 
 `
 }
 
 func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&cmd.opts.dryRun, "dry-run", false, "Don't write override files")
-	f.BoolVar(&cmd.opts.printUpdates, "print", true, "Print updates to stdout")
+	f.BoolVar(&cmd.opts.logUpdates, "log-updates", true, "Log updates to stdout")
+	f.BoolVar(&cmd.print, "print", false, "Print metadata from specified song file(s)")
 	f.BoolVar(&cmd.scan, "scan", false, "Scan songs for updated metadata")
 	f.StringVar(&cmd.setAlbumID, "set-album-id", "", "MusicBrainz release ID for songs in specified dir(s)")
 }
@@ -51,6 +56,8 @@ func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interfac
 	api := newAPI("https://musicbrainz.org")
 
 	switch {
+	case cmd.print:
+		return cmd.doPrint(fs.Args())
 	case cmd.scan:
 		return cmd.doScan(ctx, api, fs.Args())
 	case cmd.setAlbumID != "":
@@ -59,6 +66,63 @@ func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interfac
 		fmt.Fprintln(os.Stderr, "No action specified (-scan, -set-album-id)")
 		return subcommands.ExitUsageError
 	}
+}
+
+// doPrint prints metadata for the specified song files.
+func (cmd *Command) doPrint(args []string) subcommands.ExitStatus {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "No song files specified")
+		return subcommands.ExitUsageError
+	}
+	cmd.Cfg.ComputeGain = false // no need to compute gains
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	for _, p := range args {
+		s, err := files.ReadSong(cmd.Cfg, p, nil, false /* onlyTags */, nil /* gc */)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed reading song:", err)
+			return subcommands.ExitFailure
+		}
+		var date string
+		if !s.Date.IsZero() {
+			date = s.Date.Format("2006-01-02")
+		}
+		// Use a custom struct instead of db.Song so we can choose which fields get printed.
+		enc.Encode(struct {
+			SHA1            string  `json:"sha1"`
+			Filename        string  `json:"filename"`
+			Artist          string  `json:"artist"`
+			Title           string  `json:"title"`
+			Album           string  `json:"album"`
+			AlbumArtist     string  `json:"albumArtist"`
+			DiscSubtitle    string  `json:"discSubtitle"`
+			AlbumID         string  `json:"albumId"`
+			OrigAlbumID     string  `json:"origAlbumId"`
+			RecordingID     string  `json:"recordingId"`
+			OrigRecordingID string  `json:"origRecordingId"`
+			Track           int     `json:"track"`
+			Disc            int     `json:"disc"`
+			Date            string  `json:"date"`
+			Length          float64 `json:"length"`
+		}{
+			SHA1:            s.SHA1,
+			Filename:        s.Filename,
+			Artist:          s.Artist,
+			Title:           s.Title,
+			Album:           s.Album,
+			AlbumArtist:     s.AlbumArtist,
+			DiscSubtitle:    s.DiscSubtitle,
+			AlbumID:         s.AlbumID,
+			OrigAlbumID:     s.OrigAlbumID,
+			RecordingID:     s.RecordingID,
+			OrigRecordingID: s.OrigRecordingID,
+			Track:           s.Track,
+			Disc:            s.Disc,
+			Date:            date,
+			Length:          s.Length,
+		})
+	}
+	return subcommands.ExitSuccess
 }
 
 // doScan scans for updated metadata with the supplied positional args.
@@ -133,7 +197,7 @@ func (cmd *Command) doSetAlbumID(ctx context.Context, api *api, dirs []string) s
 		if orig.MetadataEquals(up) {
 			continue
 		}
-		if cmd.opts.printUpdates {
+		if cmd.opts.logUpdates {
 			fmt.Println(orig.Filename + "\n" + db.DiffSongs(orig, up) + "\n")
 		}
 		if !cmd.opts.dryRun {
@@ -150,8 +214,8 @@ func (cmd *Command) doSetAlbumID(ctx context.Context, api *api, dirs []string) s
 
 // updateOptions configures how songs are updated.
 type updateOptions struct {
-	dryRun       bool // don't actually write override files
-	printUpdates bool // print song updates to stderr
+	dryRun     bool // don't actually write override files
+	logUpdates bool // print song updates to stdout
 }
 
 // scanSong reads the song file at p, fetches updated metadata using api,
@@ -173,7 +237,7 @@ func scanSong(ctx context.Context, cfg *client.Config, api *api,
 		return nil
 	}
 
-	if opts.printUpdates {
+	if opts.logUpdates {
 		fmt.Println(orig.Filename + "\n" + db.DiffSongs(orig, updated) + "\n")
 	}
 	if opts.dryRun {
