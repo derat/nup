@@ -174,7 +174,7 @@ func (cmd *Command) checkSongs(songs []*db.Song) error {
 	if cmd.checks&checkMetadata != 0 {
 		fs = append(fs, func(s *db.Song) error {
 			abs := filepath.Join(cmd.Cfg.MusicDir, s.Filename)
-			local, err := files.ReadSong(cmd.Cfg, abs, nil, true /* onlyTags */, nil /* gc */)
+			local, err := files.ReadSong(cmd.Cfg, abs, nil, files.SkipAudioData, nil /* gc */)
 			if err != nil {
 				return err
 			}

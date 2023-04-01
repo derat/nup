@@ -29,23 +29,31 @@ func TestReadSong_Override(t *testing.T) {
 
 	// Test that metadata can be overridden.
 	// The overriding logic is tested in more detail in override_test.go.
-	if err := WriteMetadataOverride(cfg, want.Filename, &MetadataOverride{Artist: &want.Artist}); err != nil {
+	if err := UpdateMetadataOverride(cfg, &want); err != nil {
 		t.Fatal(err)
 	}
 
-	if got, err := ReadSong(cfg, p, nil /* fi */, false /* onlyTags */, nil /* gc */); err != nil {
-		t.Fatalf("ReadSong(cfg, %q, nil, false, nil) failed: %v", p, err)
+	if got, err := ReadSong(cfg, p, nil /* fi */, 0, nil /* gc */); err != nil {
+		t.Fatalf("ReadSong(cfg, %q, nil, 0, nil) failed: %v", p, err)
 	} else if diff := cmp.Diff(want, *got); diff != "" {
-		t.Errorf("ReadSong(cfg, %q, nil, false, nil) returned bad data:\n%s", p, diff)
+		t.Errorf("ReadSong(cfg, %q, nil, 0, nil) returned bad data:\n%s", p, diff)
 	}
 
-	// Also check that the SHA1 and duration are omitted when onlyTags is true.
+	// Also check that the SHA1 and duration are omitted when SkipAudioData is passed.
 	want.SHA1 = ""
 	want.Length = 0
-	if got, err := ReadSong(cfg, p, nil /* fi */, true /* onlyTags */, nil /* gc */); err != nil {
-		t.Fatalf("ReadSong(cfg, %q, nil, true, nil) failed: %v", p, err)
+	if got, err := ReadSong(cfg, p, nil /* fi */, SkipAudioData, nil /* gc */); err != nil {
+		t.Fatalf("ReadSong(cfg, %q, nil, SkipAudioData, nil) failed: %v", p, err)
 	} else if diff := cmp.Diff(want, *got); diff != "" {
-		t.Errorf("ReadSong(cfg, %q, nil, true, nil) returned bad data:\n%s", p, diff)
+		t.Errorf("ReadSong(cfg, %q, nil, SkipAudioData, nil) returned bad data:\n%s", p, diff)
+	}
+
+	// Check that OnlyFileMetadata works too.
+	want.Artist = test.Song0s.Artist
+	if got, err := ReadSong(cfg, p, nil /* fi */, SkipAudioData|OnlyFileMetadata, nil /* gc */); err != nil {
+		t.Fatalf("ReadSong(cfg, %q, nil, SkipAudioData|OnlyFileMetadata, nil) failed: %v", p, err)
+	} else if diff := cmp.Diff(want, *got); diff != "" {
+		t.Errorf("ReadSong(cfg, %q, nil, SkipAudioData|OnlyFileMetadata, nil) returned bad data:\n%s", p, diff)
 	}
 }
 
@@ -59,7 +67,7 @@ func TestReadSong_ID3V1(t *testing.T) {
 	p := filepath.Join(dir, want.Filename)
 
 	cfg := client.Config{MusicDir: dir}
-	if got, err := ReadSong(&cfg, p, nil /* fi */, false /* onlyTags */, nil /* gc */); err != nil {
+	if got, err := ReadSong(&cfg, p, nil /* fi */, 0, nil /* gc */); err != nil {
 		t.Fatalf("ReadSong(cfg, %q, ...) failed: %v", p, err)
 	} else if diff := cmp.Diff(want, *got); diff != "" {
 		t.Errorf("ReadSong(cfg, %q, ...) returned bad data:\n%s", p, diff)

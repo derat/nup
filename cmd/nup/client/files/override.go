@@ -36,10 +36,34 @@ type MetadataOverride struct {
 	Date         *time.Time `json:"date,omitempty"`
 }
 
-// GenMetadataOverride creates a MetadataOverride struct containing the differences
+// MetadataOverridePath returns the path under cfg.MetadataDir for a JSON-marshaled
+// MetadataOverride struct used to override metadata for a song with the supplied
+// Filename value.
+func MetadataOverridePath(cfg *client.Config, songFilename string) (string, error) {
+	if cfg.MetadataDir == "" {
+		return "", errors.New("metadataDir not set in config")
+	}
+	// Not using a cutesy ".jsong" extension here is killing me.
+	return filepath.Join(cfg.MetadataDir, songFilename+".json"), nil
+}
+
+// UpdateMetadataOverride writes a JSON file containing overridden metadata for the song
+// at updated.Filename.
+func UpdateMetadataOverride(cfg *client.Config, updated *db.Song) error {
+	// Read the song's unmodified metadata so we know what needs to be overridden.
+	sp := filepath.Join(cfg.MusicDir, updated.Filename)
+	orig, err := ReadSong(cfg, sp, nil, SkipAudioData|OnlyFileMetadata, nil)
+	if err != nil {
+		return err
+	}
+	over := genMetadataOverride(orig, updated)
+	return writeMetadataOverride(cfg, updated.Filename, over)
+}
+
+// genMetadataOverride creates a MetadataOverride struct containing the differences
 // between orig and updated. New values are allocated for the returned struct,
 // so it is safe to modify orig and updated after calling this function.
-func GenMetadataOverride(orig, updated *db.Song) *MetadataOverride {
+func genMetadataOverride(orig, updated *db.Song) *MetadataOverride {
 	var over MetadataOverride
 	for _, info := range []struct {
 		before, after string
@@ -70,20 +94,10 @@ func GenMetadataOverride(orig, updated *db.Song) *MetadataOverride {
 	return &over
 }
 
-// MetadataOverridePath returns the path under cfg.MetadataDir for a JSON-marshaled
-// MetadataOverride struct used to override metadata for a song with the supplied
-// Filename value.
-func MetadataOverridePath(cfg *client.Config, songFilename string) (string, error) {
-	if cfg.MetadataDir == "" {
-		return "", errors.New("metadataDir not set in config")
-	}
-	// Not using a cutesy ".jsong" extension here is killing me.
-	return filepath.Join(cfg.MetadataDir, songFilename+".json"), nil
-}
-
-// WriteMetadataOverride writes a JSON file containing overridden metadata for the song with the
-// specified Filename field. The destination directory is created if it does not exist.
-func WriteMetadataOverride(cfg *client.Config, songFilename string, over *MetadataOverride) error {
+// writeMetadataOverride JSON-marshals over to the appropriate location in cfg.MetadataDir to
+// override metadata for the specified song. The destination directory is created if it does not
+// exist.
+func writeMetadataOverride(cfg *client.Config, songFilename string, over *MetadataOverride) error {
 	p, err := MetadataOverridePath(cfg, songFilename)
 	if err != nil {
 		return err

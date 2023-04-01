@@ -114,7 +114,7 @@ func (gc *GainsCache) get(p, album, albumID string) (mp3gain.Info, error) {
 				// scheme of things.
 				// I'm ignoring errors here since it's weird if we fail to add a new song because
 				// some other song in the same directory is broken.
-				s, err := ReadSong(gc.cfg, p, nil, true /* onlyTags */, nil)
+				s, err := ReadSong(gc.cfg, p, nil, SkipAudioData, nil)
 				if err == nil && s.Album == album && s.AlbumID == albumID {
 					paths = append(paths, p)
 				}

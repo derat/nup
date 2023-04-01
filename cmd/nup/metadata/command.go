@@ -57,6 +57,7 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 
 func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	api := newAPI("https://musicbrainz.org")
+	cmd.Cfg.ComputeGain = false // no need to compute gains
 
 	switch {
 	case cmd.print, cmd.printFull:
@@ -77,12 +78,14 @@ func (cmd *Command) doPrint(args []string) subcommands.ExitStatus {
 		fmt.Fprintln(os.Stderr, "No song files specified")
 		return subcommands.ExitUsageError
 	}
-	cmd.Cfg.ComputeGain = false // no need to compute gains
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	for _, p := range args {
-		onlyTags := !cmd.printFull
-		s, err := files.ReadSong(cmd.Cfg, p, nil, onlyTags, nil /* gc */)
+		var flags files.ReadSongFlag
+		if !cmd.printFull {
+			flags |= files.SkipAudioData
+		}
+		s, err := files.ReadSong(cmd.Cfg, p, nil, flags, nil /* gc */)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Failed reading song:", err)
 			return subcommands.ExitFailure
@@ -169,7 +172,6 @@ func (cmd *Command) doScan(ctx context.Context, api *api, args []string) subcomm
 func (cmd *Command) doSetAlbumID(ctx context.Context, api *api, dirs []string) subcommands.ExitStatus {
 	// Read the songs from disk first.
 	var songs []*db.Song
-	cmd.Cfg.ComputeGain = false // no need to compute gains
 	for _, dir := range dirs {
 		ds, err := readSongsInDir(cmd.Cfg, dir)
 		if err != nil {
@@ -205,8 +207,7 @@ func (cmd *Command) doSetAlbumID(ctx context.Context, api *api, dirs []string) s
 			fmt.Println(orig.Filename + "\n" + db.DiffSongs(orig, up) + "\n")
 		}
 		if !cmd.opts.dryRun {
-			over := files.GenMetadataOverride(orig, up)
-			if err := files.WriteMetadataOverride(cmd.Cfg, orig.Filename, over); err != nil {
+			if err := files.UpdateMetadataOverride(cmd.Cfg, up); err != nil {
 				fmt.Fprintln(os.Stderr, "Failed writing override file:", err)
 				return subcommands.ExitFailure
 			}
@@ -229,7 +230,7 @@ func scanSong(ctx context.Context, cfg *client.Config, api *api,
 	if opts == nil {
 		opts = &updateOptions{}
 	}
-	orig, err := files.ReadSong(cfg, p, fi, true /* onlyTags */, nil /* gc */)
+	orig, err := files.ReadSong(cfg, p, fi, files.SkipAudioData, nil /* gc */)
 	if err != nil {
 		return err
 	}
@@ -247,8 +248,7 @@ func scanSong(ctx context.Context, cfg *client.Config, api *api,
 	if opts.dryRun {
 		return nil
 	}
-	over := files.GenMetadataOverride(orig, updated)
-	return files.WriteMetadataOverride(cfg, orig.Filename, over)
+	return files.UpdateMetadataOverride(cfg, updated)
 }
 
 // getSongUpdates fetches metadata for song using api and returns an updated copy.
@@ -317,7 +317,7 @@ func readSongsInDir(cfg *client.Config, dir string) ([]*db.Song, error) {
 		if !fi.Mode().IsRegular() || !files.IsMusicPath(p) {
 			continue
 		}
-		s, err := files.ReadSong(cfg, p, nil, false /* onlyTags */, nil /* gc */)
+		s, err := files.ReadSong(cfg, p, nil, 0, nil /* gc */)
 		if err != nil {
 			return nil, fmt.Errorf("%v: %v", p, err)
 		}

@@ -237,7 +237,7 @@ func TestScanAndCompareSongs_OverrideMetadata(t *testing.T) {
 	test.Must(t, test.CopySongs(musicDir, test.Song1s.Filename))
 
 	metadataDir := filepath.Join(td, "metadata")
-	cfg := &client.Config{MetadataDir: metadataDir}
+	cfg := &client.Config{MusicDir: musicDir, MetadataDir: metadataDir}
 	opts := &scanTestOptions{metadataDir: metadataDir}
 
 	// Perform an initial scan to pick up the song.
@@ -249,10 +249,7 @@ func TestScanAndCompareSongs_OverrideMetadata(t *testing.T) {
 	updated.Artist = "New Artist"
 	updated.Title = "New Title"
 	waitCtime(t, metadataDir, startTime)
-	test.Must(t, files.WriteMetadataOverride(cfg, updated.Filename, &files.MetadataOverride{
-		Artist: &updated.Artist,
-		Title:  &updated.Title,
-	}))
+	test.Must(t, files.UpdateMetadataOverride(cfg, &updated))
 
 	// The next scan should pick up the new metadata even though the song file wasn't updated.
 	overrideTime := time.Now()
@@ -260,7 +257,7 @@ func TestScanAndCompareSongs_OverrideMetadata(t *testing.T) {
 
 	// Clear the override file and scan again to go back to the original metadata.
 	waitCtime(t, metadataDir, overrideTime)
-	test.Must(t, files.WriteMetadataOverride(cfg, updated.Filename, &files.MetadataOverride{}))
+	test.Must(t, files.UpdateMetadataOverride(cfg, &test.Song1s))
 	clearTime := time.Now()
 	scanAndCompareSongs(t, "cleared override", musicDir, overrideTime, opts, []db.Song{test.Song1s})
 

@@ -61,7 +61,7 @@ func readSongList(cfg *client.Config, listPath string, ch chan songOrErr,
 	go func() {
 		for _, rel := range paths {
 			full := filepath.Join(cfg.MusicDir, rel)
-			s, err := files.ReadSong(cfg, full, nil, false, gains)
+			s, err := files.ReadSong(cfg, full, nil, 0, gains)
 			ch <- songOrErr{s, err}
 		}
 	}()
@@ -164,7 +164,7 @@ func scanForUpdatedSongs(cfg *client.Config, lastUpdateTime time.Time, lastUpdat
 			// TODO: Find a better way to rate-limit this that also avoids creating so many
 			// simultaneous goroutines. Updating 10,000 songs brought my computer to its knees.
 			workers <- struct{}{}
-			s, err := files.ReadSong(cfg, path, fi, false, gains)
+			s, err := files.ReadSong(cfg, path, fi, 0, gains)
 			<-workers
 			if err != nil && s == nil {
 				s = &db.Song{Filename: relPath} // return the filename for error reporting

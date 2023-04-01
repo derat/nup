@@ -145,7 +145,7 @@ func TestScanSong_Release(t *testing.T) {
 	ctx := context.Background()
 	p := filepath.Join(env.cfg.MusicDir, song.Filename)
 	test.Must(t, scanSong(ctx, env.cfg, env.api, p, nil, nil))
-	if got, err := files.ReadSong(env.cfg, p, nil /* fi */, true /* onlyTags */, nil /* gc */); err != nil {
+	if got, err := files.ReadSong(env.cfg, p, nil /* fi */, files.SkipAudioData, nil /* gc */); err != nil {
 		t.Error("ReadSong failed:", err)
 	} else if diff := cmp.Diff(want, *got); diff != "" {
 		t.Error("ReadSong returned unexpected results:\n" + diff)

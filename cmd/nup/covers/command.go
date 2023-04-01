@@ -93,7 +93,7 @@ func (cmd *Command) doDownload(paths []string) error {
 		for _, p := range paths {
 			// Pass a bogus config in case p isn't within cmd.Cfg.MusicDir.
 			cfg := client.Config{MusicDir: filepath.Dir(p)}
-			if s, err := files.ReadSong(&cfg, p, nil, true /* onlyTags */, nil); err != nil {
+			if s, err := files.ReadSong(&cfg, p, nil, files.SkipAudioData, nil); err != nil {
 				return err
 			} else if s.AlbumID != "" {
 				log.Printf("%v has album ID %v", p, s.AlbumID)

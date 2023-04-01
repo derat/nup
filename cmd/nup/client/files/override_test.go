@@ -53,9 +53,10 @@ func TestApplyMetadataOverride(t *testing.T) {
 	}
 
 	// Update all of the fields via the override file.
-	if err := WriteMetadataOverride(cfg, orig.Filename, GenMetadataOverride(&orig, &updated)); err != nil {
+	if err := writeMetadataOverride(cfg, orig.Filename, genMetadataOverride(&orig, &updated)); err != nil {
 		t.Fatal(err)
 	}
+
 	got = orig
 	if err := applyMetadataOverride(cfg, &got); err != nil {
 		t.Fatal("applyMetadataOverride with full override failed:", err)
@@ -64,7 +65,7 @@ func TestApplyMetadataOverride(t *testing.T) {
 	}
 
 	// Nothing should happen if the override file contains an empty object.
-	if err := WriteMetadataOverride(cfg, orig.Filename, &MetadataOverride{}); err != nil {
+	if err := writeMetadataOverride(cfg, orig.Filename, &MetadataOverride{}); err != nil {
 		t.Fatal(err)
 	}
 	got = orig

@@ -325,7 +325,7 @@ func (cmd *Command) doPrintCoverID() subcommands.ExitStatus {
 	} else {
 		cmd.Cfg.MusicDir = filepath.Dir(abs)
 	}
-	s, err := files.ReadSong(cmd.Cfg, cmd.printCoverID, nil, true /* onlyTags */, nil)
+	s, err := files.ReadSong(cmd.Cfg, cmd.printCoverID, nil, files.SkipAudioData, nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed reading song:", err)
 		return subcommands.ExitFailure

@@ -29,13 +29,23 @@ const (
 	recordingIDOwner = "http://musicbrainz.org" // UFID for Song.RecordingID
 )
 
+// ReadSongFlag values can be masked together to configure ReadSong's behavior.
+type ReadSongFlag uint32
+
+const (
+	// SkipAudioData indicates that audio data (used to compute the song's SHA1,
+	// duration, and gain adjustments) will not be read.
+	SkipAudioData ReadSongFlag = 1 << iota
+	// OnlyFileMetadata indicates that the returned db.Song object should only include
+	// metadata from the file's ID3 tag. cfg.ArtistRewrites and cfg.AlbumIDRewrites will
+	// not be used and metadata override files will not be read.
+	OnlyFileMetadata
+)
+
 // ReadSong reads the song file at p and creates a Song object.
-//
 // If fi is non-nil, it will be used; otherwise the file will be stat-ed by this function.
-// If onlyTags is true, only fields derived from the file's MP3 tags will be filled
-// (specifically, the song's SHA1, duration, and gain adjustments will not be computed).
-// gc is only used if cfg.ComputeGains is true and onlyTags is false.
-func ReadSong(cfg *client.Config, p string, fi os.FileInfo, onlyTags bool, gc *GainsCache) (*db.Song, error) {
+// gc is only used if cfg.ComputeGains is true and flags does not contain SkipAudioData.
+func ReadSong(cfg *client.Config, p string, fi os.FileInfo, flags ReadSongFlag, gc *GainsCache) (*db.Song, error) {
 	var relPath string
 	var err error
 	if cfg.MusicDir == "" {
@@ -120,34 +130,34 @@ func ReadSong(cfg *client.Config, p string, fi os.FileInfo, onlyTags bool, gc *G
 		}
 	}
 
-	if repl, ok := cfg.ArtistRewrites[s.Artist]; ok {
-		s.Artist = repl
-	}
-
-	if repl, ok := cfg.AlbumIDRewrites[s.AlbumID]; ok {
-		// Look for a cover image corresponding to the original ID as well.
-		// Don't bother setting this if the rewrite didn't actually change anything
-		// (i.e. it was just defined to set the disc number).
-		if s.CoverID == "" && s.AlbumID != repl {
-			s.CoverID = s.AlbumID
+	if flags&OnlyFileMetadata == 0 {
+		if repl, ok := cfg.ArtistRewrites[s.Artist]; ok {
+			s.Artist = repl
 		}
-		s.AlbumID = repl
+		if repl, ok := cfg.AlbumIDRewrites[s.AlbumID]; ok {
+			// Look for a cover image corresponding to the original ID as well.
+			// Don't bother setting this if the rewrite didn't actually change anything
+			// (i.e. it was just defined to set the disc number).
+			if s.CoverID == "" && s.AlbumID != repl {
+				s.CoverID = s.AlbumID
+			}
+			s.AlbumID = repl
 
-		// Extract the disc number and subtitle from the album name.
-		if album, disc, subtitle := extractAlbumDisc(s.Album); disc != 0 {
-			s.Album = album
-			s.Disc = disc
-			if s.DiscSubtitle == "" {
-				s.DiscSubtitle = subtitle
+			// Extract the disc number and subtitle from the album name.
+			if album, disc, subtitle := extractAlbumDisc(s.Album); disc != 0 {
+				s.Album = album
+				s.Disc = disc
+				if s.DiscSubtitle == "" {
+					s.DiscSubtitle = subtitle
+				}
 			}
 		}
+		if err := applyMetadataOverride(cfg, &s); err != nil {
+			return nil, err
+		}
 	}
 
-	if err := applyMetadataOverride(cfg, &s); err != nil {
-		return nil, err
-	}
-
-	if onlyTags {
+	if flags&SkipAudioData != 0 {
 		return &s, nil
 	}
 
