@@ -39,14 +39,16 @@ the `dump` command or in cover images.
 check <flags>:
 	Check for issues in dumped songs read from stdin.
 
-  -check string
+  -checks string
     	Comma-separated list of checks to perform:
     	  album-id        Songs have MusicBrainz album IDs
     	  cover-size-400  Cover images are at least 400x400
     	  cover-size-800  Cover images are at least 800x800
-    	  imported        All songs have been imported
-    	  song-cover      Songs have cover files
-    	 (default "album-id,imported,song-cover")
+    	  imported        Local songs have been imported
+    	  metadata        Song metadata is the same in dumped and local songs
+    	  song-cover      Songs with album IDs have cover files
+    	  unused-cover    Cover image files are referenced by songs
+    	 (default "album-id,imported,song-cover,unused-cover")
 ```
 
 ## `config` command

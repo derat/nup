@@ -13,9 +13,11 @@ import (
 	_ "image/jpeg"
 	"io"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/derat/nup/cmd/nup/client"
@@ -35,6 +37,7 @@ const (
 	checkImported
 	checkMetadata
 	checkSongCover
+	checkUnusedCover
 )
 
 var checkInfos = map[string]struct { // keys are values for -check flag
@@ -45,9 +48,10 @@ var checkInfos = map[string]struct { // keys are values for -check flag
 	"album-id":       {checkAlbumID, "Songs have MusicBrainz album IDs", true},
 	"cover-size-400": {checkCoverSize400, "Cover images are at least 400x400", false},
 	"cover-size-800": {checkCoverSize800, "Cover images are at least 800x800", false},
-	"imported":       {checkImported, "All songs have been imported", true},
-	"metadata":       {checkMetadata, "Song metadata is the same in dumped songs and locally", false},
-	"song-cover":     {checkSongCover, "Songs have cover files", true},
+	"imported":       {checkImported, "Local songs have been imported", true},
+	"metadata":       {checkMetadata, "Song metadata is the same in dumped and local songs", false},
+	"song-cover":     {checkSongCover, "Songs with album IDs have cover files", true},
+	"unused-cover":   {checkUnusedCover, "Cover image files are referenced by songs", true},
 }
 
 type Command struct {
@@ -68,15 +72,19 @@ func (*Command) Usage() string {
 func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	var defaultChecks []string
 	var checkDescs []string
+	var max int // maximum check name length
+	for s := range checkInfos {
+		max = int(math.Max(float64(max), float64(len(s))))
+	}
 	for s, info := range checkInfos {
 		if info.def {
 			defaultChecks = append(defaultChecks, s)
 		}
-		checkDescs = append(checkDescs, fmt.Sprintf("  %-14s  %s\n", s, info.desc))
+		checkDescs = append(checkDescs, fmt.Sprintf("  %-"+strconv.Itoa(max)+"s  %s\n", s, info.desc))
 	}
 	sort.Strings(defaultChecks)
 	sort.Strings(checkDescs)
-	f.StringVar(&cmd.checksList, "check", strings.Join(defaultChecks, ","),
+	f.StringVar(&cmd.checksList, "checks", strings.Join(defaultChecks, ","),
 		"Comma-separated list of checks to perform:\n"+strings.Join(checkDescs, ""))
 }
 
@@ -156,7 +164,7 @@ func (cmd *Command) checkSongs(songs []*db.Song) error {
 			}
 			if len(s.CoverFilename) == 0 {
 				if len(s.AlbumID) == 0 {
-					return errors.New("no cover file set and no album ID")
+					return nil // ignore missing covers for non-album tracks
 				}
 				fn := s.AlbumID + cover.OrigExt
 				if fileExists(fn) {
@@ -260,15 +268,17 @@ func (cmd *Command) checkCovers(songs []*db.Song) error {
 		}
 	}
 
-	fs := [](func(fn string) error){
-		func(fn string) error {
+	var fs [](func(fn string) error)
+
+	if cmd.checks&checkUnusedCover != 0 {
+		fs = append(fs, func(fn string) error {
 			// Check for the original cover if this is a generated WebP image.
 			fn = cover.OrigFilename(fn)
 			if _, ok := songFns[fn]; !ok {
 				return errors.New("unused cover")
 			}
 			return nil
-		},
+		})
 	}
 
 	if cmd.checks&(checkCoverSize400|checkCoverSize800) != 0 {
