@@ -16,14 +16,21 @@ import (
 	"github.com/derat/nup/test"
 )
 
-func TestUpdate(t *testing.T) {
+func TestImportSongs(t *testing.T) {
+	var numReqs int
 	recv := make([]db.Song, 0)
 	replace := ""
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		replace = r.FormValue("replaceUserData")
-
 		defer r.Body.Close()
+
+		// Make the first request fail to test the retry logic.
+		if numReqs++; numReqs == 1 {
+			http.Error(w, "Intentional failure", http.StatusInternalServerError)
+			return
+		}
+
 		d := json.NewDecoder(r.Body)
 		for {
 			s := db.Song{}
@@ -77,11 +84,11 @@ func TestUpdate(t *testing.T) {
 		ch <- s1
 		close(ch)
 	}()
-	if err := updateSongs(cfg, ch, true, false); err != nil {
+	if err := importSongs(cfg, ch, importReplaceUserData|importNoRetryDelay); err != nil {
 		t.Fatalf("Failed to send songs: %v", err)
 	}
 	if err := test.CompareSongs([]db.Song{s0, s1}, recv, test.CompareOrder); err != nil {
-		t.Error("Bad songs after initial update: ", err)
+		t.Error("Bad songs after initial import: ", err)
 	}
 	if replace != "1" {
 		t.Errorf("replaceUserData param was %q instead of 1", replace)
@@ -97,11 +104,11 @@ func TestUpdate(t *testing.T) {
 		}
 		close(ch)
 	}()
-	if err := updateSongs(cfg, ch, false, false); err != nil {
+	if err := importSongs(cfg, ch, importNoRetryDelay); err != nil {
 		t.Fatalf("Failed to send songs: %v", err)
 	}
 	if err := test.CompareSongs(sent, recv, test.CompareOrder); err != nil {
-		t.Error("Bad songs after second update: ", err)
+		t.Error("Bad songs after second import: ", err)
 	}
 	if len(replace) > 0 {
 		t.Errorf("replaceUserData param was %q instead of empty", replace)

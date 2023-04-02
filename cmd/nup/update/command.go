@@ -231,8 +231,18 @@ func (cmd *Command) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface
 				return subcommands.ExitFailure
 			}
 		}
-	} else if err := updateSongs(cmd.Cfg, updateChan, replaceUserData, cmd.useFilenames); err != nil {
-		fmt.Fprintln(os.Stderr, "Failed updating songs:", err)
+	} else {
+		var flags importSongsFlag
+		if replaceUserData {
+			flags |= importReplaceUserData
+		}
+		if cmd.useFilenames {
+			flags |= importUseFilenames
+		}
+		if err := importSongs(cmd.Cfg, updateChan, flags); err != nil {
+			fmt.Fprintln(os.Stderr, "Failed updating songs:", err)
+			return subcommands.ExitFailure
+		}
 	}
 
 	if err := <-errChan; err != nil {
@@ -301,8 +311,7 @@ func (cmd *Command) doMergeSongs() subcommands.ExitStatus {
 		ch := make(chan db.Song, 1)
 		ch <- dst
 		close(ch)
-		if err := updateSongs(cmd.Cfg, ch, true, /* replaceUserData */
-			false /* useFilenames */); err != nil {
+		if err := importSongs(cmd.Cfg, ch, importReplaceUserData); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed updating song %v: %v\n", dstID, err)
 			return subcommands.ExitFailure
 		}

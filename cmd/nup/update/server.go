@@ -20,10 +20,10 @@ import (
 )
 
 const (
-	batchSize        = 50 // updateSongs HTTP request batch size
 	tlsTimeout       = time.Minute
-	updateTries      = 3
-	updateRetryDelay = 3 * time.Second
+	importBatchSize  = 50 // max songs to import per HTTP request
+	importTries      = 3
+	importRetryDelay = 3 * time.Second
 )
 
 // I started seeing "net/http: TLS handshake timeout" errors when trying to import songs.
@@ -66,35 +66,47 @@ func sendRequest(cfg *client.Config, method, path, query string,
 	return b, nil
 }
 
-// updateSongs reads all songs from ch and sends them to the server.
-//
-// replaceUserData indicates that user data (e.g. rating, tags, plays)
-// should be replaced with data from ch; otherwise the existing data is
-// preserved and only static fields (e.g. artist, title, album, etc.)
-// are replaced.
-//
-// useFilenames indicates that the server should identify songs to update
-// by their filenames rather than by SHA1s of their audio data. This can
-// be used to avoid creating a new database object after deliberately
-// modifying a song file's audio data.
-func updateSongs(cfg *client.Config, ch chan db.Song, replaceUserData, useFilenames bool) error {
+// importSongsFlag values can be masked together to configure importSongs's behavior.
+type importSongsFlag uint32
+
+const (
+	// importReplaceUserData indicates that user data (e.g. rating, tags, plays) should be
+	// replaced with data from ch; otherwise the existing data is preserved and only static
+	// fields (e.g. artist, title, album, etc.) are replaced.
+	importReplaceUserData importSongsFlag = 1 << iota
+	// importUseFilenames indicates that the server should identify songs to import by their
+	// filenames rather than by SHA1s of their audio data. This can be used to avoid creating
+	// a new database object after deliberately modifying a song file's audio data.
+	importUseFilenames
+	// importNoRetryDelay indicates that importSongs should not sleep after a failed HTTP
+	// request. This is just useful for unit tests.
+	importNoRetryDelay
+)
+
+// importSongs reads all songs from ch and sends them to the server.
+func importSongs(cfg *client.Config, ch chan db.Song, flags importSongsFlag) error {
 	var args []string
-	if replaceUserData {
+	if flags&importReplaceUserData != 0 {
 		args = append(args, "replaceUserData=1")
 	}
-	if useFilenames {
+	if flags&importUseFilenames != 0 {
 		args = append(args, "useFilenames=1")
 	}
 	query := strings.Join(args, "&")
 
-	sendFunc := func(r io.Reader) error {
+	sendFunc := func(body []byte) error {
 		var err error
-		for try := 1; try <= updateTries; try++ {
+		for try := 1; try <= importTries; try++ {
+			r := bytes.NewReader(body)
 			if _, err = sendRequest(cfg, "POST", "/import", query, r, "text/plain"); err == nil {
 				break
-			} else if try < updateTries {
-				log.Printf("Sleeping %v before retrying after error: %v", updateRetryDelay, err)
-				time.Sleep(updateRetryDelay)
+			} else if try < importTries {
+				delay := importRetryDelay
+				if flags&importNoRetryDelay != 0 {
+					delay = 0
+				}
+				log.Printf("Sleeping %v before retrying after error: %v", delay, err)
+				time.Sleep(delay)
 			}
 		}
 		return err
@@ -111,15 +123,17 @@ func updateSongs(cfg *client.Config, ch chan db.Song, replaceUserData, useFilena
 		if err := e.Encode(s); err != nil {
 			return fmt.Errorf("failed to encode song: %v", err)
 		}
-		if numSongs%batchSize == 0 {
-			if err := sendFunc(&buf); err != nil {
+		if numSongs%importBatchSize == 0 {
+			// Pass the underlying bytes rather than an io.Reader so sendFunc() can re-read the
+			// data if it needs to retry due to network issues or App Engine flakiness.
+			if err := sendFunc(buf.Bytes()); err != nil {
 				return err
 			}
 			buf.Reset()
 		}
 	}
 	if buf.Len() > 0 {
-		if err := sendFunc(&buf); err != nil {
+		if err := sendFunc(buf.Bytes()); err != nil {
 			return err
 		}
 	}
