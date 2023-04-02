@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/derat/nup/cmd/nup/client"
@@ -25,13 +26,14 @@ import (
 const maxSongLengthDiff = 5 * time.Second
 
 type Command struct {
-	Cfg         *client.Config
-	opts        updateOptions
-	print       bool   // print song metadata
-	printFull   bool   // print song metadata with SHA1 and length
-	scan        bool   // scan songs for updated metadata
-	setAlbumID  string // release MBID to update songs to
-	setNonAlbum bool   // update songs to be non-album tracks
+	Cfg          *client.Config
+	opts         updateOptions
+	print        bool   // print song metadata
+	printFull    bool   // print song metadata with SHA1 and length
+	scan         bool   // scan songs for updated metadata
+	setAlbumID   string // release MBID to update songs to
+	setNonAlbum  bool   // update songs to be non-album tracks
+	recordingIDs string // comma-separated list of recording MBIDs
 }
 
 func (*Command) Name() string     { return "metadata" }
@@ -40,7 +42,7 @@ func (*Command) Usage() string {
 	return `metadata <flags> <path>...:
 	Fetch updated metadata from MusicBrainz and write override files.
 	-scan updates the specified songs or all songs (without positional arguments).
-	-set-album changes the album of songs in specified dir(s).
+	-set-album changes the album of the specified files or directories.
 	-set-non-album updates the specified song file(s) to be non-album tracks.
 	-print prints current on-disk metadata for the specified file(s).
 	-print-full additionally includes SHA1s and lengths.
@@ -53,8 +55,9 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&cmd.opts.logUpdates, "log-updates", true, "Log updates to stdout")
 	f.BoolVar(&cmd.print, "print", false, "Print metadata from specified song file(s)")
 	f.BoolVar(&cmd.printFull, "print-full", false, "Like -print, but include SHA1 and length (slower)")
+	f.StringVar(&cmd.recordingIDs, "recordings", "", "Comma-separated list of recording ID overrides for -set-album")
 	f.BoolVar(&cmd.scan, "scan", false, "Scan songs for updated metadata")
-	f.StringVar(&cmd.setAlbumID, "set-album", "", "Update MusicBrainz release ID for songs in specified dir(s)")
+	f.StringVar(&cmd.setAlbumID, "set-album", "", "Update MusicBrainz release ID for specified files/dirs")
 	f.BoolVar(&cmd.setNonAlbum, "set-non-album", false, "Update specified file(s) to be non-album tracks")
 }
 
@@ -175,16 +178,16 @@ func (cmd *Command) doScan(ctx context.Context, api *api, args []string) subcomm
 	return subcommands.ExitSuccess
 }
 
-func (cmd *Command) doSetAlbum(ctx context.Context, api *api, dirs []string) subcommands.ExitStatus {
+func (cmd *Command) doSetAlbum(ctx context.Context, api *api, paths []string) subcommands.ExitStatus {
 	// Read the songs from disk first.
 	var songs []*db.Song
-	for _, dir := range dirs {
-		ds, err := readSongsInDir(cmd.Cfg, dir)
+	for _, p := range paths {
+		ps, err := readAlbumSongs(cmd.Cfg, p)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Failed reading songs:", err)
 			return subcommands.ExitFailure
 		}
-		songs = append(songs, ds...)
+		songs = append(songs, ps...)
 	}
 	if len(songs) == 0 {
 		fmt.Fprintln(os.Stderr, "No songs found")
@@ -198,12 +201,18 @@ func (cmd *Command) doSetAlbum(ctx context.Context, api *api, dirs []string) sub
 		return subcommands.ExitFailure
 	}
 
-	updated, err := setAlbum(songs, rel)
+	// Map the songs to the album.
+	var recordingIDs []string
+	if cmd.recordingIDs != "" {
+		recordingIDs = strings.Split(cmd.recordingIDs, ",")
+	}
+	updated, err := setAlbum(songs, rel, recordingIDs)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed setting album:", err)
 		return subcommands.ExitFailure
 	}
 
+	// Save the updates.
 	for i, orig := range songs {
 		up := updated[i]
 		if orig.MetadataEquals(up) {
@@ -332,9 +341,23 @@ func getSongUpdates(ctx context.Context, song *db.Song, api *api) (*db.Song, err
 	return nil, errors.New("song is untagged")
 }
 
-// readSongsInDir reads the contents of dir and returns sorted songs.
-// The song's SHA1s and lengths are computed.
-func readSongsInDir(cfg *client.Config, dir string) ([]*db.Song, error) {
+// readAlbumSongs reads p, a song file or a directory containing song files from a
+// single album. Directory entries are sorted by ascinding disc and track, and
+// SHA1s and lengths are computed.
+func readAlbumSongs(cfg *client.Config, p string) ([]*db.Song, error) {
+	// If the path is a file, read it directly.
+	if fi, err := os.Stat(p); err != nil {
+		return nil, err
+	} else if !fi.IsDir() {
+		if s, err := files.ReadSong(cfg, p, nil, 0, nil /* gc */); err != nil {
+			return nil, err
+		} else {
+			return []*db.Song{s}, nil
+		}
+	}
+
+	// Otherwise, process all the songs in the directory.
+	dir := p
 	f, err := os.Open(dir)
 	if err != nil {
 		return nil, err
@@ -384,12 +407,18 @@ func readSongsInDir(cfg *client.Config, dir string) ([]*db.Song, error) {
 
 // setAlbum returns a shallow copy of the supplied songs with their album (and other metadata)
 // switched to rel. An error is returned if the songs can't be mapped to the new album.
-func setAlbum(songs []*db.Song, rel *release) ([]*db.Song, error) {
+// recordingIDs may be used to override songs' recording IDs before matching.
+func setAlbum(songs []*db.Song, rel *release, recordingIDs []string) ([]*db.Song, error) {
 	trackCountsMatch := len(songs) == rel.numTracks()
 	updated := make([]*db.Song, len(songs))
 	for i, s := range songs {
 		cp := *s
 		updated[i] = &cp
+
+		// Override the song's recording ID if requested.
+		if i < len(recordingIDs) && recordingIDs[i] != "" {
+			cp.RecordingID = recordingIDs[i]
+		}
 
 		// First, try to match the song by recording ID.
 		// TODO: Is this safe, or would it be better to also compare the lengths here?

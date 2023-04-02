@@ -182,50 +182,64 @@ func TestSetAlbum(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		desc  string
-		songs []*db.Song
-		rel   *release
-		want  []*db.Song // nil for error
+		desc   string
+		songs  []*db.Song
+		rel    *release
+		recIDs []string
+		want   []*db.Song // nil for error
 	}{
 		{
 			"direct mapping",
 			[]*db.Song{ms("a", "1", 60), ms("b", "2", 40), ms("c", "3", 120)},
 			mr("album", []track{mt("a0", "1", 60), mt("b0", "2", 40), mt("c0", "3", 120)}),
+			nil,
 			[]*db.Song{ms("a0", "1", 60), ms("b0", "2", 40), ms("c0", "3", 120)},
 		},
 		{
 			"reordered",
 			[]*db.Song{ms("a", "1", 60), ms("b", "2", 40), ms("c", "3", 120)},
 			mr("album", []track{mt("c0", "3", 120), mt("a0", "1", 60), mt("b0", "2", 40)}),
+			nil,
 			[]*db.Song{ms("a0", "1", 60), ms("b0", "2", 40), ms("c0", "3", 120)},
 		},
 		{
 			"new recordings",
 			[]*db.Song{ms("a", "1", 60), ms("b", "2", 40), ms("c", "3", 120), ms("d", "4", 50)},
 			mr("album", []track{mt("a0", "5", 61), mt("b0", "6", 43)}, []track{mt("c0", "7", 122), mt("d0", "8", 50)}),
+			nil,
 			[]*db.Song{ms("a0", "5", 60), ms("b0", "6", 40), ms("c0", "7", 120), ms("d0", "8", 50)},
+		},
+		{
+			"override recording IDs",
+			[]*db.Song{ms("a", "1", 60), ms("b", "2", 40)},
+			mr("album", []track{mt("a0", "3", 60), mt("c0", "4", 30), mt("b0", "5", 40)}),
+			[]string{"3", "5"},
+			[]*db.Song{ms("a0", "3", 60), ms("b0", "5", 40)},
 		},
 		{
 			"different lengths",
 			[]*db.Song{ms("a", "1", 60), ms("b", "2", 40)},
 			mr("album", []track{mt("a0", "3", 40), mt("b0", "2", 40)}),
+			nil,
 			nil, // should fail
 		},
 		{
 			"different track counts",
 			[]*db.Song{ms("a", "1", 60), ms("b", "2", 40)},
 			mr("album", []track{mt("a0", "1", 60)}),
+			nil,
 			nil, // should fail
 		},
 		{
 			"duplicate recordings",
 			[]*db.Song{ms("a", "1", 60), ms("b", "1", 60)},
 			mr("album", []track{mt("a0", "1", 60), mt("b0", "2", 40)}),
+			nil,
 			nil, // should fail
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			got, err := setAlbum(tc.songs, tc.rel)
+			got, err := setAlbum(tc.songs, tc.rel, tc.recIDs)
 			if err != nil {
 				if tc.want != nil {
 					t.Error("setAlbum failed:", err)
