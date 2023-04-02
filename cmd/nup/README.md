@@ -156,7 +156,8 @@ The `metadata` command queries [MusicBrainz] for updated song metadata.
 metadata <flags> <path>...:
 	Fetch updated metadata from MusicBrainz and write override files.
 	-scan updates the specified songs or all songs (without positional arguments).
-	-set-album-id changes the album ID of songs in specified dir(s).
+	-set-album changes the album of songs in specified dir(s).
+	-set-non-album updates the specified song file(s) to be non-album tracks.
 	-print prints current on-disk metadata for the specified file(s).
 	-print-full additionally includes SHA1s and lengths.
 
@@ -170,8 +171,10 @@ metadata <flags> <path>...:
     	Like -print, but include SHA1 and length (slower)
   -scan
     	Scan songs for updated metadata
-  -set-album-id string
-    	MusicBrainz release ID for songs in specified dir(s)
+  -set-album string
+    	Update MusicBrainz release ID for songs in specified dir(s)
+  -set-non-album
+    	Update specified file(s) to be non-album tracks
 ```
 
 ## `projectid` command

@@ -25,12 +25,13 @@ import (
 const maxSongLengthDiff = 5 * time.Second
 
 type Command struct {
-	Cfg        *client.Config
-	opts       updateOptions
-	print      bool   // print song metadata
-	printFull  bool   // print song metadata with SHA1 and length
-	scan       bool   // scan songs for updated metadata
-	setAlbumID string // release MBID to update songs to
+	Cfg         *client.Config
+	opts        updateOptions
+	print       bool   // print song metadata
+	printFull   bool   // print song metadata with SHA1 and length
+	scan        bool   // scan songs for updated metadata
+	setAlbumID  string // release MBID to update songs to
+	setNonAlbum bool   // update songs to be non-album tracks
 }
 
 func (*Command) Name() string     { return "metadata" }
@@ -39,7 +40,8 @@ func (*Command) Usage() string {
 	return `metadata <flags> <path>...:
 	Fetch updated metadata from MusicBrainz and write override files.
 	-scan updates the specified songs or all songs (without positional arguments).
-	-set-album-id changes the album ID of songs in specified dir(s).
+	-set-album changes the album of songs in specified dir(s).
+	-set-non-album updates the specified song file(s) to be non-album tracks.
 	-print prints current on-disk metadata for the specified file(s).
 	-print-full additionally includes SHA1s and lengths.
 
@@ -52,22 +54,26 @@ func (cmd *Command) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&cmd.print, "print", false, "Print metadata from specified song file(s)")
 	f.BoolVar(&cmd.printFull, "print-full", false, "Like -print, but include SHA1 and length (slower)")
 	f.BoolVar(&cmd.scan, "scan", false, "Scan songs for updated metadata")
-	f.StringVar(&cmd.setAlbumID, "set-album-id", "", "MusicBrainz release ID for songs in specified dir(s)")
+	f.StringVar(&cmd.setAlbumID, "set-album", "", "Update MusicBrainz release ID for songs in specified dir(s)")
+	f.BoolVar(&cmd.setNonAlbum, "set-non-album", false, "Update specified file(s) to be non-album tracks")
 }
 
 func (cmd *Command) Execute(ctx context.Context, fs *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	api := newAPI("https://musicbrainz.org")
 	cmd.Cfg.ComputeGain = false // no need to compute gains
 
+	// TODO: Fail if multiple actions are specified.
 	switch {
 	case cmd.print, cmd.printFull:
 		return cmd.doPrint(fs.Args())
 	case cmd.scan:
 		return cmd.doScan(ctx, api, fs.Args())
 	case cmd.setAlbumID != "":
-		return cmd.doSetAlbumID(ctx, api, fs.Args())
+		return cmd.doSetAlbum(ctx, api, fs.Args())
+	case cmd.setNonAlbum:
+		return cmd.doSetNonAlbum(ctx, api, fs.Args())
 	default:
-		fmt.Fprintln(os.Stderr, "No action specified (-scan, -set-album-id)")
+		fmt.Fprintln(os.Stderr, "No action specified")
 		return subcommands.ExitUsageError
 	}
 }
@@ -169,7 +175,7 @@ func (cmd *Command) doScan(ctx context.Context, api *api, args []string) subcomm
 	return subcommands.ExitSuccess
 }
 
-func (cmd *Command) doSetAlbumID(ctx context.Context, api *api, dirs []string) subcommands.ExitStatus {
+func (cmd *Command) doSetAlbum(ctx context.Context, api *api, dirs []string) subcommands.ExitStatus {
 	// Read the songs from disk first.
 	var songs []*db.Song
 	for _, dir := range dirs {
@@ -208,6 +214,36 @@ func (cmd *Command) doSetAlbumID(ctx context.Context, api *api, dirs []string) s
 		}
 		if !cmd.opts.dryRun {
 			if err := files.UpdateMetadataOverride(cmd.Cfg, up); err != nil {
+				fmt.Fprintln(os.Stderr, "Failed writing override file:", err)
+				return subcommands.ExitFailure
+			}
+		}
+	}
+
+	return subcommands.ExitSuccess
+}
+
+// doSetNonAlbum updates the specified song files to be non-album tracks.
+func (cmd *Command) doSetNonAlbum(ctx context.Context, api *api, paths []string) subcommands.ExitStatus {
+	for _, p := range paths {
+		orig, err := files.ReadSong(cmd.Cfg, p, nil, files.SkipAudioData, nil /* gc */)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed reading songs:", err)
+			return subcommands.ExitFailure
+		}
+
+		updated := *orig
+		updated.Album = files.NonAlbumTracksValue
+		updated.AlbumID = ""
+
+		if orig.MetadataEquals(&updated) {
+			continue
+		}
+		if cmd.opts.logUpdates {
+			fmt.Println(orig.Filename + "\n" + db.DiffSongs(orig, &updated) + "\n")
+		}
+		if !cmd.opts.dryRun {
+			if err := files.UpdateMetadataOverride(cmd.Cfg, &updated); err != nil {
 				fmt.Fprintln(os.Stderr, "Failed writing override file:", err)
 				return subcommands.ExitFailure
 			}
