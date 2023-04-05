@@ -43,8 +43,8 @@ github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5P
 github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1/go.mod h1:Q3SI9o4m/ZMnBNeIyt5eFwwo7qiLfzFZmjNmxjkiQlU=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/derat/mpeg v0.0.0-20221111004622-1eb9a3d8515a h1:nVlC/+Q25amlJKH7+adwJxUtn+/+SIXFcbEcN9lNlaI=
-github.com/derat/mpeg v0.0.0-20221111004622-1eb9a3d8515a/go.mod h1:Bks5u5jkfFWMbUswC18uoLbDdrj9fluhloqvv+vnfjA=
+github.com/derat/mpeg v0.0.0-20230405111453-f1e2a9704812 h1:j7aRkge3Tis90y5LtsgsKOKvuhhSQO25kszMsDvfcZE=
+github.com/derat/mpeg v0.0.0-20230405111453-f1e2a9704812/go.mod h1:Bks5u5jkfFWMbUswC18uoLbDdrj9fluhloqvv+vnfjA=
 github.com/derat/taglib-go v0.0.0-20200408183415-49d1875d1328 h1:vL5y2JeRI7/ZVSKdT4PPKQMuAq2R/IOkRrvYaYmajrA=
 github.com/derat/taglib-go v0.0.0-20200408183415-49d1875d1328/go.mod h1:qwWjliZMVa4OH8+uv4VFv7r19h1Gl4JPykItAcWR+fM=
 github.com/djherbis/atime v1.1.0/go.mod h1:28OF6Y8s3NQWwacXc5eZTsEsiMzp7LF8MbXE+XJPdBE=

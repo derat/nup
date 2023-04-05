@@ -31,7 +31,13 @@ type mpegInfo struct {
 	emptyFrame      int           // first empty frame at end of file
 	emptyOffset     int64         // offset of emptyFrame from start of file
 	emptyTime       time.Duration // time of emptyFrame
-	skipped         [][2]int64    // [offset, size]
+	skipped         []skipInfo    // skipped regions
+}
+
+// skipInfo contains details about an invalid region of an MP3 file that was skipped.
+type skipInfo struct {
+	offset, size int64 // in bytes
+	err          error // first error
 }
 
 // getMPEGInfo returns debug information about the MP3 file at p.
@@ -68,18 +74,27 @@ func getMPEGInfo(p string) (*mpegInfo, error) {
 	// Read all of the frames in the file.
 	off := info.header
 	var skipped, kbitRateSum int64
+	var skipErr error
 	var lastKbitRate int
 	for off < info.size-info.footer {
 		finfo, err := mpeg.ReadFrameInfo(f, off)
 		if err != nil {
 			off++
 			skipped++
+			if skipErr == nil {
+				skipErr = err
+			}
 			continue
 		}
 
 		if skipped > 0 {
-			info.skipped = append(info.skipped, [2]int64{off - skipped, skipped})
+			info.skipped = append(info.skipped, skipInfo{
+				offset: off - skipped,
+				size:   skipped,
+				err:    skipErr,
+			})
 			skipped = 0
+			skipErr = nil
 		}
 
 		// Skip the Xing frame for bitrate calculations since its bitrate sometimes differs from the
@@ -114,7 +129,11 @@ func getMPEGInfo(p string) (*mpegInfo, error) {
 		off += finfo.Size()
 	}
 	if skipped > 0 {
-		info.skipped = append(info.skipped, [2]int64{off - skipped, skipped})
+		info.skipped = append(info.skipped, skipInfo{
+			offset: off - skipped,
+			size:   skipped,
+			err:    skipErr,
+		})
 	}
 
 	// The Xing header apparently doesn't include itself in the frame count
