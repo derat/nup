@@ -4,6 +4,8 @@
 package debug
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -76,6 +78,36 @@ func getMPEGInfo(p string) (*mpegInfo, error) {
 	var skipped, kbitRateSum int64
 	var skipErr error
 	var lastKbitRate int
+
+	addSkipped := func() {
+		if skipped == 0 {
+			return
+		}
+
+		start := off - skipped
+
+		// Diagnose common errors.
+		b := make([]byte, skipped)
+		if _, err := f.ReadAt(b, start); err == nil {
+			if bytes.HasPrefix(b, []byte("LYRICSBEGIN")) && bytes.HasSuffix(b, []byte("LYRICSEND")) {
+				skipErr = errors.New("Lyrics3v1 tag")
+			} else if bytes.HasPrefix(b, []byte("LYRICSBEGIN")) && bytes.HasSuffix(b, []byte("LYRICS200")) {
+				skipErr = errors.New("Lyrics3v2 tag")
+			} else if bytes.HasPrefix(b, []byte("TAG")) {
+				skipErr = errors.New("extra ID3v1 tag")
+			} else if bytes.Count(b, []byte{0}) == len(b) {
+				skipErr = errors.New("empty")
+			}
+		}
+		info.skipped = append(info.skipped, skipInfo{
+			offset: start,
+			size:   skipped,
+			err:    skipErr,
+		})
+		skipped = 0
+		skipErr = nil
+	}
+
 	for off < info.size-info.footer {
 		finfo, err := mpeg.ReadFrameInfo(f, off)
 		if err != nil {
@@ -87,15 +119,7 @@ func getMPEGInfo(p string) (*mpegInfo, error) {
 			continue
 		}
 
-		if skipped > 0 {
-			info.skipped = append(info.skipped, skipInfo{
-				offset: off - skipped,
-				size:   skipped,
-				err:    skipErr,
-			})
-			skipped = 0
-			skipErr = nil
-		}
+		addSkipped()
 
 		// Skip the Xing frame for bitrate calculations since its bitrate sometimes differs from the
 		// audio frames in CBR files.
@@ -128,13 +152,7 @@ func getMPEGInfo(p string) (*mpegInfo, error) {
 		info.actualBytes += finfo.Size()
 		off += finfo.Size()
 	}
-	if skipped > 0 {
-		info.skipped = append(info.skipped, skipInfo{
-			offset: off - skipped,
-			size:   skipped,
-			err:    skipErr,
-		})
-	}
+	addSkipped()
 
 	// The Xing header apparently doesn't include itself in the frame count
 	// (but confusingly *does* include itself in the bytes count):
