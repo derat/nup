@@ -104,7 +104,7 @@ func (cmd *Command) doMPEG(p string) error {
 	fmt.Printf("%d bytes: %d header, %d data, %d footer (%v)\n",
 		info.size, info.header, info.size-info.header-info.footer, info.footer, info.sha1)
 	for _, s := range info.skipped {
-		fmt.Printf("  skipped %d-%d (%d) %v\n", s.offset, s.offset+s.size, s.size, s.err)
+		fmt.Printf("  skipped %d-%d (%d) %v\n", s.offset, s.offset+s.size-1, s.size, s.err)
 	}
 
 	var actualBitrate string
