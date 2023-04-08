@@ -165,7 +165,7 @@ func ReadSong(cfg *client.Config, p string, fi os.FileInfo, flags ReadSongFlag, 
 	if err != nil {
 		return nil, err
 	}
-	dur, _, _, err := mpeg.ComputeAudioDuration(f, fi, headerLen, footerLen)
+	dur, _, err := mpeg.ComputeAudioDuration(f, fi, headerLen, footerLen)
 	if err != nil {
 		return nil, err
 	}

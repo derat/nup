@@ -117,8 +117,12 @@ func (cmd *Command) doMPEG(p string) error {
 	format := func(d time.Duration) string {
 		return fmt.Sprintf("%d:%06.3f", int(d.Minutes()), (d % time.Minute).Seconds())
 	}
-	fmt.Printf("Xing:   %s (%d frames, %d data)\n",
-		format(info.xingDur), info.xingFrames, info.xingBytes)
+	var enc string
+	if info.xingEnc != "" {
+		enc = ", " + info.xingEnc
+	}
+	fmt.Printf("Xing:   %s (%d frames, %d data%s)\n",
+		format(info.xingDur), info.xingFrames, info.xingBytes, enc)
 	fmt.Printf("Actual: %s (%d frames, %d data, %s)\n",
 		format(info.actualDur), info.actualFrames, info.actualBytes, actualBitrate)
 	if info.emptyFrame >= 0 {

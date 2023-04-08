@@ -26,7 +26,8 @@ type mpegInfo struct {
 	samplesPerFrame int           // from first audio frame
 	xingFrames      int           // number of frames from Xing header
 	xingBytes       int64         // audio data size from Xing header
-	xingDur         time.Duration // audio duration from Xing header (or CBR)
+	xingDur         time.Duration // audio duration from Xing header (or guessed as CBR)
+	xingEnc         string        // human-readable encoder version and settings
 	actualFrames    int           // actual frame count
 	actualBytes     int64         // actual audio data size
 	actualDur       time.Duration // actual duration
@@ -67,10 +68,20 @@ func getMPEGInfo(p string) (*mpegInfo, error) {
 	}
 
 	// Read the Xing header.
-	info.xingDur, info.xingFrames, info.xingBytes, err = mpeg.ComputeAudioDuration(
-		f, fi, info.header, info.footer)
-	if err != nil {
+	var vbrInfo *mpeg.VBRInfo
+	if info.xingDur, vbrInfo, err = mpeg.ComputeAudioDuration(f, fi, info.header, info.footer); err != nil {
 		return &info, fmt.Errorf("failed computing duration: %v", err)
+	}
+	if vbrInfo != nil {
+		// An "Xing" header ID (as opposed to "Info") typically indicates a VBR stream.
+		// Make this assumption so that we won't report streams that were encoded with VBR
+		// settings as CBR if all of the frames happen to have the same bitrate.
+		info.vbr = vbrInfo.ID == mpeg.XingID && (vbrInfo.Method != mpeg.CBR && vbrInfo.Method != mpeg.CBR2Pass)
+		info.xingFrames = int(vbrInfo.Frames)
+		info.xingBytes = int64(vbrInfo.Bytes)
+		if vbrInfo.Encoder != "" {
+			info.xingEnc = fmt.Sprintf("%s %s", vbrInfo.Encoder, vbrInfo.Method)
+		}
 	}
 
 	// Read all of the frames in the file.
@@ -121,9 +132,11 @@ func getMPEGInfo(p string) (*mpegInfo, error) {
 
 		addSkipped()
 
-		// Skip the Xing frame for bitrate calculations since its bitrate sometimes differs from the
-		// audio frames in CBR files.
-		if isXing := info.xingBytes != 0 && info.actualFrames == 0; !isXing {
+		if isXing := info.xingBytes != 0 && info.actualFrames == 0; isXing {
+		} else {
+			// Skip the Xing frame for bitrate calculations since its bitrate sometimes
+			// differs from the audio frames in CBR files. See e.g.
+			// https://github.com/JamesHeinrich/getID3/issues/287#issuecomment-786357902.
 			if lastKbitRate > 0 && finfo.KbitRate != lastKbitRate {
 				info.vbr = true
 			}
