@@ -85,6 +85,7 @@ type Song struct {
 	// RecordingID is an opaque ID uniquely identifying the recording (generally, the MusicBrainz ID
 	// corresponding to the MusicBrainz recording entity, taken from a UFID ID3v2 tag).
 	// This is used to find cover art if neither AlbumID nor CoverID is set.
+	// It is also used to find updated metadata for the song in MusicBrainz.
 	RecordingID string `datastore:"-" json:"-"`
 
 	// OrigAlbumID and OrigRecordingID contain the original values of AlbumID and RecordingID
@@ -209,6 +210,10 @@ func (s *Song) MetadataEquals(o *Song) bool {
 		s.Album == o.Album &&
 		s.AlbumArtist == o.AlbumArtist &&
 		s.AlbumID == o.AlbumID &&
+		// RecordingID isn't sent to the server, but the nup executable's 'metadata'
+		// subcommand calls this method to check for differences after fetching new
+		// metadata, and it needs to see recording changes.
+		s.RecordingID == o.RecordingID &&
 		s.Track == o.Track &&
 		s.Disc == o.Disc &&
 		s.DiscSubtitle == o.DiscSubtitle &&
